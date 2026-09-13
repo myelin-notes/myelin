@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   canMoveElementOrderForSelection,
   coalescedPointerSamples,
+  DrawableCanvas,
   type ElementOrderItem,
   isStylusTouch,
   moveElementOrderForSelection,
-  shouldApplyPenEraserOverride,
 } from './drawable-canvas';
 import { ElementType } from './elements/element-type';
+import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
 const order = (...items: Array<[string, ElementType]>): ElementOrderItem[] =>
@@ -66,18 +67,37 @@ describe('isStylusTouch', () => {
   });
 });
 
-describe('shouldApplyPenEraserOverride', () => {
+describe('pen eraser override', () => {
   it('defaults to queued mode', () => {
     expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
   });
 
-  it('applies immediate button changes while the pen is touching', () => {
-    expect(shouldApplyPenEraserOverride(true, true)).toBe(true);
-  });
+  it('restores the pen when a queued eraser override is released', () => {
+    const pen = { id: 'pen' } as ITool;
+    const eraser = { id: 'eraser' } as ITool;
+    type TestableDrawableCanvas = {
+      toolSelected: ITool;
+      syncEraserOverride(event: PointerEvent): void;
+    };
+    const canvas = Object.assign(Object.create(DrawableCanvas.prototype), {
+      tools: [pen, eraser],
+      toolSelected: pen,
+      _eraserOverride: null,
+      _eraserButtonsHeld: false,
+      _eraserOverrideQueued: false,
+      state: { current: Number.NaN },
+    }) as TestableDrawableCanvas;
+    const penEvent = (type: string, buttons: number) =>
+      ({ type, buttons, pointerType: 'pen' }) as PointerEvent;
 
-  it('queues button changes until the pen lifts when immediate mode is off', () => {
-    expect(shouldApplyPenEraserOverride(false, true)).toBe(false);
-    expect(shouldApplyPenEraserOverride(false, false)).toBe(true);
+    canvas.syncEraserOverride(penEvent('pointerdown', 3));
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2));
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 0));
+    expect(canvas.toolSelected).toBe(pen);
   });
 });
 
