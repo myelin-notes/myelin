@@ -5,7 +5,6 @@ import {
   useEffectEvent,
   useImperativeHandle,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { Plus } from 'lucide-react';
@@ -18,21 +17,23 @@ import { VirtualGrid } from '@/components/virtual-grid';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
-  isRepositoryConfigStructurallyComplete,
-  isRepositoryFullyConfigured,
   type NodeSearchResult,
-  type RepositoryConfig,
-  type SearchNodesOptions,
   useRepository,
   useRepositoryStatus,
   type VFSNode,
 } from '@/lib/sync';
-import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
+import {
+  ExplorerModel,
+  type ExplorerSearchMode,
+  type ExplorerSortMode,
+  sortExplorerNodes,
+} from './explorer-model';
 import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { GridFileItem } from './grid/file-item';
 import { GridFolderItem } from './grid/folder-item';
 import { useDropTarget } from './use-drop-target';
+import { useExplorerSetupState } from './use-explorer-setup-state';
 
 const logger = new Logger('ExplorerTree');
 const SEARCH_DEBOUNCE_MS = 150;
@@ -43,28 +44,15 @@ const GRID_MIN_COLUMN = 198;
 const GRID_GAP = 16;
 const TREE_GAP = 4;
 
-type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
-
-function getInitialRepositorySetupState(
-  config: RepositoryConfig,
-): RepositorySetupState {
-  if (config.kind === 'local') {
-    return 'ready';
-  }
-  return isRepositoryConfigStructurallyComplete(config)
-    ? 'checking'
-    : 'setup-required';
-}
-
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
   startNewFile: (title: string, type: FileType) => Promise<void>;
 }
 
-export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
+export type SortMode = ExplorerSortMode;
 export type ViewMode = 'tree' | 'grid';
-export type SearchMode = NonNullable<SearchNodesOptions['mode']>;
+export type SearchMode = ExplorerSearchMode;
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
@@ -97,48 +85,23 @@ export function ExplorerTree({
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const explorer = useMemo(
+    () =>
+      new ExplorerModel(repository, (name, parentId) =>
+        createBlankCanvasFile(repository, name, parentId),
+      ),
+    [repository],
+  );
   const [nodes, setNodes] = useState<VFSNode[]>([]);
   const [searchMatches, setSearchMatches] =
     useState<ReadonlyMap<string, NodeSearchResult>>(EMPTY_SEARCH_MATCHES);
   const [loading, setLoading] = useState(true);
-  const [repositorySetupState, setRepositorySetupState] =
-    useState<RepositorySetupState>(() =>
-      getInitialRepositorySetupState(repositoryStatus.config),
-    );
+  const repositorySetupState = useExplorerSetupState(repositoryStatus.config);
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
-  const loadRequestRef = useRef(0);
   const isFiltering = filterTags && filterTags.length > 0;
   const isSearching = !!searchQuery?.trim();
 
-  useEffect(() => {
-    let cancelled = false;
-    const config = repositoryStatus.config;
-
-    if (config.kind === 'local') {
-      setRepositorySetupState('ready');
-      return;
-    }
-
-    if (!isRepositoryConfigStructurallyComplete(config)) {
-      setRepositorySetupState('setup-required');
-      return;
-    }
-
-    setRepositorySetupState('checking');
-    void isRepositoryFullyConfigured(config).then((configured) => {
-      if (!cancelled) {
-        setRepositorySetupState(configured ? 'ready' : 'setup-required');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repositoryStatus.config]);
-
   const reload = useCallback(async () => {
-    const requestId = loadRequestRef.current + 1;
-    loadRequestRef.current = requestId;
     if (repositorySetupState !== 'ready') {
       setNodes([]);
       setLoading(false);
@@ -147,55 +110,32 @@ export function ExplorerTree({
 
     setLoading(true);
     try {
-      let nextNodes: VFSNode[];
-      let nextMatches: ReadonlyMap<string, NodeSearchResult> =
-        EMPTY_SEARCH_MATCHES;
-      if (isSearching) {
-        let results = await repository.searchNodes(searchQuery!.trim(), {
-          mode: searchMode,
-        });
-        if (isFiltering) {
-          results = results.filter((r) =>
-            nodeMatchesAnyTag(r.node.tags, filterTags!),
-          );
-        }
-        nextNodes = results.map((result) => result.node);
-        nextMatches = new Map(
-          results.map((result) => [result.node.id, result]),
-        );
-      } else if (isFiltering) {
-        nextNodes = await repository.getNodesByAnyTag(
-          filterTags,
-          currentFolderId,
-        );
-      } else {
-        const [dirs, files] = await repository.listDirectory(currentFolderId);
-        nextNodes = [...dirs, ...files];
+      const result = await explorer.refresh({
+        folderId: currentFolderId,
+        searchQuery: searchQuery ?? '',
+        searchMode,
+        filterTags: filterTags ?? [],
+      });
+      if (!result) {
+        return;
       }
-
-      if (requestId === loadRequestRef.current) {
-        setNodes(nextNodes);
-        setSearchMatches(nextMatches);
-      }
+      setNodes(result.nodes);
+      setSearchMatches(result.searchMatches);
+      setLoading(false);
     } catch (err) {
-      if (requestId === loadRequestRef.current) {
-        logger.error('Failed to load explorer nodes', err, {
-          currentFolderId,
-          isFiltering,
-          isSearching,
-        });
-      }
-    } finally {
-      if (requestId === loadRequestRef.current) {
-        setLoading(false);
-      }
+      logger.error('Failed to load explorer nodes', err, {
+        currentFolderId,
+        isFiltering,
+        isSearching,
+      });
+      setLoading(false);
     }
   }, [
     currentFolderId,
+    explorer,
     filterTags,
     isFiltering,
     isSearching,
-    repository,
     repositorySetupState,
     searchMode,
     searchQuery,
@@ -205,63 +145,30 @@ export function ExplorerTree({
   });
 
   const startNewFolder = useCallback(async () => {
-    const name = await repository.getUniqueFileName(
-      strings.library.createNew.unnamedFolder,
+    const node = await explorer.createFolder(
       currentFolderId,
+      strings.library.createNew.unnamedFolder,
     );
-    const id = await repository.createFolder(name, currentFolderId);
-    loadRequestRef.current++;
-    setRenamingNewId(id);
-    const now = Date.now();
-    setNodes((prev) => [
-      {
-        id,
-        name,
-        type: 'folder' as const,
-        parentId: currentFolderId,
-        children: [],
-        tags: [],
-        createdAt: now,
-        modifiedAt: now,
-      },
-      ...prev,
-    ]);
+    setRenamingNewId(node.id);
+    setNodes((prev) => [node, ...prev]);
     onChanged?.();
     requestAnimationFrame(() => setRenamingNewId(null));
   }, [
     currentFolderId,
+    explorer,
     onChanged,
-    repository,
     strings.library.createNew.unnamedFolder,
   ]);
 
   const startNewFile = useCallback(
     async (title: string, type: FileType) => {
-      const name = await repository.getUniqueFileName(title, currentFolderId);
-      const id =
-        type === 'mcanvas'
-          ? await createBlankCanvasFile(repository, name, currentFolderId)
-          : await repository.createFile(name, type, currentFolderId);
-      loadRequestRef.current++;
-      setRenamingNewId(id);
-      const now = Date.now();
-      setNodes((prev) => [
-        ...prev,
-        {
-          id,
-          name,
-          type: 'file' as const,
-          fileType: type,
-          parentId: currentFolderId,
-          tags: [],
-          createdAt: now,
-          modifiedAt: now,
-        },
-      ]);
+      const node = await explorer.createFile(currentFolderId, title, type);
+      setRenamingNewId(node.id);
+      setNodes((prev) => [...prev, node]);
       onChanged?.();
       requestAnimationFrame(() => setRenamingNewId(null));
     },
-    [currentFolderId, onChanged, repository],
+    [currentFolderId, explorer, onChanged],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
@@ -274,7 +181,7 @@ export function ExplorerTree({
     if (!isSearching || repositorySetupState !== 'ready') {
       void reload();
       return () => {
-        loadRequestRef.current++;
+        explorer.invalidatePendingRequests();
       };
     }
 
@@ -285,9 +192,9 @@ export function ExplorerTree({
 
     return () => {
       window.clearTimeout(timer);
-      loadRequestRef.current++;
+      explorer.invalidatePendingRequests();
     };
-  }, [isSearching, reload, repositorySetupState]);
+  }, [explorer, isSearching, reload, repositorySetupState]);
 
   useEffect(() => {
     if (repositoryStatus.lastRemoteSyncAt !== null) {
@@ -305,23 +212,7 @@ export function ExplorerTree({
       return nodes;
     }
 
-    return [...nodes].sort((a, b) => {
-      if (a.type !== b.type) {
-        return a.type === 'folder' ? -1 : 1;
-      }
-      switch (sortMode) {
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'modified':
-          return b.modifiedAt - a.modifiedAt;
-        case 'created':
-          return b.createdAt - a.createdAt;
-        default:
-          return 0;
-      }
-    });
+    return sortExplorerNodes(nodes, sortMode);
   }, [isSearching, nodes, sortMode]);
 
   const { dragOver, dropTargetProps } = useDropTarget({

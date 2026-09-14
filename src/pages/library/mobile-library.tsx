@@ -47,11 +47,13 @@ import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
+import type {
+  ExplorerSearchMode as SearchMode,
+  ExplorerSortMode as SortMode,
+} from './explorer/explorer-model';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
-  type SearchMode,
-  type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
 import { useDropTarget } from './explorer/use-drop-target';
