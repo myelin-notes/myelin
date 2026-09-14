@@ -1,22 +1,17 @@
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import {
-  DataFileTypes,
   getFileTypeForName,
-  ImageFileTypes,
-  VideoFileTypes,
+  ImportableFileTypes,
+  isImportableFileType,
 } from '@/lib/sync';
 
-export const STORAGE_FILE_ACCEPT = [
-  ...ImageFileTypes,
-  ...VideoFileTypes,
-  ...DataFileTypes,
-]
-  .map((extension) => `.${extension}`)
-  .join(',');
+export const STORAGE_FILE_ACCEPT = ImportableFileTypes.map(
+  (extension) => `.${extension}`,
+).join(',');
 
 export function isStorageFile(file: File): boolean {
   const fileType = getFileTypeForName(file.name);
-  return fileType !== null && fileType !== 'mcanvas';
+  return fileType !== null && isImportableFileType(fileType);
 }
 
 export async function importStorageFile({
@@ -29,7 +24,7 @@ export async function importStorageFile({
   parentId: string | null;
 }): Promise<VFSNodeId> {
   const fileType = getFileTypeForName(file.name);
-  if (!fileType || fileType === 'mcanvas') {
+  if (!fileType || !isImportableFileType(fileType)) {
     throw new Error(`Unsupported file type: ${file.name}`);
   }
 
