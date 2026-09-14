@@ -7,6 +7,11 @@ import { I18nProvider } from '../../i18n';
 import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, LivePeersSnapshot } from '../../sync/live/peers';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
+import type { CanvasElementContext } from '../canvas-element-context';
+import type {
+  CanvasSearchContent,
+  SearchableElement,
+} from '../canvas-searchable-element';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
@@ -28,7 +33,7 @@ function recordingFileName(mimeType: string): string {
   return ext ? `recording.${ext}` : 'recording';
 }
 
-export class AudioElement extends DrawableElement {
+export class AudioElement extends DrawableElement implements SearchableElement {
   private _audioData: Uint8Array | null = null;
   private _fileName: string = '';
   private _duration: number = 0;
@@ -82,6 +87,18 @@ export class AudioElement extends DrawableElement {
     super(uuid, ElementType.AUDIO);
     this._localPeerId = localPeerId;
     this._creatorPeerId = creatorPeerId;
+  }
+
+  public override configureCanvas(context: CanvasElementContext): void {
+    this.setLocalPeerId(context.localPeerId);
+    this.setRecordingOwnerId(context.audioRecordingOwnerId);
+    this.setOnRecordingSaved(context.onAudioRecordingSaved);
+    this.setLivePeers(context.livePeers);
+  }
+
+  public override disposeCanvas(): void {
+    this.discardRecording();
+    super.disposeCanvas();
   }
 
   public override getYMapProps(): Record<string, unknown> {
@@ -145,6 +162,11 @@ export class AudioElement extends DrawableElement {
   public get transcript(): string {
     return segmentsToText(this._segments);
   }
+
+  public getCanvasSearchContent(): CanvasSearchContent | null {
+    const text = this.transcript.trim();
+    return text ? { kind: 'transcript', text } : null;
+  }
   public get transcriptSegments(): readonly TranscriptSegment[] {
     return this._segments;
   }
@@ -175,6 +197,9 @@ export class AudioElement extends DrawableElement {
   public setOnRecordingSaved(
     callback: (() => void | Promise<void>) | undefined,
   ): void {
+    if (this._onRecordingSaved === callback) {
+      return;
+    }
     this._onRecordingSaved = callback;
     this.render();
   }

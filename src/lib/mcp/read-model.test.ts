@@ -89,6 +89,9 @@ async function createRepositoryNote() {
     offsetY: 110,
     custom: 'value',
   });
+  ydoc.createElementMap(ElementType.SHAPE, 'shape-1', {});
+  ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {});
+  ydoc.createElementMap(ElementType.CODE_OUTPUT, 'code-output-1', {});
 
   const noteId = await repository.createFile(
     'MCP Note',
@@ -118,6 +121,9 @@ describe('MCP read model', () => {
       'latex',
       'stroke-group',
       'unknown',
+      'unknown',
+      'unknown',
+      'unknown',
     ]);
     expect(note.elements[0]).toMatchObject({
       kind: 'page-frame',
@@ -134,6 +140,11 @@ describe('MCP read model', () => {
       pageCount: 2,
       textAvailable: false,
     });
+    expect(
+      note.elements
+        .filter((element) => element.kind === 'unknown')
+        .map((element) => element.id),
+    ).toEqual(['unknown-1', 'shape-1', 'audio-1', 'code-output-1']);
   });
 
   // A note can hold hundreds of strokes, so anything the model cannot act on is

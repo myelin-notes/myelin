@@ -1,5 +1,6 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import { getElementDescriptor } from '@myelin/editor/elements/element-descriptors';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
@@ -423,27 +424,36 @@ function summarizeUnknown(yMap: Y.Map<unknown>): McpUnknownElementSummary {
   };
 }
 
+type ExternalSummaryProvider = (
+  noteId: VFSNodeId,
+  ydoc: YDocManager,
+  yMap: Y.Map<unknown>,
+) => McpNoteElementSummary;
+
+const EXTERNAL_SUMMARY_PROVIDERS: Readonly<
+  Partial<Record<string, ExternalSummaryProvider>>
+> = {
+  'page-frame': (_noteId, ydoc, yMap) => summarizePageFrame(ydoc, yMap),
+  text: (_noteId, _ydoc, yMap) => summarizeText(yMap),
+  image: (noteId, _ydoc, yMap) => summarizeImage(noteId, yMap),
+  pdf: (noteId, _ydoc, yMap) => summarizePdf(noteId, yMap),
+  latex: (_noteId, _ydoc, yMap) => summarizeLatex(yMap),
+};
+
 function summarizeElement(
   noteId: VFSNodeId,
   ydoc: YDocManager,
   yMap: Y.Map<unknown>,
 ): McpNoteElementSummary {
-  switch (getElementType(yMap)) {
-    case ElementType.PAGE_FRAME:
-      return summarizePageFrame(ydoc, yMap);
-    case ElementType.TEXT:
-      return summarizeText(yMap);
-    case ElementType.IMAGE:
-      return summarizeImage(noteId, yMap);
-    case ElementType.PDF:
-      return summarizePdf(noteId, yMap);
-    case ElementType.LATEX:
-      return summarizeLatex(yMap);
-    // ElementType.STROKE is absent on purpose: strokes never reach here because
-    // noteReadModelFromLoaded collects them into one stroke-group instead.
-    default:
-      return summarizeUnknown(yMap);
+  const descriptor = getElementDescriptor(getElementType(yMap));
+  const provider =
+    descriptor?.externalSummary === 'supported'
+      ? EXTERNAL_SUMMARY_PROVIDERS[descriptor.name]
+      : undefined;
+  if (provider) {
+    return provider(noteId, ydoc, yMap);
   }
+  return summarizeUnknown(yMap);
 }
 
 function noteReadModelFromLoaded(
@@ -457,7 +467,9 @@ function noteReadModelFromLoaded(
 
   for (let index = 0; index < loaded.ydoc.elements.length; index++) {
     const yMap = loaded.ydoc.elements.get(index);
-    if (getElementType(yMap) === ElementType.STROKE) {
+    if (
+      getElementDescriptor(getElementType(yMap))?.externalSummary === 'grouped'
+    ) {
       const bounds = getStrokeBounds(yMap);
       strokeBoxes.push([bounds.x, bounds.y, bounds.width, bounds.height]);
       if (strokeSlot < 0) {

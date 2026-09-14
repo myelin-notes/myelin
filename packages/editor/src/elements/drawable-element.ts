@@ -7,6 +7,7 @@ import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
+import type { CanvasElementContext } from './canvas-element-context';
 import { type ElementType, isBackgroundElement } from './element-type';
 
 export interface SelectionToolbarItem {
@@ -353,6 +354,8 @@ export abstract class DrawableElement {
   // For shared state that does not live on the element's main Y.Map.
   public bindSharedYState(_ydoc: YDocManager): void {}
 
+  public configureCanvas(_context: CanvasElementContext): void {}
+
   /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
   public enterEditMode(
     _canvas: DrawableCanvas,
@@ -370,6 +373,10 @@ export abstract class DrawableElement {
 
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
   public disposeDOM(): void {}
+
+  public disposeCanvas(): void {
+    this.disposeDOM();
+  }
 
   public updateBounds() {
     this.updateBoundingBox();

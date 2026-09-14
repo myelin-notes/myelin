@@ -40,6 +40,7 @@ import {
 } from '../pdf-renderer';
 import { getPlatform } from '../platform';
 import { quantizeRasterZoom } from '../raster-zoom';
+import type { CanvasElementContext } from './canvas-element-context';
 import { DrawableElement, ResizeHandles } from './drawable-element';
 import { ElementType } from './element-type';
 import {
@@ -58,6 +59,10 @@ import {
   createPdfChromeButton,
   type PdfChromeButtonHandle,
 } from './pdf-chrome-button';
+import type {
+  CanvasPdfExportData,
+  PdfExportableElement,
+} from './pdf-exportable-element';
 
 const logger = new Logger('PdfElement');
 const DEFAULT_PAGE_SIZE: PdfPageSize = { w: PAGE_WIDTH, h: PAGE_HEIGHT };
@@ -169,7 +174,10 @@ function isSameRenderKey(
   );
 }
 
-export class PdfElement extends DrawableElement {
+export class PdfElement
+  extends DrawableElement
+  implements PdfExportableElement
+{
   private _pdfBytes: Uint8Array | null = null;
   private _fileName: string = '';
   private _pageSizes: PdfPageSize[] = [DEFAULT_PAGE_SIZE];
@@ -205,6 +213,10 @@ export class PdfElement extends DrawableElement {
     provider: () => readonly DrawableElement[],
   ): void {
     this._exportElementsProvider = provider;
+  }
+
+  public override configureCanvas(context: CanvasElementContext): void {
+    this.setExportElementsProvider(context.getElements);
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -535,6 +547,10 @@ export class PdfElement extends DrawableElement {
       },
       boundingBox: this.boundingBox,
     };
+  }
+
+  public getCanvasPdfExportData(): CanvasPdfExportData {
+    return { kind: 'pdf', source: this.getPdfExportSource() };
   }
 
   private getDefaultExportFileName(): string {
