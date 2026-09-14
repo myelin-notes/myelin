@@ -44,6 +44,10 @@ describe('CanvasElementFactory', () => {
     const element = new ConfigurableElement('custom-element');
     const elements = [element];
     const onChange = vi.fn();
+    const uiServices = {
+      openChromeMenu: vi.fn(),
+      openExportDialog: vi.fn(),
+    };
     const factory = new CanvasElementFactory({
       ydoc,
       getElements: () => elements,
@@ -51,6 +55,7 @@ describe('CanvasElementFactory', () => {
       invalidateContentBounds: vi.fn(),
       localPeerId: 'peer-1',
       audioRecordingOwnerId: 'owner-1',
+      uiServices,
     });
     const yMap = ydoc.createElementMap(ElementType.SHAPE, element.uuid, {});
 
@@ -60,10 +65,56 @@ describe('CanvasElementFactory', () => {
       localPeerId: 'peer-1',
       audioRecordingOwnerId: 'owner-1',
     });
+    expect(element.configuredWith?.uiServices).toBe(uiServices);
     element.select();
     expect(onChange).toHaveBeenCalledOnce();
 
     factory.dispose(element);
     expect(element.disposed).toBe(true);
+  });
+
+  it('keeps UI services scoped to each factory', () => {
+    const firstYdoc = new YDocManager();
+    const secondYdoc = new YDocManager();
+    const firstElement = new ConfigurableElement('first-element');
+    const secondElement = new ConfigurableElement('second-element');
+    const firstUiServices = {
+      openChromeMenu: vi.fn(),
+      openExportDialog: vi.fn(),
+    };
+    const secondUiServices = {
+      openChromeMenu: vi.fn(),
+      openExportDialog: vi.fn(),
+    };
+    const firstFactory = new CanvasElementFactory({
+      ydoc: firstYdoc,
+      getElements: () => [firstElement],
+      onChange: vi.fn(),
+      invalidateContentBounds: vi.fn(),
+      localPeerId: '',
+      audioRecordingOwnerId: '',
+      uiServices: firstUiServices,
+    });
+    const secondFactory = new CanvasElementFactory({
+      ydoc: secondYdoc,
+      getElements: () => [secondElement],
+      onChange: vi.fn(),
+      invalidateContentBounds: vi.fn(),
+      localPeerId: '',
+      audioRecordingOwnerId: '',
+      uiServices: secondUiServices,
+    });
+
+    firstFactory.initialize(
+      firstElement,
+      firstYdoc.createElementMap(ElementType.SHAPE, firstElement.uuid, {}),
+    );
+    secondFactory.initialize(
+      secondElement,
+      secondYdoc.createElementMap(ElementType.SHAPE, secondElement.uuid, {}),
+    );
+
+    expect(firstElement.configuredWith?.uiServices).toBe(firstUiServices);
+    expect(secondElement.configuredWith?.uiServices).toBe(secondUiServices);
   });
 });

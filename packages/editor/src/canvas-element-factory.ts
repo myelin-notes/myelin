@@ -1,5 +1,8 @@
 import type * as Y from 'yjs';
-import type { CanvasElementContext } from './elements/canvas-element-context';
+import type {
+  CanvasElementContext,
+  CanvasUiServices,
+} from './elements/canvas-element-context';
 import type { DrawableElement } from './elements/drawable-element';
 import { getElementDescriptor } from './elements/element-descriptors';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
@@ -17,6 +20,7 @@ export interface CanvasElementFactoryOptions {
   localPeerId: string;
   audioRecordingOwnerId: string;
   onAudioRecordingSaved?: () => void | Promise<void>;
+  uiServices?: CanvasUiServices;
 }
 
 export class CanvasElementFactory {
@@ -93,6 +97,7 @@ export class CanvasElementFactory {
       audioRecordingOwnerId: this.options.audioRecordingOwnerId,
       onAudioRecordingSaved: this.options.onAudioRecordingSaved,
       livePeers: this.livePeers,
+      uiServices: this.options.uiServices,
     };
   }
 }

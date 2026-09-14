@@ -18,16 +18,13 @@ import {
 import { toast } from 'sonner';
 import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
-import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
-import {
-  type ExportTarget,
-  setExportDialogOpener,
-} from '@myelin/editor/export/export-controller';
+import type { ExportTarget } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
@@ -146,6 +143,13 @@ function CanvasViewInner({
   const [zoomLocked, setZoomLocked] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
+  const canvasUiServices = useMemo<CanvasUiServices>(
+    () => ({
+      openChromeMenu: (anchor, items) => setChromeMenu({ anchor, items }),
+      openExportDialog: (target) => setExportTarget(target),
+    }),
+    [],
+  );
   const onToggleZoomLock = useCallback(() => {
     setZoomLocked((prev) => {
       const next = !prev;
@@ -165,16 +169,6 @@ function CanvasViewInner({
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
   }, [id]);
-
-  useEffect(() => {
-    setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
-    return () => setChromeMenuOpener(() => {});
-  }, []);
-
-  useEffect(() => {
-    setExportDialogOpener((target) => setExportTarget(target));
-    return () => setExportDialogOpener(null);
-  }, []);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({
@@ -203,6 +197,7 @@ function CanvasViewInner({
     onInsertFrame: inserts.onInsertFrame,
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
+    uiServices: canvasUiServices,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
   const onExportCanvasPdf = useCallback(() => {

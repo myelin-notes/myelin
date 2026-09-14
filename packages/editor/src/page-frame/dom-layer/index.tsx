@@ -242,6 +242,7 @@ function createFrameRefs(
     {
       kindLabel: getMessages().canvas.frame.noteKind,
       getMenuItems: () => frame.getMenuItems(),
+      openChromeMenu: frame.uiServices?.openChromeMenu,
       onTitleCommit: (title) => {
         frame.setDisplayName(title);
         return frame.displayName;

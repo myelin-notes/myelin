@@ -16,6 +16,7 @@ import {
   type ElementReorderDirection,
   moveElementOrderForSelection,
 } from './element-ordering';
+import type { CanvasUiServices } from './elements/canvas-element-context';
 import type { DrawableElement } from './elements/drawable-element';
 import type { ElementType } from './elements/element-type';
 import type { Vector2 } from './geometry';
@@ -91,6 +92,7 @@ export class DrawableCanvas {
     private readonly onAudioRecordingSaved:
       | (() => void | Promise<void>)
       | undefined = undefined,
+    uiServices?: CanvasUiServices,
   ) {
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) {
@@ -112,6 +114,7 @@ export class DrawableCanvas {
       localPeerId: this.localPeerIdValue,
       audioRecordingOwnerId: this.audioRecordingOwnerId,
       onAudioRecordingSaved: this.onAudioRecordingSaved,
+      uiServices,
     });
     this.documentBinding = new CanvasDocumentBinding({
       ydoc,

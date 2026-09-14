@@ -12,11 +12,10 @@ import { trackEvent } from '@myelin/shared/analytics';
 import { getCanvasPalette } from '../canvas-theme';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
-import {
-  type ExportOptions,
-  type ExportResult,
-  type ExportTarget,
-  openExportDialog,
+import type {
+  ExportOptions,
+  ExportResult,
+  ExportTarget,
 } from '../export/export-controller';
 import { getMessages } from '../i18n';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
@@ -36,7 +35,10 @@ import {
 import { getPlatform } from '../platform';
 import { UserPrefs } from '../user-prefs';
 import type { YDocManager } from '../ydoc-manager';
-import type { CanvasElementContext } from './canvas-element-context';
+import type {
+  CanvasElementContext,
+  CanvasUiServices,
+} from './canvas-element-context';
 import type {
   CanvasSearchContent,
   SearchableElement,
@@ -96,6 +98,7 @@ export class PageFrameElement
     null;
   private _noteLinkResolver?: NoteLinkResolver;
   private _mediaResolver?: ResolveMediaSrc;
+  private _uiServices?: CanvasUiServices;
   private _onDisplayNameRenamed?: (
     uuid: string,
     newName: string,
@@ -150,6 +153,11 @@ export class PageFrameElement
     this.setMediaResolver(context.resolveMedia);
     this.setOnDisplayNameRenamed(context.onPageFrameRenamed);
     this.setExportElementsProvider(context.getElements);
+    this._uiServices = context.uiServices;
+  }
+
+  public get uiServices(): CanvasUiServices | undefined {
+    return this._uiServices;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -208,6 +216,7 @@ export class PageFrameElement
       yXmlFragment,
       this._noteLinkResolver,
       this._mediaResolver,
+      this._uiServices?.ensureCodeOutputCard,
     );
   }
 
@@ -510,7 +519,8 @@ export class PageFrameElement
         id: 'export',
         label: strings.export,
         icon: DownloadIcon,
-        onSelect: () => openExportDialog(this.buildExportTarget()),
+        onSelect: () =>
+          this._uiServices?.openExportDialog(this.buildExportTarget()),
       },
     ];
   }

@@ -8,11 +8,10 @@ import type * as Y from 'yjs';
 import { Logger } from '@myelin/shared/logger';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { ChromeMenuItem } from '../../chrome-menu';
-import {
-  type ExportOptions,
-  type ExportResult,
-  type ExportTarget,
-  openExportDialog,
+import type {
+  ExportOptions,
+  ExportResult,
+  ExportTarget,
 } from '../../export/export-controller';
 import { getMessages } from '../../i18n';
 import {
@@ -33,7 +32,10 @@ import {
 } from '../../pdf-renderer';
 import { getPlatform } from '../../platform';
 import { quantizeRasterZoom } from '../../raster-zoom';
-import type { CanvasElementContext } from '../canvas-element-context';
+import type {
+  CanvasElementContext,
+  CanvasUiServices,
+} from '../canvas-element-context';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import {
@@ -76,6 +78,7 @@ export class PdfElement
   private _loadGeneration = 0;
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
+  private _uiServices?: CanvasUiServices;
   private _thumbnailPages: {
     canvas: HTMLCanvasElement;
     page: PdfElementExportPdfPage;
@@ -118,6 +121,7 @@ export class PdfElement
 
   public override configureCanvas(context: CanvasElementContext): void {
     this.setExportElementsProvider(context.getElements);
+    this._uiServices = context.uiServices;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -227,7 +231,8 @@ export class PdfElement
               id: 'export',
               label: strings.export,
               icon: DownloadIcon,
-              onSelect: () => openExportDialog(this.buildExportTarget()),
+              onSelect: () =>
+                this._uiServices?.openExportDialog(this.buildExportTarget()),
             },
           ]
         : []),
@@ -586,6 +591,7 @@ export class PdfElement
       {
         kindLabel: getMessages().canvas.frame.pdfKind,
         getMenuItems: () => this.getMenuItems(),
+        openChromeMenu: this._uiServices?.openChromeMenu,
       },
       host,
     );
