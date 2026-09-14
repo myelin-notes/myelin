@@ -9,6 +9,7 @@
  */
 
 export const siteLinks = {
+  source: 'https://github.com/myelin-notes/myelin',
   releases: 'https://github.com/myelin-notes/myelin/releases/latest',
   /** Latest stable release, as JSON: where `src/lib/downloads.ts` finds the
    *  per-platform installer asset behind every download button. */

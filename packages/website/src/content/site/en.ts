@@ -5,10 +5,9 @@ import type { SiteCopy } from './index';
  */
 const en: SiteCopy = {
   meta: {
-    title:
-      'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs',
+    title: 'Myelin Notes | Cross-Platform Note-Taking App',
     description:
-      'Myelin Notes is a native, local-first note-taking app for Mac, Windows, and Linux, with iPhone, iPad, and Android on the way: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.',
+      'Combine handwriting, typed notes, and PDFs in Myelin Notes for Mac, Windows, and Linux. Works offline, with no account. Free for personal use.',
   },
 
   topbar: {
@@ -37,10 +36,10 @@ const en: SiteCopy = {
     // static page has no such anchor, so it labels the hero directly. Keeps the
     // hero readable as a standalone chunk, which is how crawlers and answer
     // engines lift it.
-    eyebrow: 'Myelin Notes · a local-first note-taking app',
-    headline: 'Handwriting, typing,\nand PDFs. One note.',
+    eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
+    headline: 'Myelin Notes: handwriting, typing,\nand PDFs. One note.',
     subheadline:
-      'Myelin Notes is a native, local-first note-taking app: one canvas where ink, rich text, PDFs, images, and audio live together. Your notes stay on your machine, and you can still edit live with others, no server required.',
+      'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:
       'Completely free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',

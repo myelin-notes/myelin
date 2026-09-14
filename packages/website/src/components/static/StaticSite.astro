@@ -314,6 +314,9 @@ const ctaOutline = cn(
       </div>
       <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
         <ul class="flex flex-wrap gap-x-8 gap-y-3">
+          {locale === 'en' && (
+            <li><a href={siteLinks.source} class="text-sm text-text-secondary transition-colors hover:text-text-primary">Myelin Notes on GitHub</a></li>
+          )}
           {
             navLinks.map((id) => (
               <li>
