@@ -7,10 +7,10 @@ import {
 import type { HandwritingCapability } from '@myelin/editor/platform/types';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import type {
+  ActiveRepository,
   NodeSearchResult,
   NoteBacklink,
   NoteSession,
-  ReadableRepository,
   Repository,
   StoredNoteLink,
   VFSFileNode,
@@ -817,7 +817,7 @@ export class McpToolService {
 
   constructor(
     private readonly options: {
-      repository: ReadableRepository;
+      repository: ActiveRepository;
       indexedTextByNode?: ReadonlyMap<VFSNodeId, string>;
       handwriting?: HandwritingCapability;
       allowDirectWrites?: () => boolean;
