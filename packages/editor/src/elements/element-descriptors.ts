@@ -5,7 +5,7 @@ import { ElementType } from './element-type';
 import { ImageElement } from './image-element';
 import { LatexElement } from './latex/element';
 import { PageFrameElement } from './page-frame-element';
-import { PdfElement } from './pdf-element';
+import { PdfElement } from './pdf';
 import { ShapeElement } from './shape-element';
 import { StrokeElement } from './stroke-element';
 import { TextElement } from './text/element';

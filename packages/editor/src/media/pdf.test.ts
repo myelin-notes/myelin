@@ -3,7 +3,7 @@ import type { DrawableCanvas } from '../drawable-canvas';
 import { getPdfPageSizes } from '../pdf-renderer';
 import { pdfImportHandler } from './pdf';
 
-vi.mock('../elements/pdf-element', () => ({
+vi.mock('../elements/pdf', () => ({
   PdfElement: class {},
 }));
 
