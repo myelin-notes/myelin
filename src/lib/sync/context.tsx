@@ -7,12 +7,12 @@ import {
 } from 'react';
 import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
-import {
-  getRepositoryStorageKey,
-  type RepositoryConfig,
-  type RepositoryRuntimeStatus,
-} from './repo/config';
+import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import { createRepository } from './repo/factory';
+import {
+  getRepositoryConfigIdentity,
+  getRepositoryStorageKey,
+} from './repo/repository-backends';
 import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
@@ -52,23 +52,6 @@ function mergeRuntimeStatus(
   };
 }
 
-function getConfigKey(config: RepositoryConfig): string {
-  switch (config.kind) {
-    case 'local':
-      return 'local';
-    case 'github':
-      return [
-        'github',
-        config.owner,
-        config.repo,
-        config.branch ?? '',
-        config.credentialId,
-      ].join('\0');
-    case 'google-drive':
-      return ['google-drive', config.folderId, config.credentialId].join('\0');
-  }
-}
-
 export function RepositoryProvider({
   children,
   config,
@@ -79,7 +62,8 @@ export function RepositoryProvider({
   const setResolvedConfigIfChanged = useCallback(
     (nextConfig: RepositoryConfig) => {
       setResolvedConfig((current) =>
-        getConfigKey(current) === getConfigKey(nextConfig)
+        getRepositoryConfigIdentity(current) ===
+        getRepositoryConfigIdentity(nextConfig)
           ? current
           : nextConfig,
       );
