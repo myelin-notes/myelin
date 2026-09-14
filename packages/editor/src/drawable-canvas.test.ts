@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   canMoveElementOrderForSelection,
   coalescedPointerSamples,
@@ -68,35 +68,191 @@ describe('isStylusTouch', () => {
 });
 
 describe('pen eraser override', () => {
-  it('defaults to queued mode', () => {
-    expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
-  });
+  type TestableDrawableCanvas = {
+    toolSelected: ITool;
+    _eraserButtonsHeld: boolean;
+    _eraserOverrideApplied: boolean;
+    _penContactOpen: boolean;
+    syncEraserOverride(event: PointerEvent): void;
+  };
 
-  it('restores the pen when a queued eraser override is released', () => {
+  const penEvent = (type: string, button: number, buttons: number) =>
+    ({ type, button, buttons, pointerType: 'pen' }) as PointerEvent;
+
+  function makeCanvas() {
     const pen = { id: 'pen' } as ITool;
     const eraser = { id: 'eraser' } as ITool;
-    type TestableDrawableCanvas = {
-      toolSelected: ITool;
-      syncEraserOverride(event: PointerEvent): void;
-    };
     const canvas = Object.assign(Object.create(DrawableCanvas.prototype), {
       tools: [pen, eraser],
       toolSelected: pen,
       _eraserOverride: null,
       _eraserButtonsHeld: false,
-      _eraserOverrideQueued: false,
+      _eraserOverrideApplied: false,
+      _penContactOpen: false,
       state: { current: Number.NaN },
     }) as TestableDrawableCanvas;
-    const penEvent = (type: string, buttons: number) =>
-      ({ type, buttons, pointerType: 'pen' }) as PointerEvent;
+    return { canvas, pen, eraser };
+  }
 
-    canvas.syncEraserOverride(penEvent('pointerdown', 3));
-    expect(canvas.toolSelected).toBe(pen);
+  afterEach(() => {
+    UserPrefs.set('penBarrelButtonImmediate', false);
+  });
 
-    canvas.syncEraserOverride(penEvent('pointermove', 2));
+  it('defaults to queued mode', () => {
+    expect(UserPrefs.get('penBarrelButtonImmediate')).toBe(false);
+  });
+
+  it('applies button changes during contact in immediate mode', () => {
+    UserPrefs.set('penBarrelButtonImmediate', true);
+    const { canvas, pen, eraser } = makeCanvas();
+    canvas._penContactOpen = true;
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
     expect(canvas.toolSelected).toBe(eraser);
 
-    canvas.syncEraserOverride(penEvent('pointerup', 0));
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 1));
+    expect(canvas._eraserButtonsHeld).toBe(false);
+    expect(canvas._eraserOverrideApplied).toBe(false);
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('defers a button press during contact until the pen lifts', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+    canvas._penContactOpen = true;
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 3));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(false);
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointermove', 0, 2));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+  });
+
+  it('defers a button release during contact until the pen lifts', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    expect(canvas.toolSelected).toBe(eraser);
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 3));
+    canvas._penContactOpen = true;
+
+    canvas.syncEraserOverride(penEvent('pointermove', 2, 1));
+    expect(canvas._eraserButtonsHeld).toBe(false);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+    expect(canvas._eraserOverrideApplied).toBe(false);
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('applies every button change immediately while the pen is lifted', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+    expect(canvas._eraserButtonsHeld).toBe(false);
+    expect(canvas._eraserOverrideApplied).toBe(false);
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+  });
+
+  it('resolves multiple deferred changes to the held state at lift', () => {
+    const { canvas, eraser } = makeCanvas();
+    canvas._penContactOpen = true;
+
+    canvas.syncEraserOverride(penEvent('pointermove', -1, 3));
+    canvas.syncEraserOverride(penEvent('pointermove', -1, 1));
+    canvas.syncEraserOverride(penEvent('pointermove', -1, 3));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(false);
+
+    canvas.syncEraserOverride(penEvent('pointermove', 0, 2));
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+  });
+
+  it('keeps erasing across contacts while the button remains held', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 3));
+    canvas._penContactOpen = true;
+    canvas.syncEraserOverride(penEvent('pointermove', 0, 2));
+    canvas._penContactOpen = false;
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 3));
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas._penContactOpen = true;
+    canvas.syncEraserOverride(penEvent('pointermove', 0, 2));
+    canvas._penContactOpen = false;
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+    expect(canvas.toolSelected).toBe(pen);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 3));
+    expect(canvas.toolSelected).toBe(eraser);
+  });
+
+  it('restores before a new contact that reports the button released', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 3));
+    canvas._penContactOpen = true;
+    canvas.syncEraserOverride(penEvent('pointerup', 0, 0));
+    canvas._penContactOpen = false;
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 1));
+    expect(canvas._eraserButtonsHeld).toBe(false);
+    expect(canvas._eraserOverrideApplied).toBe(false);
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('preserves a native eraser signal across its contact lift', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 5, 32));
+    expect(canvas.toolSelected).toBe(eraser);
+    canvas._penContactOpen = true;
+
+    canvas.syncEraserOverride(penEvent('pointerup', 5, 0));
+    canvas._penContactOpen = false;
+    expect(canvas._eraserButtonsHeld).toBe(true);
+    expect(canvas._eraserOverrideApplied).toBe(true);
+    expect(canvas.toolSelected).toBe(eraser);
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 0, 1));
+    expect(canvas.toolSelected).toBe(pen);
+  });
+
+  it('clears both states when the pen interaction is cancelled', () => {
+    const { canvas, pen } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    canvas._penContactOpen = true;
+    canvas.syncEraserOverride(penEvent('pointercancel', 0, 0));
+
+    expect(canvas._eraserButtonsHeld).toBe(false);
+    expect(canvas._eraserOverrideApplied).toBe(false);
     expect(canvas.toolSelected).toBe(pen);
   });
 });

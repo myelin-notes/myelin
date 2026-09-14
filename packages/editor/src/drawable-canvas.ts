@@ -223,11 +223,10 @@ export class DrawableCanvas {
   // discards the interaction instead of committing it.
   private _abortingInteraction: boolean = false;
 
-  // The tool to hand back when the eraser end or barrel button lifts, and the
-  // held state that decides it — see syncEraserOverride.
+  // The tool to hand back when the eraser end or barrel button lifts.
   private _eraserOverride: ITool | null = null;
   private _eraserButtonsHeld: boolean = false;
-  private _eraserOverrideQueued: boolean = false;
+  private _eraserOverrideApplied: boolean = false;
   // Lets the contact edges a chorded button hides be spotted — see syncPenChordedContact.
   private _penContactOpen: boolean = false;
   private _lastToolSampleTime: number = 0;
@@ -1397,12 +1396,10 @@ export class DrawableCanvas {
         this.state.change(InteractState.UsingTool, evt);
       }
       this.state.change(InteractState.Idle, evt);
+      this.syncEraserOverride(evt);
       if (evt.pointerType === 'pen') {
         this._penContactOpen = false;
       }
-      // After the interaction ends, so the eraser gets to finish its own. A
-      // barrel still held as the tip lifts keeps erasing into the next stroke.
-      this.syncEraserOverride(evt);
     };
     window.addEventListener('pointerup', this._handlePointerUp);
     // iOS fires pointercancel, not pointerup, for touches it absorbs into a system gesture; without
@@ -1568,7 +1565,7 @@ export class DrawableCanvas {
     }
   }
 
-  /** Whether the pen's barrel or eraser end is currently forcing the eraser. */
+  /** Whether the pen's barrel button or eraser end is currently held. */
   public get penIsErasing(): boolean {
     return this._eraserButtonsHeld;
   }
@@ -1607,40 +1604,53 @@ export class DrawableCanvas {
     this._palm.pointerUp(evt.pointerId, true);
   }
 
-  /**
-   * Track the erase-while-held buttons across every pen event.
-   *
-   * `button` names only the button that changed, and is absent when it was already held as the tip
-   * landed — the ordinary way an S Pen is used. `buttons` carries the held state on every event,
-   * hover included, so both edges are visible wherever they happen.
-   */
   private syncEraserOverride(evt: PointerEvent) {
     if (evt.pointerType !== 'pen') {
       return;
     }
-    const held = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
-    const changed = held !== this._eraserButtonsHeld;
-    this._eraserButtonsHeld = held;
-    const immediate = UserPrefs.get('penBarrelButtonImmediate');
+    const reportedHeld = (evt.buttons & PEN_ERASER_BUTTONS) !== 0;
     const penContact = (evt.buttons & PEN_CONTACT_BUTTONS) !== 0;
-    const penLifted =
-      evt.type === 'pointerup' || evt.type === 'pointercancel' || !penContact;
-    if (!immediate && !penLifted) {
-      if (changed) {
-        this._eraserOverrideQueued = true;
-      }
+    const penLifted = this._penContactOpen && !penContact;
+
+    if (evt.type === 'pointercancel') {
+      this._eraserButtonsHeld = false;
+      this.setEraserOverrideApplied(false, evt);
       return;
     }
-    if (!changed && !this._eraserOverrideQueued) {
+
+    // A tip lift can clear every bit even while the barrel remains held, so preserve the last state
+    // there. During contact `buttons` is authoritative; while hovering, only barrel edges are.
+    if (evt.button === 2 || penContact) {
+      this._eraserButtonsHeld = reportedHeld;
+    }
+
+    if (
+      UserPrefs.get('penBarrelButtonImmediate') ||
+      !this._penContactOpen ||
+      penLifted
+    ) {
+      this.setEraserOverrideApplied(this._eraserButtonsHeld, evt);
+    }
+  }
+
+  private setEraserOverrideApplied(applied: boolean, evt: PointerEvent) {
+    if (applied === this._eraserOverrideApplied) {
       return;
     }
-    this._eraserOverrideQueued = false;
+    this._eraserOverrideApplied = applied;
+    if (
+      (applied &&
+        (this._eraserOverride || this.toolSelected.id === 'eraser')) ||
+      (!applied && !this._eraserOverride)
+    ) {
+      return;
+    }
     // Swapping the tool mid-interaction would hand the new one an interaction the old one opened.
     const inFlight = this.state.current === InteractState.UsingTool;
     if (inFlight) {
       this.state.change(InteractState.Idle, evt);
     }
-    if (held) {
+    if (applied) {
       this.beginEraserOverride();
     } else {
       this.endEraserOverride();
@@ -1701,7 +1711,7 @@ export class DrawableCanvas {
     // like no change at all and the override could never re-engage.
     this._eraserOverride = null;
     this._eraserButtonsHeld = false;
-    this._eraserOverrideQueued = false;
+    this._eraserOverrideApplied = false;
     this.toolSelected.interrupt(this);
     const next = this.tools[to];
     // A tool that pushes options onto the selection (the text tool) needs it to survive the switch,
