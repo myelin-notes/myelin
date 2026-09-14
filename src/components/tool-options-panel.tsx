@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { type Ref, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon, Plus as PlusIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
@@ -15,6 +15,7 @@ import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
+  containerRef?: Ref<HTMLDivElement>;
   /** Null when the live tool can be saved as a preset; otherwise why it can't. */
   savePresetDisabledReason: string | null;
   onSavePreset: () => void;
@@ -120,6 +121,7 @@ function FontPicker({
 export function ToolOptionsPanel({
   options,
   customColorTool,
+  containerRef,
   savePresetDisabledReason,
   onSavePreset,
 }: ToolOptionsPanelProps) {
@@ -136,7 +138,10 @@ export function ToolOptionsPanel({
   }
 
   return (
-    <div className="flex max-h-[min(44rem,calc(100dvh-2rem))] w-full flex-col gap-3 overflow-y-auto rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
+    <div
+      ref={containerRef}
+      className="flex max-h-[min(44rem,var(--tool-options-available-height,calc(100dvh-6rem)))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md"
+    >
       {options.map((option) => {
         if (option.type === 'color') {
           return (

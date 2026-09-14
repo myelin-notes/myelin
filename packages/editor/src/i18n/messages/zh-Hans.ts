@@ -218,6 +218,10 @@ const zhHans: typeof en = {
       toggleChildren: (tag: string) => `展开或收起 #${tag} 下的标签`,
       placeholder: '标签名称…',
       deleteTag: (tag: string) => `删除 #${tag}`,
+      deleteUsedTitle: '删除正在使用的标签？',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} 正用于 ${count} 个项目。删除它也会从这些项目中移除匹配的子标签。`,
+      deleteUsedAction: '删除标签',
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',

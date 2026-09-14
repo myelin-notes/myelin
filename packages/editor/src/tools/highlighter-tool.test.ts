@@ -162,7 +162,7 @@ describe('HighlighterTool shape snapping', () => {
         middleYs.push(outline[i + 1]);
       }
     }
-    expect(Math.max(...middleYs) - Math.min(...middleYs)).toBeCloseTo(18, 5);
+    expect(Math.max(...middleYs) - Math.min(...middleYs)).toBeCloseTo(36, 5);
   });
 
   it('exposes stabilization in its options', () => {

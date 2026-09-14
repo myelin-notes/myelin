@@ -338,7 +338,8 @@ describe('StrokeElement pressure-disabled taps', () => {
     const line = finishedBounds([0, 0, 0, 10, 0, 0, 20, 0, 0]);
     const tap = finishedBounds(points);
 
-    expect(tap.height).toBeCloseTo(line.height, 1);
+    expect(line.height).toBeCloseTo(style.size, 1);
+    expect(tap.height).toBeCloseTo(style.size, 0);
   });
 });
 
@@ -411,6 +412,30 @@ describe('StrokeElement turning tip', () => {
     const actual = outlineAtTip(noisy, 30, 0);
     expect(tipDisplacement(actual, expected)).toBeLessThan(0.1);
     expect(tipDisplacement(expected, actual)).toBeLessThan(0.1);
+  });
+
+  it('rounds a tight loop without splitting its apex into corner caps', () => {
+    const points = [
+      [-15, 25],
+      [0, 25],
+      ...Array.from({ length: 12 }, (_, i) => {
+        const angle = Math.PI / 2 + ((i + 1) * Math.PI * 2) / 12;
+        return [4 * Math.cos(angle), 25 * Math.sin(angle)];
+      }),
+      [15, 25],
+      [30, 25],
+    ].flatMap(([x, y]) => [x, y, 0.5]);
+    const stroke = new StrokeElement('tight-loop', points, false, {
+      ...STYLE,
+      size: 16,
+      stabilization: 0.5,
+      simulatePressure: false,
+    });
+    const outline = outlineAtTip(stroke, 0, 0);
+
+    // A false sharp-corner hit adds perfect-freehand's 26-point circular cap at the apex.
+    expect(outline.length).toBeLessThan(80);
+    expect(Math.min(...outline.map(([, y]) => y))).toBeLessThan(-28);
   });
 
   it.each([

@@ -117,6 +117,11 @@ export class FrameChrome {
     this.render();
   }
 
+  public setZIndex(zIndex: string): void {
+    setStyleIfChanged(this.root, 'z-index', zIndex);
+    setStyleIfChanged(this.controlsSlot, 'z-index', zIndex);
+  }
+
   // `screenX`/`screenY` are the device-pixel snapped screen coordinates of the underlying content's
   // top-left; the chrome extends above and around that point by padding + header.
   public sync(params: {

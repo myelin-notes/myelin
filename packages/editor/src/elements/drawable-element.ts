@@ -366,6 +366,8 @@ export abstract class DrawableElement {
   // Called once per frame from `DrawableCanvas.redraw()` after the 2D pass.
   public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
 
+  public setDomZIndex(_zIndex: string): void {}
+
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
   public disposeDOM(): void {}
 
