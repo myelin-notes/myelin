@@ -5,7 +5,7 @@ import type { SiteCopy } from './index';
  */
 const en: SiteCopy = {
   meta: {
-    title: 'Myelin Notes | Note-Taking App for Mac, Windows & Linux',
+    title: 'Myelin Notes | Cross-Platform Note-Taking App',
     description:
       'Combine handwriting, typed notes, and PDFs in Myelin Notes for Mac, Windows, and Linux. Works offline, with no account. Free for personal use.',
   },
@@ -36,8 +36,8 @@ const en: SiteCopy = {
     // static page has no such anchor, so it labels the hero directly. Keeps the
     // hero readable as a standalone chunk, which is how crawlers and answer
     // engines lift it.
-    eyebrow: 'Myelin Notes · a cross-platform note-taking app',
-    headline: 'Handwriting, typing,\nand PDFs. One note.',
+    eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
+    headline: 'Myelin Notes: handwriting, typing,\nand PDFs. One note.',
     subheadline:
       'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:

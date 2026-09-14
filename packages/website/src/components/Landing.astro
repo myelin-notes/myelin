@@ -23,6 +23,7 @@ const softwareJsonLd = {
   '@type': 'SoftwareApplication',
   '@id': new URL('#app', Astro.site).href,
   name: 'Myelin Notes',
+  alternateName: 'Myelin',
   url: Astro.site?.href,
   sameAs: [siteLinks.source],
   downloadUrl: siteLinks.releases,
@@ -54,6 +55,7 @@ const websiteJsonLd = {
   '@type': 'WebSite',
   '@id': new URL('#website', Astro.site).href,
   name: 'Myelin Notes',
+  alternateName: 'Myelin',
   url: Astro.site?.href,
   publisher: { '@id': new URL('#organization', Astro.site).href },
 };

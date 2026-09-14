@@ -13,7 +13,6 @@ interface Props {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** False on pages published in one language only (the privacy policy). */
   translated?: boolean;
-  canvas?: boolean;
 }
 
 const {
@@ -23,7 +22,6 @@ const {
   image,
   jsonLd,
   translated = true,
-  canvas = true,
 } = Astro.props;
 
 const organization = {
@@ -58,13 +56,11 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
          so the static page is hidden without ever painting a frame of it.
          `is:inline` is required: a processed script is deferred and would run
          after the first paint, which is the flash this exists to prevent. -->
-    {canvas && (
-      <script is:inline>
-        if (matchMedia('(pointer: fine)').matches && innerWidth >= 1024) {
-          document.documentElement.classList.add('canvas-env');
-        }
-      </script>
-    )}
+    <script is:inline>
+      if (matchMedia('(pointer: fine)').matches && innerWidth >= 1024) {
+        document.documentElement.classList.add('canvas-env');
+      }
+    </script>
     <Seo
       title={title}
       description={description}

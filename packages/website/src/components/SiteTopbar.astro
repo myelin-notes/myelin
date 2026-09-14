@@ -6,7 +6,6 @@
 // Being outside the island is what lets one language picker serve both
 // renderings: the canvas and the static page share this bar.
 import { getCopy, linkHref, navLinks } from '../content/site';
-import { guides } from '../content/guides';
 import {
   LOCALES,
   type Locale,
@@ -32,16 +31,6 @@ const { path } = splitLocalePath(Astro.url.pathname);
 <header class="site-topbar">
   <a href={localizePath('/', locale)} class="wordmark">Myelin Notes</a>
   <nav class="topbar-nav" aria-label={copy.topbar.nav}>
-    {locale === 'en' && (
-      <details class="relative text-sm text-text-secondary">
-        <summary class="cursor-pointer">Guides</summary>
-        <ul class="absolute right-0 top-full mt-3 w-72 rounded-xl border border-border-divider bg-card p-3 shadow-elevated">
-          {guides.map((guide) => (
-            <li><a href={guide.href} class="block rounded-lg px-3 py-2 hover:bg-hover-tint">{guide.title}</a></li>
-          ))}
-        </ul>
-      </details>
-    )}
     {
       navLinks.map((id) => (
         <a href={linkHref(id)}>{copy.linkLabels[id]}</a>
