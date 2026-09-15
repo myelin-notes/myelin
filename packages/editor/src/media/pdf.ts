@@ -1,5 +1,5 @@
 import type { DrawableCanvas } from '../drawable-canvas';
-import { PdfElement } from '../elements/pdf-element';
+import { PdfElement } from '../elements/pdf';
 import { getPdfPageSizes } from '../pdf-renderer';
 import { UserPrefs } from '../user-prefs';
 import { getDevicePixelRatio } from '../utils';

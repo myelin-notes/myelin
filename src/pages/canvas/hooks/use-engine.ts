@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { AllSelection } from 'prosemirror-state';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import type { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import type { ActionBinding } from '@myelin/editor/keybinds';
@@ -34,6 +35,7 @@ interface UseCanvasEngineArgs {
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
   embedFiles: EmbedFilesFn;
+  uiServices: CanvasUiServices;
 }
 
 export function useCanvasEngine({
@@ -52,6 +54,7 @@ export function useCanvasEngine({
   onInsertFrame,
   onInsertEmbed,
   embedFiles,
+  uiServices,
 }: UseCanvasEngineArgs) {
   usePageCanvasBindings({
     canvasRef,
@@ -75,6 +78,7 @@ export function useCanvasEngine({
     domOverlayRef,
     drawableCanvasRef,
     canvasTools,
+    uiServices,
   });
   const canvasViewState = useDrawableCanvasViewState(drawableCanvasRef.current);
 
@@ -93,7 +97,7 @@ export function useCanvasEngine({
     noteSession: sessionController.noteSession,
   });
 
-  useCanvasClipboard({
+  const clipboard = useCanvasClipboard({
     id,
     drawableCanvasRef,
     embedFiles,
@@ -167,6 +171,7 @@ export function useCanvasEngine({
 
   return {
     drawableCanvasRef,
+    clipboard,
     ...canvasViewState,
     ...sessionController,
     ...saving,

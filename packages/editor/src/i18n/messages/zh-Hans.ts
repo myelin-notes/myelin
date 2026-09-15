@@ -793,15 +793,23 @@ const zhHans: typeof en = {
     },
     selectionToolbar: {
       label: '选区层级',
+      copy: '复制',
+      cut: '剪切',
       moveHigher: '前移一层',
       moveLower: '后移一层',
       delete: '删除',
+      lock: '锁定',
+      unlock: '解锁',
       crop: '裁剪',
       applyCrop: '应用裁剪',
     },
     insert: {
       title: '插入',
       soon: '即将推出',
+      paste: {
+        label: '粘贴',
+        description: '从剪贴板粘贴',
+      },
       frame: {
         label: '页面框',
         description: '可书写的新页面',

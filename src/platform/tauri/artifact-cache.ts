@@ -6,6 +6,7 @@ import {
   exists,
   mkdir,
   open,
+  readFile,
   remove as removeFile,
 } from '@tauri-apps/plugin-fs';
 
@@ -30,6 +31,15 @@ export const artifactCache: ArtifactCache = {
     }
     const absolute = await join(await appCacheDir(), path);
     return convertFileSrc(absolute);
+  },
+
+  async read(path) {
+    if (!(await exists(path, { baseDir: BaseDirectory.AppCache }))) {
+      return null;
+    }
+    return new Blob([
+      await readFile(path, { baseDir: BaseDirectory.AppCache }),
+    ]);
   },
 
   async write(path, data) {

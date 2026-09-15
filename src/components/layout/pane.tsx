@@ -5,6 +5,7 @@ import { CsvViewerPage } from '@/pages/csv-viewer';
 import { GraphPage } from '@/pages/graph';
 import { ImageViewerPage } from '@/pages/image-viewer';
 import { SettingsPage } from '@/pages/settings';
+import { UnsupportedFilePage } from '@/pages/unsupported-file';
 
 interface PaneContentProps {
   tab: Tab;
@@ -31,6 +32,8 @@ export const PaneContent = memo(function PaneContent({
       return <ImageViewerPage id={tab.target.id} />;
     case 'csv':
       return <CsvViewerPage id={tab.target.id} />;
+    case 'unsupported':
+      return <UnsupportedFilePage fileType={tab.target.fileType} />;
   }
 });
 

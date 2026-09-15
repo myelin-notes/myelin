@@ -815,15 +815,23 @@ const en = {
     },
     selectionToolbar: {
       label: 'Selection order',
+      copy: 'Copy',
+      cut: 'Cut',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
       delete: 'Delete',
+      lock: 'Lock',
+      unlock: 'Unlock',
       crop: 'Crop',
       applyCrop: 'Apply crop',
     },
     insert: {
       title: 'Insert',
       soon: 'Soon',
+      paste: {
+        label: 'Paste',
+        description: 'Paste from the clipboard',
+      },
       frame: {
         label: 'Page frame',
         description: 'A new page to write in',

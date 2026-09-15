@@ -1,16 +1,9 @@
-import { CachedRepository } from './cached';
-import {
-  type ActiveRepository,
-  getRepositoryStorageKey,
-  type RepositoryConfig,
-} from './config';
-import { GitHubRepository } from './github';
-import { GoogleDriveRepository } from './google-drive';
-import { LocalRepository } from './local';
+import type { ActiveRepository, RepositoryConfig } from './config';
 import {
   isRepositoryFullyConfigured,
   RepositorySetupIncompleteError,
 } from './readiness';
+import { createRepositoryFromConfig } from './repository-backends';
 import type { CreateFileOptions, FileType } from './types';
 
 function guardNoteCreation(
@@ -45,40 +38,5 @@ function guardNoteCreation(
 }
 
 export function createRepository(config: RepositoryConfig): ActiveRepository {
-  let repository: ActiveRepository;
-
-  switch (config.kind) {
-    case 'local': {
-      repository = new LocalRepository();
-      break;
-    }
-    case 'github': {
-      const cacheRoot = `repositories/github/${getRepositoryStorageKey(config)}`;
-      repository = new CachedRepository(
-        new GitHubRepository({
-          owner: config.owner,
-          repo: config.repo,
-          branch: config.branch ?? 'main',
-          credentialId: config.credentialId,
-        }),
-        new LocalRepository(cacheRoot),
-        `${cacheRoot}/outbox.json`,
-      );
-      break;
-    }
-    case 'google-drive': {
-      const cacheRoot = `repositories/google-drive/${getRepositoryStorageKey(config)}`;
-      repository = new CachedRepository(
-        new GoogleDriveRepository({
-          folderId: config.folderId,
-          credentialId: config.credentialId,
-        }),
-        new LocalRepository(cacheRoot),
-        `${cacheRoot}/outbox.json`,
-      );
-      break;
-    }
-  }
-
-  return guardNoteCreation(repository, config);
+  return guardNoteCreation(createRepositoryFromConfig(config), config);
 }

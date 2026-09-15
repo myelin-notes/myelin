@@ -24,7 +24,7 @@ export const PEN_COLORS = [
 /** Pen must dwell this long (ms) before recognition is attempted. */
 const DWELL_MS = 600;
 /** Movement beyond this (px) re-arms the dwell timer (cancels recognition). */
-const DWELL_MOVE_PX = 12;
+const DWELL_MOVE_PX = 3;
 
 export class PenTool implements ITool {
   public constructor(protected readonly getStrings: MessageGetter) {}

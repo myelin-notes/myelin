@@ -13,17 +13,20 @@ import { isApplePlatform } from '@myelin/shared/os';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
-  isRepositoryConfigStructurallyComplete,
-  isRepositoryFullyConfigured,
-  type RepositoryConfig,
-  type SearchNodesOptions,
   useRepository,
   useRepositoryStatus,
   type VFSFolderNode,
   type VFSNode,
 } from '@/lib/sync';
-import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
+import {
+  compareExplorerNodes,
+  ExplorerModel,
+  type ExplorerSearchMode,
+  type ExplorerSortMode,
+  sortExplorerNodes,
+} from '@/pages/library/explorer/explorer-model';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
+import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
 
@@ -32,48 +35,13 @@ const SEARCH_DEBOUNCE_MS = 150;
 const ROOT_KEY: string | null = null;
 const NO_COLLAPSED_IDS: ReadonlySet<string> = new Set();
 
-export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
-export type SearchMode = NonNullable<SearchNodesOptions['mode']>;
+export type SortMode = ExplorerSortMode;
+export type SearchMode = ExplorerSearchMode;
 
 export interface SidebarTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
   startNewFile: (title: string, type: FileType) => Promise<void>;
-}
-
-type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
-
-function getInitialRepositorySetupState(
-  config: RepositoryConfig,
-): RepositorySetupState {
-  if (config.kind === 'local') {
-    return 'ready';
-  }
-  return isRepositoryConfigStructurallyComplete(config)
-    ? 'checking'
-    : 'setup-required';
-}
-
-function compareNodes(a: VFSNode, b: VFSNode, sortMode: SortMode): number {
-  if (a.type !== b.type) {
-    return a.type === 'folder' ? -1 : 1;
-  }
-  switch (sortMode) {
-    case 'name-asc':
-      return a.name.localeCompare(b.name);
-    case 'name-desc':
-      return b.name.localeCompare(a.name);
-    case 'modified':
-      return b.modifiedAt - a.modifiedAt;
-    case 'created':
-      return b.createdAt - a.createdAt;
-    default:
-      return 0;
-  }
-}
-
-function sortNodes(nodes: VFSNode[], sortMode: SortMode): VFSNode[] {
-  return [...nodes].sort((a, b) => compareNodes(a, b, sortMode));
 }
 
 interface FlatResults {
@@ -105,7 +73,7 @@ function collectRows(
   childrenMap: ReadonlyMap<string | null, VFSNode[]>,
   sortMode: SortMode,
 ): VisibleRow[] {
-  return sortNodes(nodes, sortMode).flatMap((node) => {
+  return sortExplorerNodes(nodes, sortMode).flatMap((node) => {
     if (node.type !== 'folder') {
       return [{ node, depth, expanded: false }];
     }
@@ -170,9 +138,14 @@ export function SidebarTree({
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const [setupState, setSetupState] = useState<RepositorySetupState>(() =>
-    getInitialRepositorySetupState(repositoryStatus.config),
+  const explorer = useMemo(
+    () =>
+      new ExplorerModel(repository, (name, parentId) =>
+        createBlankCanvasFile(repository, name, parentId),
+      ),
+    [repository],
   );
+  const setupState = useExplorerSetupState(repositoryStatus.config);
   const [childrenMap, setChildrenMap] = useState<Map<string | null, VFSNode[]>>(
     () => new Map(),
   );
@@ -202,42 +175,16 @@ export function SidebarTree({
       ? collapsedResults.ids
       : NO_COLLAPSED_IDS;
 
-  useEffect(() => {
-    let cancelled = false;
-    const config = repositoryStatus.config;
-
-    if (config.kind === 'local') {
-      setSetupState('ready');
-      return;
-    }
-    if (!isRepositoryConfigStructurallyComplete(config)) {
-      setSetupState('setup-required');
-      return;
-    }
-
-    setSetupState('checking');
-    void isRepositoryFullyConfigured(config).then((configured) => {
-      if (!cancelled) {
-        setSetupState(configured ? 'ready' : 'setup-required');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repositoryStatus.config]);
-
   const loadFolder = useCallback(
     async (folderId: string | null) => {
-      const [dirs, files] = await repository.listDirectory(folderId);
-      const nodes: VFSNode[] = [...dirs, ...files];
+      const nodes = await explorer.loadFolder(folderId);
       setChildrenMap((prev) => {
         const next = new Map(prev);
         next.set(folderId, nodes);
         return next;
       });
     },
-    [repository],
+    [explorer],
   );
 
   const reload = useCallback(async () => {
@@ -256,18 +203,9 @@ export function SidebarTree({
   }, [loadFolder, ready]);
 
   const loadAncestors = useCallback(
-    async (nodes: VFSNode[]): Promise<VFSFolderNode[]> => {
-      const parentIds = new Set(
-        nodes
-          .map((node) => node.parentId)
-          .filter((id): id is string => id !== null),
-      );
-      const chains = await Promise.all(
-        [...parentIds].map((id) => repository.getFolderChain(id)),
-      );
-      return chains.flat();
-    },
-    [repository],
+    (nodes: VFSNode[]): Promise<VFSFolderNode[]> =>
+      explorer.loadAncestors(nodes),
+    [explorer],
   );
 
   const loadFlatResults = useCallback(async () => {
@@ -276,34 +214,27 @@ export function SidebarTree({
       return;
     }
     try {
-      let nodes: VFSNode[];
-      if (isSearching) {
-        let results = await repository.searchNodes(trimmedQuery, {
-          mode: searchMode,
-        });
-        if (isFiltering) {
-          results = results.filter((r) =>
-            nodeMatchesAnyTag(r.node.tags, filterTags),
-          );
-        }
-        nodes = results.map((result) => result.node);
-      } else {
-        nodes = await repository.getNodesByAnyTag(filterTags, ROOT_KEY);
+      const result = await explorer.refresh({
+        folderId: ROOT_KEY,
+        searchQuery: trimmedQuery,
+        searchMode,
+        filterTags,
+      });
+      if (!result) {
+        return;
       }
-      setSearchResults({ nodes, ancestors: await loadAncestors(nodes) });
+      const ancestors = await loadAncestors(result.nodes);
+      if (!explorer.isCurrent(result)) {
+        return;
+      }
+      setSearchResults({
+        nodes: result.nodes,
+        ancestors,
+      });
     } catch (err) {
       logger.error('Failed to load search results', err);
     }
-  }, [
-    filterTags,
-    isFiltering,
-    isSearching,
-    loadAncestors,
-    ready,
-    repository,
-    searchMode,
-    trimmedQuery,
-  ]);
+  }, [filterTags, explorer, loadAncestors, ready, searchMode, trimmedQuery]);
 
   // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
@@ -326,14 +257,18 @@ export function SidebarTree({
     }
     if (!isSearching) {
       void loadFlatResults();
-      return;
+      return () => explorer.invalidatePendingRequests();
     }
     const timer = window.setTimeout(
       () => void loadFlatResults(),
       SEARCH_DEBOUNCE_MS,
     );
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      explorer.invalidatePendingRequests();
+    };
   }, [
+    explorer,
     isFlat,
     isSearching,
     loadFlatResults,
@@ -361,18 +296,17 @@ export function SidebarTree({
 
   const startNewFolder = useCallback(
     async (parentId: string | null = ROOT_KEY) => {
-      const name = await repository.getUniqueFileName(
-        strings.library.createNew.unnamedFolder,
+      const node = await explorer.createFolder(
         parentId,
+        strings.library.createNew.unnamedFolder,
       );
-      const id = await repository.createFolder(name, parentId);
-      setRenamingId(id);
+      setRenamingId(node.id);
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
       await loadFolder(parentId);
     },
-    [loadFolder, repository, strings.library.createNew.unnamedFolder],
+    [explorer, loadFolder, strings.library.createNew.unnamedFolder],
   );
 
   const startNewFile = useCallback(
@@ -381,18 +315,14 @@ export function SidebarTree({
       type: FileType,
       parentId: string | null = ROOT_KEY,
     ) => {
-      const name = await repository.getUniqueFileName(title, parentId);
-      const id =
-        type === 'mcanvas'
-          ? await createBlankCanvasFile(repository, name, parentId)
-          : await repository.createFile(name, type, parentId);
-      setRenamingId(id);
+      const node = await explorer.createFile(parentId, title, type);
+      setRenamingId(node.id);
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
       await loadFolder(parentId);
     },
-    [loadFolder, repository],
+    [explorer, loadFolder],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
@@ -437,7 +367,9 @@ export function SidebarTree({
       (nodes) =>
         isSearching
           ? nodes.sort((a, b) => a.rank - b.rank)
-          : nodes.sort((a, b) => compareNodes(a.node, b.node, sortMode)),
+          : nodes.sort((a, b) =>
+              compareExplorerNodes(a.node, b.node, sortMode),
+            ),
     );
   }, [isFlat, isSearching, searchResults, sortMode]);
 

@@ -831,15 +831,23 @@ const fr: typeof en = {
     },
     selectionToolbar: {
       label: 'Ordre de la sélection',
+      copy: 'Copier',
+      cut: 'Couper',
       moveHigher: 'Avancer',
       moveLower: 'Reculer',
       delete: 'Supprimer',
+      lock: 'Verrouiller',
+      unlock: 'Déverrouiller',
       crop: 'Rogner',
       applyCrop: 'Appliquer le rognage',
     },
     insert: {
       title: 'Insérer',
       soon: 'Bientôt',
+      paste: {
+        label: 'Coller',
+        description: 'Coller depuis le presse-papiers',
+      },
       frame: {
         label: 'Cadre de page',
         description: 'Une nouvelle page pour écrire',

@@ -123,20 +123,20 @@ function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
   );
 }
 
-function isFrameMenuCoveredByHigherFrame(
-  frameIndex: number,
-  frames: PageFrameElement[],
+function isFrameMenuCoveredByHigherElement(
+  elementIndex: number,
+  elements: readonly DrawableElement[],
   menuRect: ScreenRect,
   offset: { x: number; y: number },
   zoom: number,
 ): boolean {
-  for (let i = frameIndex + 1; i < frames.length; i++) {
-    const frame = frames[i];
-    if (frame.hidden) {
+  for (let i = elementIndex + 1; i < elements.length; i++) {
+    const element = elements[i];
+    if (element.hidden) {
       continue;
     }
     if (
-      rectsIntersect(menuRect, getScreenRect(frame.boundingBox, offset, zoom))
+      rectsIntersect(menuRect, getScreenRect(element.boundingBox, offset, zoom))
     ) {
       return true;
     }
@@ -242,6 +242,7 @@ function createFrameRefs(
     {
       kindLabel: getMessages().canvas.frame.noteKind,
       getMenuItems: () => frame.getMenuItems(),
+      openChromeMenu: frame.uiServices?.openChromeMenu,
       onTitleCommit: (title) => {
         frame.setDisplayName(title);
         return frame.displayName;
@@ -454,8 +455,7 @@ export function PageFrameDomLayer({
       );
       const activeFrames = new Map<string, PageFrameElement>();
 
-      for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
-        const frame = frames[frameIndex];
+      for (const frame of frames) {
         activeFrames.set(frame.uuid, frame);
 
         let refs = frameMap.current.get(frame.uuid);
@@ -493,9 +493,9 @@ export function PageFrameDomLayer({
           contentWidth,
           contentHeight,
           zoom,
-          controlsVisible: !isFrameMenuCoveredByHigherFrame(
-            frameIndex,
-            frames,
+          controlsVisible: !isFrameMenuCoveredByHigherElement(
+            elements.indexOf(frame),
+            elements,
             menuRect,
             offset,
             zoom,

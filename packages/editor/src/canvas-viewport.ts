@@ -309,6 +309,15 @@ export class CanvasViewport {
     this.notifyViewChange();
   }
 
+  /** Replaces the camera without clamping, for restoring a previously saved local view. */
+  public setView(view: { zoom: number; offset: Vector2 }): void {
+    this.cancelAnimation();
+    this._zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom));
+    this._offset = { ...view.offset };
+    this._onZoomChange?.(this._zoom);
+    this.emitViewChange();
+  }
+
   public worldToScreen(world: Vector2): Vector2 {
     return {
       x: (world.x + this._offset.x) * this._zoom,

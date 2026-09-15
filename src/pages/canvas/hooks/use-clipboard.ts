@@ -1,6 +1,16 @@
-import { type RefObject, useEffect, useEffectEvent, useMemo } from 'react';
+import {
+  type RefObject,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+} from 'react';
 import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
+import {
+  MYELIN_CANVAS_CLIPBOARD_LABEL,
+  MYELIN_CANVAS_CLIPBOARD_MIME,
+} from '@myelin/editor/clipboard/formats';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { VFSNodeId } from '@/lib/sync';
 import type { EmbedFilesFn } from './use-embed-files';
@@ -41,6 +51,7 @@ export function useCanvasClipboard({
   embedFiles,
 }: UseCanvasClipboardArgs) {
   const controller = useMemo(() => new CanvasClipboardController(), []);
+  const copiedCanvasPayloadRef = useRef<string | null>(null);
   const handleMediaPaste = useEffectEvent((event: ClipboardEvent) => {
     const files = extractEmbeddableClipboardFiles(event);
     if (files.length === 0) {
@@ -50,6 +61,90 @@ export function useCanvasClipboard({
     embedFiles(files);
     return true;
   });
+  const copy = useEffectEvent(async (): Promise<boolean> => {
+    if (!id) {
+      return false;
+    }
+
+    const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
+    const payload = controller.copyPayload(adapter);
+    if (!payload) {
+      return false;
+    }
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [MYELIN_CANVAS_CLIPBOARD_MIME]: new Blob([payload], {
+            type: MYELIN_CANVAS_CLIPBOARD_MIME,
+          }),
+          'text/plain': new Blob([MYELIN_CANVAS_CLIPBOARD_LABEL], {
+            type: 'text/plain',
+          }),
+        }),
+      ]);
+      copiedCanvasPayloadRef.current = payload;
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  const paste = useEffectEvent(async () => {
+    if (!id) {
+      return;
+    }
+
+    const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        if (item.types.includes(MYELIN_CANVAS_CLIPBOARD_MIME)) {
+          const payload = await (
+            await item.getType(MYELIN_CANVAS_CLIPBOARD_MIME)
+          ).text();
+          if (controller.pastePayload(payload, adapter)) {
+            return;
+          }
+        }
+      }
+
+      for (const item of items) {
+        if (
+          item.types.includes('text/plain') &&
+          (await (await item.getType('text/plain')).text()) ===
+            MYELIN_CANVAS_CLIPBOARD_LABEL
+        ) {
+          const payload = copiedCanvasPayloadRef.current;
+          if (payload && controller.pastePayload(payload, adapter)) {
+            return;
+          }
+        }
+      }
+
+      const files: File[] = [];
+      for (const item of items) {
+        for (const type of item.types) {
+          if (
+            type.startsWith('image/') ||
+            type.startsWith('audio/') ||
+            type === 'application/pdf'
+          ) {
+            files.push(
+              new File([await item.getType(type)], 'clipboard', { type }),
+            );
+          }
+        }
+      }
+      if (files.length > 0) {
+        embedFiles(files);
+      }
+    } catch {
+      const payload = copiedCanvasPayloadRef.current;
+      if (payload && controller.pastePayload(payload, adapter)) {
+        return;
+      }
+    }
+  });
 
   useEffect(() => {
     if (!id) {
@@ -58,7 +153,10 @@ export function useCanvasClipboard({
 
     const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
     const handleCopy = (event: ClipboardEvent) => {
-      controller.handleCopy(event, adapter);
+      if (controller.handleCopy(event, adapter)) {
+        copiedCanvasPayloadRef.current =
+          event.clipboardData?.getData(MYELIN_CANVAS_CLIPBOARD_MIME) ?? null;
+      }
     };
     const handleCut = (event: ClipboardEvent) => {
       controller.handleCut(event, adapter);
@@ -76,4 +174,18 @@ export function useCanvasClipboard({
       document.removeEventListener('paste', handlePaste);
     };
   }, [controller, drawableCanvasRef, id]);
+
+  return {
+    copy: () => {
+      void copy();
+    },
+    cut: () => {
+      void (async () => {
+        if (await copy()) {
+          drawableCanvasRef.current?.deleteSelected();
+        }
+      })();
+    },
+    paste,
+  };
 }

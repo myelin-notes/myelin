@@ -1,7 +1,7 @@
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ImageElement } from '@myelin/editor/elements/image-element';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
-import { PdfElement } from '@myelin/editor/elements/pdf-element';
+import { PdfElement } from '@myelin/editor/elements/pdf';
 import { ShapeElement } from '@myelin/editor/elements/shape-element';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
 import { TextElement } from '@myelin/editor/elements/text/element';

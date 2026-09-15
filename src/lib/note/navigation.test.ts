@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { FileTypeDescriptors } from '@myelin/editor/sync/repo/file-types';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { Repository } from '@/lib/sync';
 import { TabStateController } from '@/lib/tabs/controller';
@@ -9,6 +10,28 @@ function asRepository<T>(repository: T): T & Repository {
 }
 
 describe('note navigation', () => {
+  it.each(
+    FileTypeDescriptors,
+  )('routes .$extension to its descriptor viewer', (descriptor) => {
+    const controller = new TabStateController();
+
+    openNote(
+      controller,
+      { fileType: descriptor.extension, id: `note-${descriptor.extension}` },
+      undefined,
+      'explorer',
+    );
+
+    const state = controller.getSnapshot();
+    const pane = state.layout.type === 'pane' ? state.layout : null;
+    const tab = pane?.tabs.find((candidate) =>
+      'id' in candidate.target
+        ? candidate.target.id === `note-${descriptor.extension}`
+        : false,
+    );
+    expect(tab?.target.type).toBe(descriptor.viewer);
+  });
+
   it('opens a canvas note as a tab', () => {
     const controller = new TabStateController();
     openNote(

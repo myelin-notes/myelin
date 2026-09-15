@@ -14,6 +14,7 @@ export function initWebPlatform(): void {
   }
 
   const objectUrls = new Map<string, string>();
+  const artifacts = new Map<string, Blob>();
 
   setPlatform({
     async saveFile({ suggestedName, data }) {
@@ -38,11 +39,15 @@ export function initWebPlatform(): void {
       async getUrl(path) {
         return objectUrls.get(path) ?? null;
       },
+      async read(path) {
+        return artifacts.get(path) ?? null;
+      },
       async write(path, data) {
         const previous = objectUrls.get(path);
         if (previous) {
           URL.revokeObjectURL(previous);
         }
+        artifacts.set(path, data);
         objectUrls.set(path, URL.createObjectURL(data));
       },
       async remove(path) {
@@ -50,6 +55,7 @@ export function initWebPlatform(): void {
           if (key === path || key.startsWith(`${path}/`)) {
             URL.revokeObjectURL(url);
             objectUrls.delete(key);
+            artifacts.delete(key);
           }
         }
       },

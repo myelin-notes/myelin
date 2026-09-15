@@ -8,9 +8,13 @@ import {
   useState,
 } from 'react';
 import {
+  Copy as CopyIcon,
+  Scissors as CutIcon,
   Trash2 as DeleteIcon,
+  Lock as LockIcon,
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
+  LockOpen as UnlockIcon,
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
@@ -37,6 +41,8 @@ import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
+  onCopy: () => void;
+  onCut: () => void;
 }
 
 interface ToolbarState {
@@ -145,10 +151,26 @@ function collectElementItems(
   if (selected.length !== 1) {
     return [];
   }
-  return selected[0].getSelectionToolbarItems(strings);
+  const element = selected[0];
+  return [
+    ...element.getSelectionToolbarItems(strings),
+    {
+      id: 'lock',
+      label: element.locked
+        ? strings.canvas.selectionToolbar.unlock
+        : strings.canvas.selectionToolbar.lock,
+      icon: element.locked ? UnlockIcon : LockIcon,
+      active: element.locked,
+      onClick: () => element.setLocked(!element.locked),
+    },
+  ];
 }
 
-export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
+export function SelectionToolbar({
+  drawableCanvasRef,
+  onCopy,
+  onCut,
+}: SelectionToolbarProps) {
   const strings = useMessages();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ToolbarState>(HIDDEN_STATE);
@@ -279,6 +301,29 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     [strings.canvas.selectionToolbar.delete, deleteSelection],
   );
 
+  const clipboardItems = useMemo<SelectionToolbarItem[]>(
+    () => [
+      {
+        id: 'copy',
+        label: strings.canvas.selectionToolbar.copy,
+        icon: CopyIcon,
+        onClick: onCopy,
+      },
+      {
+        id: 'cut',
+        label: strings.canvas.selectionToolbar.cut,
+        icon: CutIcon,
+        onClick: onCut,
+      },
+    ],
+    [
+      strings.canvas.selectionToolbar.copy,
+      strings.canvas.selectionToolbar.cut,
+      onCopy,
+      onCut,
+    ],
+  );
+
   const reorderItems = useMemo<SelectionToolbarItem[]>(
     () => [
       {
@@ -346,6 +391,8 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
           <Divider />
         )}
         <ToolbarItemGroup items={reorderItems} divided />
+        <Divider />
+        <ToolbarItemGroup items={clipboardItems} divided />
         <Divider />
         <ToolbarItemGroup items={deleteItems} />
       </div>

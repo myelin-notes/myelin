@@ -21,25 +21,19 @@ import type {
   RepositoryStatusSource,
 } from '../config';
 import type { LocalRepository } from '../local';
-import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
   computeRevision,
-  createDocFromBytes,
   createFileNode,
   createNodeId,
   deleteNodeFromManifest,
   ensureVersionHistoryRoot,
-  getStoredFilePath,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
-  MANIFEST_PATH,
   type RepositorySnapshot,
-  setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
   VERSION_HISTORY_MAX_PER_FILE,
-  type VFSManifest,
 } from '../shared';
 import type {
   CreateFileOptions,
@@ -61,6 +55,12 @@ import type {
   VFSNode,
   VFSNodeId,
 } from '../types';
+import {
+  type BatchCanvasOperation,
+  type BatchPlan,
+  type BatchRawOperation,
+  createBatchPlan,
+} from './batch-planner';
 import { withAsyncKeyedMutex } from './lock';
 import {
   CachedRepositoryOutbox,
@@ -89,40 +89,6 @@ class RemoteNoteCacheMergeError extends Error {
     super(`Failed to merge remote note ${nodeId} into cache.`);
     this.name = 'RemoteNoteCacheMergeError';
   }
-}
-
-interface BatchPlan {
-  manifest: VFSManifest;
-  manifestChanged: boolean;
-  additions: Map<string, Uint8Array>;
-  deletions: Set<string>;
-  messages: string[];
-  resolvedOps: PendingOp[];
-  expectedHeadOid: string;
-}
-
-async function mapWithConcurrency<T, U>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<U>,
-): Promise<U[]> {
-  const results: U[] = new Array(items.length);
-  let cursor = 0;
-  const workers = Array.from(
-    { length: Math.min(Math.max(1, limit), items.length) },
-    async () => {
-      while (true) {
-        const i = cursor;
-        cursor += 1;
-        if (i >= items.length) {
-          return;
-        }
-        results[i] = await fn(items[i]);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
 }
 
 function buildCommitBody(messages: string[]): string | undefined {
@@ -967,16 +933,8 @@ export class CachedRepository
       }
       const cacheSnapshot = await this.cache.exportSnapshot();
 
-      const canvasOps: Array<{
-        op: Extract<PendingOp, { kind: 'push-note' }>;
-        node: VFSFileNode;
-        snapshot: YjsSyncSnapshot;
-      }> = [];
-      const rawOps: Array<{
-        op: Extract<PendingOp, { kind: 'push-note' }>;
-        node: VFSFileNode;
-        bytes: Uint8Array | null;
-      }> = [];
+      const canvasOps: BatchCanvasOperation[] = [];
+      const rawOps: BatchRawOperation[] = [];
 
       for (const op of ops) {
         if (op.kind !== 'push-note') {
@@ -1008,172 +966,16 @@ export class CachedRepository
       return null;
     }
     const { ops, cacheSnapshot, canvasOps, rawOps } = snapshot;
-
-    const plan: BatchPlan = {
-      manifest: structuredClone(remoteManifest),
-      manifestChanged: false,
-      additions: new Map(),
-      deletions: new Set(),
-      messages: [],
-      resolvedOps: ops,
+    return createBatchPlan({
+      repositoryKind: this.kind,
+      remote,
       expectedHeadOid,
-    };
-
-    for (const op of ops) {
-      switch (op.kind) {
-        case 'upsert-manifest-node':
-          applyCachedManifestUpsert(
-            plan.manifest,
-            cacheSnapshot.manifest,
-            op.nodeId,
-          );
-          plan.manifestChanged = true;
-          plan.messages.push(`Upsert node ${op.nodeId}`);
-          break;
-        case 'delete-manifest-node':
-          for (const fileId of op.deletedFileIds) {
-            const node = plan.manifest.nodes[fileId];
-            if (node && node.type === 'file') {
-              plan.deletions.add(getStoredFilePath(node));
-            }
-          }
-          deleteNodeFromManifest(plan.manifest, op.nodeId);
-          plan.manifestChanged = true;
-          plan.messages.push(`Delete node ${op.nodeId}`);
-          break;
-        case 'sync-custom-colors':
-          plan.manifest.colors = structuredClone(cacheSnapshot.manifest.colors);
-          plan.manifestChanged = true;
-          plan.messages.push('Sync custom colors');
-          break;
-        case 'sync-tag-registry':
-          plan.manifest.tagRegistry = [...cacheSnapshot.manifest.tagRegistry];
-          plan.manifestChanged = true;
-          plan.messages.push('Sync tag registry');
-          break;
-        case 'sync-pen-presets':
-          plan.manifest.penPresets = structuredClone(
-            cacheSnapshot.manifest.penPresets,
-          );
-          plan.manifestChanged = true;
-          plan.messages.push('Sync pen presets');
-          break;
-        case 'push-note': {
-          const node = cacheSnapshot.manifest.nodes[op.nodeId];
-          if (!node || node.type !== 'file') {
-            plan.messages.push(`Skip missing node ${op.nodeId}`);
-          }
-          break;
-        }
-      }
-    }
-
-    const fileSavedAt = Date.now();
-
-    if (rawOps.length > 0) {
-      const conflict = await this.checkRawConflicts(remote, rawOps);
-      if (conflict) {
-        return 'abort-to-rest';
-      }
-      for (const entry of rawOps) {
-        if (entry.op.replaceFile && !entry.bytes) {
-          return 'abort-to-rest';
-        }
-        plan.additions.set(
-          getStoredFilePath(entry.node),
-          entry.bytes ?? new Uint8Array(),
-        );
-        if (entry.op.replaceFile && entry.node.fileType === 'mcanvas') {
-          setStoredNoteLinks(
-            plan.manifest,
-            entry.node.id,
-            extractStoredNoteLinks(createDocFromBytes(entry.bytes)),
-          );
-          plan.messages.push(`Replace note ${entry.node.name}`);
-        } else {
-          plan.messages.push(
-            `Update raw ${entry.node.fileType} ${entry.node.name}`,
-          );
-        }
-        const manifestNode = plan.manifest.nodes[entry.node.id];
-        if (manifestNode && manifestNode.type === 'file') {
-          manifestNode.modifiedAt = fileSavedAt;
-          plan.manifestChanged = true;
-        }
-      }
-    }
-
-    if (canvasOps.length > 0) {
-      const merged = await mapWithConcurrency(canvasOps, 4, async (entry) => {
-        const remoteSnapshot = await remote.loadDocument(entry.op.nodeId);
-        const doc = new Y.Doc();
-        if (remoteSnapshot.update && remoteSnapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, remoteSnapshot.update);
-        }
-        if (entry.snapshot.update && entry.snapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, entry.snapshot.update);
-        }
-        return {
-          nodeId: entry.node.id,
-          path: getStoredFilePath(entry.node),
-          bytes: Y.encodeStateAsUpdate(doc),
-          links: extractStoredNoteLinks(doc),
-          name: entry.node.name,
-        };
-      });
-      for (const m of merged) {
-        plan.additions.set(m.path, m.bytes);
-        plan.messages.push(`Update note ${m.name}`);
-        const manifestNode = plan.manifest.nodes[m.nodeId];
-        if (manifestNode && manifestNode.type === 'file') {
-          manifestNode.modifiedAt = fileSavedAt;
-          setStoredNoteLinks(plan.manifest, m.nodeId, m.links);
-          plan.manifestChanged = true;
-        }
-      }
-    }
-
-    if (plan.manifestChanged) {
-      plan.additions.set(
-        MANIFEST_PATH,
-        new TextEncoder().encode(JSON.stringify(plan.manifest, null, 2)),
-      );
-    }
-
-    // A path can appear in both additions and deletions (e.g. delete then
-    // re-create same path) — the addition wins.
-    for (const path of plan.additions.keys()) {
-      plan.deletions.delete(path);
-    }
-
-    return plan;
-  }
-
-  private async checkRawConflicts(
-    remote: BaseRepository,
-    rawOps: Array<{
-      op: Extract<PendingOp, { kind: 'push-note' }>;
-      node: VFSFileNode;
-      bytes: Uint8Array | null;
-    }>,
-  ): Promise<boolean> {
-    for (const entry of rawOps) {
-      if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
-        continue;
-      }
-      const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
-      const remoteRevision = await computeRevision(remoteBytes);
-      if (remoteRevision !== entry.op.baseFileRevision) {
-        logger.debug('Raw file conflict detected; aborting batch', {
-          repositoryKind: this.kind,
-          nodeId: entry.op.nodeId,
-          baseFileRevision: entry.op.baseFileRevision,
-          remoteRevision,
-        });
-        return true;
-      }
-    }
-    return false;
+      remoteManifest,
+      cacheSnapshot,
+      ops,
+      canvasOps,
+      rawOps,
+    });
   }
 
   private async commitBatchedPlan(

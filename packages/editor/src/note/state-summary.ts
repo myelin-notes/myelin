@@ -1,18 +1,22 @@
 import type * as Y from 'yjs';
 import type { DrawableElement } from '../elements/drawable-element';
-import { ElementType } from '../elements/element-type';
+import {
+  ELEMENT_DESCRIPTORS,
+  getElementDescriptor,
+} from '../elements/element-descriptors';
 import type { YDocManager } from '../ydoc-manager';
 
 const MAX_SAMPLED_ELEMENTS = 20;
 const MAX_UUID_SAMPLES = 50;
 
-interface ElementDescriptor {
+interface SampledElement {
   position: number;
   uuid: string | null;
   type: string;
 }
 
 interface ElementCounts {
+  elementCounts: Record<string, number>;
   strokeCount: number;
   textCount: number;
   imageCount: number;
@@ -22,12 +26,16 @@ interface ElementCounts {
 }
 
 function createEmptyCounts(): ElementCounts {
+  const elementCounts = Object.fromEntries(
+    ELEMENT_DESCRIPTORS.map((descriptor) => [descriptor.name, 0]),
+  ) as Record<string, number>;
   return {
-    strokeCount: 0,
-    textCount: 0,
-    imageCount: 0,
-    pageFrameCount: 0,
-    pdfCount: 0,
+    elementCounts,
+    strokeCount: elementCounts.stroke ?? 0,
+    textCount: elementCounts.text ?? 0,
+    imageCount: elementCounts.image ?? 0,
+    pageFrameCount: elementCounts['page-frame'] ?? 0,
+    pdfCount: elementCounts.pdf ?? 0,
     unknownCount: 0,
   };
 }
@@ -48,36 +56,26 @@ function summarizeElements(
   },
 ) {
   const counts = createEmptyCounts();
-  const sampledElements: ElementDescriptor[] = [];
+  const sampledElements: SampledElement[] = [];
   const pageFrameUuids: string[] = [];
   const strokeUuids: string[] = [];
 
   for (let position = 0; position < elementCount; position++) {
     const descriptor = readElement(position);
     const type = descriptor.type;
-    const typeLabel = describeElementType(type);
+    const elementDescriptor = getElementDescriptor(type);
+    const typeLabel = elementDescriptor?.name ?? describeElementType(type);
 
-    switch (type) {
-      case ElementType.STROKE:
-        counts.strokeCount += 1;
+    if (elementDescriptor) {
+      counts.elementCounts[elementDescriptor.name] += 1;
+      if (elementDescriptor.summaryUuidSample === 'stroke') {
         appendUuidSample(strokeUuids, descriptor.uuid);
-        break;
-      case ElementType.TEXT:
-        counts.textCount += 1;
-        break;
-      case ElementType.IMAGE:
-        counts.imageCount += 1;
-        break;
-      case ElementType.PAGE_FRAME:
-        counts.pageFrameCount += 1;
+      }
+      if (elementDescriptor.summaryUuidSample === 'page-frame') {
         appendUuidSample(pageFrameUuids, descriptor.uuid);
-        break;
-      case ElementType.PDF:
-        counts.pdfCount += 1;
-        break;
-      default:
-        counts.unknownCount += 1;
-        break;
+      }
+    } else {
+      counts.unknownCount += 1;
     }
 
     if (sampledElements.length < MAX_SAMPLED_ELEMENTS) {
@@ -92,6 +90,11 @@ function summarizeElements(
   return {
     elementCount,
     ...counts,
+    strokeCount: counts.elementCounts.stroke ?? 0,
+    textCount: counts.elementCounts.text ?? 0,
+    imageCount: counts.elementCounts.image ?? 0,
+    pageFrameCount: counts.elementCounts['page-frame'] ?? 0,
+    pdfCount: counts.elementCounts.pdf ?? 0,
     pageFrameUuids,
     strokeUuids,
     sampledElements,
@@ -100,26 +103,7 @@ function summarizeElements(
 }
 
 export function describeElementType(type: number | null | undefined): string {
-  switch (type) {
-    case ElementType.STROKE:
-      return 'stroke';
-    case ElementType.TEXT:
-      return 'text';
-    case ElementType.IMAGE:
-      return 'image';
-    case ElementType.PAGE_FRAME:
-      return 'page-frame';
-    case ElementType.PDF:
-      return 'pdf';
-    case ElementType.LATEX:
-      return 'latex';
-    case ElementType.AUDIO:
-      return 'audio';
-    case ElementType.CODE_OUTPUT:
-      return 'code-output';
-    default:
-      return `unknown:${String(type)}`;
-  }
+  return getElementDescriptor(type)?.name ?? `unknown:${String(type)}`;
 }
 
 export function summarizeDrawableElements(

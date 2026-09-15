@@ -12,6 +12,10 @@ import { parseCssColor } from '../../pdf-export/color';
 import type { FontKey } from '../../pdf-export/contract';
 import { familyToKey } from '../../pdf-export/fonts';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
+import type {
+  CanvasSearchContent,
+  SearchableElement,
+} from '../canvas-searchable-element';
 import { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
 
@@ -36,7 +40,7 @@ const DEFAULT_BOX_HEIGHT = 80;
  * render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source for PDF
  * export, thumbnails, and the bounding box.
  */
-export class TextElement extends DrawableElement {
+export class TextElement extends DrawableElement implements SearchableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _text: string = '';
   private _style: TextStyle;
@@ -77,6 +81,11 @@ export class TextElement extends DrawableElement {
       boxWidth: this._boxWidth,
       boxHeight: this._boxHeight,
     };
+  }
+
+  public getCanvasSearchContent(): CanvasSearchContent | null {
+    const text = this._text.trim();
+    return text ? { kind: 'text', text } : null;
   }
 
   public override bindToYMap(yMap: Y.Map<unknown>): void {

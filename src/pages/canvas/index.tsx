@@ -18,16 +18,13 @@ import {
 import { toast } from 'sonner';
 import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
-import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
-import {
-  type ExportTarget,
-  setExportDialogOpener,
-} from '@myelin/editor/export/export-controller';
+import type { ExportTarget } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
@@ -146,6 +143,13 @@ function CanvasViewInner({
   const [zoomLocked, setZoomLocked] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
+  const canvasUiServices = useMemo<CanvasUiServices>(
+    () => ({
+      openChromeMenu: (anchor, items) => setChromeMenu({ anchor, items }),
+      openExportDialog: (target) => setExportTarget(target),
+    }),
+    [],
+  );
   const onToggleZoomLock = useCallback(() => {
     setZoomLocked((prev) => {
       const next = !prev;
@@ -165,16 +169,6 @@ function CanvasViewInner({
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
   }, [id]);
-
-  useEffect(() => {
-    setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
-    return () => setChromeMenuOpener(() => {});
-  }, []);
-
-  useEffect(() => {
-    setExportDialogOpener((target) => setExportTarget(target));
-    return () => setExportDialogOpener(null);
-  }, []);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({
@@ -203,6 +197,7 @@ function CanvasViewInner({
     onInsertFrame: inserts.onInsertFrame,
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
+    uiServices: canvasUiServices,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
   const onExportCanvasPdf = useCallback(() => {
@@ -528,6 +523,10 @@ function CanvasViewInner({
   const insertPopover = useMemo(
     () => (
       <InsertPopover
+        onPaste={() => {
+          void engine.clipboard.paste();
+          inserts.closeInsert();
+        }}
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
         onInsertLatex={inserts.onInsertLatex}
@@ -537,6 +536,7 @@ function CanvasViewInner({
     ),
     [
       inserts.closeInsert,
+      engine.clipboard,
       inserts.onInsertEmbed,
       inserts.onInsertFrame,
       inserts.onInsertLatex,
@@ -617,11 +617,12 @@ function CanvasViewInner({
       />
 
       {/* Frame chrome controls (hamburger buttons). Each control shares its
-          frame’s stacking rank, so a higher frame can cover a lower frame’s
+          frame’s stacking rank, so a higher element can cover a lower element’s
           controls. Pointer-events-none by default; individual buttons opt in. */}
       <div
         data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{ zIndex: 20 }}
       />
 
       <StatusBar
@@ -633,7 +634,11 @@ function CanvasViewInner({
         onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
-        <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
+        <SelectionToolbar
+          drawableCanvasRef={drawableCanvasRef}
+          onCopy={engine.clipboard.copy}
+          onCut={engine.clipboard.cut}
+        />
       )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
@@ -678,6 +683,10 @@ function CanvasViewInner({
           }}
         >
           <InsertPopover
+            onPaste={() => {
+              void engine.clipboard.paste();
+              inserts.closeContextInsert();
+            }}
             onInsertFrame={inserts.onContextInsertFrame}
             onInsertEmbed={inserts.onContextInsertEmbed}
             onInsertLatex={inserts.onContextInsertLatex}

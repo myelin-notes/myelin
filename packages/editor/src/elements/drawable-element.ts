@@ -7,6 +7,7 @@ import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
+import type { CanvasElementContext } from './canvas-element-context';
 import { type ElementType, isBackgroundElement } from './element-type';
 
 export interface SelectionToolbarItem {
@@ -23,7 +24,6 @@ export interface SelectionToolbarItem {
 const HANDLE_SIZE = 6;
 const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
-const SELECTION_ANIM_SPEED = 8;
 
 // Screen-space radius (px) for grabbing a resize handle, divided by zoom for world tolerance.
 const HANDLE_HIT_RADIUS = 10;
@@ -85,13 +85,135 @@ const HANDLE_SPECS: readonly HandleSpec[] = [
   { flag: ResizeHandles.BottomRight, fx: 1, fy: 1, cursor: 'nwse-resize' },
 ];
 
+/** Draw a selection envelope in world coordinates. */
+export function drawSelectionBounds(
+  ctx: CanvasRenderingContext2D,
+  box: DOMRect,
+  progress: number,
+  isEditing: boolean,
+  resizeHandles: ResizeHandles,
+): void {
+  const eased = 1 - (1 - progress) * (1 - progress);
+  const pad = SELECTION_PADDING * eased;
+  const x = box.x - pad;
+  const y = box.y - pad;
+  const w = box.width + pad * 2;
+  const h = box.height + pad * 2;
+  const r = SELECTION_RADIUS * eased;
+  const palette = getCanvasPalette();
+
+  ctx.globalAlpha = eased;
+
+  if (!isEditing) {
+    ctx.fillStyle = palette.selectionFill;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = palette.selectionStroke;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.stroke();
+
+  const size = HANDLE_SIZE * eased;
+  const half = size / 2;
+  const radius = 1.5 * eased;
+
+  for (const spec of HANDLE_SPECS) {
+    if (!(resizeHandles & spec.flag)) {
+      continue;
+    }
+    const cx = x + w * spec.fx - half;
+    const cy = y + h * spec.fy - half;
+
+    ctx.fillStyle = palette.surface;
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, size, size, radius);
+    ctx.fill();
+
+    ctx.strokeStyle = palette.selectionStroke;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, size, size, radius);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+/** Build resize handles for a world-space selection envelope. */
+export function getResizeHandles(
+  box: DOMRect,
+  flags: ResizeHandles,
+): ResizeHandle[] {
+  if (flags === ResizeHandles.None) {
+    return [];
+  }
+  const result: ResizeHandle[] = [];
+
+  for (const spec of HANDLE_SPECS) {
+    if (!(flags & spec.flag)) {
+      continue;
+    }
+    const fxA = 1 - spec.fx;
+    const fyA = 1 - spec.fy;
+    result.push({
+      position: {
+        x: box.x + box.width * spec.fx + (2 * spec.fx - 1) * SELECTION_PADDING,
+        y: box.y + box.height * spec.fy + (2 * spec.fy - 1) * SELECTION_PADDING,
+      },
+      anchor: {
+        x: box.x + box.width * fxA + (2 * fxA - 1) * SELECTION_PADDING,
+        y: box.y + box.height * fyA + (2 * fyA - 1) * SELECTION_PADDING,
+      },
+      anchorPad: {
+        x: (2 * fxA - 1) * SELECTION_PADDING,
+        y: (2 * fyA - 1) * SELECTION_PADDING,
+      },
+      anchorFx: fxA,
+      anchorFy: fyA,
+      scaleX: spec.fx !== 0.5,
+      scaleY: spec.fy !== 0.5,
+      cursor: spec.cursor,
+    });
+  }
+  return result;
+}
+
+/** Return the nearest resize handle within the pointer-specific screen-space radius. */
+export function hitResizeHandle(
+  handles: readonly ResizeHandle[],
+  point: Vector2,
+  zoom: number,
+  touch = false,
+): ResizeHandle | null {
+  const hitRadius =
+    (touch ? HANDLE_TOUCH_HIT_RADIUS : HANDLE_HIT_RADIUS) / zoom;
+  let best: ResizeHandle | null = null;
+  let bestDistSq = hitRadius * hitRadius;
+  for (const handle of handles) {
+    const dx = point.x - handle.position.x;
+    const dy = point.y - handle.position.y;
+    const distSq = dx * dx + dy * dy;
+    if (distSq <= bestDistSq) {
+      best = handle;
+      bestDistSq = distSq;
+    }
+  }
+  return best;
+}
+
 export abstract class DrawableElement {
   protected _scale: Vector2 = { x: 1, y: 1 };
   private _offset: Vector2 = { x: 0, y: 0 };
   private selected: boolean = false;
-  private selectionT: number = 0;
   private _hidden: boolean = false;
+  private _locked: boolean = false;
   public onSelectionChanged?: () => void;
+  public onLockChanged?: () => void;
   public onTransformChanged?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
@@ -134,6 +256,13 @@ export abstract class DrawableElement {
         this._scale.y = v as number;
         this.updateBoundingBox();
       },
+      locked: (v) => {
+        const locked = v === true;
+        if (this._locked !== locked) {
+          this._locked = locked;
+          this.onLockChanged?.();
+        }
+      },
     });
   }
 
@@ -145,7 +274,16 @@ export abstract class DrawableElement {
   /** Apply changed Y.Map fields after the canvas observes a remote update. */
   public syncFromYMap(keys: Iterable<string>): void {
     if (this._yMap) {
-      applyYFields(this._yMap, this._yFields, keys);
+      const changedKeys = Array.from(keys);
+      applyYFields(this._yMap, this._yFields, changedKeys);
+      if (
+        changedKeys.includes('locked') &&
+        this._yMap.get('locked') === undefined &&
+        this._locked
+      ) {
+        this._locked = false;
+        this.onLockChanged?.();
+      }
     }
   }
 
@@ -189,16 +327,23 @@ export abstract class DrawableElement {
     this._hidden = value;
   }
 
-  /** Draw element content. Selection outline is drawn separately by `drawSelectionOverlay`. */
+  public get locked(): boolean {
+    return this._locked;
+  }
+
+  public setLocked(locked: boolean): void {
+    if (this._locked === locked) {
+      return;
+    }
+    this._locked = locked;
+    this.syncToYMap({ locked });
+    this.onLockChanged?.();
+  }
+
+  /** Draw element content. The renderer draws the shared selection overlay separately. */
   public draw(ctx: CanvasRenderingContext2D, deltaTime: number): void {
     if (this._hidden) {
       return;
-    }
-    if (this.selected) {
-      this.selectionT = Math.min(
-        1,
-        this.selectionT + deltaTime * SELECTION_ANIM_SPEED,
-      );
     }
     ctx.save();
     ctx.translate(this._offset.x, this._offset.y);
@@ -224,92 +369,6 @@ export abstract class DrawableElement {
     this.draw2D(ctx, deltaTime);
   }
 
-  // Exactly the condition `drawSelectionOverlay` early-returns on, so the renderer can skip
-  // touching the overlay canvas entirely.
-  public get hasSelectionOverlay(): boolean {
-    return !this._hidden && this.selectionT > 0;
-  }
-
-  // On a separate always-on-top canvas so it stays visible above DOM-backed editing chrome.
-  public drawSelectionOverlay(
-    ctx: CanvasRenderingContext2D,
-    isEditing: boolean,
-  ): void {
-    if (this._hidden || this.selectionT <= 0) {
-      return;
-    }
-    ctx.save();
-    ctx.translate(this._offset.x, this._offset.y);
-    this.drawSelection(ctx, this.selectionT, isEditing);
-    ctx.restore();
-  }
-
-  private drawSelection(
-    ctx: CanvasRenderingContext2D,
-    t: number,
-    isEditing: boolean,
-  ): void {
-    // Derive from boundingBox so element-specific overrides — e.g. PDF mixing scaled content with
-    // unscaled chrome padding — flow through consistently.
-    const box = this.boundingBox;
-    const eased = 1 - (1 - t) * (1 - t);
-
-    const pad = SELECTION_PADDING * eased;
-    const x = box.x - this._offset.x - pad;
-    const y = box.y - this._offset.y - pad;
-    const w = box.width + pad * 2;
-    const h = box.height + pad * 2;
-    const r = SELECTION_RADIUS * eased;
-
-    const palette = getCanvasPalette();
-
-    ctx.globalAlpha = eased;
-
-    // Selection fill — skipped while editing to keep the editing surface clean.
-    if (!isEditing) {
-      ctx.fillStyle = palette.selectionFill;
-      ctx.beginPath();
-      ctx.roundRect(x, y, w, h, r);
-      ctx.fill();
-    }
-
-    // Selection border
-    ctx.strokeStyle = palette.selectionStroke;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, r);
-    ctx.stroke();
-
-    // Resize handles
-    const flags = this.resizeHandles;
-    const handleScale = eased;
-    const size = HANDLE_SIZE * handleScale;
-    const half = size / 2;
-    const radius = 1.5 * handleScale;
-
-    for (const spec of HANDLE_SPECS) {
-      if (!(flags & spec.flag)) {
-        continue;
-      }
-      const cx = x + w * spec.fx - half;
-      const cy = y + h * spec.fy - half;
-
-      ctx.fillStyle = palette.surface;
-      ctx.beginPath();
-      ctx.roundRect(cx, cy, size, size, radius);
-      ctx.fill();
-
-      ctx.strokeStyle = palette.selectionStroke;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(cx, cy, size, size, radius);
-      ctx.stroke();
-    }
-
-    ctx.globalAlpha = 1;
-  }
-
   public select() {
     if (this.selected) {
       return;
@@ -323,7 +382,6 @@ export abstract class DrawableElement {
       return;
     }
     this.selected = false;
-    this.selectionT = 0;
     this.onSelectionChanged?.();
   }
 
@@ -353,6 +411,8 @@ export abstract class DrawableElement {
   // For shared state that does not live on the element's main Y.Map.
   public bindSharedYState(_ydoc: YDocManager): void {}
 
+  public configureCanvas(_context: CanvasElementContext): void {}
+
   /** Called when the element enters inline edit mode. Returns the root DOM element of the editing UI, if any. */
   public enterEditMode(
     _canvas: DrawableCanvas,
@@ -370,6 +430,10 @@ export abstract class DrawableElement {
 
   /** Detach any DOM this element created. Called on removal. Default: no-op. */
   public disposeDOM(): void {}
+
+  public disposeCanvas(): void {
+    this.disposeDOM();
+  }
 
   public updateBounds() {
     this.updateBoundingBox();
@@ -436,41 +500,7 @@ export abstract class DrawableElement {
 
   /** Enabled resize handles in world space, with anchor & axis info. */
   public getHandles(): ResizeHandle[] {
-    const flags = this.resizeHandles;
-    if (flags === ResizeHandles.None) {
-      return [];
-    }
-    const box = this.boundingBox;
-    const p = SELECTION_PADDING;
-    const result: ResizeHandle[] = [];
-
-    for (const spec of HANDLE_SPECS) {
-      if (!(flags & spec.flag)) {
-        continue;
-      }
-      const fxA = 1 - spec.fx;
-      const fyA = 1 - spec.fy;
-      result.push({
-        position: {
-          x: box.x + box.width * spec.fx + (2 * spec.fx - 1) * p,
-          y: box.y + box.height * spec.fy + (2 * spec.fy - 1) * p,
-        },
-        anchor: {
-          x: box.x + box.width * fxA + (2 * fxA - 1) * p,
-          y: box.y + box.height * fyA + (2 * fyA - 1) * p,
-        },
-        anchorPad: {
-          x: (2 * fxA - 1) * p,
-          y: (2 * fyA - 1) * p,
-        },
-        anchorFx: fxA,
-        anchorFy: fyA,
-        scaleX: spec.fx !== 0.5,
-        scaleY: spec.fy !== 0.5,
-        cursor: spec.cursor,
-      });
-    }
-    return result;
+    return getResizeHandles(this.boundingBox, this.resizeHandles);
   }
 
   // Pass `touch` for finger input, which grabs with the larger radius.
@@ -479,22 +509,7 @@ export abstract class DrawableElement {
     zoom: number,
     touch = false,
   ): ResizeHandle | null {
-    const hitRadius =
-      (touch ? HANDLE_TOUCH_HIT_RADIUS : HANDLE_HIT_RADIUS) / zoom;
-    // Nearest match, not first: on an element small enough that the radius spans neighbouring
-    // handles, taking whichever `getHandles` lists first would resize along the wrong axis.
-    let best: ResizeHandle | null = null;
-    let bestDistSq = hitRadius * hitRadius;
-    for (const h of this.getHandles()) {
-      const dx = point.x - h.position.x;
-      const dy = point.y - h.position.y;
-      const distSq = dx * dx + dy * dy;
-      if (distSq <= bestDistSq) {
-        best = h;
-        bestDistSq = distSq;
-      }
-    }
-    return best;
+    return hitResizeHandle(this.getHandles(), point, zoom, touch);
   }
 
   // Only when it is the sole selected element. Override to expose element-specific actions.

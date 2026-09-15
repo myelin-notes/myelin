@@ -6,11 +6,12 @@ import {
 import { isApplePlatform } from '@myelin/shared/os';
 import { getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import type {
-  DrawableElement,
-  ResizeHandle,
+import {
+  type DrawableElement,
+  MIN_SCALE,
+  type ResizeHandle,
 } from '../elements/drawable-element';
-import { ElementType } from '../elements/element-type';
+import { ElementType, isBackgroundElement } from '../elements/element-type';
 import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
@@ -22,6 +23,34 @@ enum SelectMode {
   Marquee,
   Lasso,
 }
+
+const DOUBLE_CLICK_SLOP_PX = 8;
+
+interface ElementTransformSnapshot {
+  element: DrawableElement;
+  offset: Vector2;
+  scale: Vector2;
+}
+
+interface ElementScaleInteraction {
+  kind: 'element';
+  element: DrawableElement;
+  handle: ResizeHandle;
+  anchorWorld: Vector2;
+  originalScale: Vector2;
+  originalOffset: Vector2;
+  originalDraggedWorld: Vector2;
+}
+
+interface GroupScaleInteraction {
+  kind: 'group';
+  handle: ResizeHandle;
+  anchorWorld: Vector2;
+  originalDraggedWorld: Vector2;
+  transforms: ElementTransformSnapshot[];
+}
+
+type ScaleInteraction = ElementScaleInteraction | GroupScaleInteraction;
 
 export class SelectTool implements ITool {
   public constructor(private readonly getStrings: MessageGetter) {}
@@ -43,12 +72,7 @@ export class SelectTool implements ITool {
   } | null = null;
 
   // Scale state
-  private scalingElement: DrawableElement | null = null;
-  private scalingHandle: ResizeHandle | null = null;
-  private anchorWorld: Vector2 = { x: 0, y: 0 };
-  private originalScale: Vector2 = { x: 1, y: 1 };
-  private originalOffset: Vector2 = { x: 0, y: 0 };
-  private originalDraggedWorld: Vector2 = { x: 0, y: 0 };
+  private scaleInteraction: ScaleInteraction | null = null;
 
   // Lasso state
   private lassoPath: Vector2[] = [];
@@ -113,31 +137,64 @@ export class SelectTool implements ITool {
   public start(canvas: DrawableCanvas, event: PointerEvent): void {
     const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
+    this.lastPoint = point;
 
     // Cmd on macOS / Ctrl on Windows, matching the app-wide convention and avoiding the macOS
     // Ctrl+click right-click gesture.
     const additive = isApplePlatform ? event.metaKey : event.ctrlKey;
 
-    // Must match the test DrawableCanvas ran to hand the gesture to this tool, or a handle a finger
-    // grabbed there would miss here and fall through to a move.
-    const touch = event.pointerType === 'touch';
+    const selectedElements = canvas.getSelectedElements();
+    const selectionBounds = canvas.getSelectedElementBounds();
+    const insideSelectionBounds =
+      selectionBounds !== null && CollisionHelper.inBox(point, selectionBounds);
 
-    // 1. Check handles on selected elements first
-    for (let i = canvas.elements.length - 1; i >= 0; i--) {
-      const e = canvas.elements[i];
-      if (!e.isSelected) {
-        continue;
-      }
-      const handle = e.hitHandle(point, canvas.viewport.zoom, touch);
+    // The selection body wins where a large touch target overlaps a handle. Handle centres sit
+    // outside the content bounds, so they remain reachable without stealing thin strokes' interior.
+    if (!insideSelectionBounds) {
+      const handle = canvas.hitSelectionHandle(point, event.pointerType);
       if (handle) {
         this.mode = SelectMode.Scaling;
-        this.scalingElement = e;
-        this.scalingHandle = handle;
-        this.originalScale = { ...e.scale };
-        this.originalOffset = { ...e.offset };
-        this.anchorWorld = handle.anchor;
-        this.originalDraggedWorld = handle.position;
-        e.beginResize();
+        if (selectedElements.length > 1 && selectionBounds) {
+          this.scaleInteraction = {
+            kind: 'group',
+            handle,
+            anchorWorld: {
+              x: selectionBounds.x + selectionBounds.width * handle.anchorFx,
+              y: selectionBounds.y + selectionBounds.height * handle.anchorFy,
+            },
+            originalDraggedWorld: {
+              x:
+                selectionBounds.x +
+                selectionBounds.width * (1 - handle.anchorFx),
+              y:
+                selectionBounds.y +
+                selectionBounds.height * (1 - handle.anchorFy),
+            },
+            transforms: selectedElements
+              .filter((element) => !element.locked)
+              .map((element) => ({
+                element,
+                offset: { ...element.offset },
+                scale: { ...element.scale },
+              })),
+          };
+        } else {
+          const element = selectedElements[0];
+          if (!element) {
+            this.reset();
+            return;
+          }
+          this.scaleInteraction = {
+            kind: 'element',
+            element,
+            handle,
+            originalScale: { ...element.scale },
+            originalOffset: { ...element.offset },
+            anchorWorld: handle.anchor,
+            originalDraggedWorld: handle.position,
+          };
+          element.beginResize();
+        }
         return;
       }
     }
@@ -146,8 +203,10 @@ export class SelectTool implements ITool {
     const now = Date.now();
     const dx = point.x - this.lastClickPos.x;
     const dy = point.y - this.lastClickPos.y;
+    const doubleClickSlop = DOUBLE_CLICK_SLOP_PX / canvas.viewport.zoom;
     const isDoubleClick =
-      now - this.lastClickTime < 400 && dx * dx + dy * dy < 25;
+      now - this.lastClickTime < 400 &&
+      dx * dx + dy * dy < doubleClickSlop * doubleClickSlop;
 
     if (isDoubleClick && !additive && canvas.enterEditAtPoint(point, event)) {
       this.lastClickTime = 0;
@@ -170,12 +229,17 @@ export class SelectTool implements ITool {
         pick.unselect();
       } else {
         pick.select();
-        this.mode = SelectMode.Moving;
-        this.lastPoint = point;
-        this.totalDelta = { x: 0, y: 0 };
-        this.movingElements = canvas.elements.filter((e) => e.isSelected);
+        this.beginMove(
+          canvas.elements.filter((element) => element.isSelected),
+          point,
+        );
       }
       this.lastCycledElement = null;
+      return;
+    }
+
+    if (selectedElements.length > 1 && insideSelectionBounds) {
+      this.beginMove(selectedElements, point);
       return;
     }
 
@@ -227,10 +291,10 @@ export class SelectTool implements ITool {
         pick.select();
       }
 
-      this.mode = SelectMode.Moving;
-      this.lastPoint = point;
-      this.totalDelta = { x: 0, y: 0 };
-      this.movingElements = canvas.elements.filter((e) => e.isSelected);
+      this.beginMove(
+        canvas.elements.filter((element) => element.isSelected),
+        point,
+      );
 
       // Clicking an already-selected editable element (without dragging)
       // re-enters edit mode.
@@ -242,6 +306,18 @@ export class SelectTool implements ITool {
       ) {
         this.clickToEditCandidate = pick;
       }
+      return;
+    }
+
+    const interactionBounds = canvas.getSelectionInteractionBounds(
+      event.pointerType,
+    );
+    if (
+      selectedElements.length > 0 &&
+      interactionBounds &&
+      CollisionHelper.inBox(point, interactionBounds)
+    ) {
+      this.beginMove(selectedElements, point);
       return;
     }
 
@@ -285,23 +361,28 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Scaling: {
-        if (!this.scalingElement || !this.scalingHandle) {
+        const interaction = this.scaleInteraction;
+        if (!interaction) {
           break;
         }
-        const e = this.scalingElement;
-        const h = this.scalingHandle;
+        if (interaction.kind === 'group') {
+          this.updateGroupScale(interaction, position);
+          break;
+        }
+        const e = interaction.element;
+        const h = interaction.handle;
         const localBox = e.localBoundingBox;
         if (localBox.width === 0 || localBox.height === 0) {
           break;
         }
 
         const origDist = {
-          x: this.originalDraggedWorld.x - this.anchorWorld.x,
-          y: this.originalDraggedWorld.y - this.anchorWorld.y,
+          x: interaction.originalDraggedWorld.x - interaction.anchorWorld.x,
+          y: interaction.originalDraggedWorld.y - interaction.anchorWorld.y,
         };
         const curDist = {
-          x: position.x - this.anchorWorld.x,
-          y: position.y - this.anchorWorld.y,
+          x: origDist.x + position.x - this.startPoint.x,
+          y: origDist.y + position.y - this.startPoint.y,
         };
 
         let ratioX = h.scaleX && origDist.x !== 0 ? curDist.x / origDist.x : 1;
@@ -317,15 +398,16 @@ export class SelectTool implements ITool {
 
         e.applyResize({
           handle: h,
-          originalScale: this.originalScale,
-          originalOffset: this.originalOffset,
+          originalScale: interaction.originalScale,
+          originalOffset: interaction.originalOffset,
           ratioX,
           ratioY,
-          anchorWorld: this.anchorWorld,
+          anchorWorld: interaction.anchorWorld,
         });
         break;
       }
       case SelectMode.Marquee: {
+        this.lastPoint = position;
         const marqueeRect = new DOMRect(
           Math.min(this.startPoint.x, position.x),
           Math.min(this.startPoint.y, position.y),
@@ -334,9 +416,14 @@ export class SelectTool implements ITool {
         );
         for (const e of canvas.elements) {
           const box = e.boundingBox;
+          const overlap = CollisionHelper.overlappingAreaOf2Rect(
+            marqueeRect,
+            box,
+          );
           if (
-            CollisionHelper.overlappingAreaOf2Rect(marqueeRect, box) >
-            box.width * box.height * 0.5
+            !e.locked &&
+            overlap >
+              (isBackgroundElement(e.type) ? box.width * box.height * 0.5 : 0)
           ) {
             e.select();
           } else {
@@ -346,6 +433,7 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Lasso: {
+        this.lastPoint = position;
         this.lassoPath.push(position);
         const poly = this.lassoPath;
         for (const e of canvas.elements) {
@@ -354,7 +442,7 @@ export class SelectTool implements ITool {
             x: box.x + box.width * 0.5,
             y: box.y + box.height * 0.5,
           };
-          if (CollisionHelper.isPointInPolygon(center, poly)) {
+          if (!e.locked && CollisionHelper.isPointInPolygon(center, poly)) {
             e.select();
           } else {
             e.unselect();
@@ -380,7 +468,9 @@ export class SelectTool implements ITool {
       }
       case SelectMode.Scaling: {
         // Yjs captures mutations automatically — no command needed
-        this.scalingElement?.endResize();
+        if (this.scaleInteraction?.kind === 'element') {
+          this.scaleInteraction.element.endResize();
+        }
         break;
       }
       case SelectMode.Marquee:
@@ -388,7 +478,16 @@ export class SelectTool implements ITool {
         // Nothing caught means the gesture was a click on the backdrop it
         // started from, not a selection of what sits on top of it.
         const backdrop = this.backdropClickCandidate;
-        if (backdrop && !canvas.elements.some((e) => e.isSelected)) {
+        if (
+          backdrop &&
+          !canvas.elements.some((e) => e.isSelected) &&
+          (!backdrop.locked ||
+            Math.hypot(
+              this.lastPoint.x - this.startPoint.x,
+              this.lastPoint.y - this.startPoint.y,
+            ) <=
+              DOUBLE_CLICK_SLOP_PX / canvas.viewport.zoom)
+        ) {
           backdrop.select();
           this.lastCycledElement = backdrop;
         }
@@ -404,18 +503,31 @@ export class SelectTool implements ITool {
   public interrupt(canvas: DrawableCanvas): void {
     if (
       this.mode === SelectMode.Moving &&
+      this.movingElements.length > 0 &&
       (this.totalDelta.x !== 0 || this.totalDelta.y !== 0)
     ) {
       canvas.undo();
     }
-    if (this.mode === SelectMode.Scaling && this.scalingElement) {
-      const e = this.scalingElement;
-      const changed =
-        e.scale.x !== this.originalScale.x ||
-        e.scale.y !== this.originalScale.y ||
-        e.offset.x !== this.originalOffset.x ||
-        e.offset.y !== this.originalOffset.y;
-      e.endResize();
+    if (this.mode === SelectMode.Scaling && this.scaleInteraction) {
+      const interaction = this.scaleInteraction;
+      let changed: boolean;
+      if (interaction.kind === 'element') {
+        const e = interaction.element;
+        changed =
+          e.scale.x !== interaction.originalScale.x ||
+          e.scale.y !== interaction.originalScale.y ||
+          e.offset.x !== interaction.originalOffset.x ||
+          e.offset.y !== interaction.originalOffset.y;
+        e.endResize();
+      } else {
+        changed = interaction.transforms.some(
+          ({ element, offset, scale }) =>
+            element.scale.x !== scale.x ||
+            element.scale.y !== scale.y ||
+            element.offset.x !== offset.x ||
+            element.offset.y !== offset.y,
+        );
+      }
       if (changed) {
         canvas.undo();
       }
@@ -429,31 +541,31 @@ export class SelectTool implements ITool {
       canvas.setCursor('move');
       return;
     }
-    if (this.mode === SelectMode.Scaling && this.scalingHandle) {
-      canvas.setCursor(this.scalingHandle.cursor);
+    if (this.mode === SelectMode.Scaling && this.scaleInteraction) {
+      canvas.setCursor(this.scaleInteraction.handle.cursor);
       return;
     }
 
-    // Idle — check handles on selected elements
-    for (let i = canvas.elements.length - 1; i >= 0; i--) {
-      const e = canvas.elements[i];
-      if (!e.isSelected) {
-        continue;
-      }
-      const handle = e.hitHandle(position, canvas.viewport.zoom);
+    const selectionBounds = canvas.getSelectedElementBounds();
+    const insideSelectionBounds =
+      selectionBounds !== null &&
+      CollisionHelper.inBox(position, selectionBounds);
+    if (!insideSelectionBounds) {
+      const handle = canvas.hitSelectionHandle(position, 'mouse');
       if (handle) {
         canvas.setCursor(handle.cursor);
         return;
       }
     }
 
-    // Check selected element bodies
-    for (let i = canvas.elements.length - 1; i >= 0; i--) {
-      const e = canvas.elements[i];
-      if (e.isSelected && CollisionHelper.inBox(position, e.boundingBox)) {
-        canvas.setCursor('move');
-        return;
-      }
+    const interactionBounds = canvas.getSelectionInteractionBounds('mouse');
+    if (
+      canvas.getSelectedElements().some((element) => !element.locked) &&
+      interactionBounds &&
+      CollisionHelper.inBox(position, interactionBounds)
+    ) {
+      canvas.setCursor('move');
+      return;
     }
 
     canvas.setCursor('default');
@@ -462,12 +574,67 @@ export class SelectTool implements ITool {
   private reset() {
     this.mode = SelectMode.None;
     this.movingElements = [];
-    this.scalingElement = null;
-    this.scalingHandle = null;
+    this.scaleInteraction = null;
     this.lassoPath = [];
     this.pendingCycle = null;
     this.clickToEditCandidate = null;
     this.backdropClickCandidate = null;
+  }
+
+  private beginMove(elements: DrawableElement[], point: Vector2): void {
+    this.mode = SelectMode.Moving;
+    this.lastPoint = point;
+    this.totalDelta = { x: 0, y: 0 };
+    this.movingElements = elements.filter((element) => !element.locked);
+  }
+
+  private updateGroupScale(
+    interaction: GroupScaleInteraction,
+    position: Vector2,
+  ): void {
+    const pointerDelta = {
+      x: position.x - this.startPoint.x,
+      y: position.y - this.startPoint.y,
+    };
+    const originalDistance = {
+      x: interaction.originalDraggedWorld.x - interaction.anchorWorld.x,
+      y: interaction.originalDraggedWorld.y - interaction.anchorWorld.y,
+    };
+    const currentDistance = {
+      x: originalDistance.x + pointerDelta.x,
+      y: originalDistance.y + pointerDelta.y,
+    };
+    const ratios: number[] = [];
+    if (originalDistance.x !== 0) {
+      ratios.push(currentDistance.x / originalDistance.x);
+    }
+    if (originalDistance.y !== 0) {
+      ratios.push(currentDistance.y / originalDistance.y);
+    }
+    if (ratios.length === 0) {
+      return;
+    }
+    const ratio = Math.max(
+      MIN_SCALE,
+      ratios.reduce((best, candidate) =>
+        Math.abs(candidate) > Math.abs(best) ? candidate : best,
+      ),
+    );
+    const anchor = interaction.anchorWorld;
+    for (const snapshot of interaction.transforms) {
+      snapshot.element.setScale(
+        snapshot.scale.x * ratio,
+        snapshot.scale.y * ratio,
+      );
+      const targetOffset = {
+        x: anchor.x + (snapshot.offset.x - anchor.x) * ratio,
+        y: anchor.y + (snapshot.offset.y - anchor.y) * ratio,
+      };
+      snapshot.element.translate(
+        targetOffset.x - snapshot.element.offset.x,
+        targetOffset.y - snapshot.element.offset.y,
+      );
+    }
   }
 
   private cyclePendingSelection(canvas: DrawableCanvas): void {

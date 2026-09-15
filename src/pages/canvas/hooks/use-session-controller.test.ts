@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import type {
   ActiveRepository,
   NoteSessionStatus,
@@ -13,7 +14,10 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
     drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
       return {
         elements: [],
-        viewport: { screenToWorld: vi.fn() },
+        viewport: {
+          screenToWorld: vi.fn(),
+          onViewChange: vi.fn(() => vi.fn()),
+        },
         addElement: vi.fn(),
         setBackgroundHost: vi.fn(),
         setOverlayCanvas: vi.fn(),
@@ -217,6 +221,39 @@ describe('CanvasSessionController', () => {
       'Alpha Note',
       expect.any(Map),
     );
+
+    await controller.dispose();
+  });
+
+  it('passes UI services scoped to this controller into DrawableCanvas', async () => {
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(createSession('note-1')),
+      getNode: vi.fn().mockResolvedValue(undefined),
+      searchNodes: vi.fn(),
+    };
+    const uiServices: CanvasUiServices = {
+      openChromeMenu: vi.fn(),
+      openExportDialog: vi.fn(),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+      'tab-1',
+      uiServices,
+    );
+
+    await controller.open('note-1');
+
+    expect(drawableCanvasCtor.mock.calls[0]?.[8]).toMatchObject(uiServices);
+    expect(drawableCanvasCtor.mock.calls[0]?.[8]).toMatchObject({
+      ensureCodeOutputCard: expect.any(Function),
+    });
 
     await controller.dispose();
   });

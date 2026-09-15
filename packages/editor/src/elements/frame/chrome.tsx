@@ -8,7 +8,7 @@ import { createRef } from 'react';
 import { Pencil as PencilIcon } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
+import type { ChromeMenuItem, ChromeMenuOpener } from '../../chrome-menu';
 import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
@@ -35,6 +35,7 @@ export interface FrameChromeOptions {
   // Returning an empty array suppresses the menu. Called lazily per click so items reflect
   // current state.
   getMenuItems?: () => ChromeMenuItem[];
+  openChromeMenu?: ChromeMenuOpener;
   onTitleCommit?: (title: string) => string | undefined;
 }
 
@@ -47,6 +48,7 @@ export class FrameChrome {
   private readonly reactRoot: Root;
   private readonly viewRef = createRef<FrameChromeViewHandle>();
   private readonly getMenuItems?: () => ChromeMenuItem[];
+  private readonly openChromeMenu?: ChromeMenuOpener;
   private readonly onTitleCommit?: (title: string) => string | undefined;
 
   private fileName: string | null = null;
@@ -56,6 +58,7 @@ export class FrameChrome {
   constructor(options: FrameChromeOptions, host: HTMLElement) {
     this.kindLabel = options.kindLabel;
     this.getMenuItems = options.getMenuItems;
+    this.openChromeMenu = options.openChromeMenu;
     this.onTitleCommit = options.onTitleCommit;
 
     this.root = document.createElement('div');
@@ -251,7 +254,7 @@ export class FrameChrome {
     if (items.length === 0) {
       return;
     }
-    openChromeMenu(anchor, items);
+    this.openChromeMenu?.(anchor, items);
   };
 
   private getChromeMenuItems(): ChromeMenuItem[] {

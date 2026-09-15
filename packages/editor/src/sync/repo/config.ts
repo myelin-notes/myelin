@@ -19,32 +19,6 @@ export type RepositoryConfig =
       credentialId: string;
     };
 
-function normalizeStorageKeyPart(value: string): string {
-  return value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_') || 'default';
-}
-
-/**
- * Stable, filesystem-safe key for a repository's local storage. GitHub repos cache files under
- * `repositories/github/<key>`, and the note-index namespaces artifacts under `NoteIndex/<key>/`.
- * The same owner/repo/branch always maps to the same key regardless of credential.
- */
-export function getRepositoryStorageKey(config: RepositoryConfig): string {
-  switch (config.kind) {
-    case 'local':
-      return 'local';
-    case 'github':
-      return [
-        normalizeStorageKeyPart(config.owner),
-        normalizeStorageKeyPart(config.repo),
-        normalizeStorageKeyPart(config.branch ?? 'main'),
-      ].join('__');
-    // Keyed on the folder id, not its name: renaming the Drive folder must keep the local cache, and
-    // two accounts each holding a folder named `Myelin` must not share one cache directory.
-    case 'google-drive':
-      return normalizeStorageKeyPart(config.folderId);
-  }
-}
-
 export interface RepositoryLifecycle {
   initialize(): Promise<void>;
   refresh(): Promise<void>;

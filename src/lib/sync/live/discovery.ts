@@ -1,5 +1,6 @@
 import type { VFSNodeId } from '@myelin/editor/sync/types';
 import type { RepositoryConfig } from '../repo/config';
+import { getLiveDiscoveryRepositoryKey as getBackendDiscoveryKey } from '../repo/repository-backends';
 
 export const LIVE_DISCOVERY_RECORD_TTL_MS = 10 * 60 * 1000;
 export const LIVE_DISCOVERY_MAX_RECORDS = 16;
@@ -92,21 +93,7 @@ export function parseLiveDiscoveryRecords(
 export function getLiveDiscoveryRepositoryKey(
   config: RepositoryConfig,
 ): string | null {
-  switch (config.kind) {
-    case 'local':
-      return null;
-    case 'github':
-      return [
-        'github',
-        config.owner.trim().toLowerCase(),
-        config.repo.trim().toLowerCase(),
-        (config.branch?.trim() || 'main').toLowerCase(),
-      ].join('\0');
-    // Keyed on the folder id: it is the account-unique identity of the folder,
-    // and unlike its name it survives a rename.
-    case 'google-drive':
-      return ['google-drive', config.folderId.trim()].join('\0');
-  }
+  return getBackendDiscoveryKey(config);
 }
 
 export async function createLiveDiscoveryRoomId(
