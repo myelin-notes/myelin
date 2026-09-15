@@ -36,34 +36,6 @@ interface EmbedAnchor {
   screenY: number;
 }
 
-interface CanvasTap {
-  t: number;
-  x: number;
-  y: number;
-}
-
-interface PointerTapCandidate {
-  pointerId: number;
-  x: number;
-  y: number;
-}
-
-const CANVAS_DOUBLE_TAP_MS = 400;
-const CANVAS_DOUBLE_TAP_SLOP_PX = 16;
-const CANVAS_TAP_SLOP_PX = 12;
-
-export function isCanvasDoubleTap(
-  previous: CanvasTap | null,
-  current: CanvasTap,
-): boolean {
-  return (
-    previous !== null &&
-    current.t - previous.t <= CANVAS_DOUBLE_TAP_MS &&
-    Math.hypot(current.x - previous.x, current.y - previous.y) <=
-      CANVAS_DOUBLE_TAP_SLOP_PX
-  );
-}
-
 interface UseCanvasInsertsArgs {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
@@ -336,12 +308,8 @@ export function useCanvasInserts({
     setEmbedOpen(true);
   }, [contextInsert]);
 
-  const lastTapRef = useRef<CanvasTap | null>(null);
-  const pointerTapCandidateRef = useRef<PointerTapCandidate | null>(null);
-  const activeCanvasPointersRef = useRef(new Set<number>());
-
-  const handleCanvasTap = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
+  const onCanvasDoubleClick = useCallback(
+    (event: React.MouseEvent<HTMLCanvasElement>) => {
       const dc = drawableCanvasRef.current;
       if (!dc) {
         return;
@@ -359,17 +327,8 @@ export function useCanvasInserts({
         (el) => !el.hidden && CollisionHelper.inBox(worldPos, el.boundingBox),
       );
       if (hit) {
-        lastTapRef.current = null;
         return;
       }
-      const now = performance.now();
-      const prev = lastTapRef.current;
-      const current = { t: now, x: screenPos.x, y: screenPos.y };
-      lastTapRef.current = current;
-      if (!isCanvasDoubleTap(prev, current)) {
-        return;
-      }
-      lastTapRef.current = null;
       setInsertOpen(false);
       setEmbedOpen(false);
       setContextInsert({
@@ -379,66 +338,6 @@ export function useCanvasInserts({
       });
     },
     [drawableCanvasRef, canvasTools, selectedToolIndex],
-  );
-
-  const onCanvasPointerDown = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const activePointers = activeCanvasPointersRef.current;
-      activePointers.add(event.pointerId);
-      if (event.button !== 0 || activePointers.size !== 1) {
-        pointerTapCandidateRef.current = null;
-        lastTapRef.current = null;
-        return;
-      }
-      pointerTapCandidateRef.current = {
-        pointerId: event.pointerId,
-        x: event.clientX,
-        y: event.clientY,
-      };
-    },
-    [],
-  );
-
-  const onCanvasPointerMove = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const candidate = pointerTapCandidateRef.current;
-      if (
-        candidate?.pointerId === event.pointerId &&
-        Math.hypot(event.clientX - candidate.x, event.clientY - candidate.y) >
-          CANVAS_TAP_SLOP_PX
-      ) {
-        pointerTapCandidateRef.current = null;
-        lastTapRef.current = null;
-      }
-    },
-    [],
-  );
-
-  const onCanvasPointerUp = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      activeCanvasPointersRef.current.delete(event.pointerId);
-      const candidate = pointerTapCandidateRef.current;
-      pointerTapCandidateRef.current = null;
-      if (
-        candidate?.pointerId !== event.pointerId ||
-        Math.hypot(event.clientX - candidate.x, event.clientY - candidate.y) >
-          CANVAS_TAP_SLOP_PX
-      ) {
-        lastTapRef.current = null;
-        return;
-      }
-      handleCanvasTap(event);
-    },
-    [handleCanvasTap],
-  );
-
-  const onCanvasPointerCancel = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      activeCanvasPointersRef.current.delete(event.pointerId);
-      pointerTapCandidateRef.current = null;
-      lastTapRef.current = null;
-    },
-    [],
   );
 
   const submitEmbed = useCallback(
@@ -477,10 +376,7 @@ export function useCanvasInserts({
     onContextInsertEmbed,
     onContextInsertLatex,
     onContextInsertAudio,
-    onCanvasPointerDown,
-    onCanvasPointerMove,
-    onCanvasPointerUp,
-    onCanvasPointerCancel,
+    onCanvasDoubleClick,
     submitEmbed,
     closeEmbed,
   };
