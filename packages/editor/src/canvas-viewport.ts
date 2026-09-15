@@ -309,6 +309,30 @@ export class CanvasViewport {
     this.notifyViewChange();
   }
 
+  /** Moves the camera without changing zoom. */
+  public animateOffsetTo(offset: Vector2, durationMs: number = 300): void {
+    const startOffset = { ...this._offset };
+    this.cancelAnimation();
+    const start = performance.now();
+    let rafId = 0;
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - (1 - t) ** 5;
+      this._offset = {
+        x: startOffset.x + (offset.x - startOffset.x) * eased,
+        y: startOffset.y + (offset.y - startOffset.y) * eased,
+      };
+      this.notifyViewChange();
+      if (t < 1) {
+        rafId = requestAnimationFrame(step);
+      } else {
+        this._viewAnim = null;
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
+  }
+
   /** Replaces the camera without clamping, for restoring a previously saved local view. */
   public setView(view: { zoom: number; offset: Vector2 }): void {
     this.cancelAnimation();

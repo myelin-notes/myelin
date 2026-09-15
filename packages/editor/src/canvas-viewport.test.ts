@@ -97,6 +97,36 @@ describe('CanvasViewport content fitting', () => {
   });
 });
 
+describe('CanvasViewport offset animation', () => {
+  it('moves to the requested offset without changing zoom', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      }),
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const now = vi.spyOn(performance, 'now').mockReturnValue(100);
+    const { viewport } = createViewport();
+    viewport.setView({ zoom: 2, offset: { x: 0, y: 0 } });
+
+    viewport.animateOffsetTo({ x: 100, y: -50 });
+    frames.shift()?.(250);
+
+    expect(viewport.zoom).toBe(2);
+    expect(viewport.offset.x).toBeCloseTo(96.875);
+    expect(viewport.offset.y).toBeCloseTo(-48.4375);
+
+    frames.shift()?.(400);
+    expect(viewport.offset).toEqual({ x: 100, y: -50 });
+
+    now.mockRestore();
+    vi.unstubAllGlobals();
+  });
+});
+
 describe('CanvasViewport zoom limits', () => {
   it('restores a saved view', () => {
     const { viewport } = createViewport();

@@ -832,6 +832,13 @@ const es: typeof en = {
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
     },
+    pdfNavigator: {
+      label: 'Navegación de páginas PDF',
+      previousPage: 'Página anterior',
+      nextPage: 'Página siguiente',
+      goToPage: 'Ir a la página',
+      pageNumber: 'Número de página',
+    },
     insert: {
       title: 'Insertar',
       soon: 'Pronto',

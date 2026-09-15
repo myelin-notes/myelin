@@ -803,6 +803,13 @@ const zhHans: typeof en = {
       crop: '裁剪',
       applyCrop: '应用裁剪',
     },
+    pdfNavigator: {
+      label: 'PDF 页面导航',
+      previousPage: '上一页',
+      nextPage: '下一页',
+      goToPage: '跳转到页面',
+      pageNumber: '页码',
+    },
     insert: {
       title: '插入',
       soon: '即将推出',

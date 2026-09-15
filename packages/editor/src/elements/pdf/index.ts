@@ -248,6 +248,26 @@ export class PdfElement
     return this.model.layout.totalHeight;
   }
 
+  public get pageCount(): number {
+    return this.model.layout.pages.length;
+  }
+
+  /** Returns a logical page's world bounds, including its current edited order. */
+  public getPageBounds(position: number): DOMRect | null {
+    const page = this.model.layout.pages[position];
+    if (!page) {
+      return null;
+    }
+    const scaleX = getPositiveScale(this._scale.x);
+    const scaleY = getPositiveScale(this._scale.y);
+    return new DOMRect(
+      this.offset.x + page.localLeft * scaleX,
+      this.offset.y + page.localTop * scaleY,
+      page.size.w * scaleX,
+      page.size.h * scaleY,
+    );
+  }
+
   public get localBoundingBox(): DOMRect {
     return new DOMRect(
       -CHROME_SIDE_PADDING,

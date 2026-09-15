@@ -1,0 +1,134 @@
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function visibleArea(rect: Rect, viewport: Rect): number {
+  const width = Math.max(
+    0,
+    Math.min(rect.left + rect.width, viewport.left + viewport.width) -
+      Math.max(rect.left, viewport.left),
+  );
+  const height = Math.max(
+    0,
+    Math.min(rect.top + rect.height, viewport.top + viewport.height) -
+      Math.max(rect.top, viewport.top),
+  );
+  return width * height;
+}
+
+export function findCurrentPdfPage(
+  pageBounds: readonly Rect[],
+  viewport: Rect,
+): number | null {
+  let current: number | null = null;
+  let greatestArea = 0;
+  for (const [index, bounds] of pageBounds.entries()) {
+    const area = visibleArea(bounds, viewport);
+    if (area > greatestArea) {
+      greatestArea = area;
+      current = index;
+    }
+  }
+  if (current !== null) {
+    return current;
+  }
+  let nearest: number | null = null;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  const viewportCenter = {
+    x: viewport.left + viewport.width / 2,
+    y: viewport.top + viewport.height / 2,
+  };
+  for (const [index, bounds] of pageBounds.entries()) {
+    const distance = Math.hypot(
+      bounds.left + bounds.width / 2 - viewportCenter.x,
+      bounds.top + bounds.height / 2 - viewportCenter.y,
+    );
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = index;
+    }
+  }
+  return nearest;
+}
+
+export function getNavigatorPosition(params: {
+  pdfBounds: Rect;
+  viewport: Rect;
+  navigatorSize: { width: number; height: number };
+  edgeInset: number;
+  viewportBottomInset: number;
+}): { left: number; top: number } | null {
+  const visibleLeft = Math.max(params.pdfBounds.left, params.viewport.left);
+  const visibleRight = Math.min(
+    params.pdfBounds.left + params.pdfBounds.width,
+    params.viewport.left + params.viewport.width,
+  );
+  const visibleTop = Math.max(params.pdfBounds.top, params.viewport.top);
+  const visibleBottom = Math.min(
+    params.pdfBounds.top + params.pdfBounds.height,
+    params.viewport.top + params.viewport.height,
+  );
+  const visibleWidth = visibleRight - visibleLeft;
+  const visibleHeight = visibleBottom - visibleTop;
+  if (visibleWidth <= 0 || visibleHeight <= 0) {
+    return null;
+  }
+
+  const minLeft = params.viewport.left + params.edgeInset;
+  const maxLeft = Math.max(
+    minLeft,
+    params.viewport.left +
+      params.viewport.width -
+      params.edgeInset -
+      params.navigatorSize.width,
+  );
+  const preferredLeft =
+    visibleLeft + visibleWidth / 2 - params.navigatorSize.width / 2;
+  const minTop = params.viewport.top + params.edgeInset;
+  const maxTop = Math.max(
+    minTop,
+    params.viewport.top +
+      params.viewport.height -
+      params.viewportBottomInset -
+      params.navigatorSize.height,
+  );
+  const preferredTop =
+    visibleBottom - params.navigatorSize.height - params.edgeInset;
+
+  return {
+    left: clamp(preferredLeft, minLeft, maxLeft),
+    top: clamp(Math.min(preferredTop, maxTop), minTop, maxTop),
+  };
+}
+
+export function getPdfPageJumpOffset(params: {
+  pageBounds: Rect;
+  viewport: Rect;
+  zoom: number;
+  margin: number;
+}): { x: number; y: number } {
+  const screenWidth = params.viewport.width * params.zoom;
+  const screenHeight = params.viewport.height * params.zoom;
+  const pageWidth = params.pageBounds.width * params.zoom;
+  const pageHeight = params.pageBounds.height * params.zoom;
+  const targetLeft =
+    pageWidth <= screenWidth - params.margin * 2
+      ? (screenWidth - pageWidth) / 2
+      : params.margin;
+  const targetTop =
+    pageHeight <= screenHeight - params.margin * 2
+      ? (screenHeight - pageHeight) / 2
+      : params.margin;
+
+  return {
+    x: targetLeft / params.zoom - params.pageBounds.left,
+    y: targetTop / params.zoom - params.pageBounds.top,
+  };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}

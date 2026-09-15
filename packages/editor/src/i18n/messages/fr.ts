@@ -841,6 +841,13 @@ const fr: typeof en = {
       crop: 'Rogner',
       applyCrop: 'Appliquer le rognage',
     },
+    pdfNavigator: {
+      label: 'Navigation dans le PDF',
+      previousPage: 'Page précédente',
+      nextPage: 'Page suivante',
+      goToPage: 'Aller à la page',
+      pageNumber: 'Numéro de page',
+    },
     insert: {
       title: 'Insérer',
       soon: 'Bientôt',
