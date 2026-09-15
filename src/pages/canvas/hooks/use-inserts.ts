@@ -1,4 +1,5 @@
 import { type RefObject, useCallback, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { DrawableCanvas, Vector2 } from '@myelin/editor/drawable-canvas';
 import {
   AUDIO_NATURAL_HEIGHT,
@@ -16,10 +17,13 @@ import {
   PAGE_WIDTH,
   PageFrameElement,
 } from '@myelin/editor/elements/page-frame-element';
+import { useMessages } from '@myelin/editor/i18n';
 import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { CollisionHelper } from '@myelin/editor/utils/collision-helper';
 import { trackEvent } from '@/lib/analytics';
+import { MOBILE_PLATFORM } from '@/lib/env';
+import { prepareCapturedPhoto } from '../photo-capture';
 
 export interface ContextInsertAnchor {
   screenX: number;
@@ -49,8 +53,12 @@ export function useCanvasInserts({
   selectedToolIndex,
   embedFiles,
 }: UseCanvasInsertsArgs) {
+  const strings = useMessages();
   const [insertOpen, setInsertOpen] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const cameraFileInputRef = useRef<HTMLInputElement>(null);
+  const cameraAnchorRef = useRef<EmbedAnchor | null>(null);
   const [embedAnchor, setEmbedAnchor] = useState<EmbedAnchor | null>(null);
   const [contextInsert, setContextInsert] =
     useState<ContextInsertAnchor | null>(null);
@@ -186,6 +194,69 @@ export function useCanvasInserts({
     setEmbedOpen(true);
   }, [drawableCanvasRef]);
 
+  const openCamera = useCallback(
+    (anchor: EmbedAnchor | null) => {
+      if (!drawableCanvasRef.current) {
+        return;
+      }
+      cameraAnchorRef.current = anchor;
+      setInsertOpen(false);
+      setContextInsert(null);
+      setEmbedOpen(false);
+      drawableCanvasRef.current.cancelPlacement();
+      if (MOBILE_PLATFORM === 'ios' || MOBILE_PLATFORM === 'android') {
+        cameraFileInputRef.current?.click();
+      } else {
+        setCameraOpen(true);
+      }
+    },
+    [drawableCanvasRef],
+  );
+
+  const onTakePhoto = useCallback(() => openCamera(null), [openCamera]);
+
+  const onContextTakePhoto = useCallback(() => {
+    if (contextInsert) {
+      openCamera({
+        screenX: contextInsert.screenX,
+        screenY: contextInsert.screenY,
+      });
+    }
+  }, [contextInsert, openCamera]);
+
+  const onCameraCapture = useCallback(
+    (file: File) => {
+      embedFiles(
+        [file],
+        cameraAnchorRef.current?.screenX,
+        cameraAnchorRef.current?.screenY,
+      );
+      setCameraOpen(false);
+    },
+    [embedFiles],
+  );
+
+  const onCameraFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.currentTarget.files?.[0];
+      event.currentTarget.value = '';
+      if (!file) {
+        return;
+      }
+      const anchor = cameraAnchorRef.current;
+      void prepareCapturedPhoto(file)
+        .then((photo) => embedFiles([photo], anchor?.screenX, anchor?.screenY))
+        .catch((cause) => {
+          toast.error(strings.canvas.camera.captureFailed, {
+            description: cause instanceof Error ? cause.message : String(cause),
+          });
+        });
+    },
+    [embedFiles, strings.canvas.camera.captureFailed],
+  );
+
+  const closeCamera = useCallback(() => setCameraOpen(false), []);
+
   const toggleInsert = useCallback(() => {
     setInsertOpen((v) => {
       const next = !v;
@@ -300,6 +371,8 @@ export function useCanvasInserts({
   return {
     insertOpen,
     embedOpen,
+    cameraOpen,
+    cameraFileInputRef,
     contextInsert,
     toggleInsert,
     closeInsert,
@@ -308,6 +381,11 @@ export function useCanvasInserts({
     onInsertEmbed,
     onInsertLatex,
     onInsertAudio,
+    onTakePhoto,
+    onContextTakePhoto,
+    onCameraCapture,
+    onCameraFileChange,
+    closeCamera,
     onContextInsertFrame,
     onContextInsertEmbed,
     onContextInsertLatex,

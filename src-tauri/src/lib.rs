@@ -32,7 +32,7 @@ pub fn run() {
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
             // WebKitGTK denies getUserMedia by default; enable media streams
-            // and allow microphone permission requests so audio recording works.
+            // and allow microphone or camera permission requests.
             #[cfg(target_os = "linux")]
             app.get_webview_window("main")
                 .expect("main window missing")
@@ -49,7 +49,7 @@ pub fn run() {
                     webview.connect_permission_request(|_, request| {
                         if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>()
                         {
-                            if request.is_for_audio_device() && !request.is_for_video_device() {
+                            if request.is_for_audio_device() || request.is_for_video_device() {
                                 request.allow();
                             } else {
                                 request.deny();

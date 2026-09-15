@@ -840,6 +840,10 @@ const en = {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
       },
+      photo: {
+        label: 'Take photo',
+        description: 'Capture and insert a photo',
+      },
       latex: {
         label: 'LaTeX',
         description: 'A math block you can write equations in',
@@ -848,6 +852,13 @@ const en = {
         label: 'Audio',
         description: 'Record or import a voice memo',
       },
+    },
+    camera: {
+      requesting: 'Opening camera...',
+      unavailable: 'Camera unavailable',
+      takePhoto: 'Take photo',
+      cancel: 'Cancel',
+      captureFailed: 'Could not capture photo',
     },
     audioPlayer: {
       requestingMic: 'Requesting microphone...',

@@ -818,6 +818,10 @@ const zhHans: typeof en = {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
       },
+      photo: {
+        label: '拍照',
+        description: '拍摄并插入照片',
+      },
       latex: {
         label: 'LaTeX',
         description: '可书写公式的数学块',
@@ -826,6 +830,13 @@ const zhHans: typeof en = {
         label: '音频',
         description: '录制或导入语音备忘',
       },
+    },
+    camera: {
+      requesting: '正在打开相机…',
+      unavailable: '相机不可用',
+      takePhoto: '拍照',
+      cancel: '取消',
+      captureFailed: '无法拍摄照片',
     },
     audioPlayer: {
       requestingMic: '正在请求麦克风…',

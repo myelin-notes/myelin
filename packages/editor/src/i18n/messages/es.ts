@@ -847,6 +847,10 @@ const es: typeof en = {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
       },
+      photo: {
+        label: 'Tomar foto',
+        description: 'Captura e inserta una foto',
+      },
       latex: {
         label: 'LaTeX',
         description: 'Un bloque para escribir ecuaciones',
@@ -855,6 +859,13 @@ const es: typeof en = {
         label: 'Audio',
         description: 'Graba o importa una nota de voz',
       },
+    },
+    camera: {
+      requesting: 'Abriendo la cámara...',
+      unavailable: 'Cámara no disponible',
+      takePhoto: 'Tomar foto',
+      cancel: 'Cancelar',
+      captureFailed: 'No se pudo capturar la foto',
     },
     audioPlayer: {
       requestingMic: 'Solicitando micrófono...',

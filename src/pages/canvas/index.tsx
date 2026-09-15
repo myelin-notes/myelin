@@ -58,6 +58,7 @@ import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
+import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
@@ -531,6 +532,7 @@ function CanvasViewInner({
         onInsertEmbed={inserts.onInsertEmbed}
         onInsertLatex={inserts.onInsertLatex}
         onInsertAudio={inserts.onInsertAudio}
+        onTakePhoto={inserts.onTakePhoto}
         onClose={inserts.closeInsert}
       />
     ),
@@ -541,6 +543,7 @@ function CanvasViewInner({
       inserts.onInsertFrame,
       inserts.onInsertLatex,
       inserts.onInsertAudio,
+      inserts.onTakePhoto,
     ],
   );
   const embedPresence = usePresence(inserts.embedOpen);
@@ -565,6 +568,20 @@ function CanvasViewInner({
       className="relative h-full w-full overflow-clip bg-page"
       style={surfaceStyle}
     >
+      <input
+        ref={inserts.cameraFileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={inserts.onCameraFileChange}
+      />
+      {inserts.cameraOpen && (
+        <CameraCapture
+          onCapture={inserts.onCameraCapture}
+          onClose={inserts.closeCamera}
+        />
+      )}
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
@@ -691,6 +708,7 @@ function CanvasViewInner({
             onInsertEmbed={inserts.onContextInsertEmbed}
             onInsertLatex={inserts.onContextInsertLatex}
             onInsertAudio={inserts.onContextInsertAudio}
+            onTakePhoto={inserts.onContextTakePhoto}
             onClose={inserts.closeContextInsert}
           />
         </div>

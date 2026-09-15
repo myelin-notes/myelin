@@ -856,6 +856,10 @@ const fr: typeof en = {
         label: 'Image ou PDF',
         description: 'Déposez des fichiers ou collez une URL',
       },
+      photo: {
+        label: 'Prendre une photo',
+        description: 'Capturer et insérer une photo',
+      },
       latex: {
         label: 'LaTeX',
         description: 'Un bloc mathématique pour écrire des équations',
@@ -864,6 +868,13 @@ const fr: typeof en = {
         label: 'Audio',
         description: 'Enregistrer ou importer un mémo vocal',
       },
+    },
+    camera: {
+      requesting: 'Ouverture de la caméra...',
+      unavailable: 'Caméra indisponible',
+      takePhoto: 'Prendre une photo',
+      cancel: 'Annuler',
+      captureFailed: 'Impossible de capturer la photo',
     },
     audioPlayer: {
       requestingMic: 'Demande du microphone...',

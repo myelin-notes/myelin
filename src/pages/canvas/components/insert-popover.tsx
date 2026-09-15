@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import {
+  Camera as CameraIcon,
   FilePlus2 as FilePlusIcon,
   ImagePlus as ImagePlusIcon,
   type LucideIcon,
@@ -17,6 +18,7 @@ interface InsertPopoverProps {
   onInsertEmbed: () => void;
   onInsertLatex: () => void;
   onInsertAudio: () => void;
+  onTakePhoto: () => void;
   onClose: () => void;
 }
 
@@ -37,6 +39,7 @@ export function InsertPopover({
   onInsertEmbed,
   onInsertLatex,
   onInsertAudio,
+  onTakePhoto,
   onClose,
 }: InsertPopoverProps) {
   const strings = useMessages();
@@ -99,6 +102,14 @@ export function InsertPopover({
       description: strings.canvas.insert.embed.description,
       hotkey: getInsertHotkey('embed'),
       onSelect: onInsertEmbed,
+    },
+    {
+      key: 'photo',
+      icon: CameraIcon,
+      label: strings.canvas.insert.photo.label,
+      description: strings.canvas.insert.photo.description,
+      hotkey: '',
+      onSelect: onTakePhoto,
     },
     {
       key: 'latex',
