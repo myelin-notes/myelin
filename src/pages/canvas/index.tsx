@@ -523,6 +523,10 @@ function CanvasViewInner({
   const insertPopover = useMemo(
     () => (
       <InsertPopover
+        onPaste={() => {
+          void engine.clipboard.paste();
+          inserts.closeInsert();
+        }}
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
         onInsertLatex={inserts.onInsertLatex}
@@ -532,6 +536,7 @@ function CanvasViewInner({
     ),
     [
       inserts.closeInsert,
+      engine.clipboard,
       inserts.onInsertEmbed,
       inserts.onInsertFrame,
       inserts.onInsertLatex,
@@ -629,7 +634,11 @@ function CanvasViewInner({
         onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
-        <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
+        <SelectionToolbar
+          drawableCanvasRef={drawableCanvasRef}
+          onCopy={engine.clipboard.copy}
+          onCut={engine.clipboard.cut}
+        />
       )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
@@ -674,6 +683,10 @@ function CanvasViewInner({
           }}
         >
           <InsertPopover
+            onPaste={() => {
+              void engine.clipboard.paste();
+              inserts.closeContextInsert();
+            }}
             onInsertFrame={inserts.onContextInsertFrame}
             onInsertEmbed={inserts.onContextInsertEmbed}
             onInsertLatex={inserts.onContextInsertLatex}

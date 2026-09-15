@@ -831,6 +831,8 @@ const fr: typeof en = {
     },
     selectionToolbar: {
       label: 'Ordre de la sélection',
+      copy: 'Copier',
+      cut: 'Couper',
       moveHigher: 'Avancer',
       moveLower: 'Reculer',
       delete: 'Supprimer',
@@ -840,6 +842,10 @@ const fr: typeof en = {
     insert: {
       title: 'Insérer',
       soon: 'Bientôt',
+      paste: {
+        label: 'Coller',
+        description: 'Coller depuis le presse-papiers',
+      },
       frame: {
         label: 'Cadre de page',
         description: 'Une nouvelle page pour écrire',

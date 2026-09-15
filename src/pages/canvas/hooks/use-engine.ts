@@ -97,7 +97,7 @@ export function useCanvasEngine({
     noteSession: sessionController.noteSession,
   });
 
-  useCanvasClipboard({
+  const clipboard = useCanvasClipboard({
     id,
     drawableCanvasRef,
     embedFiles,
@@ -171,6 +171,7 @@ export function useCanvasEngine({
 
   return {
     drawableCanvasRef,
+    clipboard,
     ...canvasViewState,
     ...sessionController,
     ...saving,

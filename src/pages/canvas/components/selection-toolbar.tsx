@@ -8,6 +8,8 @@ import {
   useState,
 } from 'react';
 import {
+  Copy as CopyIcon,
+  Scissors as CutIcon,
   Trash2 as DeleteIcon,
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
@@ -37,6 +39,8 @@ import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
+  onCopy: () => void;
+  onCut: () => void;
 }
 
 interface ToolbarState {
@@ -148,7 +152,11 @@ function collectElementItems(
   return selected[0].getSelectionToolbarItems(strings);
 }
 
-export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
+export function SelectionToolbar({
+  drawableCanvasRef,
+  onCopy,
+  onCut,
+}: SelectionToolbarProps) {
   const strings = useMessages();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ToolbarState>(HIDDEN_STATE);
@@ -279,6 +287,29 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
     [strings.canvas.selectionToolbar.delete, deleteSelection],
   );
 
+  const clipboardItems = useMemo<SelectionToolbarItem[]>(
+    () => [
+      {
+        id: 'copy',
+        label: strings.canvas.selectionToolbar.copy,
+        icon: CopyIcon,
+        onClick: onCopy,
+      },
+      {
+        id: 'cut',
+        label: strings.canvas.selectionToolbar.cut,
+        icon: CutIcon,
+        onClick: onCut,
+      },
+    ],
+    [
+      strings.canvas.selectionToolbar.copy,
+      strings.canvas.selectionToolbar.cut,
+      onCopy,
+      onCut,
+    ],
+  );
+
   const reorderItems = useMemo<SelectionToolbarItem[]>(
     () => [
       {
@@ -346,6 +377,8 @@ export function SelectionToolbar({ drawableCanvasRef }: SelectionToolbarProps) {
           <Divider />
         )}
         <ToolbarItemGroup items={reorderItems} divided />
+        <Divider />
+        <ToolbarItemGroup items={clipboardItems} divided />
         <Divider />
         <ToolbarItemGroup items={deleteItems} />
       </div>

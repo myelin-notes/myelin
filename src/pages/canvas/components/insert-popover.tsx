@@ -4,12 +4,15 @@ import {
   ImagePlus as ImagePlusIcon,
   type LucideIcon,
   Mic as MicIcon,
+  ClipboardPaste as PasteIcon,
   Sigma as SigmaIcon,
 } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
+import { formatKeyCombo } from '@myelin/editor/keybinds';
 import { getInsertHotkey } from '@myelin/editor/tools/tool-keybinds';
 
 interface InsertPopoverProps {
+  onPaste: () => void;
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
   onInsertLatex: () => void;
@@ -29,6 +32,7 @@ interface InsertItem {
 }
 
 export function InsertPopover({
+  onPaste,
   onInsertFrame,
   onInsertEmbed,
   onInsertLatex,
@@ -72,6 +76,14 @@ export function InsertPopover({
   }, []);
 
   const items: InsertItem[] = [
+    {
+      key: 'paste',
+      icon: PasteIcon,
+      label: strings.canvas.insert.paste.label,
+      description: strings.canvas.insert.paste.description,
+      hotkey: formatKeyCombo({ key: 'v', mod: true }),
+      onSelect: onPaste,
+    },
     {
       key: 'frame',
       icon: FilePlusIcon,

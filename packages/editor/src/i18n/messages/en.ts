@@ -815,6 +815,8 @@ const en = {
     },
     selectionToolbar: {
       label: 'Selection order',
+      copy: 'Copy',
+      cut: 'Cut',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
       delete: 'Delete',
@@ -824,6 +826,10 @@ const en = {
     insert: {
       title: 'Insert',
       soon: 'Soon',
+      paste: {
+        label: 'Paste',
+        description: 'Paste from the clipboard',
+      },
       frame: {
         label: 'Page frame',
         description: 'A new page to write in',
