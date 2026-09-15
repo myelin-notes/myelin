@@ -493,6 +493,32 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(created).toHaveLength(1);
   });
 
+  it('waits for a true dwell before snapping a smallest-size pen stroke', () => {
+    const { canvas, created, removeElement } = makeCanvas();
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'size');
+    if (option?.type !== 'size') {
+      throw new Error('pen has no stroke size option');
+    }
+    option.set(1);
+
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+    expect(stroke.strokeStyle.size).toBe(1);
+    feed(tool, canvas, lineStroke(0, 0, 40, 0));
+
+    vi.advanceTimersByTime(599);
+    tool.update(canvas, PRESSURE_EVENT, pos(44, 0));
+    vi.advanceTimersByTime(1);
+
+    expect(removeElement).not.toHaveBeenCalled();
+    expect(created).toHaveLength(1);
+
+    vi.advanceTimersByTime(600);
+    expect(removeElement).toHaveBeenCalledWith(stroke);
+    expect((created[1] as ShapeElement).shapeType).toBe('line');
+  });
+
   it('fires recognition exactly once per anchor even with a late tiny move', () => {
     const { canvas, created, addElement } = makeCanvas();
     const tool = makeTool();
@@ -504,7 +530,7 @@ describe('PenTool draw-and-hold recognition', () => {
     vi.advanceTimersByTime(599);
     const rectPts = rectStroke(10, 20, 200, 120);
     const last = rectPts[rectPts.length - 1];
-    tool.update(canvas, PRESSURE_EVENT, pos(last[0] + 3, last[1] + 3)); // < 12px
+    tool.update(canvas, PRESSURE_EVENT, pos(last[0] + 2, last[1])); // < 3px
     vi.advanceTimersByTime(1); // original timer fires
 
     // Exactly one swap happened (stroke add + one shape add).
