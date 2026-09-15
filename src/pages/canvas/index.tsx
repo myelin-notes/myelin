@@ -621,7 +621,10 @@ function CanvasViewInner({
         <canvas
           ref={canvasRef}
           className="absolute inset-0 block h-full w-full touch-none"
-          onClick={inserts.onCanvasClick}
+          onPointerDown={inserts.onCanvasPointerDown}
+          onPointerMove={inserts.onCanvasPointerMove}
+          onPointerUp={inserts.onCanvasPointerUp}
+          onPointerCancel={inserts.onCanvasPointerCancel}
         />
       </div>
 
