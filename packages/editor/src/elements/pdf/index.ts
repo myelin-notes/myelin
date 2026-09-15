@@ -44,6 +44,7 @@ import {
   CHROME_SIDE_PADDING,
   FrameChrome,
 } from '../frame/chrome';
+import { getFrameChromeMenuButtonRect } from '../frame/chrome-layout';
 import type { PageLayout } from '../page-frame-constants';
 import type {
   CanvasPdfExportData,
@@ -379,12 +380,30 @@ export class PdfElement
     const layout = this.model.layout;
     const contentWidth = layout.totalWidth * scaleX;
     const contentHeight = layout.totalHeight * scaleY;
+    const screenX = snapToDevicePixel(
+      (this.offset.x + viewport.offset.x) * zoom,
+    );
+    const screenY = snapToDevicePixel(
+      (this.offset.y + viewport.offset.y) * zoom,
+    );
+    const menuRect = getFrameChromeMenuButtonRect({
+      screenX,
+      screenY,
+      contentWidth,
+      zoom,
+    });
     this._chrome?.sync({
-      screenX: snapToDevicePixel((this.offset.x + viewport.offset.x) * zoom),
-      screenY: snapToDevicePixel((this.offset.y + viewport.offset.y) * zoom),
+      screenX,
+      screenY,
       contentWidth,
       contentHeight,
       zoom,
+      controlsVisible: !this.isChromeButtonCovered(
+        menuRect.left + menuRect.size / 2,
+        menuRect.top + menuRect.size / 2,
+        menuRect.size,
+        viewport,
+      ),
     });
     const rasterZoom = quantizeRasterZoom(zoom);
     this.syncContentRoot(contentWidth, contentHeight, rasterZoom);
@@ -408,12 +427,54 @@ export class PdfElement
       scaleY,
       pageLayout: this.model.pageLayout,
       layout,
+      isCovered: (screenX, screenY, size) =>
+        this.isChromeButtonCovered(screenX, screenY, size, viewport),
     });
   }
 
   public override setDomZIndex(zIndex: string): void {
     this._chrome?.setZIndex(zIndex);
     this.chromeController.setZIndex(zIndex);
+  }
+
+  private isChromeButtonCovered(
+    screenX: number,
+    screenY: number,
+    size: number,
+    viewport: CanvasViewport,
+  ): boolean {
+    const elements = this._exportElementsProvider?.();
+    if (!elements) {
+      return false;
+    }
+    const elementIndex = elements.indexOf(this);
+    if (elementIndex < 0) {
+      return false;
+    }
+    const left = screenX - size / 2;
+    const top = screenY - size / 2;
+    const right = left + size;
+    const bottom = top + size;
+    for (let i = elementIndex + 1; i < elements.length; i++) {
+      const element = elements[i];
+      if (element.hidden) {
+        continue;
+      }
+      const bounds = element.boundingBox;
+      const elementLeft = (bounds.left + viewport.offset.x) * viewport.zoom;
+      const elementTop = (bounds.top + viewport.offset.y) * viewport.zoom;
+      const elementRight = elementLeft + bounds.width * viewport.zoom;
+      const elementBottom = elementTop + bounds.height * viewport.zoom;
+      if (
+        left < elementRight &&
+        right > elementLeft &&
+        top < elementBottom &&
+        bottom > elementTop
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   public override disposeDOM(): void {

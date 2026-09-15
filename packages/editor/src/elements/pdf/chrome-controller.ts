@@ -34,6 +34,7 @@ export class PdfChromeController {
     scaleY: number;
     pageLayout: PageLayout;
     layout: PdfLayout;
+    isCovered?: (screenX: number, screenY: number, size: number) => boolean;
   }): void {
     this.syncGapButtons(params);
     this.syncDeleteButtons(params);
@@ -65,6 +66,7 @@ export class PdfChromeController {
     scaleY: number;
     pageLayout: PageLayout;
     layout: PdfLayout;
+    isCovered?: (screenX: number, screenY: number, size: number) => boolean;
   }): void {
     const activePositions = new Set<number>();
     const worldRect = params.viewport.getWorldRect();
@@ -110,21 +112,18 @@ export class PdfChromeController {
         MIN_CHROME_BUTTON_PIXEL_SIZE,
         GAP_BUTTON_SIZE * params.zoom,
       );
-      button.sync({
-        screenX: snapToDevicePixel(
-          (params.offset.x +
-            params.viewport.offset.x +
-            localX * params.scaleX) *
-            params.zoom,
-        ),
-        screenY: snapToDevicePixel(
-          (params.offset.y +
-            params.viewport.offset.y +
-            localY * params.scaleY) *
-            params.zoom,
-        ),
-        size,
-      });
+      const screenX = snapToDevicePixel(
+        (params.offset.x + params.viewport.offset.x + localX * params.scaleX) *
+          params.zoom,
+      );
+      const screenY = snapToDevicePixel(
+        (params.offset.y + params.viewport.offset.y + localY * params.scaleY) *
+          params.zoom,
+      );
+      button.sync({ screenX, screenY, size });
+      button.root.style.visibility = params.isCovered?.(screenX, screenY, size)
+        ? 'hidden'
+        : 'visible';
     }
     this.removeInactiveGapButtons(activePositions);
   }
@@ -137,6 +136,7 @@ export class PdfChromeController {
     scaleY: number;
     pageLayout: PageLayout;
     layout: PdfLayout;
+    isCovered?: (screenX: number, screenY: number, size: number) => boolean;
   }): void {
     const activePositions = new Set<number>();
     const worldRect = params.viewport.getWorldRect();
@@ -175,22 +175,23 @@ export class PdfChromeController {
         MIN_CHROME_BUTTON_PIXEL_SIZE,
         DELETE_BUTTON_SIZE * params.zoom,
       );
-      button.sync({
-        screenX: snapToDevicePixel(
-          (params.offset.x +
-            params.viewport.offset.x +
-            (page.localLeft + page.size.w - DELETE_BUTTON_OFFSET) *
-              params.scaleX) *
-            params.zoom,
-        ),
-        screenY: snapToDevicePixel(
-          (params.offset.y +
-            params.viewport.offset.y +
-            (page.localTop + DELETE_BUTTON_OFFSET) * params.scaleY) *
-            params.zoom,
-        ),
-        size,
-      });
+      const screenX = snapToDevicePixel(
+        (params.offset.x +
+          params.viewport.offset.x +
+          (page.localLeft + page.size.w - DELETE_BUTTON_OFFSET) *
+            params.scaleX) *
+          params.zoom,
+      );
+      const screenY = snapToDevicePixel(
+        (params.offset.y +
+          params.viewport.offset.y +
+          (page.localTop + DELETE_BUTTON_OFFSET) * params.scaleY) *
+          params.zoom,
+      );
+      button.sync({ screenX, screenY, size });
+      button.root.style.visibility = params.isCovered?.(screenX, screenY, size)
+        ? 'hidden'
+        : 'visible';
     }
     this.removeInactiveDeleteButtons(activePositions);
   }

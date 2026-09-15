@@ -612,11 +612,12 @@ function CanvasViewInner({
       />
 
       {/* Frame chrome controls (hamburger buttons). Each control shares its
-          frame’s stacking rank, so a higher frame can cover a lower frame’s
+          frame’s stacking rank, so a higher element can cover a lower element’s
           controls. Pointer-events-none by default; individual buttons opt in. */}
       <div
         data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
+        style={{ zIndex: 20 }}
       />
 
       <StatusBar
