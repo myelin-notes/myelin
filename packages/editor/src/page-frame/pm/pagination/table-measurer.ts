@@ -1,7 +1,10 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import type { ParagraphLine, TableRowLine } from './core';
-import { measureLinesWithDom, type PaginationBlockInfo } from './line-measurer';
+import type {
+  PaginationBlockInfo,
+  ParagraphLineMeasurer,
+} from './line-measurer';
 
 function isTableRowBreakElement(element: Element): boolean {
   return (
@@ -112,6 +115,7 @@ function measureTableRowSplitLines(
   editorScreenTop: number,
   invScale: number,
   rowExternalShift: number,
+  lineMeasurer: ParagraphLineMeasurer,
 ): ParagraphLine[] {
   const lines: ParagraphLine[] = [];
 
@@ -121,16 +125,16 @@ function measureTableRowSplitLines(
       invScale,
     );
     lines.push(
-      ...measureLinesWithDom(
+      ...lineMeasurer.measure({
         block,
         view,
         editorScreenTop,
         invScale,
-        null,
-        rowExternalShift + cellBreakShiftBeforeBlock,
-        null,
-        null,
-      ),
+        blockNaturalTop: null,
+        blockShift: rowExternalShift + cellBreakShiftBeforeBlock,
+        metrics: null,
+        measurementCacheGeneration: 0,
+      }),
     );
   }
 
@@ -145,6 +149,7 @@ export function measureTableRows(
   editorScreenTop: number,
   invScale: number,
   blockShift: number,
+  lineMeasurer: ParagraphLineMeasurer,
 ): TableRowLine[] {
   const tableNode = view.state.doc.nodeAt(block.pos);
   if (!tableNode || tableNode.type.name !== 'table') {
@@ -215,6 +220,7 @@ export function measureTableRows(
           editorScreenTop,
           invScale,
           totalExistingShift,
+          lineMeasurer,
         ),
     });
   }

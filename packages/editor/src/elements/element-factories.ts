@@ -5,4 +5,6 @@ export {
   type ElementFactory,
   type ExternalSummaryPolicy,
   getElementDescriptor,
+  type RegisteredElementDescriptor,
+  type SupportedExternalSummaryElementName,
 } from './element-descriptors';

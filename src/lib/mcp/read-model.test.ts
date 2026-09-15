@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ELEMENT_DESCRIPTORS } from '@myelin/editor/elements/element-descriptors';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -145,6 +146,25 @@ describe('MCP read model', () => {
         .filter((element) => element.kind === 'unknown')
         .map((element) => element.id),
     ).toEqual(['unknown-1', 'shape-1', 'audio-1', 'code-output-1']);
+  });
+
+  it('summarizes every element declared externally supported', async () => {
+    const { repository, noteId } = await createRepositoryNote();
+    const note = await buildMcpNoteReadModel(repository, noteId);
+    const supportedNames = ELEMENT_DESCRIPTORS.filter(
+      (descriptor) => descriptor.externalSummary === 'supported',
+    )
+      .map((descriptor) => descriptor.name)
+      .sort();
+    const summarizedKinds = [
+      ...new Set(
+        note.elements
+          .map((element) => element.kind)
+          .filter((kind) => kind !== 'unknown' && kind !== 'stroke-group'),
+      ),
+    ].sort();
+
+    expect(summarizedKinds).toEqual(supportedNames);
   });
 
   // A note can hold hundreds of strokes, so anything the model cannot act on is

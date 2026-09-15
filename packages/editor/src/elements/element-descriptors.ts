@@ -24,7 +24,7 @@ export interface ElementDescriptor {
   summaryUuidSample?: 'page-frame' | 'stroke';
 }
 
-export const ELEMENT_DESCRIPTORS: readonly ElementDescriptor[] = [
+export const ELEMENT_DESCRIPTORS = [
   {
     type: ElementType.STROKE,
     name: 'stroke',
@@ -86,15 +86,24 @@ export const ELEMENT_DESCRIPTORS: readonly ElementDescriptor[] = [
     create: (uuid) => new CodeOutputElement(uuid),
     externalSummary: 'unknown-compatible',
   },
-];
+] as const satisfies readonly ElementDescriptor[];
 
-const descriptorsByType = new Map(
-  ELEMENT_DESCRIPTORS.map((descriptor) => [descriptor.type, descriptor]),
-);
+export type SupportedExternalSummaryElementName = Extract<
+  (typeof ELEMENT_DESCRIPTORS)[number],
+  { externalSummary: 'supported' }
+>['name'];
+
+export type RegisteredElementDescriptor = ElementDescriptor &
+  (typeof ELEMENT_DESCRIPTORS)[number];
+
+const descriptorsByType: ReadonlyMap<number, RegisteredElementDescriptor> =
+  new Map(
+    ELEMENT_DESCRIPTORS.map((descriptor) => [descriptor.type, descriptor]),
+  );
 
 export function getElementDescriptor(
   type: number | null | undefined,
-): ElementDescriptor | undefined {
+): RegisteredElementDescriptor | undefined {
   return typeof type === 'number' ? descriptorsByType.get(type) : undefined;
 }
 
@@ -104,4 +113,4 @@ export const ELEMENT_FACTORIES: Record<ElementType, ElementFactory> =
       descriptor.type,
       descriptor.create,
     ]),
-  ) as Record<ElementType, ElementFactory>;
+  ) as unknown as Record<ElementType, ElementFactory>;

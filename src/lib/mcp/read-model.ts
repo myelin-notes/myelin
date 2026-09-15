@@ -1,6 +1,9 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
-import { getElementDescriptor } from '@myelin/editor/elements/element-descriptors';
+import {
+  getElementDescriptor,
+  type SupportedExternalSummaryElementName,
+} from '@myelin/editor/elements/element-descriptors';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
@@ -430,15 +433,15 @@ type ExternalSummaryProvider = (
   yMap: Y.Map<unknown>,
 ) => McpNoteElementSummary;
 
-const EXTERNAL_SUMMARY_PROVIDERS: Readonly<
-  Partial<Record<string, ExternalSummaryProvider>>
-> = {
+const EXTERNAL_SUMMARY_PROVIDERS = {
   'page-frame': (_noteId, ydoc, yMap) => summarizePageFrame(ydoc, yMap),
   text: (_noteId, _ydoc, yMap) => summarizeText(yMap),
   image: (noteId, _ydoc, yMap) => summarizeImage(noteId, yMap),
   pdf: (noteId, _ydoc, yMap) => summarizePdf(noteId, yMap),
   latex: (_noteId, _ydoc, yMap) => summarizeLatex(yMap),
-};
+} satisfies Readonly<
+  Record<SupportedExternalSummaryElementName, ExternalSummaryProvider>
+>;
 
 function summarizeElement(
   noteId: VFSNodeId,

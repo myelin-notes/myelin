@@ -9,7 +9,11 @@ import {
 } from './decoration-renderer';
 import { observePaginationInvalidations } from './invalidation-controller';
 import { calculatePaginationLayout } from './layout-calculator';
-import { collectPaginationBlocks } from './line-measurer';
+import {
+  BrowserParagraphLineMeasurer,
+  collectPaginationBlocks,
+  DomParagraphLineMeasurer,
+} from './line-measurer';
 import { paginationProfiler } from './profiler';
 
 const SETTLE_PASS_COUNT = 4;
@@ -141,6 +145,10 @@ export function paginationPlugin(
       },
     },
     view(editorView) {
+      const domLineMeasurer = new DomParagraphLineMeasurer();
+      const paragraphLineMeasurer = new BrowserParagraphLineMeasurer(
+        domLineMeasurer,
+      );
       let rafId = 0;
       let destroyed = false;
       let pendingFollowUpPasses = 0;
@@ -262,6 +270,8 @@ export function paginationPlugin(
             prevBreaks,
             metrics,
             measurementCacheGeneration,
+            paragraphLineMeasurer,
+            domLineMeasurer,
           );
           if (metrics) {
             metrics.calculateLayoutMs =

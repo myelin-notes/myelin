@@ -39,6 +39,15 @@ describe('PdfPageRenderScheduler', () => {
     });
     const scheduler = new PdfPageRenderScheduler({ canvasPool: pool, render });
     const surface = createSurface(1);
+    const visibleCanvas = surface.canvas;
+    const drawImage = vi.fn();
+    visibleCanvas.width = 100;
+    visibleCanvas.height = 200;
+    (
+      visibleCanvas as unknown as {
+        getContext(): CanvasRenderingContext2D;
+      }
+    ).getContext = () => ({ drawImage }) as unknown as CanvasRenderingContext2D;
     const params = {
       surface,
       document: {} as PDFDocumentProxy,
@@ -51,7 +60,9 @@ describe('PdfPageRenderScheduler', () => {
 
     scheduler.request(params);
     expect(render).not.toHaveBeenCalled();
+    expect(visibleCanvas).toMatchObject({ width: 100, height: 200 });
     vi.advanceTimersByTime(120);
+    expect(visibleCanvas).toMatchObject({ width: 100, height: 200 });
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -60,6 +71,8 @@ describe('PdfPageRenderScheduler', () => {
     expect(pool.acquire).toHaveBeenCalledOnce();
     expect(pool.release).toHaveBeenCalledWith(stagingCanvas);
     expect(surface.rendered).toEqual({ pageIndex: 0, renderScale: 1.25 });
+    expect(visibleCanvas).toMatchObject({ width: 125, height: 250 });
+    expect(drawImage).toHaveBeenCalledWith(stagingCanvas, 0, 0);
   });
 
   it('cancels an active render when a page is released', () => {
