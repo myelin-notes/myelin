@@ -37,6 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { getSelectionToolbarPosition } from './selection-toolbar-position';
 import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
@@ -71,10 +72,6 @@ const HIDDEN_STATE: ToolbarState = {
 
 const VIEWPORT_MARGIN = 12;
 const SELECTION_GAP = 10;
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
 
 function sameElementItems(
   a: SelectionToolbarItem[],
@@ -166,6 +163,49 @@ function collectElementItems(
   ];
 }
 
+function positionToolbar(toolbar: HTMLDivElement, bounds: DOMRect): void {
+  const container = toolbar.offsetParent;
+  if (!(container instanceof HTMLElement)) {
+    return;
+  }
+  const containerRect = container.getBoundingClientRect();
+  const viewportLeft = window.visualViewport?.offsetLeft ?? 0;
+  const viewportTop = window.visualViewport?.offsetTop ?? 0;
+  const viewportRight =
+    viewportLeft + (window.visualViewport?.width ?? window.innerWidth);
+  const viewportBottom =
+    viewportTop + (window.visualViewport?.height ?? window.innerHeight);
+  const containerLeft = containerRect.left + container.clientLeft;
+  const containerTop = containerRect.top + container.clientTop;
+  const visibleLeft = Math.max(0, viewportLeft - containerLeft);
+  const visibleTop = Math.max(0, viewportTop - containerTop);
+  const visibleRight = Math.min(
+    container.clientWidth,
+    viewportRight - containerLeft,
+  );
+  const visibleBottom = Math.min(
+    container.clientHeight,
+    viewportBottom - containerTop,
+  );
+  const { left, top } = getSelectionToolbarPosition({
+    selectionBounds: bounds,
+    viewport: {
+      left: visibleLeft,
+      top: visibleTop,
+      width: Math.max(0, visibleRight - visibleLeft),
+      height: Math.max(0, visibleBottom - visibleTop),
+    },
+    toolbarSize: {
+      width: toolbar.offsetWidth,
+      height: toolbar.offsetHeight,
+    },
+    viewportMargin: VIEWPORT_MARGIN,
+    selectionGap: SELECTION_GAP,
+  });
+
+  toolbar.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+}
+
 export function SelectionToolbar({
   drawableCanvasRef,
   onCopy,
@@ -214,25 +254,7 @@ export function SelectionToolbar({
       }
 
       if (bounds && toolbar) {
-        const toolbarWidth = toolbar.offsetWidth;
-        const toolbarHeight = toolbar.offsetHeight;
-        const minLeft = VIEWPORT_MARGIN;
-        const maxLeft = window.innerWidth - VIEWPORT_MARGIN - toolbarWidth;
-        const left = clamp(
-          bounds.left + bounds.width / 2 - toolbarWidth / 2,
-          minLeft,
-          Math.max(minLeft, maxLeft),
-        );
-        const aboveTop = bounds.top - toolbarHeight - SELECTION_GAP;
-        const belowTop = bounds.bottom + SELECTION_GAP;
-        const maxTop = window.innerHeight - VIEWPORT_MARGIN - toolbarHeight;
-        const top = clamp(
-          aboveTop >= VIEWPORT_MARGIN ? aboveTop : belowTop,
-          VIEWPORT_MARGIN,
-          Math.max(VIEWPORT_MARGIN, maxTop),
-        );
-
-        toolbar.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+        positionToolbar(toolbar, bounds);
       }
 
       if (!sameToolbarState(currentState, nextState)) {
@@ -264,7 +286,12 @@ export function SelectionToolbar({
     const resizeObserver = new ResizeObserver(scheduleSync);
     if (observedToolbar) {
       resizeObserver.observe(observedToolbar);
+      if (observedToolbar.offsetParent instanceof HTMLElement) {
+        resizeObserver.observe(observedToolbar.offsetParent);
+      }
     }
+    window.visualViewport?.addEventListener('resize', scheduleSync);
+    window.visualViewport?.addEventListener('scroll', scheduleSync);
 
     return () => {
       if (pendingFrame !== 0) {
@@ -274,6 +301,8 @@ export function SelectionToolbar({
       unsubChange();
       unsubView();
       window.removeEventListener('resize', scheduleSync);
+      window.visualViewport?.removeEventListener('resize', scheduleSync);
+      window.visualViewport?.removeEventListener('scroll', scheduleSync);
     };
   }, [drawableCanvasRef, strings]);
 
