@@ -60,7 +60,7 @@ export class CanvasInteractionController {
   private readonly activeTouchPointers = new Set<number>();
   private screenPosition: Vector2 = { x: 0, y: 0 };
   private lastTouchTapTime = 0;
-  private lastTouchTapPos: Vector2 = { x: 0, y: 0 };
+  private lastTouchTapScreenPos: Vector2 = { x: 0, y: 0 };
   private touchTapCandidate: Vector2 | null = null;
   private abortingInteraction = false;
   private eraserOverride: ITool | null = null;
@@ -306,18 +306,19 @@ export class CanvasInteractionController {
       this.state.update(event);
       return;
     }
-    const point = this.host.viewport.getPoint(event);
     const now = Date.now();
-    const dx = point.x - this.lastTouchTapPos.x;
-    const dy = point.y - this.lastTouchTapPos.y;
+    const dx = event.clientX - this.lastTouchTapScreenPos.x;
+    const dy = event.clientY - this.lastTouchTapScreenPos.y;
     const isDoubleTap =
-      now - this.lastTouchTapTime < 400 && dx * dx + dy * dy < 25;
+      now - this.lastTouchTapTime < 400 &&
+      dx * dx + dy * dy < TOUCH_TAP_SLOP * TOUCH_TAP_SLOP;
+    const point = this.host.viewport.getPoint(event);
     if (isDoubleTap && this.host.enterEditAtPoint(point, event)) {
       this.lastTouchTapTime = 0;
       return;
     }
     this.lastTouchTapTime = now;
-    this.lastTouchTapPos = point;
+    this.lastTouchTapScreenPos = { x: event.clientX, y: event.clientY };
     const selecting = this.selectedTool.id === 'select';
     if (selecting && this.touchGrabsElement(point)) {
       this.touchTapCandidate = null;

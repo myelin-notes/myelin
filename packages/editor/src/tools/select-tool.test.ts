@@ -74,7 +74,7 @@ function makePageFrame(uuid = 'frame-uuid', offsetX = 0, offsetY = 0) {
   return frame;
 }
 
-function makeCanvas(elements: DrawableElement[], point: Vector2) {
+function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
   const enterElementEdit = vi.fn();
   // Mirrors DrawableCanvas.enterEditAtPoint: hit-test the topmost editable
   // element under the point, select it exclusively, and enter its edit mode.
@@ -101,7 +101,7 @@ function makeCanvas(elements: DrawableElement[], point: Vector2) {
     enterEditAtPoint,
     viewport: {
       getPoint: vi.fn(() => point),
-      zoom: 1,
+      zoom,
     },
   } as unknown as DrawableCanvas;
   enterElementEdit.mockImplementation((element: DrawableElement) => {
@@ -136,6 +136,31 @@ describe('SelectTool', () => {
 
     expect(image.isSelected).toBe(true);
     expect(enterCropMode).toHaveBeenCalledTimes(1);
+    expect(enterElementEdit).toHaveBeenCalledWith(image, event);
+  });
+
+  it('uses a screen-space tolerance for double-clicks', () => {
+    const { image } = makeImageElement();
+    vi.spyOn(image, 'enterCropMode').mockImplementation(() => {});
+    const { canvas, enterElementEdit } = makeCanvas(
+      [image],
+      { x: 10, y: 10 },
+      0.5,
+    );
+    vi.mocked(canvas.viewport.getPoint)
+      .mockReturnValueOnce({ x: 10, y: 10 })
+      .mockReturnValueOnce({ x: 22, y: 10 });
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1100);
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+    tool.start(canvas, event);
+
     expect(enterElementEdit).toHaveBeenCalledWith(image, event);
   });
 

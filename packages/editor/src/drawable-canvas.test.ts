@@ -67,6 +67,79 @@ describe('isStylusTouch', () => {
   });
 });
 
+describe('touch editing', () => {
+  type TouchInteraction = {
+    onPointerDown(event: PointerEvent): void;
+    onPointerUp(event: PointerEvent): void;
+    destroy(): void;
+  };
+
+  it('recognizes a double-tap within the screen-space tap tolerance', () => {
+    UserPrefs.set('inputMode', 'pen');
+    vi.stubGlobal('window', new EventTarget());
+    const canvas = Object.assign(new EventTarget(), {
+      style: {},
+    }) as unknown as HTMLCanvasElement;
+    const enterEditAtPoint = vi.fn(() => true);
+    const tool = {
+      id: 'select',
+      start: () => {},
+      update: () => {},
+      finish: () => {},
+      interrupt: () => {},
+    } as unknown as ITool;
+    let point = { x: 0, y: 0 };
+    const interaction = new CanvasInteractionController({
+      drawableCanvas: {} as never,
+      canvas,
+      viewport: {
+        getPoint: () => point,
+        zoom: 0.5,
+        panBy: () => {},
+      } as never,
+      getElements: () => [],
+      getActiveTool: () => tool,
+      setActiveTool: () => {},
+      getTools: () => [tool],
+      clearSelection: () => {},
+      stopUndoCapturing: () => {},
+      isPlacementActive: () => false,
+      placeAt: () => {},
+      endPlacement: () => {},
+      enterEditAtPoint,
+      refreshRendererSize: () => {},
+    }) as unknown as TouchInteraction;
+    const down = (clientX: number) =>
+      ({
+        clientX,
+        clientY: 0,
+        pointerId: 1,
+        pointerType: 'touch',
+      }) as PointerEvent;
+    const up = (clientX: number) =>
+      ({
+        ...down(clientX),
+        type: 'pointerup',
+      }) as PointerEvent;
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1100)
+      .mockReturnValueOnce(1100);
+
+    interaction.onPointerDown(down(0));
+    interaction.onPointerUp(up(0));
+    point = { x: 12, y: 0 };
+    interaction.onPointerDown(down(6));
+
+    expect(enterEditAtPoint).toHaveBeenCalledWith(point, expect.anything());
+
+    interaction.destroy();
+    vi.unstubAllGlobals();
+    UserPrefs.set('inputMode', 'touch');
+  });
+});
+
 describe('pen eraser override', () => {
   type TestableInteraction = {
     readonly selectedTool: ITool;

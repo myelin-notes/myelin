@@ -23,6 +23,8 @@ enum SelectMode {
   Lasso,
 }
 
+const DOUBLE_CLICK_SLOP_PX = 8;
+
 export class SelectTool implements ITool {
   public constructor(private readonly getStrings: MessageGetter) {}
 
@@ -146,8 +148,10 @@ export class SelectTool implements ITool {
     const now = Date.now();
     const dx = point.x - this.lastClickPos.x;
     const dy = point.y - this.lastClickPos.y;
+    const doubleClickSlop = DOUBLE_CLICK_SLOP_PX / canvas.viewport.zoom;
     const isDoubleClick =
-      now - this.lastClickTime < 400 && dx * dx + dy * dy < 25;
+      now - this.lastClickTime < 400 &&
+      dx * dx + dy * dy < doubleClickSlop * doubleClickSlop;
 
     if (isDoubleClick && !additive && canvas.enterEditAtPoint(point, event)) {
       this.lastClickTime = 0;
