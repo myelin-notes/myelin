@@ -36,6 +36,8 @@ export interface SaveFileResult {
 export interface ArtifactCache {
   /** A URL renderable in the webview for a cached artifact, or null when absent. */
   getUrl(path: string): Promise<string | null>;
+  /** The cached artifact bytes, or null when absent. */
+  read(path: string): Promise<Blob | null>;
   write(path: string, data: Blob): Promise<void>;
   /** Remove a file or directory (recursively). Missing paths are a no-op. */
   remove(path: string): Promise<void>;

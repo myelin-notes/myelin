@@ -35,6 +35,11 @@ import {
 } from '@/lib/sync';
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
 import type { TabId } from '@/lib/tabs/types';
+import {
+  flushViewportStates,
+  readViewportState,
+  saveViewportState,
+} from '@/lib/viewport-state-cache';
 import type {
   RenameReferencesChoice,
   RenameReferencesPrompt,
@@ -84,6 +89,7 @@ interface ActiveCanvasSession {
   drawableCanvas: DrawableCanvas;
   unsubscribeStatus: () => void;
   unsubscribePeers: () => void;
+  unsubscribeViewport: () => void;
 }
 
 export class CanvasSessionController {
@@ -191,6 +197,10 @@ export class CanvasSessionController {
         },
         canvasUiServices,
       );
+      const viewportState = await readViewportState(noteId);
+      if (viewportState) {
+        drawableCanvas.viewport.setView(viewportState);
+      }
       drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
         this.handlePageFrameRenamed(noteId, uuid, newName);
       });
@@ -272,6 +282,8 @@ export class CanvasSessionController {
 
       activeSession.unsubscribeStatus();
       activeSession.unsubscribePeers();
+      activeSession.unsubscribeViewport();
+      await flushViewportStates();
       activeSession.drawableCanvas.destroy();
 
       if (hasAudioRecordingsForOwner(this.recordingOwnerId)) {
@@ -337,12 +349,19 @@ export class CanvasSessionController {
         peers: snapshot.connectedPeers,
       });
     });
+    const unsubscribeViewport = drawableCanvas.viewport.onViewChange(() => {
+      saveViewportState(noteSession.id, {
+        zoom: drawableCanvas.viewport.zoom,
+        offset: { ...drawableCanvas.viewport.offset },
+      });
+    });
 
     this.activeSession = {
       noteSession,
       drawableCanvas,
       unsubscribeStatus: () => unsubscribeStatus(),
       unsubscribePeers,
+      unsubscribeViewport,
     };
     this.drawableCanvasRef.current = drawableCanvas;
 

@@ -98,6 +98,15 @@ describe('CanvasViewport content fitting', () => {
 });
 
 describe('CanvasViewport zoom limits', () => {
+  it('restores a saved view', () => {
+    const { viewport } = createViewport();
+
+    viewport.setView({ zoom: 2, offset: { x: 120, y: -80 } });
+
+    expect(viewport.zoom).toBe(2);
+    expect(viewport.offset).toEqual({ x: 120, y: -80 });
+  });
+
   it('clamps zoom between 5% and 500%', () => {
     vi.stubGlobal('window', { devicePixelRatio: 1 });
     const { viewport } = createViewport();

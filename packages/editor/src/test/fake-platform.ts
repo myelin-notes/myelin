@@ -22,6 +22,7 @@ export function createFakePlatform(
     },
     artifactCache: {
       getUrl: async () => null,
+      read: async () => null,
       write: async () => {},
       remove: async () => {},
     },
