@@ -5,6 +5,7 @@ import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
 import { quantizeRasterZoom } from './raster-zoom';
+import type { SelectionController } from './selection-controller';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
@@ -214,6 +215,7 @@ export class CanvasRenderer {
     screenPosition: Vector2,
     placementController: PlacementController,
     domOverlayHost: HTMLElement | null,
+    selection: SelectionController,
   ): void {
     const dpr = window.devicePixelRatio || 1;
     const logicalW = this.canvas.width / dpr;
@@ -250,10 +252,8 @@ export class CanvasRenderer {
     }
     this.ctx.restore();
 
-    // Read after the draw loop, which is what advances `selectionT` from zero.
-    const overlayHasContent = elements.some(
-      (element) => element.hasSelectionOverlay,
-    );
+    selection.advanceOverlay(deltaTime);
+    const overlayHasContent = selection.hasOverlay;
     if (
       this.overlayCtx &&
       this.overlayCanvas &&
@@ -266,12 +266,7 @@ export class CanvasRenderer {
       this.overlayCtx.save();
       this.overlayCtx.scale(zoom, zoom);
       this.overlayCtx.translate(offset.x, offset.y);
-      for (const element of elements) {
-        element.drawSelectionOverlay(
-          this.overlayCtx,
-          element === editingElement,
-        );
-      }
+      selection.drawOverlay(this.overlayCtx, editingElement, zoom);
       this.overlayCtx.restore();
       this.overlayHasContent = overlayHasContent;
     }

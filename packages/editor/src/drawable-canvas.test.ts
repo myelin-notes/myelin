@@ -90,14 +90,15 @@ describe('touch editing', () => {
     } as unknown as ITool;
     let point = { x: 0, y: 0 };
     const interaction = new CanvasInteractionController({
-      drawableCanvas: {} as never,
+      drawableCanvas: {
+        shouldUseSelectToolForTouch: () => false,
+      } as never,
       canvas,
       viewport: {
         getPoint: () => point,
         zoom: 0.5,
         panBy: () => {},
       } as never,
-      getElements: () => [],
       getActiveTool: () => tool,
       setActiveTool: () => {},
       getTools: () => [tool],
@@ -140,6 +141,100 @@ describe('touch editing', () => {
   });
 });
 
+describe('tablet selection routing', () => {
+  type TestableInteraction = {
+    onPointerDown(event: PointerEvent): void;
+    onPointerUp(event: PointerEvent): void;
+    destroy(): void;
+  };
+
+  function makeInteraction(selectionClaimsTouch: boolean) {
+    vi.stubGlobal('window', new EventTarget());
+    const canvas = Object.assign(new EventTarget(), {
+      style: {},
+    }) as unknown as HTMLCanvasElement;
+    const tool = {
+      id: 'select',
+      start: vi.fn(),
+      update: vi.fn(),
+      finish: vi.fn(),
+      interrupt: vi.fn(),
+    } as unknown as ITool;
+    const interaction = new CanvasInteractionController({
+      drawableCanvas: {
+        shouldUseSelectToolForTouch: () => selectionClaimsTouch,
+      } as never,
+      canvas,
+      viewport: {
+        getPoint: () => ({ x: 10, y: 10 }),
+        zoom: 1,
+        panBy: vi.fn(),
+      } as never,
+      getActiveTool: () => tool,
+      setActiveTool: () => {},
+      getTools: () => [tool],
+      clearSelection: () => {},
+      stopUndoCapturing: () => {},
+      isPlacementActive: () => false,
+      placeAt: () => {},
+      endPlacement: () => {},
+      enterEditAtPoint: () => false,
+      refreshRendererSize: () => {},
+    }) as unknown as TestableInteraction;
+    return { interaction, tool };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    UserPrefs.set('inputMode', 'touch');
+  });
+
+  it.each([
+    'pen',
+    'touch',
+  ] as const)('lets a finger manipulate a selected target in %s input mode', (inputMode) => {
+    UserPrefs.set('inputMode', inputMode);
+    const { interaction, tool } = makeInteraction(true);
+    const event = {
+      pointerId: 1,
+      pointerType: 'touch',
+      clientX: 10,
+      clientY: 10,
+      type: 'pointerdown',
+    } as PointerEvent;
+
+    interaction.onPointerDown(event);
+    interaction.onPointerUp({ ...event, type: 'pointerup' } as PointerEvent);
+
+    expect(tool.start).toHaveBeenCalledWith(expect.anything(), event);
+    expect(tool.finish).toHaveBeenCalled();
+    interaction.destroy();
+  });
+
+  it.each([
+    'pen',
+    'touch',
+  ] as const)('lets a stylus manipulate a selection in %s input mode', (inputMode) => {
+    UserPrefs.set('inputMode', inputMode);
+    const { interaction, tool } = makeInteraction(false);
+    const event = {
+      pointerId: 1,
+      pointerType: 'pen',
+      buttons: 1,
+      clientX: 10,
+      clientY: 10,
+      type: 'pointerdown',
+    } as PointerEvent;
+
+    interaction.onPointerDown(event);
+    interaction.onPointerUp({ ...event, type: 'pointerup' } as PointerEvent);
+
+    expect(tool.start).toHaveBeenCalledWith(expect.anything(), event);
+    expect(tool.finish).toHaveBeenCalled();
+    interaction.destroy();
+  });
+});
+
 describe('pen eraser override', () => {
   type TestableInteraction = {
     readonly selectedTool: ITool;
@@ -167,7 +262,6 @@ describe('pen eraser override', () => {
       drawableCanvas: {} as never,
       canvas,
       viewport: {} as never,
-      getElements: () => [],
       getActiveTool: () => selectedTool,
       setActiveTool: (tool) => {
         selectedTool = tool;

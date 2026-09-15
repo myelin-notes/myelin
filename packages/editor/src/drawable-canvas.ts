@@ -17,7 +17,10 @@ import {
   moveElementOrderForSelection,
 } from './element-ordering';
 import type { CanvasUiServices } from './elements/canvas-element-context';
-import type { DrawableElement } from './elements/drawable-element';
+import type {
+  DrawableElement,
+  ResizeHandle,
+} from './elements/drawable-element';
 import type { ElementType } from './elements/element-type';
 import type { Vector2 } from './geometry';
 import { catalogs, type MessageGetter } from './i18n/messages';
@@ -141,7 +144,6 @@ export class DrawableCanvas {
       drawableCanvas: this,
       canvas,
       viewport: this.viewport,
-      getElements: () => this.elements,
       getActiveTool: () => this.toolSelected,
       setActiveTool: (tool) => {
         this.toolSelected = tool;
@@ -296,6 +298,7 @@ export class DrawableCanvas {
       this.interaction.cursorPosition,
       this.placement,
       this.editSession.domHost,
+      this.selection,
     );
   }
 
@@ -333,6 +336,24 @@ export class DrawableCanvas {
 
   public getSelectedElementScreenBounds(): DOMRect | null {
     return this.selection.getScreenBounds(this.viewport);
+  }
+
+  public getSelectionInteractionBounds(pointerType: string): DOMRect | null {
+    return this.selection.getInteractionBounds(this.viewport.zoom, pointerType);
+  }
+
+  public hitSelectionHandle(
+    point: Vector2,
+    pointerType: string,
+  ): ResizeHandle | null {
+    return this.selection.hitHandle(point, this.viewport.zoom, pointerType);
+  }
+
+  public shouldUseSelectToolForTouch(point: Vector2): boolean {
+    return this.selection.shouldUseSelectToolForTouch(
+      point,
+      this.viewport.zoom,
+    );
   }
 
   public canReorderSelection(direction: ElementReorderDirection): boolean {

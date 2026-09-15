@@ -1,11 +1,9 @@
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableCanvas, Vector2 } from './drawable-canvas';
-import type { DrawableElement } from './elements/drawable-element';
 import { InputModeController } from './input-mode';
 import { PalmRejection } from './palm-rejection';
 import type { ITool, ToolId } from './tools/tool';
 import { UserPrefs } from './user-prefs';
-import { CollisionHelper } from './utils/collision-helper';
 import { StateMachine } from './utils/state-machine';
 
 const TOUCH_TAP_SLOP = 8;
@@ -38,7 +36,6 @@ export interface CanvasInteractionHost {
   drawableCanvas: DrawableCanvas;
   canvas: HTMLCanvasElement;
   viewport: CanvasViewport;
-  getElements: () => readonly DrawableElement[];
   getActiveTool: () => ITool;
   setActiveTool: (tool: ITool) => void;
   getTools: () => readonly ITool[];
@@ -320,7 +317,10 @@ export class CanvasInteractionController {
     this.lastTouchTapTime = now;
     this.lastTouchTapScreenPos = { x: event.clientX, y: event.clientY };
     const selecting = this.selectedTool.id === 'select';
-    if (selecting && this.touchGrabsElement(point)) {
+    if (
+      selecting &&
+      this.host.drawableCanvas.shouldUseSelectToolForTouch(point)
+    ) {
       this.touchTapCandidate = null;
       this.state.change(InteractState.UsingTool, event);
       this.state.update(event);
@@ -354,29 +354,6 @@ export class CanvasInteractionController {
     if (event.pointerType === 'pen') {
       this.penContactOpen = false;
     }
-  }
-
-  private touchGrabsElement(point: Vector2): boolean {
-    const elements = this.host.getElements();
-    for (let i = elements.length - 1; i >= 0; i--) {
-      const element = elements[i];
-      if (
-        element.isSelected &&
-        element.hitHandle(point, this.host.viewport.zoom, true)
-      ) {
-        return true;
-      }
-    }
-    for (let i = elements.length - 1; i >= 0; i--) {
-      const element = elements[i];
-      if (
-        CollisionHelper.inBox(point, element.boundingBox) &&
-        element.grabsFromBody
-      ) {
-        return true;
-      }
-    }
-    return false;
   }
 
   private beginPenContact(event: PointerEvent): void {

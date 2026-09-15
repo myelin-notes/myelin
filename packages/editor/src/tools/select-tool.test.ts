@@ -6,6 +6,7 @@ import { ImageElement } from '../elements/image-element';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { catalogs } from '../i18n/messages';
+import { SelectionController } from '../selection-controller';
 import { CollisionHelper } from '../utils/collision-helper';
 import { YDocManager } from '../ydoc-manager';
 import { SelectTool } from './select-tool';
@@ -76,6 +77,7 @@ function makePageFrame(uuid = 'frame-uuid', offsetX = 0, offsetY = 0) {
 
 function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
   const enterElementEdit = vi.fn();
+  const selection = new SelectionController(() => elements);
   // Mirrors DrawableCanvas.enterEditAtPoint: hit-test the topmost editable
   // element under the point, select it exclusively, and enter its edit mode.
   const enterEditAtPoint = vi.fn((p: Vector2, event?: Event) => {
@@ -99,6 +101,12 @@ function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
     elements,
     enterElementEdit,
     enterEditAtPoint,
+    getSelectedElements: () => selection.selectedElements,
+    getSelectedElementBounds: () => selection.getBounds(),
+    getSelectionInteractionBounds: (pointerType: string) =>
+      selection.getInteractionBounds(zoom, pointerType),
+    hitSelectionHandle: (p: Vector2, pointerType: string) =>
+      selection.hitHandle(p, zoom, pointerType),
     viewport: {
       getPoint: vi.fn(() => point),
       zoom,
@@ -243,6 +251,56 @@ describe('SelectTool', () => {
     expect(frame.offset).toEqual({ x: 0, y: 0 });
   });
 
+  it('selects an ordinary element as soon as the marquee overlaps it', () => {
+    const { image } = makeImageElement('image', 100, 100);
+    const start = { x: 90, y: 90 };
+    const { canvas } = makeCanvas([image], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 101, y: 110 });
+    tool.finish(canvas, event);
+
+    expect(image.isSelected).toBe(true);
+  });
+
+  it('does not select a page frame from a small marquee overlap', () => {
+    const frame = makePageFrame();
+    const box = frame.boundingBox;
+    const start = { x: box.right + 10, y: box.bottom + 10 };
+    const { canvas } = makeCanvas([frame], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, {
+      x: box.right - 10,
+      y: box.bottom - 10,
+    });
+    tool.finish(canvas, event);
+
+    expect(frame.isSelected).toBe(false);
+  });
+
+  it('still selects a page frame when the marquee covers most of it', () => {
+    const frame = makePageFrame();
+    const box = frame.boundingBox;
+    const start = { x: box.left - 10, y: box.top - 10 };
+    const { canvas } = makeCanvas([frame], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, {
+      x: box.right + 10,
+      y: box.bottom + 10,
+    });
+    tool.finish(canvas, event);
+
+    expect(frame.isSelected).toBe(true);
+  });
+
   it('selects the page frame a marquee started on when it caught nothing', () => {
     const frame = makePageFrame();
     const point = { x: 50, y: 50 };
@@ -291,5 +349,64 @@ describe('SelectTool', () => {
     expect(image.isSelected).toBe(true);
     expect(image.offset).toEqual({ x: 0, y: 0 });
     expect(updates).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'mouse',
+    'pen',
+    'touch',
+  ])('moves a thin selected element from its enlarged %s target', (pointerType) => {
+    const { image } = makeImageElement();
+    image.setScale(1, 0.025);
+    image.select();
+    const start = { x: 50, y: 10 };
+    const { canvas } = makeCanvas([image], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 70, y: 30 });
+    tool.finish(canvas, event);
+
+    expect(image.offset).toEqual({ x: 20, y: 20 });
+    expect(image.scale).toEqual({ x: 1, y: 0.025 });
+  });
+
+  it('moves a multi-selection by dragging the gap inside its shared bounds', () => {
+    const { image: first } = makeImageElement('first', 0, 0);
+    const { image: second } = makeImageElement('second', 200, 0);
+    first.select();
+    second.select();
+    const start = { x: 150, y: 40 };
+    const { canvas } = makeCanvas([first, second], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType: 'touch' } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 180, y: 60 });
+    tool.finish(canvas, event);
+
+    expect(first.offset).toEqual({ x: 30, y: 20 });
+    expect(second.offset).toEqual({ x: 230, y: 20 });
+  });
+
+  it('scales a multi-selection proportionally from its shared corner', () => {
+    const { image: first } = makeImageElement('first', 0, 0);
+    const { image: second } = makeImageElement('second', 200, 0);
+    first.select();
+    second.select();
+    const start = { x: 304, y: 84 };
+    const { canvas } = makeCanvas([first, second], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType: 'mouse' } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 604, y: 164 });
+    tool.finish(canvas, event);
+
+    expect(first.offset).toEqual({ x: 0, y: 0 });
+    expect(first.scale).toEqual({ x: 2, y: 2 });
+    expect(second.offset).toEqual({ x: 400, y: 0 });
+    expect(second.scale).toEqual({ x: 2, y: 2 });
   });
 });
