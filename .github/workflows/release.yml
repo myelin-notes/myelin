@@ -377,7 +377,10 @@ jobs:
           # fail the compile-time size assertions (E0080 overflow). Pointing
           # bindgen at the sysroot lets it generate correct per-ABI bindings.
           BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-        run: yarn tauri android build --apk --aab
+        run: |
+          VERSION_CODE=$((1000000 + GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          CONFIG="{\"bundle\":{\"android\":{\"versionCode\":$VERSION_CODE}}}"
+          yarn tauri android build --config "$CONFIG" --apk --aab
 
       # The alignment above rides on an env var through two process hops
       # (CLI -> gradle -> CLI -> cargo), and a dropped var fails silently: the
