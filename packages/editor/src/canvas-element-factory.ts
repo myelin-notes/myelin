@@ -76,6 +76,7 @@ export class CanvasElementFactory {
 
   private configure(element: DrawableElement): void {
     element.onSelectionChanged = this.options.onChange;
+    element.onLockChanged = this.options.onChange;
     element.onTransformChanged = () => {
       this.options.invalidateContentBounds();
       if (element.isSelected) {

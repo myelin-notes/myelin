@@ -820,6 +820,8 @@ const en = {
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
       delete: 'Delete',
+      lock: 'Lock',
+      unlock: 'Unlock',
       crop: 'Crop',
       applyCrop: 'Apply crop',
     },

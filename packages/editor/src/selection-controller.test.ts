@@ -17,6 +17,7 @@ function createElement(uuid: string, bounds: DOMRect): DrawableElement {
       return bounds;
     },
     resizeHandles: ResizeHandles.All,
+    locked: false,
     hidden: false,
     getHandles() {
       return getResizeHandles(bounds, ResizeHandles.All);
@@ -33,6 +34,22 @@ function createElement(uuid: string, bounds: DOMRect): DrawableElement {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('SelectionController', () => {
+  it('skips locked elements in group selection but permits an explicit single selection', () => {
+    const locked = createElement('locked', new DOMRect(0, 0, 20, 20));
+    const free = createElement('free', new DOMRect(30, 0, 20, 20));
+    Object.defineProperty(locked, 'locked', { value: true });
+    const controller = new SelectionController(() => [locked, free]);
+
+    controller.selectAll();
+    expect(controller.selectedElements).toEqual([free]);
+
+    controller.selectByUuid(['locked', 'free']);
+    expect(controller.selectedElements).toEqual([free]);
+
+    controller.selectByUuid(['locked']);
+    expect(controller.selectedElements).toEqual([locked]);
+    expect(controller.hitHandle({ x: -4, y: -4 }, 1, 'mouse')).toBeNull();
+  });
   it('owns selection and derives its shared bounds without a canvas', () => {
     const first = createElement('first', new DOMRect(10, 20, 30, 40));
     const second = createElement('second', new DOMRect(-5, 50, 20, 10));

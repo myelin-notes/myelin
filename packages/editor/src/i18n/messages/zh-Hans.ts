@@ -798,6 +798,8 @@ const zhHans: typeof en = {
       moveHigher: '前移一层',
       moveLower: '后移一层',
       delete: '删除',
+      lock: '锁定',
+      unlock: '解锁',
       crop: '裁剪',
       applyCrop: '应用裁剪',
     },

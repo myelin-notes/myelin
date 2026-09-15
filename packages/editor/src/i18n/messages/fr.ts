@@ -836,6 +836,8 @@ const fr: typeof en = {
       moveHigher: 'Avancer',
       moveLower: 'Reculer',
       delete: 'Supprimer',
+      lock: 'Verrouiller',
+      unlock: 'Déverrouiller',
       crop: 'Rogner',
       applyCrop: 'Appliquer le rognage',
     },

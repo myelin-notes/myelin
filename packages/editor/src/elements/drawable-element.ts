@@ -211,7 +211,9 @@ export abstract class DrawableElement {
   private _offset: Vector2 = { x: 0, y: 0 };
   private selected: boolean = false;
   private _hidden: boolean = false;
+  private _locked: boolean = false;
   public onSelectionChanged?: () => void;
+  public onLockChanged?: () => void;
   public onTransformChanged?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
@@ -254,6 +256,13 @@ export abstract class DrawableElement {
         this._scale.y = v as number;
         this.updateBoundingBox();
       },
+      locked: (v) => {
+        const locked = v === true;
+        if (this._locked !== locked) {
+          this._locked = locked;
+          this.onLockChanged?.();
+        }
+      },
     });
   }
 
@@ -265,7 +274,16 @@ export abstract class DrawableElement {
   /** Apply changed Y.Map fields after the canvas observes a remote update. */
   public syncFromYMap(keys: Iterable<string>): void {
     if (this._yMap) {
-      applyYFields(this._yMap, this._yFields, keys);
+      const changedKeys = Array.from(keys);
+      applyYFields(this._yMap, this._yFields, changedKeys);
+      if (
+        changedKeys.includes('locked') &&
+        this._yMap.get('locked') === undefined &&
+        this._locked
+      ) {
+        this._locked = false;
+        this.onLockChanged?.();
+      }
     }
   }
 
@@ -307,6 +325,19 @@ export abstract class DrawableElement {
   }
   public set hidden(value: boolean) {
     this._hidden = value;
+  }
+
+  public get locked(): boolean {
+    return this._locked;
+  }
+
+  public setLocked(locked: boolean): void {
+    if (this._locked === locked) {
+      return;
+    }
+    this._locked = locked;
+    this.syncToYMap({ locked });
+    this.onLockChanged?.();
   }
 
   /** Draw element content. The renderer draws the shared selection overlay separately. */

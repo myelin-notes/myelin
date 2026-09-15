@@ -11,8 +11,10 @@ import {
   Copy as CopyIcon,
   Scissors as CutIcon,
   Trash2 as DeleteIcon,
+  Lock as LockIcon,
   ArrowDown as MoveBackwardIcon,
   ArrowUp as MoveForwardIcon,
+  LockOpen as UnlockIcon,
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
@@ -149,7 +151,19 @@ function collectElementItems(
   if (selected.length !== 1) {
     return [];
   }
-  return selected[0].getSelectionToolbarItems(strings);
+  const element = selected[0];
+  return [
+    ...element.getSelectionToolbarItems(strings),
+    {
+      id: 'lock',
+      label: element.locked
+        ? strings.canvas.selectionToolbar.unlock
+        : strings.canvas.selectionToolbar.lock,
+      icon: element.locked ? UnlockIcon : LockIcon,
+      active: element.locked,
+      onClick: () => element.setLocked(!element.locked),
+    },
+  ];
 }
 
 export function SelectionToolbar({

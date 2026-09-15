@@ -55,7 +55,10 @@ export class SelectionController {
   public selectByUuid(uuids: readonly string[]): void {
     const selected = new Set(uuids);
     for (const element of this.getElements()) {
-      if (selected.has(element.uuid)) {
+      if (
+        selected.has(element.uuid) &&
+        (uuids.length === 1 || !element.locked)
+      ) {
         element.select();
       } else {
         element.unselect();
@@ -65,7 +68,11 @@ export class SelectionController {
 
   public selectAll(): void {
     for (const element of this.getElements()) {
-      element.select();
+      if (element.locked) {
+        element.unselect();
+      } else {
+        element.select();
+      }
     }
   }
 
@@ -277,7 +284,12 @@ export class SelectionController {
     zoom: number,
   ): ResizeHandles {
     if (selected.length !== 1) {
-      return ResizeHandles.Corners;
+      return selected.some((element) => !element.locked)
+        ? ResizeHandles.Corners
+        : ResizeHandles.None;
+    }
+    if (selected[0].locked) {
+      return ResizeHandles.None;
     }
     const flags = selected[0].resizeHandles;
     const bounds = this.getBounds();

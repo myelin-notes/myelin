@@ -1,8 +1,42 @@
 import { describe, expect, it } from 'vitest';
+import { YDocManager } from '../ydoc-manager';
 import { HANDLE_TOUCH_HIT_RADIUS } from './drawable-element';
+import { ElementType } from './element-type';
 import { StrokeElement, type StrokeStyle } from './stroke-element';
 
 const STYLE: StrokeStyle = { color: '#191c1e', size: 8 };
+
+describe('element locking', () => {
+  it('persists the lock and clears it when the Yjs field is removed', () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.STROKE, 'locked-stroke', {
+      points: [0, 0, 0.5, 10, 10, 0.5],
+    });
+    const stroke = new StrokeElement(
+      'locked-stroke',
+      [0, 0, 0.5, 10, 10, 0.5],
+      false,
+      STYLE,
+    );
+    stroke.bindToYMap(yMap);
+
+    stroke.setLocked(true);
+    expect(yMap.get('locked')).toBe(true);
+
+    const reloaded = new StrokeElement(
+      'locked-stroke',
+      [0, 0, 0.5, 10, 10, 0.5],
+      false,
+      STYLE,
+    );
+    reloaded.bindToYMap(yMap);
+    expect(reloaded.locked).toBe(true);
+
+    yMap.delete('locked');
+    reloaded.syncFromYMap(['locked']);
+    expect(reloaded.locked).toBe(false);
+  });
+});
 
 describe('hitHandle', () => {
   it('reaches a handle a fingertip away only when touch is requested', () => {

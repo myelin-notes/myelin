@@ -10,6 +10,7 @@ import { SelectionController } from '../selection-controller';
 import { CollisionHelper } from '../utils/collision-helper';
 import { YDocManager } from '../ydoc-manager';
 import { SelectTool } from './select-tool';
+import { setToolOption } from './tool';
 
 class TestDOMRect {
   constructor(
@@ -265,6 +266,38 @@ describe('SelectTool', () => {
     expect(image.isSelected).toBe(true);
   });
 
+  it('skips a locked element in a marquee and lasso', () => {
+    const { image: locked } = makeImageElement('locked', 100, 100);
+    const { image: free } = makeImageElement('free', 220, 100);
+    locked.setLocked(true);
+    const start = { x: 90, y: 90 };
+    const { canvas } = makeCanvas([locked, free], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 330, y: 190 });
+    tool.finish(canvas, event);
+
+    expect(locked.isSelected).toBe(false);
+    expect(free.isSelected).toBe(true);
+
+    setToolOption(tool, 'selectionStyle', 'lasso');
+    tool.start(canvas, event);
+    for (const point of [
+      { x: 330, y: 90 },
+      { x: 330, y: 190 },
+      { x: 90, y: 190 },
+      start,
+    ]) {
+      tool.update(canvas, event, point);
+    }
+    tool.finish(canvas, event);
+
+    expect(locked.isSelected).toBe(false);
+    expect(free.isSelected).toBe(true);
+  });
+
   it('does not select a page frame from a small marquee overlap', () => {
     const frame = makePageFrame();
     const box = frame.boundingBox;
@@ -317,6 +350,25 @@ describe('SelectTool', () => {
     expect(frame.offset).toEqual({ x: 0, y: 0 });
   });
 
+  it('selects a locked page frame by tap but skips it after a marquee drag', () => {
+    const frame = makePageFrame();
+    frame.setLocked(true);
+    const start = { x: 50, y: 50 };
+    const { canvas } = makeCanvas([frame], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 150, y: 150 });
+    tool.finish(canvas, event);
+    expect(frame.isSelected).toBe(false);
+
+    const tapTool = new SelectTool(() => catalogs.en);
+    tapTool.start(canvas, event);
+    tapTool.finish(canvas, event);
+    expect(frame.isSelected).toBe(true);
+  });
+
   it('moves an already-selected page frame dragged from its body', () => {
     const frame = makePageFrame();
     frame.select();
@@ -331,6 +383,22 @@ describe('SelectTool', () => {
 
     expect(frame.isSelected).toBe(true);
     expect(frame.offset).toEqual({ x: 30, y: 40 });
+  });
+
+  it('selects a locked element by click without moving it on a drag', () => {
+    const { image } = makeImageElement();
+    image.setLocked(true);
+    const start = { x: 10, y: 10 };
+    const { canvas } = makeCanvas([image], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 50, y: 40 });
+    tool.finish(canvas, event);
+
+    expect(image.isSelected).toBe(true);
+    expect(image.offset).toEqual({ x: 0, y: 0 });
   });
 
   it('does not write element position when clicking to select without moving', () => {
@@ -390,6 +458,25 @@ describe('SelectTool', () => {
     expect(second.offset).toEqual({ x: 230, y: 20 });
   });
 
+  it('moves only unlocked members of an additive selection', () => {
+    const { image: locked } = makeImageElement('locked', 0, 0);
+    const { image: free } = makeImageElement('free', 200, 0);
+    locked.setLocked(true);
+    locked.select();
+    free.select();
+    const start = { x: 150, y: 40 };
+    const { canvas } = makeCanvas([locked, free], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType: 'touch' } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 180, y: 60 });
+    tool.finish(canvas, event);
+
+    expect(locked.offset).toEqual({ x: 0, y: 0 });
+    expect(free.offset).toEqual({ x: 230, y: 20 });
+  });
+
   it('scales a multi-selection proportionally from its shared corner', () => {
     const { image: first } = makeImageElement('first', 0, 0);
     const { image: second } = makeImageElement('second', 200, 0);
@@ -408,5 +495,26 @@ describe('SelectTool', () => {
     expect(first.scale).toEqual({ x: 2, y: 2 });
     expect(second.offset).toEqual({ x: 400, y: 0 });
     expect(second.scale).toEqual({ x: 2, y: 2 });
+  });
+
+  it('resizes only unlocked members of an additive selection', () => {
+    const { image: locked } = makeImageElement('locked', 0, 0);
+    const { image: free } = makeImageElement('free', 200, 0);
+    locked.setLocked(true);
+    locked.select();
+    free.select();
+    const start = { x: 304, y: 84 };
+    const { canvas } = makeCanvas([locked, free], start);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType: 'mouse' } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 604, y: 164 });
+    tool.finish(canvas, event);
+
+    expect(locked.offset).toEqual({ x: 0, y: 0 });
+    expect(locked.scale).toEqual({ x: 1, y: 1 });
+    expect(free.offset).toEqual({ x: 400, y: 0 });
+    expect(free.scale).toEqual({ x: 2, y: 2 });
   });
 });

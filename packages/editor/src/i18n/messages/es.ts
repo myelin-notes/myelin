@@ -827,6 +827,8 @@ const es: typeof en = {
       moveHigher: 'Mover hacia delante',
       moveLower: 'Mover hacia atrás',
       delete: 'Eliminar',
+      lock: 'Bloquear',
+      unlock: 'Desbloquear',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
     },

@@ -137,6 +137,7 @@ export class SelectTool implements ITool {
   public start(canvas: DrawableCanvas, event: PointerEvent): void {
     const point = canvas.viewport.getPoint(event);
     this.startPoint = point;
+    this.lastPoint = point;
 
     // Cmd on macOS / Ctrl on Windows, matching the app-wide convention and avoiding the macOS
     // Ctrl+click right-click gesture.
@@ -169,11 +170,13 @@ export class SelectTool implements ITool {
                 selectionBounds.y +
                 selectionBounds.height * (1 - handle.anchorFy),
             },
-            transforms: selectedElements.map((element) => ({
-              element,
-              offset: { ...element.offset },
-              scale: { ...element.scale },
-            })),
+            transforms: selectedElements
+              .filter((element) => !element.locked)
+              .map((element) => ({
+                element,
+                offset: { ...element.offset },
+                scale: { ...element.scale },
+              })),
           };
         } else {
           const element = selectedElements[0];
@@ -404,6 +407,7 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Marquee: {
+        this.lastPoint = position;
         const marqueeRect = new DOMRect(
           Math.min(this.startPoint.x, position.x),
           Math.min(this.startPoint.y, position.y),
@@ -417,8 +421,9 @@ export class SelectTool implements ITool {
             box,
           );
           if (
+            !e.locked &&
             overlap >
-            (isBackgroundElement(e.type) ? box.width * box.height * 0.5 : 0)
+              (isBackgroundElement(e.type) ? box.width * box.height * 0.5 : 0)
           ) {
             e.select();
           } else {
@@ -428,6 +433,7 @@ export class SelectTool implements ITool {
         break;
       }
       case SelectMode.Lasso: {
+        this.lastPoint = position;
         this.lassoPath.push(position);
         const poly = this.lassoPath;
         for (const e of canvas.elements) {
@@ -436,7 +442,7 @@ export class SelectTool implements ITool {
             x: box.x + box.width * 0.5,
             y: box.y + box.height * 0.5,
           };
-          if (CollisionHelper.isPointInPolygon(center, poly)) {
+          if (!e.locked && CollisionHelper.isPointInPolygon(center, poly)) {
             e.select();
           } else {
             e.unselect();
@@ -472,7 +478,16 @@ export class SelectTool implements ITool {
         // Nothing caught means the gesture was a click on the backdrop it
         // started from, not a selection of what sits on top of it.
         const backdrop = this.backdropClickCandidate;
-        if (backdrop && !canvas.elements.some((e) => e.isSelected)) {
+        if (
+          backdrop &&
+          !canvas.elements.some((e) => e.isSelected) &&
+          (!backdrop.locked ||
+            Math.hypot(
+              this.lastPoint.x - this.startPoint.x,
+              this.lastPoint.y - this.startPoint.y,
+            ) <=
+              DOUBLE_CLICK_SLOP_PX / canvas.viewport.zoom)
+        ) {
           backdrop.select();
           this.lastCycledElement = backdrop;
         }
@@ -488,6 +503,7 @@ export class SelectTool implements ITool {
   public interrupt(canvas: DrawableCanvas): void {
     if (
       this.mode === SelectMode.Moving &&
+      this.movingElements.length > 0 &&
       (this.totalDelta.x !== 0 || this.totalDelta.y !== 0)
     ) {
       canvas.undo();
@@ -544,6 +560,7 @@ export class SelectTool implements ITool {
 
     const interactionBounds = canvas.getSelectionInteractionBounds('mouse');
     if (
+      canvas.getSelectedElements().some((element) => !element.locked) &&
       interactionBounds &&
       CollisionHelper.inBox(position, interactionBounds)
     ) {
@@ -568,7 +585,7 @@ export class SelectTool implements ITool {
     this.mode = SelectMode.Moving;
     this.lastPoint = point;
     this.totalDelta = { x: 0, y: 0 };
-    this.movingElements = elements;
+    this.movingElements = elements.filter((element) => !element.locked);
   }
 
   private updateGroupScale(
