@@ -4,9 +4,9 @@ import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
 
 /** A resting pen summons the tool wheel after this long (ms). */
-const PEN_HOLD_MS = 350;
+const PEN_HOLD_MS = 500;
 /** Movement past this (px) during the hold means the pen is drawing, not resting. */
-const PEN_HOLD_SLOP = 6;
+const PEN_HOLD_SLOP = 3;
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
 // PointerEvent.buttons bit for a second barrel button, which reports as the middle button. The
