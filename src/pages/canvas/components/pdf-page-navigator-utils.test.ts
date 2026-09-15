@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   findCurrentPdfPage,
-  getNavigatorPosition,
   getPdfPageJumpOffset,
 } from './pdf-page-navigator-utils';
 
@@ -16,42 +15,6 @@ describe('PDF page navigator geometry', () => {
         { left: 0, top: 60, width: 100, height: 100 },
       ),
     ).toBe(1);
-  });
-
-  it('centers over the visible PDF intersection and stays above the bottom inset', () => {
-    expect(
-      getNavigatorPosition({
-        pdfBounds: { left: -50, top: 20, width: 200, height: 500 },
-        viewport: { left: 0, top: 0, width: 300, height: 400 },
-        navigatorSize: { width: 100, height: 40 },
-        edgeInset: 16,
-        viewportBottomInset: 16,
-      }),
-    ).toEqual({ left: 25, top: 344 });
-  });
-
-  it('keeps the navigator inside the viewport at narrow PDF edges', () => {
-    expect(
-      getNavigatorPosition({
-        pdfBounds: { left: -80, top: 10, width: 100, height: 500 },
-        viewport: { left: 0, top: 0, width: 300, height: 400 },
-        navigatorSize: { width: 136, height: 40 },
-        edgeInset: 16,
-        viewportBottomInset: 88,
-      }),
-    ).toEqual({ left: 16, top: 272 });
-  });
-
-  it('hides when the PDF does not intersect the viewport', () => {
-    expect(
-      getNavigatorPosition({
-        pdfBounds: { left: 400, top: 0, width: 100, height: 100 },
-        viewport: { left: 0, top: 0, width: 300, height: 400 },
-        navigatorSize: { width: 136, height: 40 },
-        edgeInset: 16,
-        viewportBottomInset: 16,
-      }),
-    ).toBeNull();
   });
 });
 

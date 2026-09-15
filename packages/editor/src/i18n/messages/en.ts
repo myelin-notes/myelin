@@ -826,7 +826,6 @@ const en = {
       applyCrop: 'Apply crop',
     },
     pdfNavigator: {
-      label: 'PDF page navigation',
       previousPage: 'Previous page',
       nextPage: 'Next page',
       goToPage: 'Go to page',

@@ -5,7 +5,7 @@ export interface Rect {
   height: number;
 }
 
-export function visibleArea(rect: Rect, viewport: Rect): number {
+function visibleArea(rect: Rect, viewport: Rect): number {
   const width = Math.max(
     0,
     Math.min(rect.left + rect.width, viewport.left + viewport.width) -
@@ -54,56 +54,6 @@ export function findCurrentPdfPage(
   return nearest;
 }
 
-export function getNavigatorPosition(params: {
-  pdfBounds: Rect;
-  viewport: Rect;
-  navigatorSize: { width: number; height: number };
-  edgeInset: number;
-  viewportBottomInset: number;
-}): { left: number; top: number } | null {
-  const visibleLeft = Math.max(params.pdfBounds.left, params.viewport.left);
-  const visibleRight = Math.min(
-    params.pdfBounds.left + params.pdfBounds.width,
-    params.viewport.left + params.viewport.width,
-  );
-  const visibleTop = Math.max(params.pdfBounds.top, params.viewport.top);
-  const visibleBottom = Math.min(
-    params.pdfBounds.top + params.pdfBounds.height,
-    params.viewport.top + params.viewport.height,
-  );
-  const visibleWidth = visibleRight - visibleLeft;
-  const visibleHeight = visibleBottom - visibleTop;
-  if (visibleWidth <= 0 || visibleHeight <= 0) {
-    return null;
-  }
-
-  const minLeft = params.viewport.left + params.edgeInset;
-  const maxLeft = Math.max(
-    minLeft,
-    params.viewport.left +
-      params.viewport.width -
-      params.edgeInset -
-      params.navigatorSize.width,
-  );
-  const preferredLeft =
-    visibleLeft + visibleWidth / 2 - params.navigatorSize.width / 2;
-  const minTop = params.viewport.top + params.edgeInset;
-  const maxTop = Math.max(
-    minTop,
-    params.viewport.top +
-      params.viewport.height -
-      params.viewportBottomInset -
-      params.navigatorSize.height,
-  );
-  const preferredTop =
-    visibleBottom - params.navigatorSize.height - params.edgeInset;
-
-  return {
-    left: clamp(preferredLeft, minLeft, maxLeft),
-    top: clamp(Math.min(preferredTop, maxTop), minTop, maxTop),
-  };
-}
-
 export function getPdfPageJumpOffset(params: {
   pageBounds: Rect;
   viewport: Rect;
@@ -127,8 +77,4 @@ export function getPdfPageJumpOffset(params: {
     x: targetLeft / params.zoom - params.pageBounds.left,
     y: targetTop / params.zoom - params.pageBounds.top,
   };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

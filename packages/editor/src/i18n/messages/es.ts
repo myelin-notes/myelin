@@ -833,7 +833,6 @@ const es: typeof en = {
       applyCrop: 'Aplicar recorte',
     },
     pdfNavigator: {
-      label: 'Navegación de páginas PDF',
       previousPage: 'Página anterior',
       nextPage: 'Página siguiente',
       goToPage: 'Ir a la página',

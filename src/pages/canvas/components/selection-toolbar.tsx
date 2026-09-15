@@ -3,11 +3,14 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import {
+  ChevronLeft,
+  ChevronRight,
   Copy as CopyIcon,
   Scissors as CutIcon,
   Trash2 as DeleteIcon,
@@ -19,6 +22,7 @@ import {
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
 import { LatexElement } from '@myelin/editor/elements/latex/element';
+import { PdfElement } from '@myelin/editor/elements/pdf';
 import {
   TextElement,
   type TextStyle,
@@ -37,6 +41,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  findCurrentPdfPage,
+  getPdfPageJumpOffset,
+} from './pdf-page-navigator-utils';
 import { getSelectionToolbarPosition } from './selection-toolbar-position';
 import { TextStyleControls } from './text-style-controls';
 
@@ -57,6 +65,8 @@ interface ToolbarState {
   /** Set when exactly one LaTeX block is selected, so its scale is editable as text size. */
   latexElement: LatexElement | null;
   latexFontSize: number | null;
+  pdfElement: PdfElement | null;
+  pdfCurrentPage: number | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -68,10 +78,13 @@ const HIDDEN_STATE: ToolbarState = {
   textStyle: null,
   latexElement: null,
   latexFontSize: null,
+  pdfElement: null,
+  pdfCurrentPage: null,
 };
 
 const VIEWPORT_MARGIN = 12;
 const SELECTION_GAP = 10;
+const PDF_PAGE_VIEWPORT_MARGIN = 48;
 
 function sameElementItems(
   a: SelectionToolbarItem[],
@@ -116,7 +129,9 @@ function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
     a.textElement === b.textElement &&
     sameTextStyle(a.textStyle, b.textStyle) &&
     a.latexElement === b.latexElement &&
-    a.latexFontSize === b.latexFontSize
+    a.latexFontSize === b.latexFontSize &&
+    a.pdfElement === b.pdfElement &&
+    a.pdfCurrentPage === b.pdfCurrentPage
   );
 }
 
@@ -136,6 +151,34 @@ function findLatexTarget(canvas: DrawableCanvas): LatexElement | null {
   }
   const [only] = selected;
   return only instanceof LatexElement ? only : null;
+}
+
+function findPdfPageState(canvas: DrawableCanvas): {
+  element: PdfElement;
+  currentPage: number;
+} | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1 || !(selected[0] instanceof PdfElement)) {
+    return null;
+  }
+  const element = selected[0];
+  if (element.pageCount < 2) {
+    return null;
+  }
+  const pageBounds = Array.from({ length: element.pageCount }, (_, index) =>
+    element.getPageBounds(index),
+  );
+  const resolvedPageBounds = pageBounds.filter(
+    (bounds): bounds is DOMRect => bounds !== null,
+  );
+  if (resolvedPageBounds.length !== element.pageCount) {
+    return null;
+  }
+  const currentPage = findCurrentPdfPage(
+    resolvedPageBounds,
+    canvas.viewport.getWorldRect(),
+  );
+  return currentPage === null ? null : { element, currentPage };
 }
 
 function collectElementItems(
@@ -213,7 +256,12 @@ export function SelectionToolbar({
 }: SelectionToolbarProps) {
   const strings = useMessages();
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const pdfPageInputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<ToolbarState>(HIDDEN_STATE);
+  const [editingPdf, setEditingPdf] = useState<PdfElement | null>(null);
+  const [pdfPageInput, setPdfPageInput] = useState('');
+  const editingPdfPage =
+    state.pdfElement !== null && editingPdf === state.pdfElement;
 
   useEffect(() => {
     const canvas = drawableCanvasRef.current;
@@ -240,6 +288,7 @@ export function SelectionToolbar({
         if (bounds) {
           const textElement = findTextTarget(canvas);
           const latexElement = findLatexTarget(canvas);
+          const pdfPageState = findPdfPageState(canvas);
           nextState = {
             visible: true,
             canMoveHigher: canvas.canReorderSelection('higher'),
@@ -249,6 +298,8 @@ export function SelectionToolbar({
             textStyle: textElement ? { ...textElement.style } : null,
             latexElement,
             latexFontSize: latexElement ? latexElement.fontSize : null,
+            pdfElement: pdfPageState?.element ?? null,
+            pdfCurrentPage: pdfPageState?.currentPage ?? null,
           };
         }
       }
@@ -305,6 +356,33 @@ export function SelectionToolbar({
       window.visualViewport?.removeEventListener('scroll', scheduleSync);
     };
   }, [drawableCanvasRef, strings]);
+
+  useLayoutEffect(() => {
+    if (editingPdfPage) {
+      pdfPageInputRef.current?.select();
+    }
+  }, [editingPdfPage]);
+
+  const jumpToPdfPage = useCallback(
+    (page: number) => {
+      const canvas = drawableCanvasRef.current;
+      const pdf = state.pdfElement;
+      const pageBounds = pdf?.getPageBounds(page);
+      if (!(canvas && pdf && pageBounds)) {
+        return;
+      }
+      canvas.viewport.animateOffsetTo(
+        getPdfPageJumpOffset({
+          pageBounds,
+          viewport: canvas.viewport.getWorldRect(),
+          zoom: canvas.viewport.zoom,
+          margin: PDF_PAGE_VIEWPORT_MARGIN,
+        }),
+      );
+      setEditingPdf(null);
+    },
+    [drawableCanvasRef, state.pdfElement],
+  );
 
   const moveHigher = useCallback(() => {
     drawableCanvasRef.current?.reorderSelection('higher');
@@ -392,6 +470,24 @@ export function SelectionToolbar({
         aria-label={strings.canvas.selectionToolbar.label}
         aria-hidden={!state.visible}
       >
+        {state.pdfElement && state.pdfCurrentPage !== null && (
+          <>
+            <PdfPageControls
+              pdf={state.pdfElement}
+              currentPage={state.pdfCurrentPage}
+              editing={editingPdfPage}
+              pageInput={pdfPageInput}
+              setEditing={(editing) =>
+                setEditingPdf(editing ? state.pdfElement : null)
+              }
+              setPageInput={setPdfPageInput}
+              inputRef={pdfPageInputRef}
+              jumpToPage={jumpToPdfPage}
+              strings={strings}
+            />
+            <Divider />
+          </>
+        )}
         {state.textElement && state.textStyle && (
           <>
             <TextStyleControls
@@ -426,6 +522,97 @@ export function SelectionToolbar({
         <ToolbarItemGroup items={deleteItems} />
       </div>
     </TooltipProvider>
+  );
+}
+
+function PdfPageControls({
+  pdf,
+  currentPage,
+  editing,
+  pageInput,
+  setEditing,
+  setPageInput,
+  inputRef,
+  jumpToPage,
+  strings,
+}: {
+  pdf: PdfElement;
+  currentPage: number;
+  editing: boolean;
+  pageInput: string;
+  setEditing: (editing: boolean) => void;
+  setPageInput: (value: string) => void;
+  inputRef: RefObject<HTMLInputElement | null>;
+  jumpToPage: (page: number) => void;
+  strings: Messages;
+}) {
+  const pageNumber = currentPage + 1;
+  const pageFieldWidth = `calc(${String(pdf.pageCount).length * 2 + 3}ch + 1rem)`;
+  return (
+    <>
+      <button
+        type="button"
+        className="flex size-8 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent p-0 transition-colors hover:bg-hover-tint focus-visible:outline-none disabled:cursor-default disabled:opacity-35"
+        aria-label={strings.canvas.pdfNavigator.previousPage}
+        disabled={currentPage === 0}
+        onClick={() => jumpToPage(currentPage - 1)}
+      >
+        <ChevronLeft className="size-4" />
+      </button>
+      {editing ? (
+        <input
+          ref={inputRef}
+          aria-label={strings.canvas.pdfNavigator.pageNumber}
+          className="h-8 shrink-0 rounded-lg border-none bg-hover-tint px-1 text-center text-sm tabular-nums outline-none"
+          style={{ width: pageFieldWidth }}
+          inputMode="numeric"
+          value={pageInput}
+          onChange={(event) => setPageInput(event.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              setEditing(false);
+              return;
+            }
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              const page = Number.parseInt(pageInput, 10);
+              if (
+                Number.isInteger(page) &&
+                page >= 1 &&
+                page <= pdf.pageCount
+              ) {
+                jumpToPage(page - 1);
+              }
+            }
+          }}
+        />
+      ) : (
+        <button
+          type="button"
+          className="h-8 shrink-0 cursor-text whitespace-nowrap rounded-lg border-none bg-transparent px-2 text-sm tabular-nums transition-colors hover:bg-hover-tint focus-visible:outline-none"
+          style={{ width: pageFieldWidth }}
+          aria-label={strings.canvas.pdfNavigator.goToPage}
+          onClick={() => {
+            setPageInput(String(pageNumber));
+            setEditing(true);
+          }}
+        >
+          {pageNumber} / {pdf.pageCount}
+        </button>
+      )}
+      <button
+        type="button"
+        className="flex size-8 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent p-0 transition-colors hover:bg-hover-tint focus-visible:outline-none disabled:cursor-default disabled:opacity-35"
+        aria-label={strings.canvas.pdfNavigator.nextPage}
+        disabled={currentPage === pdf.pageCount - 1}
+        onClick={() => jumpToPage(currentPage + 1)}
+      >
+        <ChevronRight className="size-4" />
+      </button>
+    </>
   );
 }
 

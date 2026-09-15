@@ -804,7 +804,6 @@ const zhHans: typeof en = {
       applyCrop: '应用裁剪',
     },
     pdfNavigator: {
-      label: 'PDF 页面导航',
       previousPage: '上一页',
       nextPage: '下一页',
       goToPage: '跳转到页面',

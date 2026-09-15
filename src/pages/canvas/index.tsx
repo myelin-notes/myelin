@@ -65,7 +65,6 @@ import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
 import { InsertPopover } from './components/insert-popover';
-import { PdfPageNavigator } from './components/pdf-page-navigator';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
@@ -652,14 +651,11 @@ function CanvasViewInner({
         onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
-        <>
-          <SelectionToolbar
-            drawableCanvasRef={drawableCanvasRef}
-            onCopy={engine.clipboard.copy}
-            onCut={engine.clipboard.cut}
-          />
-          <PdfPageNavigator drawableCanvasRef={drawableCanvasRef} />
-        </>
+        <SelectionToolbar
+          drawableCanvasRef={drawableCanvasRef}
+          onCopy={engine.clipboard.copy}
+          onCut={engine.clipboard.cut}
+        />
       )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
