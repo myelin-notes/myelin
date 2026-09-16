@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A1F47E852E744E899F9975E /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A1F47E852E744E899F9975F /* AuthenticationServices.framework */; };
 		2FAA099D743A6A55C7C2674D /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A3EFDCC6BAFFED53F50D66D3 /* QuartzCore.framework */; };
 		61D735211C3216F188049DB7 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AE1CCB0A77CF548EE0B710AD /* Security.framework */; };
 		63AD68C06D5FE909F05627B3 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C3A3489A3A20A223CDFAC4BE /* WebKit.framework */; };
@@ -23,6 +24,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0A1F47E852E744E899F9975F /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = System/Library/Frameworks/AuthenticationServices.framework; sourceTree = SDKROOT; };
 		012EB9417413A19162A2803A /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
 		0299DC85A36CDDC9C4B67A91 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		0BC458936FC425F72D46C262 /* store.rs */ = {isa = PBXFileReference; path = store.rs; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E878B93575FCB19874DBB13B /* libapp.a in Frameworks */,
+				0A1F47E852E744E899F9975E /* AuthenticationServices.framework in Frameworks */,
 				CD837D2F8F32D33D743AB590 /* CoreGraphics.framework in Frameworks */,
 				D5D0CCF17E2D4525032C79EA /* Metal.framework in Frameworks */,
 				92B7E3E5C806CFB966DEA524 /* MetalKit.framework in Frameworks */,
@@ -135,6 +138,7 @@
 		6235676F34BF835F60945519 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				0A1F47E852E744E899F9975F /* AuthenticationServices.framework */,
 				829504EBF0AE5D97A2FAB7C7 /* CoreGraphics.framework */,
 				012EB9417413A19162A2803A /* libapp.a */,
 				C1058E9C1C8C584A695C31A3 /* Metal.framework */,

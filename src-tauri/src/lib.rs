@@ -63,7 +63,6 @@ pub fn run() {
 
             Ok(())
         })
-        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
@@ -108,6 +107,16 @@ pub fn run() {
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
         ]);
+
+    #[cfg(not(target_os = "ios"))]
+    {
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+    }
+
+    #[cfg(target_os = "ios")]
+    {
+        builder = builder.plugin(tauri_plugin_apple_compliance::init());
+    }
 
     #[cfg(mobile)]
     {

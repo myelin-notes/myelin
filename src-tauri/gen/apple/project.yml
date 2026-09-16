@@ -56,11 +56,6 @@ targets:
         CFBundleDisplayName: Myelin Notes
         NSCameraUsageDescription: Take photos to insert into your notes.
         NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
-        # OAuth redirect target
-        CFBundleURLTypes:
-          - CFBundleURLName: com.github.wintersteve25.myelin
-            CFBundleTypeRole: Editor
-            CFBundleURLSchemes: [com.github.wintersteve25.myelin]
     entitlements:
       path: myelin_iOS/myelin_iOS.entitlements
     scheme:
@@ -91,6 +86,7 @@ targets:
     dependencies:
       - framework: libapp.a
         embed: false
+      - sdk: AuthenticationServices.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

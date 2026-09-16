@@ -38,7 +38,7 @@ const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 
 // Google's iOS and Android client types reject the loopback redirect the desktop flow uses, so
-// mobile comes back through the custom URI scheme, in the single-slash form Google documents.
+// mobile uses the custom URI scheme, in the single-slash form Google documents.
 const MOBILE_REDIRECT_URI = `${MOBILE_REDIRECT_SCHEME}:/oauth2redirect`;
 
 // Google issues a separate client per platform, each accepting only its own redirect style. Only

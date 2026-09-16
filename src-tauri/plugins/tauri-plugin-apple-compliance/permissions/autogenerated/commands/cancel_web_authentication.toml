@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-cancel-web-authentication"
+description = "Enables the cancel_web_authentication command without any pre-configured scope."
+commands.allow = ["cancel_web_authentication"]
+
+[[permission]]
+identifier = "deny-cancel-web-authentication"
+description = "Denies the cancel_web_authentication command without any pre-configured scope."
+commands.deny = ["cancel_web_authentication"]
