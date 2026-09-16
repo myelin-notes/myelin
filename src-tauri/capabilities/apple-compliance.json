@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "apple-compliance",
+  "description": "Tracking authorization on iOS and iPadOS",
+  "platforms": ["iOS"],
+  "windows": ["*"],
+  "permissions": ["apple-compliance:default"]
+}

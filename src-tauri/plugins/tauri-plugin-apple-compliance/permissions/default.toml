@@ -1,0 +1,8 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows checking and requesting Apple's tracking authorization."
+permissions = [
+  "allow-get-tracking-authorization-status",
+  "allow-request-tracking-authorization",
+]

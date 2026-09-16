@@ -1,8 +1,16 @@
 import posthog from 'posthog-js';
 import { UserPrefs } from '@myelin/editor/user-prefs';
-import { MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
+import { Logger } from '@myelin/shared/logger';
+import { MOBILE_PLATFORM, MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
+import {
+  getTrackingAuthorizationStatus,
+  requestTrackingAuthorization,
+} from '@/platform/tauri/apple-compliance';
 
 let initialized = false;
+let appleTrackingAuthorized = false;
+let appleConsentRequest: Promise<boolean> | null = null;
+const logger = new Logger('AppleCompliance');
 
 // Autocapture, pageviews and session recording stay off; only unhandled exceptions, logger-
 // forwarded error reports, and explicit product events (see analytics.ts) are captured. All capture
@@ -39,7 +47,7 @@ function ensureInitialized(): boolean {
 // Opting out disables every kind of capture — product events and automatic exception reporting
 // alike. `captureEventName: false` keeps the opt-in from emitting its own event.
 function applyAnalyticsConsent(enabled: boolean): void {
-  if (!enabled) {
+  if (!enabled || (MOBILE_PLATFORM === 'ios' && !appleTrackingAuthorized)) {
     if (initialized) {
       posthog.opt_out_capturing();
     }
@@ -51,7 +59,47 @@ function applyAnalyticsConsent(enabled: boolean): void {
 }
 
 export function isErrorTrackingEnabled(): boolean {
-  return initialized;
+  return (
+    initialized &&
+    (MOBILE_PLATFORM !== 'ios' ||
+      (appleTrackingAuthorized && UserPrefs.get('analyticsEnabled')))
+  );
+}
+
+/** Requests only while onboarding is complete; repeated calls share the pending request. */
+export function syncAppleTrackingConsent(): Promise<boolean> {
+  if (MOBILE_PLATFORM !== 'ios' || !UserPrefs.get('onboardingCompleted')) {
+    return Promise.resolve(false);
+  }
+  if (appleConsentRequest) {
+    return appleConsentRequest;
+  }
+
+  appleTrackingAuthorized = false;
+  applyAnalyticsConsent(false);
+  appleConsentRequest = (async () => {
+    try {
+      const current = await getTrackingAuthorizationStatus();
+      const needsRequest = current.status === 'notDetermined';
+      const result = needsRequest
+        ? await requestTrackingAuthorization()
+        : current;
+      appleTrackingAuthorized = result.status === 'authorized';
+      if (!appleTrackingAuthorized || needsRequest) {
+        UserPrefs.set('analyticsEnabled', appleTrackingAuthorized);
+      }
+      applyAnalyticsConsent(UserPrefs.get('analyticsEnabled'));
+      return appleTrackingAuthorized;
+    } catch (error) {
+      appleTrackingAuthorized = false;
+      applyAnalyticsConsent(false);
+      logger.error('Failed to resolve tracking authorization', error);
+      return false;
+    } finally {
+      appleConsentRequest = null;
+    }
+  })();
+  return appleConsentRequest;
 }
 
 export { posthog };

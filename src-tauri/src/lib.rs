@@ -109,6 +109,11 @@ pub fn run() {
             onenote_import::parse_onenote,
         ]);
 
+    #[cfg(target_os = "ios")]
+    {
+        builder = builder.plugin(tauri_plugin_apple_compliance::init());
+    }
+
     #[cfg(mobile)]
     {
         builder = builder.plugin(tauri_plugin_scoped_storage::init());
