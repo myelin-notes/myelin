@@ -1,6 +1,8 @@
+import { PenToolIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
-import type { Vector2 } from '../geometry';
+import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import type { Messages } from '../i18n/messages';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { ShapeType } from '../shape-recognizer';
@@ -9,6 +11,7 @@ import {
   MIN_SCALE,
   type ResizeHandle,
   ResizeHandles,
+  type SelectionToolbarItem,
 } from './drawable-element';
 import { ElementType } from './element-type';
 import type { StrokeStyle } from './stroke-element';
@@ -28,6 +31,7 @@ export class ShapeElement extends DrawableElement {
 
   /** Pre-drag geometry snapshot; resize ratios are cumulative from drag start. */
   private resizeBaseGeom: number[] | null = null;
+  private editingPoints = false;
 
   public constructor(
     uuid: string,
@@ -36,6 +40,7 @@ export class ShapeElement extends DrawableElement {
     protected style: StrokeStyle,
   ) {
     super(uuid, ElementType.SHAPE);
+    this.geom = normalizeGeom(shapeType, geom);
     this.updateBoundingBox();
   }
 
@@ -64,7 +69,7 @@ export class ShapeElement extends DrawableElement {
         this.style.size = v as number;
       },
       geom: (v) => {
-        this.geom = (v as number[]).slice();
+        this.geom = normalizeGeom(this.shapeType, v as number[]);
         this.updateBounds();
       },
     });
@@ -89,7 +94,7 @@ export class ShapeElement extends DrawableElement {
 
   protected updateBoundingBox(): void {
     const g = this.geom;
-    if (this.shapeType === 'rect' || this.shapeType === 'ellipse') {
+    if (this.shapeType === 'ellipse') {
       if (g.length < 4) {
         this.box = new DOMRect(0, 0, 0, 0);
         return;
@@ -97,7 +102,7 @@ export class ShapeElement extends DrawableElement {
       this.box = this.withStrokeThickness(new DOMRect(g[0], g[1], g[2], g[3]));
       return;
     }
-    // line / triangle: min/max of flat coordinate pairs.
+    // line / rectangle / triangle: min/max of flat coordinate pairs.
     if (g.length < 4) {
       this.box = new DOMRect(0, 0, 0, 0);
       return;
@@ -133,6 +138,94 @@ export class ShapeElement extends DrawableElement {
       : ResizeHandles.All;
   }
 
+  public override get hasControlPoints(): boolean {
+    return this.editingPoints;
+  }
+
+  public override get editable(): boolean {
+    return true;
+  }
+
+  public override get entersEditOnSelectedClick(): boolean {
+    return false;
+  }
+
+  public override enterEditMode(_canvas: DrawableCanvas): HTMLElement | null {
+    this.editingPoints = true;
+    return null;
+  }
+
+  public override exitEditMode(): void {
+    this.editingPoints = false;
+  }
+
+  public override getSelectionToolbarItems(
+    strings: Messages,
+    canvas?: DrawableCanvas,
+  ): SelectionToolbarItem[] {
+    if (!canvas) {
+      return [];
+    }
+    return [
+      {
+        id: 'edit-points',
+        label: this.editingPoints
+          ? strings.canvas.selectionToolbar.finishEditingPoints
+          : strings.canvas.selectionToolbar.editPoints,
+        icon: PenToolIcon,
+        active: this.editingPoints,
+        onClick: () => {
+          if (this.editingPoints) {
+            canvas.exitElementEdit();
+          } else {
+            canvas.enterElementEdit(this);
+          }
+        },
+      },
+    ];
+  }
+
+  public override getHandles(): ResizeHandle[] {
+    if (!this.editingPoints) {
+      return super.getHandles();
+    }
+    if (this.shapeType === 'ellipse') {
+      const [x, y, width, height] = this.geom;
+      const center = this.localToWorld(x + width / 2, y + height / 2);
+      return [
+        {
+          position: this.localToWorld(x + width, y + height / 2),
+          anchor: center,
+          anchorPad: { x: 0, y: 0 },
+          anchorFx: 0.5,
+          anchorFy: 0.5,
+          scaleX: true,
+          scaleY: true,
+          cursor: 'move',
+          control: { kind: 'radius' },
+        },
+      ];
+    }
+
+    const handles: ResizeHandle[] = [];
+    for (let i = 0; i + 1 < this.geom.length; i += 2) {
+      const opposite = this.oppositeVertex(i);
+      const anchor = this.localToWorld(opposite.x, opposite.y);
+      handles.push({
+        position: this.localToWorld(this.geom[i], this.geom[i + 1]),
+        anchor,
+        anchorPad: { x: 0, y: 0 },
+        anchorFx: fractionWithin(opposite.x, this.box.x, this.box.width),
+        anchorFy: fractionWithin(opposite.y, this.box.y, this.box.height),
+        scaleX: true,
+        scaleY: true,
+        cursor: 'move',
+        control: { kind: 'vertex', index: i },
+      });
+    }
+    return handles;
+  }
+
   public override beginResize(): void {
     // applyResize receives a ratio cumulative from the drag start, so each
     // update re-derives the geometry from this baseline rather than compounding.
@@ -149,9 +242,32 @@ export class ShapeElement extends DrawableElement {
     ratioX: number;
     ratioY: number;
     anchorWorld: Vector2;
+    pointerWorld?: Vector2;
   }): void {
-    const { handle: h, originalOffset, ratioX, ratioY, anchorWorld } = opts;
+    const {
+      handle: h,
+      originalOffset,
+      ratioX,
+      ratioY,
+      anchorWorld,
+      pointerWorld,
+    } = opts;
     const base = this.resizeBaseGeom ?? this.geom;
+    if (h.control && pointerWorld) {
+      const local = this.worldToLocal(pointerWorld);
+      if (h.control.kind === 'vertex') {
+        const next = [...base];
+        next[h.control.index] = local.x;
+        next[h.control.index + 1] = local.y;
+        this.setGeom(next);
+      } else {
+        const cx = base[0] + base[2] / 2;
+        const cy = base[1] + base[3] / 2;
+        const radius = Math.hypot(local.x - cx, local.y - cy);
+        this.setGeom([cx - radius, cy - radius, radius * 2, radius * 2]);
+      }
+      return;
+    }
     const sx = h.scaleX ? Math.max(MIN_SCALE, ratioX) : 1;
     const sy = h.scaleY ? Math.max(MIN_SCALE, ratioY) : 1;
     this.setGeom(scaleGeom(this.shapeType, base, sx, sy));
@@ -176,9 +292,9 @@ export class ShapeElement extends DrawableElement {
 
   /** Replace the local-frame geometry and mirror it into the backing Y.Map value. */
   public setGeom(geom: number[]): void {
-    this.geom = geom;
+    this.geom = normalizeGeom(this.shapeType, geom);
     this.updateBoundingBox();
-    this.syncToYMap({ geom: [...geom] });
+    this.syncToYMap({ geom: [...this.geom] });
   }
 
   protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -194,7 +310,11 @@ export class ShapeElement extends DrawableElement {
 
     switch (this.shapeType) {
       case 'rect':
-        ctx.rect(g[0], g[1], g[2], g[3]);
+        ctx.moveTo(g[0], g[1]);
+        for (let i = 2; i + 1 < g.length; i += 2) {
+          ctx.lineTo(g[i], g[i + 1]);
+        }
+        ctx.closePath();
         break;
       case 'ellipse': {
         const cx = g[0] + g[2] / 2;
@@ -228,7 +348,7 @@ export class ShapeElement extends DrawableElement {
       case 'line':
         return distToSegment(x, y, g[0], g[1], g[2], g[3]) <= tol;
       case 'rect': {
-        const edges = rectEdges(g);
+        const edges = polygonEdges(g);
         return edges.some(
           ([ax, ay, bx, by]) => distToSegment(x, y, ax, ay, bx, by) <= tol,
         );
@@ -320,7 +440,7 @@ export class ShapeElement extends DrawableElement {
       case 'line':
         return [toWorld(g[0], g[1]), toWorld(g[2], g[3])];
       case 'rect':
-        return rectCorners(g).map(([x, y]) => toWorld(x, y));
+        return coordinatePairs(g).map(([x, y]) => toWorld(x, y));
       case 'triangle':
         return [toWorld(g[0], g[1]), toWorld(g[2], g[3]), toWorld(g[4], g[5])];
       case 'ellipse': {
@@ -337,6 +457,35 @@ export class ShapeElement extends DrawableElement {
       }
     }
   }
+
+  private localToWorld(x: number, y: number): Vector2 {
+    return {
+      x: x * this.scale.x + this.offset.x,
+      y: y * this.scale.y + this.offset.y,
+    };
+  }
+
+  private worldToLocal(point: Vector2): Vector2 {
+    return {
+      x: (point.x - this.offset.x) / this.scale.x,
+      y: (point.y - this.offset.y) / this.scale.y,
+    };
+  }
+
+  private oppositeVertex(index: number): Vector2 {
+    if (this.shapeType === 'line') {
+      const opposite = index === 0 ? 2 : 0;
+      return { x: this.geom[opposite], y: this.geom[opposite + 1] };
+    }
+    if (this.shapeType === 'rect') {
+      const opposite = (index + 4) % 8;
+      return { x: this.geom[opposite], y: this.geom[opposite + 1] };
+    }
+    return {
+      x: (this.geom[0] + this.geom[2] + this.geom[4]) / 3,
+      y: (this.geom[1] + this.geom[3] + this.geom[5]) / 3,
+    };
+  }
 }
 
 function scaleGeom(
@@ -347,7 +496,7 @@ function scaleGeom(
 ): number[] {
   // Geometry lives in a local frame anchored at (0,0); scaling about the origin
   // resizes the shape while keeping that anchor fixed.
-  if (shapeType === 'rect' || shapeType === 'ellipse') {
+  if (shapeType === 'ellipse') {
     return [geom[0] * sx, geom[1] * sy, geom[2] * sx, geom[3] * sy];
   }
   const out = new Array<number>(geom.length);
@@ -358,24 +507,37 @@ function scaleGeom(
   return out;
 }
 
-function rectCorners(g: number[]): [number, number][] {
-  const [x, y, w, h] = g;
+function normalizeGeom(shapeType: ShapeType, geom: number[]): number[] {
+  if (shapeType !== 'rect' || geom.length !== 4) {
+    return geom.slice();
+  }
+  const [x, y, width, height] = geom;
   return [
     [x, y],
-    [x + w, y],
-    [x + w, y + h],
-    [x, y + h],
-  ];
+    [x + width, y],
+    [x + width, y + height],
+    [x, y + height],
+  ].flat();
 }
 
-function rectEdges(g: number[]): [number, number, number, number][] {
-  const c = rectCorners(g);
-  return [
-    [c[0][0], c[0][1], c[1][0], c[1][1]],
-    [c[1][0], c[1][1], c[2][0], c[2][1]],
-    [c[2][0], c[2][1], c[3][0], c[3][1]],
-    [c[3][0], c[3][1], c[0][0], c[0][1]],
-  ];
+function coordinatePairs(g: number[]): [number, number][] {
+  const points: [number, number][] = [];
+  for (let i = 0; i + 1 < g.length; i += 2) {
+    points.push([g[i], g[i + 1]]);
+  }
+  return points;
+}
+
+function polygonEdges(g: number[]): [number, number, number, number][] {
+  const points = coordinatePairs(g);
+  return points.map((point, index) => {
+    const next = points[(index + 1) % points.length];
+    return [point[0], point[1], next[0], next[1]];
+  });
+}
+
+function fractionWithin(value: number, start: number, length: number): number {
+  return length === 0 ? 0.5 : (value - start) / length;
 }
 
 function distToSegment(

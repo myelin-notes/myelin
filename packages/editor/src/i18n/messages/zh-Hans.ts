@@ -802,6 +802,8 @@ const zhHans: typeof en = {
       unlock: '解锁',
       crop: '裁剪',
       applyCrop: '应用裁剪',
+      editPoints: '编辑节点',
+      finishEditingPoints: '完成节点编辑',
     },
     pdfNavigator: {
       previousPage: '上一页',

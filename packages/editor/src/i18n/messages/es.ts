@@ -831,6 +831,8 @@ const es: typeof en = {
       unlock: 'Desbloquear',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
+      editPoints: 'Editar puntos',
+      finishEditingPoints: 'Terminar de editar puntos',
     },
     pdfNavigator: {
       previousPage: 'Página anterior',

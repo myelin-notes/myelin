@@ -824,6 +824,8 @@ const en = {
       unlock: 'Unlock',
       crop: 'Crop',
       applyCrop: 'Apply crop',
+      editPoints: 'Edit points',
+      finishEditingPoints: 'Finish editing points',
     },
     pdfNavigator: {
       previousPage: 'Previous page',

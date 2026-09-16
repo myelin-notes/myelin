@@ -2,6 +2,7 @@ import { getCanvasPalette } from './canvas-theme';
 import type { CanvasViewport } from './canvas-viewport';
 import {
   type DrawableElement,
+  drawControlPoints,
   drawSelectionBounds,
   getResizeHandles,
   hitResizeHandle,
@@ -162,6 +163,9 @@ export class SelectionController {
 
   private getHandles(zoom: number): ResizeHandle[] {
     const selected = this.selectedElements;
+    if (selected.length === 1 && selected[0].hasControlPoints) {
+      return selected[0].getHandles();
+    }
     const bounds = this.getDisplayBounds(zoom);
     return bounds
       ? getResizeHandles(bounds, this.getResizeHandleFlags(selected, zoom))
@@ -174,6 +178,11 @@ export class SelectionController {
     pointerType: string,
   ): ResizeHandle | null {
     const selected = this.selectedElements;
+    if (selected.length === 1 && selected[0].hasControlPoints) {
+      return selected[0].locked
+        ? null
+        : selected[0].hitHandle(point, zoom, pointerType === 'touch');
+    }
     const bounds = this.getBounds();
     if (bounds) {
       const minPx =
@@ -275,8 +284,17 @@ export class SelectionController {
       bounds,
       this.overlayProgress,
       selected.length === 1 && selected[0] === editingElement,
-      this.getResizeHandleFlags(selected, zoom),
+      selected.length === 1 && selected[0].hasControlPoints
+        ? ResizeHandles.None
+        : this.getResizeHandleFlags(selected, zoom),
     );
+    if (
+      selected.length === 1 &&
+      selected[0].hasControlPoints &&
+      !selected[0].locked
+    ) {
+      drawControlPoints(ctx, selected[0].getHandles(), this.overlayProgress);
+    }
   }
 
   private getResizeHandleFlags(

@@ -840,6 +840,8 @@ const fr: typeof en = {
       unlock: 'Déverrouiller',
       crop: 'Rogner',
       applyCrop: 'Appliquer le rognage',
+      editPoints: 'Modifier les points',
+      finishEditingPoints: 'Terminer la modification des points',
     },
     pdfNavigator: {
       previousPage: 'Page précédente',

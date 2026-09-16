@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DrawableCanvas } from '../drawable-canvas';
 import type { PageItem } from '../pdf-export/contract';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { YDocManager } from '../ydoc-manager';
@@ -83,7 +84,7 @@ describe('ShapeElement persistence', () => {
       ...src.getYMapProps(),
     });
     // Geometry is a single flat array value, written at creation (no seeding).
-    expect(yMap.get('geom')).toEqual([0, 0, 120, 90]);
+    expect(yMap.get('geom')).toEqual([0, 0, 120, 0, 120, 90, 0, 90]);
 
     src.bindToYMap(yMap);
 
@@ -121,6 +122,23 @@ describe('ShapeElement resize', () => {
     }
     return handle;
   }
+
+  it('uses bounding-box handles until point editing begins', () => {
+    const shape = new ShapeElement('mode', 'rect', [0, 0, 100, 60], STYLE);
+
+    expect(shape.hasControlPoints).toBe(false);
+    expect(shape.getHandles()).toHaveLength(8);
+    expect(shape.getHandles().every((handle) => !handle.control)).toBe(true);
+
+    shape.enterEditMode({} as DrawableCanvas);
+
+    expect(shape.hasControlPoints).toBe(true);
+    expect(shape.getHandles()).toHaveLength(4);
+    expect(shape.getHandles().every((handle) => handle.control)).toBe(true);
+
+    shape.exitEditMode();
+    expect(shape.hasControlPoints).toBe(false);
+  });
 
   it('bakes a rect resize into geometry and leaves scale at 1', () => {
     const shape = new ShapeElement('rs', 'rect', [0, 0, 100, 60], {
@@ -182,6 +200,66 @@ describe('ShapeElement resize', () => {
     expect(shape.scale).toEqual({ x: 1, y: 1 });
     expect(shape.localBoundingBox.width).toBeCloseTo(200);
     expect(shape.localBoundingBox.height).toBeCloseTo(80);
+  });
+
+  it('moves one rectangle vertex without moving the others', () => {
+    const shape = new ShapeElement('rv', 'rect', [0, 0, 100, 60], STYLE);
+    const yMap = bind(shape);
+    shape.enterEditMode({} as DrawableCanvas);
+    const handle = shape
+      .getHandles()
+      .find(
+        (candidate) =>
+          candidate.position.x === 100 && candidate.position.y === 0,
+      );
+    if (!handle) {
+      throw new Error('no top-right vertex');
+    }
+
+    shape.beginResize();
+    shape.applyResize({
+      handle,
+      originalScale: { x: 1, y: 1 },
+      originalOffset: { x: 0, y: 0 },
+      ratioX: 1,
+      ratioY: 1,
+      anchorWorld: handle.anchor,
+      pointerWorld: { x: 130, y: 20 },
+    });
+    shape.endResize();
+
+    expect(yMap.get('geom')).toEqual([0, 0, 130, 20, 100, 60, 0, 60]);
+    expect(shape.getHandles().map((candidate) => candidate.position)).toEqual([
+      { x: 0, y: 0 },
+      { x: 130, y: 20 },
+      { x: 100, y: 60 },
+      { x: 0, y: 60 },
+    ]);
+  });
+
+  it('uses one circle handle to change the radius around a fixed center', () => {
+    const shape = new ShapeElement('cr', 'ellipse', [10, 20, 80, 80], STYLE);
+    const yMap = bind(shape);
+    shape.enterEditMode({} as DrawableCanvas);
+    const handles = shape.getHandles();
+
+    expect(handles).toHaveLength(1);
+    expect(handles[0].position).toEqual({ x: 90, y: 60 });
+
+    shape.beginResize();
+    shape.applyResize({
+      handle: handles[0],
+      originalScale: { x: 1, y: 1 },
+      originalOffset: { x: 0, y: 0 },
+      ratioX: 1,
+      ratioY: 1,
+      anchorWorld: handles[0].anchor,
+      pointerWorld: { x: 110, y: 60 },
+    });
+    shape.endResize();
+
+    expect(yMap.get('geom')).toEqual([-10, 0, 120, 120]);
+    expect(shape.getHandles()[0].position).toEqual({ x: 110, y: 60 });
   });
 });
 

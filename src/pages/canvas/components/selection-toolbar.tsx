@@ -193,7 +193,7 @@ function collectElementItems(
   }
   const element = selected[0];
   return [
-    ...element.getSelectionToolbarItems(strings),
+    ...element.getSelectionToolbarItems(strings, canvas),
     {
       id: 'lock',
       label: element.locked
