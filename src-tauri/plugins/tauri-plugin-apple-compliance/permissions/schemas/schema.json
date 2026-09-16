@@ -295,6 +295,30 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the authenticate_web command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-authenticate-web",
+          "markdownDescription": "Enables the authenticate_web command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the authenticate_web command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-authenticate-web",
+          "markdownDescription": "Denies the authenticate_web command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the cancel_web_authentication command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-cancel-web-authentication",
+          "markdownDescription": "Enables the cancel_web_authentication command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the cancel_web_authentication command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-cancel-web-authentication",
+          "markdownDescription": "Denies the cancel_web_authentication command without any pre-configured scope."
+        },
+        {
           "description": "Enables the get_tracking_authorization_status command without any pre-configured scope.",
           "type": "string",
           "const": "allow-get-tracking-authorization-status",
@@ -319,10 +343,10 @@
           "markdownDescription": "Denies the request_tracking_authorization command without any pre-configured scope."
         },
         {
-          "description": "Allows checking and requesting Apple's tracking authorization.\n#### This default permission set includes:\n\n- `allow-get-tracking-authorization-status`\n- `allow-request-tracking-authorization`",
+          "description": "Allows Apple platform compliance and system authentication APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-get-tracking-authorization-status`\n- `allow-request-tracking-authorization`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows checking and requesting Apple's tracking authorization.\n#### This default permission set includes:\n\n- `allow-get-tracking-authorization-status`\n- `allow-request-tracking-authorization`"
+          "markdownDescription": "Allows Apple platform compliance and system authentication APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-get-tracking-authorization-status`\n- `allow-request-tracking-authorization`"
         }
       ]
     }

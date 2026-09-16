@@ -19,6 +19,9 @@ let package = Package(
       name: "tauri-plugin-apple-compliance",
       dependencies: [.byName(name: "Tauri")],
       path: "Sources",
-      linkerSettings: [.linkedFramework("AppTrackingTransparency")])
+      linkerSettings: [
+        .linkedFramework("AppTrackingTransparency"),
+        .linkedFramework("AuthenticationServices")
+      ])
   ]
 )

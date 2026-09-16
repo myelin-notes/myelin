@@ -93,6 +93,7 @@ targets:
       - framework: libapp.a
         embed: false
       - sdk: AppTrackingTransparency.framework
+      - sdk: AuthenticationServices.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

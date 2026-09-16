@@ -11,7 +11,7 @@
 //   - VITE_GOOGLE_CLIENT_SECRET — Google rejects the token exchange without it even on PKCE.
 //     Unused on mobile, where Google issues no secret for the iOS/Android client types;
 //     VITE_GOOGLE_CLIENT_ID_IOS / VITE_GOOGLE_CLIENT_ID_ANDROID are used there instead and
-//     redirect through the app's custom URI scheme (see google-drive-credentials.ts).
+//     use the app's custom URI scheme (see google-drive-credentials.ts).
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for live sync peer discovery
 //   - VITE_POSTHOG_KEY / VITE_POSTHOG_HOST (defaults to us.i.posthog.com)
 
