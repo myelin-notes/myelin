@@ -29,6 +29,7 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: null,
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'none' },
     });
 
@@ -36,11 +37,25 @@ describe('getAudioPlayerInteractionState', () => {
     expect(state.isWaitingForRemoteAudio).toBe(true);
   });
 
+  it('shows processing feedback and disables the primary button after recording stops', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBytes: null,
+      hasTranscript: false,
+      isCreator: true,
+      recordingState: 'processing',
+      slot: { kind: 'none' },
+    });
+
+    expect(state.primaryButtonDisabled).toBe(true);
+    expect(state.isProcessingRecording).toBe(true);
+  });
+
   it('shows captions as loading while a valid remote claim is transcribing', () => {
     const state = getAudioPlayerInteractionState({
       audioBytes: new Uint8Array([1]),
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'transcribing-remote', peerId: 'peer-b' },
     });
 
@@ -53,6 +68,7 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: new Uint8Array([1]),
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'unavailable' },
     });
 
@@ -65,6 +81,7 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: new Uint8Array([1]),
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'can-transcribe' },
     });
 
@@ -77,6 +94,7 @@ describe('getAudioPlayerInteractionState', () => {
       audioBytes: new Uint8Array([1]),
       hasTranscript: true,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'none' },
     });
 

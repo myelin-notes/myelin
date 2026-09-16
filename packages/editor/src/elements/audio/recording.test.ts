@@ -59,6 +59,7 @@ function listener(): AudioRecordingListener {
 
 describe('audio recording lifecycle', () => {
   beforeEach(() => {
+    vi.mocked(decodeAudio).mockReset();
     vi.mocked(decodeAudio).mockResolvedValue({
       buffer: {} as AudioBuffer,
       duration: 2,
@@ -127,6 +128,58 @@ describe('audio recording lifecycle', () => {
 
     await stopAudioRecordingsForOwner('tab-1');
     expect(recordingTarget.onRecorded).toHaveBeenCalledOnce();
+  });
+
+  it('reports processing until the recorded audio is ready', async () => {
+    let resolveDecode!: (decoded: {
+      buffer: AudioBuffer;
+      duration: number;
+      waveform: Float32Array;
+    }) => void;
+    vi.mocked(decodeAudio).mockReturnValue(
+      new Promise((resolve) => {
+        resolveDecode = resolve;
+      }),
+    );
+    vi.stubGlobal('navigator', {
+      mediaDevices: {
+        getUserMedia: vi.fn(async () => ({ getTracks: () => [] })),
+      },
+    });
+    vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+
+    const recordingListener = listener();
+    const recordingTarget = target();
+    attachAudioRecording('audio-1', recordingListener);
+    await startAudioRecording(
+      'audio-1',
+      'tab-1',
+      'owner-device',
+      recordingTarget,
+    );
+
+    const stopped = stopAudioRecordingsForOwner('tab-1');
+    if (!stopped) {
+      throw new Error('Expected a pending recording');
+    }
+
+    expect(getAudioRecordingState('audio-1')).toBe('processing');
+    expect(recordingListener.onStatusChange).toHaveBeenLastCalledWith({
+      state: 'processing',
+      isTranscribing: false,
+    });
+    expect(recordingTarget.onRecorded).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => expect(decodeAudio).toHaveBeenCalledOnce());
+    resolveDecode({
+      buffer: {} as AudioBuffer,
+      duration: 2,
+      waveform: new Float32Array([0.5]),
+    });
+    await stopped;
+
+    expect(recordingTarget.onRecorded).toHaveBeenCalledOnce();
+    expect(getAudioRecordingState('audio-1')).toBe('idle');
   });
 
   it('discards a deleted element recording without publishing it', async () => {

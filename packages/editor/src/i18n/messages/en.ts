@@ -876,6 +876,7 @@ const en = {
       waitingForRecording: 'Waiting for recording',
       startRecording: 'Start recording',
       stopRecording: 'Stop recording',
+      processingRecording: 'Processing recording...',
       tryRecordingAgain: 'Try recording again',
       playAudio: 'Play audio',
       pauseAudio: 'Pause audio',
