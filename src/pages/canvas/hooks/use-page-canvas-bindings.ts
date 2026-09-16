@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -77,6 +78,38 @@ export function usePageCanvasBindings({
     }
   });
 
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (
+      event.key !== 'Enter' ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      (target.isContentEditable ||
+        target.matches('input, textarea, button, select, a[href]'))
+    ) {
+      return;
+    }
+    const drawableCanvas = drawableCanvasRef.current;
+    const selected = drawableCanvas?.getSelectedElements() ?? [];
+    if (
+      !drawableCanvas ||
+      drawableCanvas.editingElement ||
+      selected.length !== 1 ||
+      selected[0].type !== ElementType.SHAPE
+    ) {
+      return;
+    }
+    event.preventDefault();
+    drawableCanvas.enterElementEdit(selected[0], event);
+  });
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -90,6 +123,11 @@ export function usePageCanvasBindings({
       event.preventDefault();
     };
     canvas.addEventListener('contextmenu', handleContextMenu);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      handleDocumentKeyDown(event);
+    };
+    document.addEventListener('keydown', handleKeyDown);
 
     // Tracked by pointer id: a palm resting on the screen emits its own moves, and those must not
     // cancel the hold.
@@ -170,6 +208,7 @@ export function usePageCanvasBindings({
     return () => {
       cancelHold();
       canvas.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
       canvas.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);

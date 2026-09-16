@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import { ElementType } from '../elements/element-type';
+import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { catalogs } from '../i18n/messages';
 import { EraserTool } from './eraser-tool';
@@ -179,5 +180,46 @@ describe('EraserTool', () => {
     expect(elements).toEqual([]);
     expect(removeElement).toHaveBeenCalledWith(stroke);
     expect(addElement).not.toHaveBeenCalled();
+  });
+
+  it('converts a shape to strokes before precisely erasing it', () => {
+    const shape = new ShapeElement('shape', 'rect', [0, 0, 100, 60], {
+      color: '#123456',
+      size: 2,
+    });
+    shape.setOffset(20, 30);
+    shape.setScale(2, 2);
+    const elements: DrawableElement[] = [shape];
+    const { canvas, removeElement, transact } = makeCanvas(elements);
+    const tool = new EraserTool(() => catalogs.en);
+    usePreciseMode(tool);
+
+    tool.update(canvas, {} as PointerEvent, { x: 120, y: 30 });
+
+    expect(elements).not.toContain(shape);
+    expect(elements).toHaveLength(5);
+    expect(elements.every((element) => element instanceof StrokeElement)).toBe(
+      true,
+    );
+    expect(removeElement).toHaveBeenCalledWith(shape);
+    expect(transact).toHaveBeenCalled();
+
+    for (const element of elements) {
+      const stroke = element as StrokeElement;
+      expect(stroke.strokeStyle).toEqual({
+        color: '#123456',
+        size: 2,
+        stabilization: 0,
+        simulatePressure: false,
+      });
+      expect(stroke.pressureEnabled).toBe(false);
+      expect(stroke.offset).toEqual({ x: 20, y: 30 });
+      expect(stroke.scale).toEqual({ x: 2, y: 2 });
+      expect(
+        stroke.xyPoints.every(
+          ([x, y]) => Math.hypot(x * 2 + 20 - 120, y * 2 + 30 - 30) > 6,
+        ),
+      ).toBe(true);
+    }
   });
 });

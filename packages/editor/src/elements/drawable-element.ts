@@ -65,6 +65,8 @@ export interface ResizeHandle {
   scaleX: boolean;
   scaleY: boolean;
   cursor: string;
+  /** Shape-owned control point; absent for ordinary bounding-box handles. */
+  control?: { kind: 'vertex'; index: number } | { kind: 'radius' };
 }
 
 interface HandleSpec {
@@ -141,6 +143,46 @@ export function drawSelectionBounds(
     ctx.stroke();
   }
 
+  ctx.globalAlpha = 1;
+}
+
+/** Draw element-specific control points in world coordinates. */
+export function drawControlPoints(
+  ctx: CanvasRenderingContext2D,
+  handles: readonly ResizeHandle[],
+  progress: number,
+): void {
+  const eased = 1 - (1 - progress) * (1 - progress);
+  const size = HANDLE_SIZE * eased;
+  const half = size / 2;
+  const radius = 1.5 * eased;
+  const palette = getCanvasPalette();
+
+  ctx.globalAlpha = eased;
+  for (const handle of handles) {
+    ctx.fillStyle = palette.surface;
+    ctx.beginPath();
+    ctx.roundRect(
+      handle.position.x - half,
+      handle.position.y - half,
+      size,
+      size,
+      radius,
+    );
+    ctx.fill();
+
+    ctx.strokeStyle = palette.selectionStroke;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(
+      handle.position.x - half,
+      handle.position.y - half,
+      size,
+      size,
+      radius,
+    );
+    ctx.stroke();
+  }
   ctx.globalAlpha = 1;
 }
 
@@ -390,6 +432,11 @@ export abstract class DrawableElement {
     return false;
   }
 
+  /** Whether a click on an already-selected element should enter its edit mode. */
+  public get entersEditOnSelectedClick(): boolean {
+    return true;
+  }
+
   // An unselected backdrop says no: its body covers the area gestures travel across, so a drag
   // starting there belongs to whatever is drawn on top of it (a marquee, or a one-finger pan).
   public get grabsFromBody(): boolean {
@@ -493,6 +540,11 @@ export abstract class DrawableElement {
     return ResizeHandles.All;
   }
 
+  /** Whether a single selection uses geometry-owned handles instead of its bounding box. */
+  public get hasControlPoints(): boolean {
+    return false;
+  }
+
   /** Force uniform scaling on corner drags (shift-key behavior, always on). */
   public get maintainAspectRatio(): boolean {
     return false;
@@ -513,7 +565,10 @@ export abstract class DrawableElement {
   }
 
   // Only when it is the sole selected element. Override to expose element-specific actions.
-  public getSelectionToolbarItems(_strings: Messages): SelectionToolbarItem[] {
+  public getSelectionToolbarItems(
+    _strings: Messages,
+    _canvas?: DrawableCanvas,
+  ): SelectionToolbarItem[] {
     return [];
   }
 
@@ -529,6 +584,7 @@ export abstract class DrawableElement {
     ratioX: number;
     ratioY: number;
     anchorWorld: Vector2;
+    pointerWorld?: Vector2;
   }): void {
     const {
       handle: h,

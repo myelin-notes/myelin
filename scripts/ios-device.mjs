@@ -56,7 +56,6 @@ function findConnectedDevice() {
     const devices = (output.result?.devices ?? []).filter(
       (device) =>
         device.hardwareProperties?.platform === 'iOS' &&
-        device.hardwareProperties?.reality === 'physical' &&
         device.connectionProperties?.transportType === 'wired',
     );
 

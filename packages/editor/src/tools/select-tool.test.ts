@@ -5,6 +5,7 @@ import { ElementType } from '../elements/element-type';
 import { ImageElement } from '../elements/image-element';
 import { PAGE_HEIGHT, PAGE_WIDTH } from '../elements/page-frame-constants';
 import { PageFrameElement } from '../elements/page-frame-element';
+import { ShapeElement } from '../elements/shape-element';
 import { catalogs } from '../i18n/messages';
 import { SelectionController } from '../selection-controller';
 import { CollisionHelper } from '../utils/collision-helper';
@@ -76,6 +77,24 @@ function makePageFrame(uuid = 'frame-uuid', offsetX = 0, offsetY = 0) {
   return frame;
 }
 
+function makeShape() {
+  vi.stubGlobal('DOMRect', TestDOMRect);
+  const ydoc = new YDocManager();
+  const shape = new ShapeElement('shape-uuid', 'rect', [0, 0, 100, 60], {
+    color: '#000',
+    size: 4,
+  });
+  const yMap = ydoc.createElementMap(ElementType.SHAPE, shape.uuid, {
+    offsetX: 0,
+    offsetY: 0,
+    scaleX: 1,
+    scaleY: 1,
+    ...shape.getYMapProps(),
+  });
+  shape.bindToYMap(yMap);
+  return { shape, yMap };
+}
+
 function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
   const enterElementEdit = vi.fn();
   const selection = new SelectionController(() => elements);
@@ -126,6 +145,49 @@ afterEach(() => {
 });
 
 describe('SelectTool', () => {
+  it.each([
+    'mouse',
+    'pen',
+    'touch',
+  ])('enters point editing on a %s double-click or double-tap', (pointerType) => {
+    const { shape } = makeShape();
+    shape.select();
+    const point = { x: 50, y: 30 };
+    const { canvas, enterElementEdit } = makeCanvas([shape], point);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType } as PointerEvent;
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1100);
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+    expect(shape.hasControlPoints).toBe(false);
+
+    tool.start(canvas, event);
+
+    expect(enterElementEdit).toHaveBeenCalledWith(shape, event);
+    expect(shape.hasControlPoints).toBe(true);
+  });
+
+  it('drags a selected shape vertex even though it overlaps the selection body', () => {
+    const { shape, yMap } = makeShape();
+    shape.select();
+    const start = { x: 100, y: 0 };
+    const { canvas } = makeCanvas([shape], start);
+    shape.enterEditMode(canvas);
+    const tool = new SelectTool(() => catalogs.en);
+    const event = { pointerType: 'mouse' } as PointerEvent;
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 130, y: 20 });
+    tool.finish(canvas, event);
+
+    expect(yMap.get('geom')).toEqual([0, 0, 130, 20, 100, 60, 0, 60]);
+    expect(shape.offset).toEqual({ x: 0, y: 0 });
+  });
+
   it('enters image crop mode on double-click', () => {
     const { image } = makeImageElement();
     const enterCropMode = vi

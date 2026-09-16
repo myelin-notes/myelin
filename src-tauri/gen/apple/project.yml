@@ -2,7 +2,7 @@ name: myelin
 options:
   bundleIdPrefix: com.github.wintersteve25.myelin
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug

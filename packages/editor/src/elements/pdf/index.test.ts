@@ -190,6 +190,35 @@ describe('PdfElement', () => {
     expect(yMap.get('pageLayout')).toBe('vertical');
   });
 
+  it('exposes world bounds for pages in the edited document order', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(
+      ydoc,
+      [
+        { w: 612, h: 792 },
+        { w: 400, h: 200 },
+      ],
+      {
+        pageOrder: [
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'blank', size: { w: 300, h: 150 } },
+          { kind: 'pdf', originalIndex: 1 },
+        ],
+        pageOrderCustom: true,
+      },
+    );
+    mockOpenedPdf(2);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    element.setOffset(100, 200);
+    element.setScale(2, 0.5);
+    await flushPromises();
+
+    expect(element.pageCount).toBe(3);
+    expect(element.getPageBounds(1)).toEqual(new DOMRect(412, 616, 600, 75));
+    expect(element.getPageBounds(3)).toBeNull();
+  });
+
   it('keeps its persisted shape when initialized before binding', () => {
     const element = new PdfElement('pdf-uuid', 'horizontal');
 

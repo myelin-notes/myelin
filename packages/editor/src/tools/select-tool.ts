@@ -73,6 +73,7 @@ export class SelectTool implements ITool {
 
   // Scale state
   private scaleInteraction: ScaleInteraction | null = null;
+  private scaleChanged = false;
 
   // Lasso state
   private lassoPath: Vector2[] = [];
@@ -150,8 +151,8 @@ export class SelectTool implements ITool {
 
     // The selection body wins where a large touch target overlaps a handle. Handle centres sit
     // outside the content bounds, so they remain reachable without stealing thin strokes' interior.
-    if (!insideSelectionBounds) {
-      const handle = canvas.hitSelectionHandle(point, event.pointerType);
+    const handle = canvas.hitSelectionHandle(point, event.pointerType);
+    if (!insideSelectionBounds || handle?.control) {
       if (handle) {
         this.mode = SelectMode.Scaling;
         if (selectedElements.length > 1 && selectionBounds) {
@@ -300,6 +301,7 @@ export class SelectTool implements ITool {
       // re-enters edit mode.
       if (
         pick.editable &&
+        pick.entersEditOnSelectedClick &&
         pick.type !== ElementType.IMAGE &&
         wasAlreadySelected &&
         !this.pendingCycle
@@ -403,7 +405,14 @@ export class SelectTool implements ITool {
           ratioX,
           ratioY,
           anchorWorld: interaction.anchorWorld,
+          pointerWorld: position,
         });
+        if (
+          position.x !== this.startPoint.x ||
+          position.y !== this.startPoint.y
+        ) {
+          this.scaleChanged = true;
+        }
         break;
       }
       case SelectMode.Marquee: {
@@ -514,6 +523,7 @@ export class SelectTool implements ITool {
       if (interaction.kind === 'element') {
         const e = interaction.element;
         changed =
+          this.scaleChanged ||
           e.scale.x !== interaction.originalScale.x ||
           e.scale.y !== interaction.originalScale.y ||
           e.offset.x !== interaction.originalOffset.x ||
@@ -550,8 +560,8 @@ export class SelectTool implements ITool {
     const insideSelectionBounds =
       selectionBounds !== null &&
       CollisionHelper.inBox(position, selectionBounds);
-    if (!insideSelectionBounds) {
-      const handle = canvas.hitSelectionHandle(position, 'mouse');
+    const handle = canvas.hitSelectionHandle(position, 'mouse');
+    if (!insideSelectionBounds || handle?.control) {
       if (handle) {
         canvas.setCursor(handle.cursor);
         return;
@@ -575,6 +585,7 @@ export class SelectTool implements ITool {
     this.mode = SelectMode.None;
     this.movingElements = [];
     this.scaleInteraction = null;
+    this.scaleChanged = false;
     this.lassoPath = [];
     this.pendingCycle = null;
     this.clickToEditCandidate = null;

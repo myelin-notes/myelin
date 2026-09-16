@@ -5,6 +5,7 @@ import {
 import { getCanvasPalette, withCanvasAlpha } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ElementType } from '../elements/element-type';
+import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
@@ -39,14 +40,55 @@ export class EraserTool implements ITool {
       ) {
         continue;
       }
-      if (this.eraserStyle === 'precise' && element instanceof StrokeElement) {
-        this.eraseStrokePoints(canvas, element, position);
-        continue;
+      if (this.eraserStyle === 'precise') {
+        if (element instanceof StrokeElement) {
+          this.eraseStrokePoints(canvas, element, position);
+          continue;
+        }
+        if (element instanceof ShapeElement) {
+          if (element.isOver(position.x, position.y, this.radius, canvas.ctx)) {
+            this.eraseShape(canvas, element, position);
+          }
+          continue;
+        }
       }
       if (element.isOver(position.x, position.y, this.radius, canvas.ctx)) {
         canvas.removeElement(element);
       }
     }
+  }
+
+  private eraseShape(
+    canvas: DrawableCanvas,
+    shape: ShapeElement,
+    position: Vector2,
+  ): void {
+    const originalIndex = canvas.elements.indexOf(shape);
+    const style = {
+      ...shape.strokeStyle,
+      stabilization: 0,
+      simulatePressure: false,
+    };
+    const offset = { ...shape.offset };
+    const scale = { ...shape.scale };
+    const strokes: StrokeElement[] = [];
+
+    canvas.transact(() => {
+      canvas.removeElement(shape);
+      for (const points of shape.toStrokePointRuns()) {
+        const stroke = canvas.addElement((uuid) => {
+          const next = new StrokeElement(uuid, points, false, { ...style });
+          next.updateBounds();
+          return next;
+        }, originalIndex + strokes.length);
+        stroke.setOffset(offset.x, offset.y);
+        stroke.setScale(scale.x, scale.y);
+        strokes.push(stroke);
+      }
+      for (const stroke of strokes) {
+        this.eraseStrokePoints(canvas, stroke, position);
+      }
+    });
   }
 
   private eraseStrokePoints(
