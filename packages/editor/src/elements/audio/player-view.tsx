@@ -216,11 +216,13 @@ interface AudioPlayerInteractionOptions {
   audioBytes: Uint8Array | null;
   hasTranscript: boolean;
   isCreator: boolean;
+  recordingState: RecordingState;
   slot: TranscriptionSlotState;
 }
 
 export interface AudioPlayerInteractionState {
   isWaitingForRemoteAudio: boolean;
+  isProcessingRecording: boolean;
   isCaptionsLoading: boolean;
   primaryButtonDisabled: boolean;
   captionsButtonDisabled: boolean;
@@ -230,16 +232,19 @@ export function getAudioPlayerInteractionState({
   audioBytes,
   hasTranscript,
   isCreator,
+  recordingState,
   slot,
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
   const hasAudio = Boolean(audioBytes);
   const isWaitingForRemoteAudio = !hasAudio && !isCreator;
+  const isProcessingRecording = recordingState === 'processing';
   const isCaptionsLoading =
     slot.kind === 'transcribing-here' || slot.kind === 'transcribing-remote';
   return {
     isWaitingForRemoteAudio,
+    isProcessingRecording,
     isCaptionsLoading,
-    primaryButtonDisabled: isWaitingForRemoteAudio,
+    primaryButtonDisabled: isWaitingForRemoteAudio || isProcessingRecording,
     // Enabled to toggle an existing transcript or to start a job here;
     // disabled while a job runs (here or remotely) and when unavailable.
     captionsButtonDisabled: !hasTranscript && slot.kind !== 'can-transcribe',
@@ -310,6 +315,7 @@ export function AudioPlayerView({
     audioBytes,
     hasTranscript,
     isCreator,
+    recordingState,
     slot,
   });
   const redrawAfterResize = useEffectEvent(() => {
@@ -516,7 +522,6 @@ export function AudioPlayerView({
 
   function stopRecording() {
     clearInterval(recordTickRef.current);
-    setRecordingState('idle');
     void stopAudioRecording(elementId);
   }
 
@@ -655,7 +660,7 @@ export function AudioPlayerView({
   }
 
   function handleButtonClick() {
-    if (isRequestingRecording || interaction.isWaitingForRemoteAudio) {
+    if (isRequestingRecording || interaction.primaryButtonDisabled) {
       return;
     }
     if (isRecording) {
@@ -673,24 +678,28 @@ export function AudioPlayerView({
 
   const ButtonIcon = isRecording
     ? SquareIcon
-    : audioBytes
-      ? isPlaying
-        ? PauseIcon
-        : PlayIcon
-      : MicIcon;
+    : interaction.isProcessingRecording
+      ? LoaderCircle
+      : audioBytes
+        ? isPlaying
+          ? PauseIcon
+          : PlayIcon
+        : MicIcon;
 
   const timeLabel = isRequestingRecording
     ? strings.requestingMic
-    : recordingState === 'error'
-      ? strings.micUnavailable
-      : isRecording
-        ? formatTime(currentTime)
-        : (notice ??
-          (audioBytes
-            ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-            : interaction.isWaitingForRemoteAudio
-              ? strings.waitingForRecording
-              : strings.tapToRecord));
+    : interaction.isProcessingRecording
+      ? strings.processingRecording
+      : recordingState === 'error'
+        ? strings.micUnavailable
+        : isRecording
+          ? formatTime(currentTime)
+          : (notice ??
+            (audioBytes
+              ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+              : interaction.isWaitingForRemoteAudio
+                ? strings.waitingForRecording
+                : strings.tapToRecord));
 
   const captionsLabel = hasTranscript
     ? showTranscript
@@ -706,17 +715,19 @@ export function AudioPlayerView({
 
   const buttonLabel = isRequestingRecording
     ? strings.requestingMicAccess
-    : isRecording
-      ? strings.stopRecording
-      : audioBytes
-        ? isPlaying
-          ? strings.pauseAudio
-          : strings.playAudio
-        : interaction.isWaitingForRemoteAudio
-          ? strings.waitingForRecording
-          : recordingState === 'error'
-            ? strings.tryRecordingAgain
-            : strings.startRecording;
+    : interaction.isProcessingRecording
+      ? strings.processingRecording
+      : isRecording
+        ? strings.stopRecording
+        : audioBytes
+          ? isPlaying
+            ? strings.pauseAudio
+            : strings.playAudio
+          : interaction.isWaitingForRemoteAudio
+            ? strings.waitingForRecording
+            : recordingState === 'error'
+              ? strings.tryRecordingAgain
+              : strings.startRecording;
 
   return (
     <div className="canvas-audio-inner" data-recording-state={recordingState}>
@@ -728,7 +739,12 @@ export function AudioPlayerView({
         aria-label={buttonLabel}
         title={buttonLabel}
       >
-        <ButtonIcon size={16} />
+        <ButtonIcon
+          size={16}
+          className={
+            interaction.isProcessingRecording ? 'animate-spin' : undefined
+          }
+        />
       </button>
       <div className="canvas-audio-body">
         <canvas

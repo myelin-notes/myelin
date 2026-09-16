@@ -883,6 +883,7 @@ const es: typeof en = {
       waitingForRecording: 'Esperando grabación',
       startRecording: 'Iniciar grabación',
       stopRecording: 'Detener grabación',
+      processingRecording: 'Procesando grabación...',
       tryRecordingAgain: 'Intentar grabar de nuevo',
       playAudio: 'Reproducir audio',
       pauseAudio: 'Pausar audio',

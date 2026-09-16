@@ -854,6 +854,7 @@ const zhHans: typeof en = {
       waitingForRecording: '正在等待录音',
       startRecording: '开始录音',
       stopRecording: '停止录音',
+      processingRecording: '正在处理录音…',
       tryRecordingAgain: '重新尝试录音',
       playAudio: '播放音频',
       pauseAudio: '暂停音频',

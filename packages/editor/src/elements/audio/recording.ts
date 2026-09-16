@@ -12,7 +12,11 @@ import { decodeAudio } from './waveform';
 
 const logger = new Logger('AudioRecording');
 
-export type AudioRecordingState = 'idle' | 'requesting' | 'recording';
+export type AudioRecordingState =
+  | 'idle'
+  | 'requesting'
+  | 'recording'
+  | 'processing';
 
 export interface AudioRecordingStatus {
   state: AudioRecordingState;
@@ -171,6 +175,8 @@ async function finalizeRecording(
   }
 
   entry.target.onRecorded(bytes, duration, recorder.mimeType, waveform);
+  entry.state = 'idle';
+  notifyStatus(entry);
   await saveRecording(entry);
 
   if (!transcription) {
@@ -261,8 +267,8 @@ async function initializeRecording(
     };
     recorder.onstop = () => {
       stopStream(entry);
-      entry.state = 'idle';
       if (entry.discardRequested) {
+        entry.state = 'idle';
         entry.isTranscribing = false;
         notifyStatus(entry);
         void cancelTranscription(entry).finally(() => {
@@ -271,6 +277,7 @@ async function initializeRecording(
         return;
       }
 
+      entry.state = 'processing';
       entry.isTranscribing = transcription !== null;
       notifyStatus(entry);
       void finalizeRecording(entry, recorder)
@@ -283,8 +290,12 @@ async function initializeRecording(
           await saveRecording(entry);
         })
         .finally(() => {
+          const statusChanged = entry.state !== 'idle' || entry.isTranscribing;
+          entry.state = 'idle';
           entry.isTranscribing = false;
-          notifyStatus(entry);
+          if (statusChanged) {
+            notifyStatus(entry);
+          }
           completeRecording(entry);
         });
     };
@@ -404,6 +415,8 @@ export function stopAudioRecording(elementId: string): Promise<void> | null {
   entry.stopRequested = true;
   const recorder = entry.recorder;
   if (recorder && recorder.state !== 'inactive') {
+    entry.state = 'processing';
+    notifyStatus(entry);
     recorder.stop();
   } else if (!recorder) {
     stopStream(entry);

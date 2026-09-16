@@ -892,6 +892,7 @@ const fr: typeof en = {
       waitingForRecording: 'En attente d’un enregistrement',
       startRecording: 'Démarrer l’enregistrement',
       stopRecording: 'Arrêter l’enregistrement',
+      processingRecording: 'Traitement de l’enregistrement...',
       tryRecordingAgain: 'Réessayer l’enregistrement',
       playAudio: 'Lire l’audio',
       pauseAudio: 'Mettre l’audio en pause',
