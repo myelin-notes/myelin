@@ -57,11 +57,6 @@ targets:
         NSCameraUsageDescription: Take photos to insert into your notes.
         NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
         NSUserTrackingUsageDescription: Allow usage analytics and error reports to help improve Myelin Notes. Your notes and canvas content are never collected.
-        # OAuth redirect target
-        CFBundleURLTypes:
-          - CFBundleURLName: com.github.wintersteve25.myelin
-            CFBundleTypeRole: Editor
-            CFBundleURLSchemes: [com.github.wintersteve25.myelin]
     entitlements:
       path: myelin_iOS/myelin_iOS.entitlements
     scheme:
