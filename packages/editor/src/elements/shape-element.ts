@@ -55,6 +55,65 @@ export class ShapeElement extends DrawableElement {
     };
   }
 
+  public get strokeStyle(): StrokeStyle {
+    return this.style;
+  }
+
+  public toStrokePointRuns(maxWorldSpacing = 2): number[][] {
+    const g = this.geom;
+    const sx = Math.abs(this.scale.x);
+    const sy = Math.abs(this.scale.y);
+    const segment = (
+      ax: number,
+      ay: number,
+      bx: number,
+      by: number,
+    ): number[] => {
+      const worldLength = Math.hypot((bx - ax) * sx, (by - ay) * sy);
+      const steps = Math.max(1, Math.ceil(worldLength / maxWorldSpacing));
+      const points: number[] = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        points.push(ax + (bx - ax) * t, ay + (by - ay) * t, 0.5);
+      }
+      return points;
+    };
+
+    switch (this.shapeType) {
+      case 'line':
+        return [segment(g[0], g[1], g[2], g[3])];
+      case 'rect':
+      case 'triangle': {
+        const vertices = coordinatePairs(g);
+        return vertices.map(([ax, ay], index) => {
+          const [bx, by] = vertices[(index + 1) % vertices.length];
+          return segment(ax, ay, bx, by);
+        });
+      }
+      case 'ellipse': {
+        const cx = g[0] + g[2] / 2;
+        const cy = g[1] + g[3] / 2;
+        const rx = g[2] / 2;
+        const ry = g[3] / 2;
+        const worldRadius = Math.max(Math.abs(rx) * sx, Math.abs(ry) * sy);
+        const steps = Math.max(
+          12,
+          Math.ceil((Math.PI * 2 * worldRadius) / maxWorldSpacing),
+        );
+        const points: number[] = [];
+        for (let i = 0; i <= steps; i++) {
+          const angle = (i / steps) * Math.PI * 2;
+          points.push(
+            cx + Math.cos(angle) * rx,
+            cy + Math.sin(angle) * ry,
+            0.5,
+          );
+        }
+        return [points];
+      }
+    }
+  }
+
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
     this.bindYFields(yMap, {
