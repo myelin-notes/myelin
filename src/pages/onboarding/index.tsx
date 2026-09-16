@@ -13,7 +13,6 @@ import {
 import { Button } from '@myelin/ui/button';
 import { WindowControls } from '@/components/layout/window-controls';
 import { trackEvent } from '@/lib/analytics';
-import { MOBILE_PLATFORM } from '@/lib/env';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { InputStep } from './input-step';
@@ -28,13 +27,16 @@ const logger = new Logger('Onboarding');
 type Step = 'welcome' | 'input' | 'privacy' | 'sync' | 'sample';
 
 // The input mode only matters where a finger can touch the canvas.
-const STEPS: readonly Step[] = [
-  'welcome',
-  ...(isTouchDevice ? (['input'] as const) : []),
-  ...(MOBILE_PLATFORM === 'ios' ? [] : (['privacy'] as const)),
-  'sync',
-  'sample',
-];
+const STEPS: readonly Step[] = isTouchDevice
+  ? ['welcome', 'input', 'privacy', 'sync', 'sample']
+  : ['welcome', 'privacy', 'sync', 'sample'];
+
+/**
+ * First-run setup, shown in place of the app shell until `onboardingCompleted` is set.
+ *
+ * The analytics toggle writes straight through to the preference rather than being staged until the
+ * end: turning it on is the consent, and quitting halfway must not leave a decision half-applied.
+ */
 export function OnboardingFlow() {
   const strings = useMessages();
   const repository = useRepository();

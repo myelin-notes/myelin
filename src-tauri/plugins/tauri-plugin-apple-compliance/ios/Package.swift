@@ -20,7 +20,6 @@ let package = Package(
       dependencies: [.byName(name: "Tauri")],
       path: "Sources",
       linkerSettings: [
-        .linkedFramework("AppTrackingTransparency"),
         .linkedFramework("AuthenticationServices")
       ])
   ]

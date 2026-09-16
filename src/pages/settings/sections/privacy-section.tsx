@@ -2,8 +2,6 @@ import { ArrowUpRight } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import { getPlatform } from '@myelin/editor/platform';
 import { UserPrefs } from '@myelin/editor/user-prefs';
-import { MOBILE_PLATFORM } from '@/lib/env';
-import { syncAppleTrackingConsent } from '@/lib/posthog';
 import { useUserPref } from '@/lib/use-user-pref';
 import { ToggleRow } from '../components/toggle-row';
 
@@ -18,14 +16,7 @@ export function PrivacySection() {
   const strings = useMessages();
   const analyticsEnabled = useUserPref('analyticsEnabled');
 
-  const handleAnalytics = async () => {
-    if (
-      !analyticsEnabled &&
-      MOBILE_PLATFORM === 'ios' &&
-      !(await syncAppleTrackingConsent())
-    ) {
-      return;
-    }
+  const handleAnalytics = () => {
     UserPrefs.set('analyticsEnabled', !analyticsEnabled);
   };
 

@@ -56,7 +56,6 @@ targets:
         CFBundleDisplayName: Myelin Notes
         NSCameraUsageDescription: Take photos to insert into your notes.
         NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
-        NSUserTrackingUsageDescription: Allow usage analytics and error reports to help improve Myelin Notes. Your notes and canvas content are never collected.
     entitlements:
       path: myelin_iOS/myelin_iOS.entitlements
     scheme:
@@ -87,7 +86,6 @@ targets:
     dependencies:
       - framework: libapp.a
         embed: false
-      - sdk: AppTrackingTransparency.framework
       - sdk: AuthenticationServices.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework

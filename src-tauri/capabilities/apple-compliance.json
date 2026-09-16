@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "apple-compliance",
-  "description": "Apple compliance and authentication APIs on iOS and iPadOS",
+  "description": "Apple system authentication APIs on iOS and iPadOS",
   "platforms": ["iOS"],
   "windows": ["*"],
   "permissions": ["apple-compliance:default"]
