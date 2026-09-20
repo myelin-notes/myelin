@@ -833,6 +833,8 @@ const es: typeof en = {
       applyCrop: 'Aplicar recorte',
       editPoints: 'Editar puntos',
       finishEditingPoints: 'Terminar de editar puntos',
+      bold: 'Negrita',
+      italic: 'Cursiva',
     },
     pdfNavigator: {
       previousPage: 'Página anterior',

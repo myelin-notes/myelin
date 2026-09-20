@@ -826,6 +826,8 @@ const en = {
       applyCrop: 'Apply crop',
       editPoints: 'Edit points',
       finishEditingPoints: 'Finish editing points',
+      bold: 'Bold',
+      italic: 'Italic',
     },
     pdfNavigator: {
       previousPage: 'Previous page',

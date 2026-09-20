@@ -1,5 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ChevronDown as ChevronDownIcon, Type as TypeIcon } from 'lucide-react';
+import {
+  Bold as BoldIcon,
+  ChevronDown as ChevronDownIcon,
+  Italic as ItalicIcon,
+  Type as TypeIcon,
+} from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
@@ -76,6 +81,21 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
 
   return (
     <div ref={containerRef} className="flex items-center gap-1">
+      <StyleButton
+        label={strings.canvas.selectionToolbar.bold}
+        active={style.bold}
+        onClick={() => element.setStyle({ bold: !style.bold })}
+      >
+        <BoldIcon className="size-4" />
+      </StyleButton>
+      <StyleButton
+        label={strings.canvas.selectionToolbar.italic}
+        active={style.italic}
+        onClick={() => element.setStyle({ italic: !style.italic })}
+      >
+        <ItalicIcon className="size-4" />
+      </StyleButton>
+
       <div className="relative">
         <StyleButton
           label={strings.canvas.toolOptions.font}

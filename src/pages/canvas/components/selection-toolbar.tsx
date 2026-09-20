@@ -116,7 +116,9 @@ function sameTextStyle(a: TextStyle | null, b: TextStyle | null): boolean {
   return (
     a.color === b.color &&
     a.fontSize === b.fontSize &&
-    a.fontFamily === b.fontFamily
+    a.fontFamily === b.fontFamily &&
+    a.bold === b.bold &&
+    a.italic === b.italic
   );
 }
 
