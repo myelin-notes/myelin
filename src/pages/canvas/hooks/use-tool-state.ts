@@ -13,6 +13,7 @@ import {
 import type {
   CustomColorTool,
   PenPreset,
+  PenPresetChanges,
   PenPresetTool,
 } from '@myelin/editor/sync/repo/types';
 import {
@@ -225,6 +226,7 @@ export function useToolState(
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
   const [shelfOpen, setShelfOpen] = useState(false);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
 
   const [canvasTools] = useState(() => {
     const tools = DrawableCanvas.makeTools(() => strings);
@@ -265,6 +267,26 @@ export function useToolState(
       ...all,
       [tool.id]: { ...all[tool.id], [option.key]: value },
     }));
+  };
+
+  const applyActiveOptionRef = useRef<
+    (tool: ITool, option: ToolOption, value: unknown) => void
+  >(() => {});
+  applyActiveOptionRef.current = (tool, option, value) => {
+    applyOptionRef.current(tool, option, value);
+    const preset = presets.find((entry) => entry.id === editingPresetId);
+    if (!preset || preset.tool !== tool.id) {
+      return;
+    }
+    let changes: PenPresetChanges | null = null;
+    if (option.key === 'color' && typeof value === 'string') {
+      changes = { color: value };
+    } else if (option.key === 'size' && typeof value === 'number') {
+      changes = { size: value };
+    }
+    if (changes) {
+      void updatePreset(preset.id, changes);
+    }
   };
 
   const allWheelItems = useMemo(
@@ -336,7 +358,7 @@ export function useToolState(
     () =>
       tool
         ? (tool.getOptions?.() ?? []).map((option) =>
-            bindToolOption(tool, option, applyOptionRef),
+            bindToolOption(tool, option, applyActiveOptionRef),
           )
         : [],
     [optionsTick, tool],
@@ -382,6 +404,7 @@ export function useToolState(
       )?.id ?? null
     );
   }, [activePenTool, canvasTools, optionsTick, presets, selectedToolIndex]);
+  const activePresetId = editingPresetId ?? matchedPresetId;
 
   const savePresetDisabledReason = !activePenTool
     ? strings.canvas.toolPresets.saveNeedsPen
@@ -415,9 +438,25 @@ export function useToolState(
     [updatePreset, wheelFull],
   );
 
+  const editPreset = useCallback(
+    (preset: PenPreset) => {
+      applyPreset(preset);
+      setEditingPresetId(preset.id);
+      setShelfOpen(false);
+      setOptionsVisible(true);
+    },
+    [applyPreset],
+  );
+
+  const handleToolSwitched = useCallback((index: number) => {
+    setSelectedToolIndex(index);
+    setEditingPresetId(null);
+  }, []);
+
   const selectTool = useCallback(
     (index: number) => {
       drawableCanvasRef.current?.switchTool(index);
+      setEditingPresetId(null);
       setShelfOpen(false);
       const toolHasOptions =
         (canvasTools[index]?.getOptions?.()?.length ?? 0) > 0;
@@ -428,16 +467,19 @@ export function useToolState(
 
   const toggleOptions = useCallback(() => {
     setOptionsVisible((v) => !v);
+    setEditingPresetId(null);
     setShelfOpen(false);
   }, []);
 
   const hideOptions = useCallback(() => {
     setOptionsVisible(false);
+    setEditingPresetId(null);
   }, []);
 
   const toggleShelf = useCallback(() => {
     setShelfOpen((v) => !v);
     setOptionsVisible(false);
+    setEditingPresetId(null);
   }, []);
 
   const closeShelf = useCallback(() => {
@@ -447,7 +489,7 @@ export function useToolState(
   return {
     canvasTools,
     selectedToolIndex,
-    setSelectedToolIndex,
+    setSelectedToolIndex: handleToolSwitched,
     selectTool,
     toggleOptions,
     toggleShelf,
@@ -461,10 +503,12 @@ export function useToolState(
     wheelEnabledIndices,
     handleToggleWheelTool,
     presets,
-    matchedPresetId,
+    activePresetId,
+    editingPresetId,
     wheelFull,
     savePresetDisabledReason,
     applyPreset,
+    editPreset,
     saveCurrentAsPreset,
     togglePresetInWheel,
     reorderPresets,

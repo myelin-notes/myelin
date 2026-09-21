@@ -672,10 +672,11 @@ function CanvasViewInner({
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         presets={toolState.presets}
-        matchedPresetId={toolState.matchedPresetId}
+        activePresetId={toolState.activePresetId}
+        editingPresetId={toolState.editingPresetId}
         wheelFull={toolState.wheelFull}
         savePresetDisabledReason={toolState.savePresetDisabledReason}
-        onApplyPreset={toolState.applyPreset}
+        onEditPreset={toolState.editPreset}
         onSavePreset={toolState.saveCurrentAsPreset}
         onTogglePresetInWheel={toolState.togglePresetInWheel}
         onReorderPresets={toolState.reorderPresets}

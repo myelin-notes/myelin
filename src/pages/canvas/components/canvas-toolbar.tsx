@@ -33,11 +33,11 @@ interface CanvasToolbarProps {
   hasOptions: boolean;
   wheelEnabledIndices: Set<number>;
   presets: PenPreset[];
-  /** The preset the live tool currently matches exactly, if any. */
-  matchedPresetId: string | null;
+  activePresetId: string | null;
+  editingPresetId: string | null;
   wheelFull: boolean;
   savePresetDisabledReason: string | null;
-  onApplyPreset: (preset: PenPreset) => void;
+  onEditPreset: (preset: PenPreset) => void;
   onSavePreset: () => void;
   onTogglePresetInWheel: (preset: PenPreset) => void;
   onReorderPresets: (ids: readonly string[]) => Promise<void>;
@@ -76,10 +76,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   hasOptions,
   wheelEnabledIndices,
   presets,
-  matchedPresetId,
+  activePresetId,
+  editingPresetId,
   wheelFull,
   savePresetDisabledReason,
-  onApplyPreset,
+  onEditPreset,
   onSavePreset,
   onTogglePresetInWheel,
   onReorderPresets,
@@ -423,7 +424,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           {presets.length > 0 && <div className={`shrink-0 ${dividerClass}`} />}
 
           {orderedPresets.map((preset) => {
-            const isMatch = matchedPresetId === preset.id;
+            const isMatch = activePresetId === preset.id;
             const isDragging = presetDragIdRef.current === preset.id;
             return (
               <Tooltip key={preset.id}>
@@ -450,7 +451,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                       event.stopPropagation();
                       return;
                     }
-                    onApplyPreset(preset);
+                    onEditPreset(preset);
                   }}
                 >
                   <PenPresetMark
@@ -504,6 +505,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               containerRef={optionsPanelContentRef}
               savePresetDisabledReason={savePresetDisabledReason}
               onSavePreset={onSavePreset}
+              editingPreset={editingPresetId !== null}
             />
           </div>
         )}
