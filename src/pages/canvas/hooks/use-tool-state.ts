@@ -220,8 +220,14 @@ export function useToolState(
       textColors.promptAddColor,
     ],
   );
-  const { presets, canAddPreset, addPreset, updatePreset, reorderPresets } =
-    usePenPresets();
+  const {
+    presets,
+    canAddPreset,
+    addPreset,
+    updatePreset,
+    reorderPresets,
+    removePreset,
+  } = usePenPresets();
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
@@ -448,6 +454,16 @@ export function useToolState(
     [applyPreset],
   );
 
+  const deletePreset = useCallback(
+    (preset: PenPreset) => {
+      if (editingPresetId === preset.id) {
+        setEditingPresetId(null);
+      }
+      void removePreset(preset.id);
+    },
+    [editingPresetId, removePreset],
+  );
+
   const handleToolSwitched = useCallback((index: number) => {
     setSelectedToolIndex(index);
     setEditingPresetId(null);
@@ -509,6 +525,7 @@ export function useToolState(
     savePresetDisabledReason,
     applyPreset,
     editPreset,
+    deletePreset,
     saveCurrentAsPreset,
     togglePresetInWheel,
     reorderPresets,

@@ -677,6 +677,7 @@ function CanvasViewInner({
         wheelFull={toolState.wheelFull}
         savePresetDisabledReason={toolState.savePresetDisabledReason}
         onEditPreset={toolState.editPreset}
+        onDeletePreset={toolState.deletePreset}
         onSavePreset={toolState.saveCurrentAsPreset}
         onTogglePresetInWheel={toolState.togglePresetInWheel}
         onReorderPresets={toolState.reorderPresets}

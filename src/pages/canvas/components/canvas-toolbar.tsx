@@ -2,6 +2,8 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
+  Trash2 as TrashIcon,
+  X as XIcon,
 } from 'lucide-react';
 import { PenPresetMark } from '@myelin/editor/components/pen-preset-mark';
 import { useMessages } from '@myelin/editor/i18n';
@@ -39,6 +41,7 @@ interface CanvasToolbarProps {
   savePresetDisabledReason: string | null;
   onEditPreset: (preset: PenPreset) => void;
   onSavePreset: () => void;
+  onDeletePreset: (preset: PenPreset) => void;
   onTogglePresetInWheel: (preset: PenPreset) => void;
   onReorderPresets: (ids: readonly string[]) => Promise<void>;
   onSelectTool: (index: number) => void;
@@ -82,6 +85,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   savePresetDisabledReason,
   onEditPreset,
   onSavePreset,
+  onDeletePreset,
   onTogglePresetInWheel,
   onReorderPresets,
   onSelectTool,
@@ -102,7 +106,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const insertButtonRef = useRef<HTMLElement | null>(null);
   const optionsPanelRef = useRef<HTMLDivElement>(null);
   const optionsPanelContentRef = useRef<HTMLDivElement>(null);
+  const presetDeleteZoneRef = useRef<HTMLDivElement>(null);
   const [presetDragOrder, setPresetDragOrder] = useState<string[] | null>(null);
+  const [presetDragging, setPresetDragging] = useState(false);
+  const [presetDeleteZoneLeft, setPresetDeleteZoneLeft] = useState(0);
+  const [presetDeleteZoneTop, setPresetDeleteZoneTop] = useState(0);
+  const [presetDeleteTargeted, setPresetDeleteTargeted] = useState(false);
   const presetHoldTimerRef = useRef<number | null>(null);
   const presetDragIdRef = useRef<string | null>(null);
   const presetPointerIdRef = useRef<number | null>(null);
@@ -114,6 +123,17 @@ export const CanvasToolbar = memo(function CanvasToolbar({
       window.clearTimeout(presetHoldTimerRef.current);
       presetHoldTimerRef.current = null;
     }
+  };
+
+  const isOverPresetDeleteZone = (clientX: number, clientY: number) => {
+    const bounds = presetDeleteZoneRef.current?.getBoundingClientRect();
+    return Boolean(
+      bounds &&
+        clientX >= bounds.left &&
+        clientX <= bounds.right &&
+        clientY >= bounds.top &&
+        clientY <= bounds.bottom,
+    );
   };
 
   useEffect(
@@ -136,11 +156,23 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     clearPresetHold();
     presetPointerIdRef.current = event.pointerId;
     presetPointerStartRef.current = { x: event.clientX, y: event.clientY };
+    const deleteZoneTop = Math.min(
+      Math.max(event.clientY - 40, 16),
+      window.innerHeight - 96,
+    );
     event.currentTarget.setPointerCapture(event.pointerId);
     presetHoldTimerRef.current = window.setTimeout(() => {
       presetHoldTimerRef.current = null;
       presetDragIdRef.current = presetId;
       suppressPresetClickRef.current = true;
+      setPresetDeleteZoneLeft(
+        Math.min(
+          (toolbarInnerRef.current?.getBoundingClientRect().right ?? 0) + 12,
+          window.innerWidth - 144,
+        ),
+      );
+      setPresetDeleteZoneTop(deleteZoneTop);
+      setPresetDragging(true);
       setPresetDragOrder(presets.map((preset) => preset.id));
     }, PRESET_DRAG_HOLD_MS);
   };
@@ -162,6 +194,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     }
     event.preventDefault();
     event.stopPropagation();
+    const overDeleteZone = isOverPresetDeleteZone(event.clientX, event.clientY);
+    setPresetDeleteTargeted(overDeleteZone);
+    if (overDeleteZone) {
+      return;
+    }
     const target = document
       .elementFromPoint(event.clientX, event.clientY)
       ?.closest<HTMLElement>('[data-preset-id]');
@@ -191,17 +228,29 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     }
     clearPresetHold();
     presetPointerIdRef.current = null;
-    const wasDragging = presetDragIdRef.current !== null;
+    const draggedPresetId = presetDragIdRef.current;
     presetDragIdRef.current = null;
-    if (!wasDragging) {
+    if (!draggedPresetId) {
       return;
     }
     event.preventDefault();
     event.stopPropagation();
+    setPresetDragging(false);
     const order = presetDragOrder;
     window.setTimeout(() => {
       suppressPresetClickRef.current = false;
     });
+    setPresetDeleteTargeted(false);
+    if (isOverPresetDeleteZone(event.clientX, event.clientY)) {
+      const draggedPreset = presets.find(
+        (preset) => preset.id === draggedPresetId,
+      );
+      setPresetDragOrder(null);
+      if (draggedPreset) {
+        onDeletePreset(draggedPreset);
+      }
+      return;
+    }
     const orderChanged = order?.some((id, index) => presets[index]?.id !== id);
     if (order && orderChanged) {
       void onReorderPresets(order).finally(() => setPresetDragOrder(null));
@@ -218,6 +267,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     presetPointerIdRef.current = null;
     presetDragIdRef.current = null;
     suppressPresetClickRef.current = false;
+    setPresetDragging(false);
+    setPresetDeleteTargeted(false);
     setPresetDragOrder(null);
   };
 
@@ -325,6 +376,20 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           }}
         />
       )}
+      {presetDragging && (
+        <div
+          ref={presetDeleteZoneRef}
+          className={`pointer-events-none fixed z-[101] flex min-h-20 w-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-3 font-medium text-xs shadow-ambient backdrop-blur-md transition-[color,background-color,border-color,transform] ${
+            presetDeleteTargeted
+              ? 'scale-105 border-destructive bg-destructive text-text-on-dark'
+              : 'border-destructive/50 bg-card/95 text-destructive'
+          }`}
+          style={{ left: presetDeleteZoneLeft, top: presetDeleteZoneTop }}
+        >
+          <TrashIcon className="size-5" />
+          <span>{strings.canvas.toolPresets.delete}</span>
+        </div>
+      )}
       <div
         ref={toolbarRef}
         className={
@@ -427,43 +492,64 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             const isMatch = activePresetId === preset.id;
             const isDragging = presetDragIdRef.current === preset.id;
             return (
-              <Tooltip key={preset.id}>
-                <TooltipTrigger
-                  data-preset-id={preset.id}
-                  aria-label={getPenPresetLabel(preset, strings)}
-                  className={`shrink-0 touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
-                    isDragging
-                      ? 'scale-110 cursor-grabbing opacity-70'
-                      : 'cursor-pointer'
-                  } ${
-                    isMatch
-                      ? 'bg-accent-dark'
-                      : 'bg-transparent hover:bg-hover-tint'
-                  }`}
-                  onPointerDown={(event) => beginPresetHold(event, preset.id)}
-                  onPointerMove={movePresetDrag}
-                  onPointerUp={endPresetDrag}
-                  onPointerCancel={cancelPresetDrag}
-                  onContextMenu={(event) => event.preventDefault()}
+              <div key={preset.id} className="group relative shrink-0">
+                <Tooltip disabled={presetDragging}>
+                  <TooltipTrigger
+                    data-preset-id={preset.id}
+                    aria-label={getPenPresetLabel(preset, strings)}
+                    className={`touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
+                      isDragging
+                        ? 'scale-110 cursor-grabbing opacity-70'
+                        : 'cursor-pointer'
+                    } ${
+                      isMatch
+                        ? 'bg-accent-dark'
+                        : 'bg-transparent hover:bg-hover-tint'
+                    }`}
+                    onPointerDown={(event) => beginPresetHold(event, preset.id)}
+                    onPointerMove={movePresetDrag}
+                    onPointerUp={endPresetDrag}
+                    onPointerCancel={cancelPresetDrag}
+                    onContextMenu={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      if (suppressPresetClickRef.current) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                      }
+                      onEditPreset(preset);
+                    }}
+                  >
+                    <PenPresetMark
+                      preset={preset}
+                      onDark={isMatch}
+                      className="size-4"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side={tooltipSide}>
+                    <p>{getPenPresetLabel(preset, strings)}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <button
+                  type="button"
+                  aria-label={`${strings.canvas.toolPresets.delete}: ${getPenPresetLabel(preset, strings)}`}
+                  title={strings.canvas.toolPresets.delete}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
                   onClick={(event) => {
-                    if (suppressPresetClickRef.current) {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      return;
-                    }
-                    onEditPreset(preset);
+                    event.stopPropagation();
+                    onDeletePreset(preset);
+                  }}
+                  className="pointer-events-none absolute -top-1 -right-1 flex size-3.5 cursor-pointer items-center justify-center rounded-full border-none bg-card p-0 text-text-secondary opacity-0 shadow-ambient transition-opacity duration-100 hover:text-text-primary focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                  style={{
+                    boxShadow: 'inset 0 0 0 0.5px var(--border-ghost)',
                   }}
                 >
-                  <PenPresetMark
-                    preset={preset}
-                    onDark={isMatch}
-                    className="size-4"
-                  />
-                </TooltipTrigger>
-                <TooltipContent side={tooltipSide}>
-                  <p>{getPenPresetLabel(preset, strings)}</p>
-                </TooltipContent>
-              </Tooltip>
+                  <XIcon className="size-2.5" strokeWidth={2.5} />
+                </button>
+              </div>
             );
           })}
 
