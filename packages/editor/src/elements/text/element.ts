@@ -1,3 +1,11 @@
+import { selectAll } from 'prosemirror-commands';
+import { keymap } from 'prosemirror-keymap';
+import {
+  EditorState,
+  TextSelection,
+  type Transaction,
+} from 'prosemirror-state';
+import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
 import {
   type LayoutLine,
@@ -8,6 +16,7 @@ import { resolveInkColor } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
 import { ensureDisplayFont, fetchFontTtfBase64 } from '../../google-fonts';
+import { comboMatches, comboToPMKey, registry } from '../../keybinds';
 import { parseCssColor } from '../../pdf-export/color';
 import type { FontKey } from '../../pdf-export/contract';
 import { familyToKey } from '../../pdf-export/fonts';
@@ -18,17 +27,31 @@ import type {
 } from '../canvas-searchable-element';
 import { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
+import {
+  applyDocumentStyle,
+  applySelectionStyle,
+  docFromJson,
+  docFromText,
+  getDocText,
+  getDocumentStyle,
+  getSelectionStyle,
+  textSchema,
+} from './rich-text';
 
 export interface TextStyle {
   color: string;
   fontSize: number;
   fontFamily: string;
+  bold: boolean;
+  italic: boolean;
 }
 
 const DEFAULT_STYLE: TextStyle = {
   color: '#1a1a1a',
   fontSize: 24,
   fontFamily: 'sans-serif',
+  bold: false,
+  italic: false,
 };
 
 const DEFAULT_BOX_WIDTH = 200;
@@ -36,9 +59,9 @@ const DEFAULT_BOX_HEIGHT = 80;
 
 /**
  * A free-floating text box. The text is a DOM overlay at all times — display and editing share one
- * persistent textarea, so entering edit mode only toggles focus and editability instead of swapping
- * render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source for PDF
- * export, thumbnails, and the bounding box.
+ * persistent rich-text view, so entering edit mode only toggles focus and editability instead of
+ * swapping render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source
+ * for PDF export, thumbnails, and the headless bounding-box fallback.
  */
 export class TextElement extends DrawableElement implements SearchableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
@@ -47,12 +70,12 @@ export class TextElement extends DrawableElement implements SearchableElement {
   private _boxWidth: number = DEFAULT_BOX_WIDTH;
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
-  private _oldText: string = '';
   private _canvas: DrawableCanvas | null = null;
   private _cachedLines: LayoutLine[] = [];
   private _cachedLineHeight: number = 0;
 
-  private _textarea: HTMLTextAreaElement | null = null;
+  private _richText = docFromText('');
+  private _view: EditorView | null = null;
 
   // TTF bytes for the display font, staged by prepareForPdf so the synchronous
   // drawToPdf pass can embed the real face; null falls back to familyToKey.
@@ -67,6 +90,7 @@ export class TextElement extends DrawableElement implements SearchableElement {
   ) {
     super(uuid, ElementType.TEXT);
     this._text = text;
+    this._richText = docFromText(text);
     this._style = { ...DEFAULT_STYLE, ...style };
     this._boxWidth = boxWidth;
     this._boxHeight = boxHeight;
@@ -78,6 +102,9 @@ export class TextElement extends DrawableElement implements SearchableElement {
       color: this._style.color,
       fontSize: this._style.fontSize,
       fontFamily: this._style.fontFamily,
+      bold: this._style.bold,
+      italic: this._style.italic,
+      richText: this._richText.toJSON(),
       boxWidth: this._boxWidth,
       boxHeight: this._boxHeight,
     };
@@ -93,6 +120,10 @@ export class TextElement extends DrawableElement implements SearchableElement {
     this.bindYFields(yMap, {
       text: (v) => {
         this._text = v as string;
+        if (!yMap.has('richText')) {
+          this._richText = docFromText(this._text);
+          this.updateViewDocument();
+        }
       },
       color: (v) => {
         this._style.color = v as string;
@@ -102,6 +133,17 @@ export class TextElement extends DrawableElement implements SearchableElement {
       },
       fontFamily: (v) => {
         this._style.fontFamily = v as string;
+      },
+      bold: (v) => {
+        this._style.bold = v === true;
+      },
+      italic: (v) => {
+        this._style.italic = v === true;
+      },
+      richText: (v) => {
+        this._richText = docFromJson(v, this._text);
+        this._text = getDocText(this._richText);
+        this.updateViewDocument();
       },
       boxWidth: (v) => {
         this._boxWidth = v as number;
@@ -114,11 +156,28 @@ export class TextElement extends DrawableElement implements SearchableElement {
     this.recomputeBox();
   }
 
+  public override syncFromYMap(keys: Iterable<string>): void {
+    const changedKeys = Array.from(keys);
+    super.syncFromYMap(changedKeys);
+    if (changedKeys.includes('text') && !changedKeys.includes('richText')) {
+      this._richText = docFromText(this._text);
+      this.updateViewDocument();
+    }
+    this.recomputeBox();
+  }
+
   public get text(): string {
     return this._text;
   }
   public get style(): TextStyle {
-    return this._style;
+    return this._editing && this._view
+      ? getSelectionStyle(this._view.state, this._style)
+      : this._style;
+  }
+  public get selectionToolbarStyle(): TextStyle {
+    return this._editing && this._view && !this._view.state.selection.empty
+      ? getSelectionStyle(this._view.state, this._style)
+      : getDocumentStyle(this._richText, this._style);
   }
   public get boxWidth(): number {
     return this._boxWidth;
@@ -139,7 +198,7 @@ export class TextElement extends DrawableElement implements SearchableElement {
   }
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
-    const textarea = this._textarea ?? this.createDom(host);
+    const editor = this._view?.dom ?? this.createDom(host);
 
     const sy = Math.abs(this._scale.y) || 1;
     const screen = viewport.worldToScreen({
@@ -147,136 +206,189 @@ export class TextElement extends DrawableElement implements SearchableElement {
       y: this.offset.y,
     });
 
-    this.applyContentStyle(textarea);
+    this.applyContentStyle(editor);
 
     // Text renders at native font size while the element's scale widens the wrap box, so only the
     // viewport zoom goes into the transform.
-    textarea.style.left = `${screen.x}px`;
-    textarea.style.top = `${screen.y}px`;
-    textarea.style.transform = `scale(${viewport.zoom})`;
-    textarea.style.height = `${this.box.height * sy}px`;
-    textarea.style.color = resolveInkColor(this._style.color);
-    textarea.dataset.editing = this._editing ? 'true' : 'false';
+    editor.style.left = `${screen.x}px`;
+    editor.style.top = `${screen.y}px`;
+    editor.style.transform = `scale(${viewport.zoom})`;
+    editor.style.minHeight = `${this.box.height * sy}px`;
+    editor.style.color = resolveInkColor(this._style.color);
+    editor.dataset.editing = this._editing ? 'true' : 'false';
   }
 
   // syncDOM pushes these each frame; the measure pass applies them first, so a recomputeBox running
   // before the next frame (font or scale change) measures the new wrapping, not the last frame's.
-  private applyContentStyle(textarea: HTMLTextAreaElement): void {
-    // Remote/undo edits land here; skip while editing so the user's
-    // in-progress typing isn't clobbered.
-    if (!this._editing && textarea.value !== this._text) {
-      textarea.value = this._text;
-    }
-
+  private applyContentStyle(editor: HTMLElement): void {
     const sx = Math.abs(this._scale.x) || 1;
-    textarea.style.width = `${this._boxWidth * sx}px`;
-    textarea.style.fontSize = `${this._style.fontSize}px`;
-    textarea.style.lineHeight = `${this._style.fontSize * 1.3}px`;
+    editor.style.width = `${this._boxWidth * sx}px`;
+    editor.style.fontSize = `${this._style.fontSize}px`;
+    editor.style.lineHeight = '1.3';
+    editor.style.fontWeight = this._style.bold ? '700' : '400';
+    editor.style.fontStyle = this._style.italic ? 'italic' : 'normal';
     // Deduped internally; covers documents opened with existing text boxes,
     // which the tool UI's font loading never sees.
     ensureDisplayFont(this._style.fontFamily);
-    textarea.style.fontFamily = this._style.fontFamily;
+    this._richText.descendants((node) => {
+      for (const mark of node.marks) {
+        const family = mark.attrs.fontFamily;
+        if (typeof family === 'string') {
+          ensureDisplayFont(family);
+        }
+      }
+    });
+    editor.style.fontFamily = this._style.fontFamily;
   }
 
-  // Measured at height 0: scrollHeight never reports less than the element's own height, and
-  // syncDOM sizes the textarea from the box, so measuring as-is would echo the box height back and
-  // pin the box to its tallest-ever size.
+  // scrollHeight never reports less than min-height, so temporarily clear the box floor to measure
+  // the content rather than echoing the box's tallest-ever size.
   private measureDomTextHeight(): number {
-    const textarea = this._textarea;
-    if (!textarea) {
+    const editor = this._view?.dom;
+    if (!editor) {
       return 0;
     }
-    this.applyContentStyle(textarea);
-    const height = textarea.style.height;
-    textarea.style.height = '0px';
-    const contentHeight = textarea.scrollHeight;
-    textarea.style.height = height;
+    this.applyContentStyle(editor);
+    const minHeight = editor.style.minHeight;
+    editor.style.minHeight = '0px';
+    const contentHeight = editor.scrollHeight;
+    editor.style.minHeight = minHeight;
     return contentHeight;
   }
 
-  private createDom(host: HTMLElement): HTMLTextAreaElement {
-    const textarea = document.createElement('textarea');
-    textarea.className = 'canvas-text-block';
-    textarea.dataset.elementUuid = this.uuid;
-    textarea.value = this._text;
-    textarea.readOnly = true;
-    // Not tab-reachable while idle; edit mode focuses it programmatically.
-    textarea.tabIndex = -1;
-    // Grow the box as the user types; otherwise the fixed-height textarea scrolls its content
-    // (overflow: hidden) instead. recomputeBox() runs off _text, so update it first.
-    textarea.addEventListener('input', () => {
-      this._text = textarea.value;
-      this.updateBounds();
-      this.onTransformChanged?.();
+  private createDom(host: HTMLElement): HTMLElement {
+    const owner = this;
+    const selectAllCombo = registry.getCombo('canvas:select-all');
+    this._view = new EditorView(host, {
+      state: EditorState.create({
+        schema: textSchema,
+        doc: this._richText,
+        plugins: selectAllCombo
+          ? [keymap({ [comboToPMKey(selectAllCombo)]: selectAll })]
+          : [],
+      }),
+      editable: () => owner._editing,
+      handleKeyDown(view, event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          if (event.shiftKey) {
+            view.dispatch(
+              view.state.tr.replaceSelectionWith(
+                textSchema.nodes.hardBreak.create(),
+              ),
+            );
+          } else {
+            owner._canvas?.exitElementEdit();
+          }
+          return true;
+        }
+        const property = (
+          [
+            ['editor:bold', 'bold'],
+            ['editor:italic', 'italic'],
+          ] as const
+        ).find(([action]) =>
+          registry
+            .getCombos(action)
+            .some((combo) => comboMatches(event, combo)),
+        )?.[1];
+        if (property) {
+          event.preventDefault();
+          owner.setStyle({ [property]: !owner.style[property] });
+          return true;
+        }
+        return false;
+      },
+      dispatchTransaction(this: EditorView, transaction: Transaction) {
+        const next = this.state.apply(transaction);
+        this.updateState(next);
+        owner._richText = next.doc;
+        owner._text = getDocText(next.doc);
+        if (transaction.docChanged) {
+          owner.syncToYMap({
+            text: owner._text,
+            richText: owner._richText.toJSON(),
+          });
+          owner.updateBounds();
+        }
+        if (
+          transaction.docChanged ||
+          transaction.selectionSet ||
+          transaction.storedMarksSet
+        ) {
+          owner.onTransformChanged?.();
+        }
+      },
     });
-    textarea.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        this._canvas?.exitElementEdit();
-      }
-    });
-    host.appendChild(textarea);
-    this._textarea = textarea;
-    return textarea;
+    const editor = this._view.dom;
+    editor.classList.add('canvas-text-block');
+    editor.dataset.elementUuid = this.uuid;
+    editor.tabIndex = -1;
+    return editor;
   }
 
   public override disposeDOM(): void {
-    this._textarea?.remove();
-    this._textarea = null;
+    this._view?.destroy();
+    this._view = null;
   }
 
   public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {
     this._editing = true;
-    this._oldText = this._text;
     this._canvas = canvas;
 
-    // The canvas syncs DOM right before this call, so the textarea exists;
+    // The canvas syncs DOM right before this call, so the rich-text view exists;
     // that sync ran with _editing still false, so flip pointer events here.
-    const textarea = this._textarea;
-    if (!textarea) {
+    const view = this._view;
+    if (!view) {
       return null;
     }
-    textarea.dataset.editing = 'true';
-    textarea.readOnly = false;
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    return textarea;
+    view.setProps({ editable: () => true });
+    view.dom.dataset.editing = 'true';
+    view.dispatch(
+      view.state.tr.setSelection(TextSelection.atEnd(view.state.doc)),
+    );
+    view.focus();
+    // WebKit can finish the originating canvas click's focus action after this pointer-up handler.
+    requestAnimationFrame(() => {
+      if (this._editing && this._view === view) {
+        view.focus();
+      }
+    });
+    return view.dom;
   }
 
   public override exitEditMode(): void {
     this._editing = false;
 
-    const textarea = this._textarea;
+    const view = this._view;
     const canvas = this._canvas;
     this._canvas = null;
 
-    if (!textarea || !canvas) {
+    if (!view || !canvas) {
       return;
     }
 
-    textarea.readOnly = true;
-    textarea.dataset.editing = 'false';
-    // Collapse the selection; a blurred textarea otherwise keeps painting its
-    // (greyed-out) highlight over the text.
-    textarea.setSelectionRange(0, 0);
-    textarea.blur();
+    view.dispatch(
+      view.state.tr.setSelection(
+        TextSelection.create(view.state.doc, view.state.selection.head),
+      ),
+    );
+    view.setProps({ editable: () => false });
+    view.dom.dataset.editing = 'false';
+    view.dom.blur();
 
-    const newText = textarea.value;
-    if (!newText.trim()) {
+    if (!this._text.trim()) {
       canvas.removeElement(this);
       return;
-    }
-
-    if (newText !== this._oldText) {
-      this.setText(newText);
-      this.updateBounds();
     }
   }
 
   public setText(text: string) {
     this._text = text;
+    this._richText = docFromText(text);
+    this.updateViewDocument();
     this.recomputeBox();
-    this.syncToYMap({ text });
+    this.syncToYMap({ text, richText: this._richText.toJSON() });
   }
 
   public setBoxSize(width: number, height: number) {
@@ -287,16 +399,65 @@ export class TextElement extends DrawableElement implements SearchableElement {
   }
 
   public setStyle(updates: Partial<TextStyle>) {
+    if (this._editing && this._view) {
+      this._view.dispatch(applySelectionStyle(this._view.state, updates));
+      this._view.focus();
+      return;
+    }
+
+    this.setWholeDocumentStyle(updates);
+  }
+
+  public setSelectionToolbarStyle(updates: Partial<TextStyle>) {
+    if (this._editing && this._view && !this._view.state.selection.empty) {
+      this.setStyle(updates);
+      return;
+    }
+
+    this.setWholeDocumentStyle(updates);
+  }
+
+  private setWholeDocumentStyle(updates: Partial<TextStyle>) {
     this._style = { ...this._style, ...updates };
+    if (this._view) {
+      this._view.dispatch(applyDocumentStyle(this._view.state, updates));
+      if (this._editing) {
+        this._view.focus();
+      }
+    } else {
+      const state = EditorState.create({
+        schema: textSchema,
+        doc: this._richText,
+      });
+      this._richText = state.apply(applyDocumentStyle(state, updates)).doc;
+    }
     this.recomputeBox();
     this.syncToYMap({
       color: this._style.color,
       fontSize: this._style.fontSize,
       fontFamily: this._style.fontFamily,
+      bold: this._style.bold,
+      italic: this._style.italic,
+      richText: this._richText.toJSON(),
     });
     // Font size and family change how the text wraps, so the box moves with the style. Notify so the
     // selection outline and toolbar follow.
     this.onTransformChanged?.();
+  }
+
+  private updateViewDocument(): void {
+    if (!this._view || this._view.state.doc.eq(this._richText)) {
+      return;
+    }
+    const selection = TextSelection.atEnd(this._richText);
+    this._view.updateState(
+      EditorState.create({
+        schema: textSchema,
+        doc: this._richText,
+        selection,
+        plugins: this._view.state.plugins,
+      }),
+    );
   }
 
   // The DOM overlay paints the text; nothing to draw on the 2D canvas.
@@ -316,7 +477,7 @@ export class TextElement extends DrawableElement implements SearchableElement {
     ctx.scale(1 / sx, 1 / sy);
 
     const fontSize = this._style.fontSize;
-    ctx.font = `${fontSize}px ${this._style.fontFamily}`;
+    ctx.font = `${this._style.italic ? 'italic ' : ''}${this._style.bold ? '700 ' : ''}${fontSize}px ${this._style.fontFamily}`;
     ctx.fillStyle = resolveInkColor(this._style.color);
     ctx.textBaseline = 'top';
 
@@ -362,8 +523,8 @@ export class TextElement extends DrawableElement implements SearchableElement {
         baselineY: p.y,
         text,
         font,
-        weight: 400,
-        italic: false,
+        weight: this._style.bold ? 700 : 400,
+        italic: this._style.italic,
         sizePt,
         color: rgb,
         opacity,
@@ -408,7 +569,7 @@ export class TextElement extends DrawableElement implements SearchableElement {
         lineHeight,
       ).lines;
 
-      // The textarea is the real renderer, so when mounted measure its content height directly — the
+      // The DOM view is the real renderer, so when mounted measure its content height directly — the
       // box then matches the displayed wrapping exactly, including trailing blank lines from
       // Shift+Enter that pretext's normal-whitespace layout collapses. pretext's line count is the
       // fallback for headless paths (PDF export, thumbnails, before the first render frame).

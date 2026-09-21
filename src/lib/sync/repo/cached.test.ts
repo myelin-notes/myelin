@@ -943,13 +943,27 @@ describe('CachedRepository', () => {
       size: 12,
       inWheel: true,
     });
+    const [, second] = await repository.addPenPreset({
+      tool: 'highlighter',
+      color: '#123456',
+      size: 24,
+      inWheel: true,
+    });
     await repository.updatePenPreset(created.id, { size: 20, inWheel: false });
+    await repository.reorderPenPresets([second.id, created.id]);
 
     expect((await remote.exportSnapshot()).manifest.penPresets).toEqual([]);
 
     await repository.flushPending();
 
     expect(await remote.getPenPresets()).toEqual([
+      {
+        id: second.id,
+        tool: 'highlighter',
+        color: '#123456',
+        size: 24,
+        inWheel: true,
+      },
       {
         id: created.id,
         tool: 'pen',
@@ -960,6 +974,7 @@ describe('CachedRepository', () => {
     ]);
 
     await repository.removePenPreset(created.id);
+    await repository.removePenPreset(second.id);
     await repository.flushPending();
 
     expect(await remote.getPenPresets()).toEqual([]);

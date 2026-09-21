@@ -639,6 +639,15 @@ export class CachedRepository
     );
   }
 
+  async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.reorderPenPresets(ids),
+      (ops) => {
+        enqueuePenPresetsSync(ops);
+      },
+    );
+  }
+
   async removePenPreset(id: string): Promise<PenPreset[]> {
     return this.writeLocalAndQueue(
       () => this.cache.removePenPreset(id),

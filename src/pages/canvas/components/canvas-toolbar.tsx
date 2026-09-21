@@ -1,7 +1,9 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
+  Trash2 as TrashIcon,
+  X as XIcon,
 } from 'lucide-react';
 import { PenPresetMark } from '@myelin/editor/components/pen-preset-mark';
 import { useMessages } from '@myelin/editor/i18n';
@@ -9,12 +11,10 @@ import { getPenPresetLabel } from '@myelin/editor/pen-presets';
 import type {
   CustomColorTool,
   PenPreset,
-  PenPresetTool,
 } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { usePresence } from '@myelin/ui';
-import { PenPresetMenu } from '@/components/pen-preset-menu';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -35,16 +35,15 @@ interface CanvasToolbarProps {
   hasOptions: boolean;
   wheelEnabledIndices: Set<number>;
   presets: PenPreset[];
-  /** The preset the live tool currently matches exactly, if any. */
-  matchedPresetId: string | null;
-  activePenTool: PenPresetTool | null;
+  activePresetId: string | null;
+  editingPresetId: string | null;
   wheelFull: boolean;
   savePresetDisabledReason: string | null;
-  onApplyPreset: (preset: PenPreset) => void;
+  onEditPreset: (preset: PenPreset) => void;
   onSavePreset: () => void;
-  onUpdatePresetToCurrent: (preset: PenPreset) => void;
-  onTogglePresetInWheel: (preset: PenPreset) => void;
   onDeletePreset: (preset: PenPreset) => void;
+  onTogglePresetInWheel: (preset: PenPreset) => void;
+  onReorderPresets: (ids: readonly string[]) => Promise<void>;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
   onToggleShelf: () => void;
@@ -56,6 +55,8 @@ interface CanvasToolbarProps {
 }
 
 const PANEL_VIEWPORT_MARGIN = 16;
+const PRESET_DRAG_HOLD_MS = 300;
+const PRESET_DRAG_SLOP_PX = 8;
 
 function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
   switch (tool?.id) {
@@ -78,15 +79,15 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   hasOptions,
   wheelEnabledIndices,
   presets,
-  matchedPresetId,
-  activePenTool,
+  activePresetId,
+  editingPresetId,
   wheelFull,
   savePresetDisabledReason,
-  onApplyPreset,
+  onEditPreset,
   onSavePreset,
-  onUpdatePresetToCurrent,
-  onTogglePresetInWheel,
   onDeletePreset,
+  onTogglePresetInWheel,
+  onReorderPresets,
   onSelectTool,
   onToggleOptions,
   onToggleShelf,
@@ -105,6 +106,178 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const insertButtonRef = useRef<HTMLElement | null>(null);
   const optionsPanelRef = useRef<HTMLDivElement>(null);
   const optionsPanelContentRef = useRef<HTMLDivElement>(null);
+  const presetDeleteZoneRef = useRef<HTMLDivElement>(null);
+  const [presetDragOrder, setPresetDragOrder] = useState<string[] | null>(null);
+  const [presetDragging, setPresetDragging] = useState(false);
+  const [presetDeleteZoneLeft, setPresetDeleteZoneLeft] = useState(0);
+  const [presetDeleteZoneTop, setPresetDeleteZoneTop] = useState(0);
+  const [presetDeleteTargeted, setPresetDeleteTargeted] = useState(false);
+  const presetHoldTimerRef = useRef<number | null>(null);
+  const presetDragIdRef = useRef<string | null>(null);
+  const presetPointerIdRef = useRef<number | null>(null);
+  const presetPointerStartRef = useRef({ x: 0, y: 0 });
+  const suppressPresetClickRef = useRef(false);
+
+  const clearPresetHold = () => {
+    if (presetHoldTimerRef.current !== null) {
+      window.clearTimeout(presetHoldTimerRef.current);
+      presetHoldTimerRef.current = null;
+    }
+  };
+
+  const isOverPresetDeleteZone = (clientX: number, clientY: number) => {
+    const bounds = presetDeleteZoneRef.current?.getBoundingClientRect();
+    return Boolean(
+      bounds &&
+        clientX >= bounds.left &&
+        clientX <= bounds.right &&
+        clientY >= bounds.top &&
+        clientY <= bounds.bottom,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      if (presetHoldTimerRef.current !== null) {
+        window.clearTimeout(presetHoldTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const beginPresetHold = (
+    event: React.PointerEvent<HTMLElement>,
+    presetId: string,
+  ) => {
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    clearPresetHold();
+    presetPointerIdRef.current = event.pointerId;
+    presetPointerStartRef.current = { x: event.clientX, y: event.clientY };
+    const deleteZoneTop = Math.min(
+      Math.max(event.clientY - 40, 16),
+      window.innerHeight - 96,
+    );
+    event.currentTarget.setPointerCapture(event.pointerId);
+    presetHoldTimerRef.current = window.setTimeout(() => {
+      presetHoldTimerRef.current = null;
+      presetDragIdRef.current = presetId;
+      suppressPresetClickRef.current = true;
+      setPresetDeleteZoneLeft(
+        Math.min(
+          (toolbarInnerRef.current?.getBoundingClientRect().right ?? 0) + 12,
+          window.innerWidth - 144,
+        ),
+      );
+      setPresetDeleteZoneTop(deleteZoneTop);
+      setPresetDragging(true);
+      setPresetDragOrder(presets.map((preset) => preset.id));
+    }, PRESET_DRAG_HOLD_MS);
+  };
+
+  const movePresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    const dragId = presetDragIdRef.current;
+    if (!dragId) {
+      const distance = Math.hypot(
+        event.clientX - presetPointerStartRef.current.x,
+        event.clientY - presetPointerStartRef.current.y,
+      );
+      if (distance > PRESET_DRAG_SLOP_PX) {
+        clearPresetHold();
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const overDeleteZone = isOverPresetDeleteZone(event.clientX, event.clientY);
+    setPresetDeleteTargeted(overDeleteZone);
+    if (overDeleteZone) {
+      return;
+    }
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-preset-id]');
+    const targetId = target?.dataset.presetId;
+    if (!targetId || targetId === dragId) {
+      return;
+    }
+    setPresetDragOrder((current) => {
+      if (!current) {
+        return current;
+      }
+      const from = current.indexOf(dragId);
+      const to = current.indexOf(targetId);
+      if (from < 0 || to < 0) {
+        return current;
+      }
+      const next = [...current];
+      next.splice(from, 1);
+      next.splice(to, 0, dragId);
+      return next;
+    });
+  };
+
+  const endPresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    clearPresetHold();
+    presetPointerIdRef.current = null;
+    const draggedPresetId = presetDragIdRef.current;
+    presetDragIdRef.current = null;
+    if (!draggedPresetId) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    setPresetDragging(false);
+    const order = presetDragOrder;
+    window.setTimeout(() => {
+      suppressPresetClickRef.current = false;
+    });
+    setPresetDeleteTargeted(false);
+    if (isOverPresetDeleteZone(event.clientX, event.clientY)) {
+      const draggedPreset = presets.find(
+        (preset) => preset.id === draggedPresetId,
+      );
+      setPresetDragOrder(null);
+      if (draggedPreset) {
+        onDeletePreset(draggedPreset);
+      }
+      return;
+    }
+    const orderChanged = order?.some((id, index) => presets[index]?.id !== id);
+    if (order && orderChanged) {
+      void onReorderPresets(order).finally(() => setPresetDragOrder(null));
+    } else {
+      setPresetDragOrder(null);
+    }
+  };
+
+  const cancelPresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    clearPresetHold();
+    presetPointerIdRef.current = null;
+    presetDragIdRef.current = null;
+    suppressPresetClickRef.current = false;
+    setPresetDragging(false);
+    setPresetDeleteTargeted(false);
+    setPresetDragOrder(null);
+  };
+
+  const orderedPresets = presetDragOrder
+    ? presetDragOrder.flatMap((id) => {
+        const preset = presets.find((entry) => entry.id === id);
+        return preset ? [preset] : [];
+      })
+    : presets;
 
   // Compact stacks the panels above a bottom bar, where they span its width and
   // need no per-button alignment.
@@ -202,6 +375,20 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             }
           }}
         />
+      )}
+      {presetDragging && (
+        <div
+          ref={presetDeleteZoneRef}
+          className={`pointer-events-none fixed z-[101] flex min-h-20 w-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-3 py-3 font-medium text-xs shadow-ambient backdrop-blur-md transition-[color,background-color,border-color,transform] ${
+            presetDeleteTargeted
+              ? 'scale-105 border-destructive bg-destructive text-text-on-dark'
+              : 'border-destructive/50 bg-card/95 text-destructive'
+          }`}
+          style={{ left: presetDeleteZoneLeft, top: presetDeleteZoneTop }}
+        >
+          <TrashIcon className="size-5" />
+          <span>{strings.canvas.toolPresets.delete}</span>
+        </div>
       )}
       <div
         ref={toolbarRef}
@@ -301,26 +488,37 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
           {presets.length > 0 && <div className={`shrink-0 ${dividerClass}`} />}
 
-          {presets.map((preset) => {
-            const isMatch = matchedPresetId === preset.id;
+          {orderedPresets.map((preset) => {
+            const isMatch = activePresetId === preset.id;
+            const isDragging = presetDragIdRef.current === preset.id;
             return (
-              <PenPresetMenu
-                key={preset.id}
-                preset={preset}
-                canUpdateToCurrent={activePenTool === preset.tool}
-                onUpdateToCurrent={() => onUpdatePresetToCurrent(preset)}
-                onToggleInWheel={() => onTogglePresetInWheel(preset)}
-                onDelete={() => onDeletePreset(preset)}
-              >
-                <Tooltip>
+              <div key={preset.id} className="group relative shrink-0">
+                <Tooltip disabled={presetDragging}>
                   <TooltipTrigger
+                    data-preset-id={preset.id}
                     aria-label={getPenPresetLabel(preset, strings)}
-                    className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
+                    className={`touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
+                      isDragging
+                        ? 'scale-110 cursor-grabbing opacity-70'
+                        : 'cursor-pointer'
+                    } ${
                       isMatch
                         ? 'bg-accent-dark'
                         : 'bg-transparent hover:bg-hover-tint'
                     }`}
-                    onClick={() => onApplyPreset(preset)}
+                    onPointerDown={(event) => beginPresetHold(event, preset.id)}
+                    onPointerMove={movePresetDrag}
+                    onPointerUp={endPresetDrag}
+                    onPointerCancel={cancelPresetDrag}
+                    onContextMenu={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      if (suppressPresetClickRef.current) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                      }
+                      onEditPreset(preset);
+                    }}
                   >
                     <PenPresetMark
                       preset={preset}
@@ -332,7 +530,26 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                     <p>{getPenPresetLabel(preset, strings)}</p>
                   </TooltipContent>
                 </Tooltip>
-              </PenPresetMenu>
+                <button
+                  type="button"
+                  aria-label={`${strings.canvas.toolPresets.delete}: ${getPenPresetLabel(preset, strings)}`}
+                  title={strings.canvas.toolPresets.delete}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDeletePreset(preset);
+                  }}
+                  className="pointer-events-none absolute -top-1 -right-1 flex size-3.5 cursor-pointer items-center justify-center rounded-full border-none bg-card p-0 text-text-secondary opacity-0 shadow-ambient transition-opacity duration-100 hover:text-text-primary focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+                  style={{
+                    boxShadow: 'inset 0 0 0 0.5px var(--border-ghost)',
+                  }}
+                >
+                  <XIcon className="size-2.5" strokeWidth={2.5} />
+                </button>
+              </div>
             );
           })}
 
@@ -374,6 +591,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               containerRef={optionsPanelContentRef}
               savePresetDisabledReason={savePresetDisabledReason}
               onSavePreset={onSavePreset}
+              editingPreset={editingPresetId !== null}
             />
           </div>
         )}
@@ -390,14 +608,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               tools={tools}
               enabledIndices={wheelEnabledIndices}
               presets={presets}
-              activePenTool={activePenTool}
               wheelFull={wheelFull}
               savePresetDisabledReason={savePresetDisabledReason}
               onToggle={onToggleWheelTool}
               onSavePreset={onSavePreset}
-              onUpdatePresetToCurrent={onUpdatePresetToCurrent}
               onTogglePresetInWheel={onTogglePresetInWheel}
-              onDeletePreset={onDeletePreset}
               onClose={onCloseShelf}
               containerRef={toolbarRef}
             />

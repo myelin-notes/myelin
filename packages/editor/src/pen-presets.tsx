@@ -20,6 +20,7 @@ export interface PenPresetsContextValue {
   canAddPreset: boolean;
   addPreset: (preset: Omit<PenPreset, 'id'>) => Promise<void>;
   updatePreset: (id: string, changes: PenPresetChanges) => Promise<void>;
+  reorderPresets: (ids: readonly string[]) => Promise<void>;
   removePreset: (id: string) => Promise<void>;
 }
 
@@ -72,15 +73,23 @@ export function PenPresetsProvider({ children }: PropsWithChildren) {
     [repository],
   );
 
+  const reorderPresets = useCallback(
+    async (ids: readonly string[]) => {
+      setPresets(await repository.reorderPenPresets(ids));
+    },
+    [repository],
+  );
+
   const value = useMemo(
     () => ({
       presets,
       canAddPreset: presets.length < MAX_PEN_PRESETS,
       addPreset,
       updatePreset,
+      reorderPresets,
       removePreset,
     }),
-    [addPreset, presets, removePreset, updatePreset],
+    [addPreset, presets, removePreset, reorderPresets, updatePreset],
   );
 
   return (

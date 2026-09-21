@@ -19,6 +19,7 @@ interface ToolOptionsPanelProps {
   /** Null when the live tool can be saved as a preset; otherwise why it can't. */
   savePresetDisabledReason: string | null;
   onSavePreset: () => void;
+  editingPreset?: boolean;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -124,6 +125,7 @@ export function ToolOptionsPanel({
   containerRef,
   savePresetDisabledReason,
   onSavePreset,
+  editingPreset = false,
 }: ToolOptionsPanelProps) {
   const strings = useMessages();
   const {
@@ -286,7 +288,7 @@ export function ToolOptionsPanel({
         return null;
       })}
 
-      {savePresetDisabledReason === null && (
+      {!editingPreset && savePresetDisabledReason === null && (
         <button
           onClick={onSavePreset}
           className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-normal rounded-lg border-none bg-surface px-2.5 py-1.5 text-center font-medium text-text-secondary text-xs leading-snug transition-colors hover:bg-card-active hover:text-text-primary"

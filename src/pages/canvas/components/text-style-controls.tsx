@@ -1,5 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ChevronDown as ChevronDownIcon, Type as TypeIcon } from 'lucide-react';
+import {
+  Bold as BoldIcon,
+  ChevronDown as ChevronDownIcon,
+  Italic as ItalicIcon,
+  Type as TypeIcon,
+} from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
@@ -65,17 +70,34 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
 
   const pickFont = (family: string) => {
     ensureDisplayFont(family);
-    element.setStyle({ fontFamily: family });
+    element.setSelectionToolbarStyle({ fontFamily: family });
     setOpenMenu(null);
   };
 
   const pickColor = (color: string) => {
-    element.setStyle({ color });
+    element.setSelectionToolbarStyle({ color });
     setOpenMenu(null);
   };
 
   return (
     <div ref={containerRef} className="flex items-center gap-1">
+      <StyleButton
+        label={strings.canvas.selectionToolbar.bold}
+        active={style.bold}
+        onClick={() => element.setSelectionToolbarStyle({ bold: !style.bold })}
+      >
+        <BoldIcon className="size-4" />
+      </StyleButton>
+      <StyleButton
+        label={strings.canvas.selectionToolbar.italic}
+        active={style.italic}
+        onClick={() =>
+          element.setSelectionToolbarStyle({ italic: !style.italic })
+        }
+      >
+        <ItalicIcon className="size-4" />
+      </StyleButton>
+
       <div className="relative">
         <StyleButton
           label={strings.canvas.toolOptions.font}
@@ -126,7 +148,7 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
         min={TEXT_FONT_SIZE_MIN}
         max={TEXT_FONT_SIZE_MAX}
         step={TEXT_FONT_SIZE_STEP}
-        onChange={(fontSize) => element.setStyle({ fontSize })}
+        onChange={(fontSize) => element.setSelectionToolbarStyle({ fontSize })}
         preserveFocus
       />
 
@@ -164,7 +186,9 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
                   onClick={() => pickColor(color)}
                   onDelete={() => {
                     if (style.color === color) {
-                      element.setStyle({ color: TEXT_COLORS[0] });
+                      element.setSelectionToolbarStyle({
+                        color: TEXT_COLORS[0],
+                      });
                     }
                     void removeColor(color);
                   }}

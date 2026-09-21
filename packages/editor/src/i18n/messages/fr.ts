@@ -842,6 +842,8 @@ const fr: typeof en = {
       applyCrop: 'Appliquer le rognage',
       editPoints: 'Modifier les points',
       finishEditingPoints: 'Terminer la modification des points',
+      bold: 'Gras',
+      italic: 'Italique',
     },
     pdfNavigator: {
       previousPage: 'Page précédente',

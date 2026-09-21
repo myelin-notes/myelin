@@ -804,6 +804,8 @@ const zhHans: typeof en = {
       applyCrop: '应用裁剪',
       editPoints: '编辑节点',
       finishEditingPoints: '完成节点编辑',
+      bold: '粗体',
+      italic: '斜体',
     },
     pdfNavigator: {
       previousPage: '上一页',
