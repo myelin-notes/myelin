@@ -3,10 +3,9 @@ import { Plus as PlusIcon } from 'lucide-react';
 import { PenPresetMark } from '@myelin/editor/components/pen-preset-mark';
 import { useMessages } from '@myelin/editor/i18n';
 import { getPenPresetLabel } from '@myelin/editor/pen-presets';
-import type { PenPreset, PenPresetTool } from '@myelin/editor/sync/repo/types';
+import type { PenPreset } from '@myelin/editor/sync/repo/types';
 import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
-import { PenPresetMenu } from '@/components/pen-preset-menu';
 
 /**
  * Ring-0 slices, tools and presets together. 45° apart is the sweet spot for eyes-free selection,
@@ -18,15 +17,12 @@ interface ToolShelfProps {
   tools: ITool[];
   enabledIndices: Set<number>;
   presets: PenPreset[];
-  activePenTool: PenPresetTool | null;
   wheelFull: boolean;
   /** Null when the live tool can be saved; otherwise why it can't. */
   savePresetDisabledReason: string | null;
   onToggle: (index: number) => void;
   onSavePreset: () => void;
-  onUpdatePresetToCurrent: (preset: PenPreset) => void;
   onTogglePresetInWheel: (preset: PenPreset) => void;
-  onDeletePreset: (preset: PenPreset) => void;
   onClose: () => void;
   containerRef?: React.RefObject<HTMLElement | null>;
 }
@@ -44,15 +40,18 @@ function ShelfRow({
   label,
   enabled,
   onClick,
+  onContextMenu,
 }: {
   glyph: React.ReactNode;
   label: string;
   enabled: boolean;
   onClick: () => void;
+  onContextMenu?: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={`flex w-full cursor-pointer items-center justify-between rounded-lg border-none px-3 py-2 transition-colors ${
         enabled
           ? 'bg-secondary-container/30 hover:bg-secondary-container/50'
@@ -82,14 +81,11 @@ export function ToolShelf({
   tools,
   enabledIndices,
   presets,
-  activePenTool,
   wheelFull,
   savePresetDisabledReason,
   onToggle,
   onSavePreset,
-  onUpdatePresetToCurrent,
   onTogglePresetInWheel,
-  onDeletePreset,
   onClose,
   containerRef,
 }: ToolShelfProps) {
@@ -162,21 +158,14 @@ export function ToolShelf({
           <SectionHeading>{strings.canvas.toolShelf.presets}</SectionHeading>
         )}
         {presets.map((preset) => (
-          <PenPresetMenu
+          <ShelfRow
             key={preset.id}
-            preset={preset}
-            canUpdateToCurrent={activePenTool === preset.tool}
-            onUpdateToCurrent={() => onUpdatePresetToCurrent(preset)}
-            onToggleInWheel={() => onTogglePresetInWheel(preset)}
-            onDelete={() => onDeletePreset(preset)}
-          >
-            <ShelfRow
-              glyph={<PenPresetMark preset={preset} className="size-4" />}
-              label={getPenPresetLabel(preset, strings)}
-              enabled={preset.inWheel}
-              onClick={() => onTogglePresetInWheel(preset)}
-            />
-          </PenPresetMenu>
+            glyph={<PenPresetMark preset={preset} className="size-4" />}
+            label={getPenPresetLabel(preset, strings)}
+            enabled={preset.inWheel}
+            onClick={() => onTogglePresetInWheel(preset)}
+            onContextMenu={(event) => event.preventDefault()}
+          />
         ))}
 
         <button

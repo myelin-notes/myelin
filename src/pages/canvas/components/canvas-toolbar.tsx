@@ -9,12 +9,10 @@ import { getPenPresetLabel } from '@myelin/editor/pen-presets';
 import type {
   CustomColorTool,
   PenPreset,
-  PenPresetTool,
 } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
 import { usePresence } from '@myelin/ui';
-import { PenPresetMenu } from '@/components/pen-preset-menu';
 import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { ToolShelf } from '@/components/tool-shelf';
 import {
@@ -37,15 +35,12 @@ interface CanvasToolbarProps {
   presets: PenPreset[];
   /** The preset the live tool currently matches exactly, if any. */
   matchedPresetId: string | null;
-  activePenTool: PenPresetTool | null;
   wheelFull: boolean;
   savePresetDisabledReason: string | null;
   onApplyPreset: (preset: PenPreset) => void;
   onSavePreset: () => void;
-  onUpdatePresetToCurrent: (preset: PenPreset) => void;
   onTogglePresetInWheel: (preset: PenPreset) => void;
   onReorderPresets: (ids: readonly string[]) => Promise<void>;
-  onDeletePreset: (preset: PenPreset) => void;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
   onToggleShelf: () => void;
@@ -82,15 +77,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   wheelEnabledIndices,
   presets,
   matchedPresetId,
-  activePenTool,
   wheelFull,
   savePresetDisabledReason,
   onApplyPreset,
   onSavePreset,
-  onUpdatePresetToCurrent,
   onTogglePresetInWheel,
   onReorderPresets,
-  onDeletePreset,
   onSelectTool,
   onToggleOptions,
   onToggleShelf,
@@ -434,60 +426,43 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             const isMatch = matchedPresetId === preset.id;
             const isDragging = presetDragIdRef.current === preset.id;
             return (
-              <PenPresetMenu
-                key={preset.id}
-                preset={preset}
-                canUpdateToCurrent={activePenTool === preset.tool}
-                onUpdateToCurrent={() => onUpdatePresetToCurrent(preset)}
-                onToggleInWheel={() => onTogglePresetInWheel(preset)}
-                onDelete={() => onDeletePreset(preset)}
-              >
-                <Tooltip>
-                  <TooltipTrigger
-                    data-preset-id={preset.id}
-                    aria-label={getPenPresetLabel(preset, strings)}
-                    className={`shrink-0 touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
-                      isDragging
-                        ? 'scale-110 cursor-grabbing opacity-70'
-                        : 'cursor-pointer'
-                    } ${
-                      isMatch
-                        ? 'bg-accent-dark'
-                        : 'bg-transparent hover:bg-hover-tint'
-                    }`}
-                    onPointerDown={(event) => beginPresetHold(event, preset.id)}
-                    onPointerMove={movePresetDrag}
-                    onPointerUp={endPresetDrag}
-                    onPointerCancel={cancelPresetDrag}
-                    onContextMenu={(event) => {
-                      if (
-                        presetDragIdRef.current ||
-                        suppressPresetClickRef.current
-                      ) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }
-                    }}
-                    onClick={(event) => {
-                      if (suppressPresetClickRef.current) {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        return;
-                      }
-                      onApplyPreset(preset);
-                    }}
-                  >
-                    <PenPresetMark
-                      preset={preset}
-                      onDark={isMatch}
-                      className="size-4"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side={tooltipSide}>
-                    <p>{getPenPresetLabel(preset, strings)}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </PenPresetMenu>
+              <Tooltip key={preset.id}>
+                <TooltipTrigger
+                  data-preset-id={preset.id}
+                  aria-label={getPenPresetLabel(preset, strings)}
+                  className={`shrink-0 touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
+                    isDragging
+                      ? 'scale-110 cursor-grabbing opacity-70'
+                      : 'cursor-pointer'
+                  } ${
+                    isMatch
+                      ? 'bg-accent-dark'
+                      : 'bg-transparent hover:bg-hover-tint'
+                  }`}
+                  onPointerDown={(event) => beginPresetHold(event, preset.id)}
+                  onPointerMove={movePresetDrag}
+                  onPointerUp={endPresetDrag}
+                  onPointerCancel={cancelPresetDrag}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onClick={(event) => {
+                    if (suppressPresetClickRef.current) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      return;
+                    }
+                    onApplyPreset(preset);
+                  }}
+                >
+                  <PenPresetMark
+                    preset={preset}
+                    onDark={isMatch}
+                    className="size-4"
+                  />
+                </TooltipTrigger>
+                <TooltipContent side={tooltipSide}>
+                  <p>{getPenPresetLabel(preset, strings)}</p>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
 
@@ -545,14 +520,11 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               tools={tools}
               enabledIndices={wheelEnabledIndices}
               presets={presets}
-              activePenTool={activePenTool}
               wheelFull={wheelFull}
               savePresetDisabledReason={savePresetDisabledReason}
               onToggle={onToggleWheelTool}
               onSavePreset={onSavePreset}
-              onUpdatePresetToCurrent={onUpdatePresetToCurrent}
               onTogglePresetInWheel={onTogglePresetInWheel}
-              onDeletePreset={onDeletePreset}
               onClose={onCloseShelf}
               containerRef={toolbarRef}
             />

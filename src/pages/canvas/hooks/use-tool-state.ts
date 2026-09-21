@@ -219,14 +219,8 @@ export function useToolState(
       textColors.promptAddColor,
     ],
   );
-  const {
-    presets,
-    canAddPreset,
-    addPreset,
-    updatePreset,
-    reorderPresets,
-    removePreset,
-  } = usePenPresets();
+  const { presets, canAddPreset, addPreset, updatePreset, reorderPresets } =
+    usePenPresets();
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
@@ -411,17 +405,6 @@ export function useToolState(
     wheelFull,
   ]);
 
-  const updatePresetToCurrent = useCallback(
-    (preset: PenPreset) => {
-      const settings = readPenSettings(canvasTools[selectedToolIndex]);
-      if (!settings) {
-        return;
-      }
-      void updatePreset(preset.id, settings);
-    },
-    [canvasTools, selectedToolIndex, updatePreset],
-  );
-
   const togglePresetInWheel = useCallback(
     (preset: PenPreset) => {
       if (!preset.inWheel && wheelFull) {
@@ -430,13 +413,6 @@ export function useToolState(
       void updatePreset(preset.id, { inWheel: !preset.inWheel });
     },
     [updatePreset, wheelFull],
-  );
-
-  const deletePreset = useCallback(
-    (preset: PenPreset) => {
-      void removePreset(preset.id);
-    },
-    [removePreset],
   );
 
   const selectTool = useCallback(
@@ -486,14 +462,11 @@ export function useToolState(
     handleToggleWheelTool,
     presets,
     matchedPresetId,
-    activePenTool,
     wheelFull,
     savePresetDisabledReason,
     applyPreset,
     saveCurrentAsPreset,
-    updatePresetToCurrent,
     togglePresetInWheel,
     reorderPresets,
-    deletePreset,
   };
 }

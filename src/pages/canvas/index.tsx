@@ -673,15 +673,12 @@ function CanvasViewInner({
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         presets={toolState.presets}
         matchedPresetId={toolState.matchedPresetId}
-        activePenTool={toolState.activePenTool}
         wheelFull={toolState.wheelFull}
         savePresetDisabledReason={toolState.savePresetDisabledReason}
         onApplyPreset={toolState.applyPreset}
         onSavePreset={toolState.saveCurrentAsPreset}
-        onUpdatePresetToCurrent={toolState.updatePresetToCurrent}
         onTogglePresetInWheel={toolState.togglePresetInWheel}
         onReorderPresets={toolState.reorderPresets}
-        onDeletePreset={toolState.deletePreset}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
