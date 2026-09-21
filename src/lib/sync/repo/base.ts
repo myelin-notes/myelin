@@ -845,6 +845,23 @@ export abstract class BaseRepository
     });
   }
 
+  async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
+    return this.mutateManifest('Reorder pen presets', (manifest) => {
+      const presetsById = new Map(
+        manifest.penPresets.map((preset) => [preset.id, preset]),
+      );
+      if (
+        ids.length !== presetsById.size ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !presetsById.has(id))
+      ) {
+        throw new Error('Preset order must contain every preset exactly once.');
+      }
+      manifest.penPresets = ids.map((id) => presetsById.get(id)!);
+      return manifest.penPresets.map((preset) => ({ ...preset }));
+    });
+  }
+
   async removePenPreset(id: string): Promise<PenPreset[]> {
     return this.mutateManifest('Remove pen preset', (manifest) => {
       manifest.penPresets = manifest.penPresets.filter(

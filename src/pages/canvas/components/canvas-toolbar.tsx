@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Plus as PlusIcon,
   SlidersHorizontal as SlidersIcon,
@@ -44,6 +44,7 @@ interface CanvasToolbarProps {
   onSavePreset: () => void;
   onUpdatePresetToCurrent: (preset: PenPreset) => void;
   onTogglePresetInWheel: (preset: PenPreset) => void;
+  onReorderPresets: (ids: readonly string[]) => Promise<void>;
   onDeletePreset: (preset: PenPreset) => void;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
@@ -56,6 +57,8 @@ interface CanvasToolbarProps {
 }
 
 const PANEL_VIEWPORT_MARGIN = 16;
+const PRESET_DRAG_HOLD_MS = 300;
+const PRESET_DRAG_SLOP_PX = 8;
 
 function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
   switch (tool?.id) {
@@ -86,6 +89,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   onSavePreset,
   onUpdatePresetToCurrent,
   onTogglePresetInWheel,
+  onReorderPresets,
   onDeletePreset,
   onSelectTool,
   onToggleOptions,
@@ -105,6 +109,131 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const insertButtonRef = useRef<HTMLElement | null>(null);
   const optionsPanelRef = useRef<HTMLDivElement>(null);
   const optionsPanelContentRef = useRef<HTMLDivElement>(null);
+  const [presetDragOrder, setPresetDragOrder] = useState<string[] | null>(null);
+  const presetHoldTimerRef = useRef<number | null>(null);
+  const presetDragIdRef = useRef<string | null>(null);
+  const presetPointerIdRef = useRef<number | null>(null);
+  const presetPointerStartRef = useRef({ x: 0, y: 0 });
+  const suppressPresetClickRef = useRef(false);
+
+  const clearPresetHold = () => {
+    if (presetHoldTimerRef.current !== null) {
+      window.clearTimeout(presetHoldTimerRef.current);
+      presetHoldTimerRef.current = null;
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (presetHoldTimerRef.current !== null) {
+        window.clearTimeout(presetHoldTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const beginPresetHold = (
+    event: React.PointerEvent<HTMLElement>,
+    presetId: string,
+  ) => {
+    if (!event.isPrimary || event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    clearPresetHold();
+    presetPointerIdRef.current = event.pointerId;
+    presetPointerStartRef.current = { x: event.clientX, y: event.clientY };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    presetHoldTimerRef.current = window.setTimeout(() => {
+      presetHoldTimerRef.current = null;
+      presetDragIdRef.current = presetId;
+      suppressPresetClickRef.current = true;
+      setPresetDragOrder(presets.map((preset) => preset.id));
+    }, PRESET_DRAG_HOLD_MS);
+  };
+
+  const movePresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    const dragId = presetDragIdRef.current;
+    if (!dragId) {
+      const distance = Math.hypot(
+        event.clientX - presetPointerStartRef.current.x,
+        event.clientY - presetPointerStartRef.current.y,
+      );
+      if (distance > PRESET_DRAG_SLOP_PX) {
+        clearPresetHold();
+      }
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-preset-id]');
+    const targetId = target?.dataset.presetId;
+    if (!targetId || targetId === dragId) {
+      return;
+    }
+    setPresetDragOrder((current) => {
+      if (!current) {
+        return current;
+      }
+      const from = current.indexOf(dragId);
+      const to = current.indexOf(targetId);
+      if (from < 0 || to < 0) {
+        return current;
+      }
+      const next = [...current];
+      next.splice(from, 1);
+      next.splice(to, 0, dragId);
+      return next;
+    });
+  };
+
+  const endPresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    clearPresetHold();
+    presetPointerIdRef.current = null;
+    const wasDragging = presetDragIdRef.current !== null;
+    presetDragIdRef.current = null;
+    if (!wasDragging) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const order = presetDragOrder;
+    window.setTimeout(() => {
+      suppressPresetClickRef.current = false;
+    });
+    const orderChanged = order?.some((id, index) => presets[index]?.id !== id);
+    if (order && orderChanged) {
+      void onReorderPresets(order).finally(() => setPresetDragOrder(null));
+    } else {
+      setPresetDragOrder(null);
+    }
+  };
+
+  const cancelPresetDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerId !== presetPointerIdRef.current) {
+      return;
+    }
+    clearPresetHold();
+    presetPointerIdRef.current = null;
+    presetDragIdRef.current = null;
+    suppressPresetClickRef.current = false;
+    setPresetDragOrder(null);
+  };
+
+  const orderedPresets = presetDragOrder
+    ? presetDragOrder.flatMap((id) => {
+        const preset = presets.find((entry) => entry.id === id);
+        return preset ? [preset] : [];
+      })
+    : presets;
 
   // Compact stacks the panels above a bottom bar, where they span its width and
   // need no per-button alignment.
@@ -301,8 +430,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
 
           {presets.length > 0 && <div className={`shrink-0 ${dividerClass}`} />}
 
-          {presets.map((preset) => {
+          {orderedPresets.map((preset) => {
             const isMatch = matchedPresetId === preset.id;
+            const isDragging = presetDragIdRef.current === preset.id;
             return (
               <PenPresetMenu
                 key={preset.id}
@@ -314,13 +444,38 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               >
                 <Tooltip>
                   <TooltipTrigger
+                    data-preset-id={preset.id}
                     aria-label={getPenPresetLabel(preset, strings)}
-                    className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
+                    className={`shrink-0 touch-none rounded-lg ${buttonPadClass} transition-[color,background-color,opacity,transform] ${
+                      isDragging
+                        ? 'scale-110 cursor-grabbing opacity-70'
+                        : 'cursor-pointer'
+                    } ${
                       isMatch
                         ? 'bg-accent-dark'
                         : 'bg-transparent hover:bg-hover-tint'
                     }`}
-                    onClick={() => onApplyPreset(preset)}
+                    onPointerDown={(event) => beginPresetHold(event, preset.id)}
+                    onPointerMove={movePresetDrag}
+                    onPointerUp={endPresetDrag}
+                    onPointerCancel={cancelPresetDrag}
+                    onContextMenu={(event) => {
+                      if (
+                        presetDragIdRef.current ||
+                        suppressPresetClickRef.current
+                      ) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }
+                    }}
+                    onClick={(event) => {
+                      if (suppressPresetClickRef.current) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                      }
+                      onApplyPreset(preset);
+                    }}
                   >
                     <PenPresetMark
                       preset={preset}

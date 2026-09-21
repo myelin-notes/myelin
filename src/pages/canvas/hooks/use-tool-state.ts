@@ -219,8 +219,14 @@ export function useToolState(
       textColors.promptAddColor,
     ],
   );
-  const { presets, canAddPreset, addPreset, updatePreset, removePreset } =
-    usePenPresets();
+  const {
+    presets,
+    canAddPreset,
+    addPreset,
+    updatePreset,
+    reorderPresets,
+    removePreset,
+  } = usePenPresets();
   const [selectedToolIndex, setSelectedToolIndex] = useState(0);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [optionsTick, setOptionsTick] = useState(0);
@@ -487,6 +493,7 @@ export function useToolState(
     saveCurrentAsPreset,
     updatePresetToCurrent,
     togglePresetInWheel,
+    reorderPresets,
     deletePreset,
   };
 }

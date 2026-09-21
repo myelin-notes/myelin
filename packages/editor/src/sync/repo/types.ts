@@ -215,6 +215,7 @@ export interface Repository {
   /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size}` duplicate is a no-op. */
   addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]>;
   updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
+  reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]>;
   removePenPreset(id: string): Promise<PenPreset[]>;
 
   getRegistryTags(): Promise<string[]>;

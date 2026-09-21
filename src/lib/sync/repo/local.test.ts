@@ -556,4 +556,41 @@ describe('LocalRepository', () => {
     ).rejects.toThrow();
     expect(await repository.getPenPresets()).toHaveLength(MAX_PEN_PRESETS);
   });
+
+  it('persists a complete pen preset order', async () => {
+    const repository = new LocalRepository(
+      'repositories/pen-preset-order-test',
+    );
+    await repository.initialize();
+
+    const first = await repository.addPenPreset({
+      tool: 'pen',
+      color: '#111111',
+      size: 1,
+      inWheel: false,
+    });
+    const second = await repository.addPenPreset({
+      tool: 'pen',
+      color: '#222222',
+      size: 2,
+      inWheel: false,
+    });
+    const third = await repository.addPenPreset({
+      tool: 'highlighter',
+      color: '#333333',
+      size: 3,
+      inWheel: true,
+    });
+    const ids = [third[2].id, second[1].id, first[0].id];
+
+    await repository.reorderPenPresets(ids);
+    const reloaded = new LocalRepository('repositories/pen-preset-order-test');
+    await reloaded.initialize();
+    expect((await reloaded.getPenPresets()).map((preset) => preset.id)).toEqual(
+      ids,
+    );
+    await expect(repository.reorderPenPresets(ids.slice(1))).rejects.toThrow(
+      'every preset exactly once',
+    );
+  });
 });

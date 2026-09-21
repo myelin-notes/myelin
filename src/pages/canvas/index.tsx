@@ -680,6 +680,7 @@ function CanvasViewInner({
         onSavePreset={toolState.saveCurrentAsPreset}
         onUpdatePresetToCurrent={toolState.updatePresetToCurrent}
         onTogglePresetInWheel={toolState.togglePresetInWheel}
+        onReorderPresets={toolState.reorderPresets}
         onDeletePreset={toolState.deletePreset}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
