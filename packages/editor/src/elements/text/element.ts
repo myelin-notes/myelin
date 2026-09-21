@@ -28,10 +28,12 @@ import type {
 import { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
 import {
+  applyDocumentStyle,
   applySelectionStyle,
   docFromJson,
   docFromText,
   getDocText,
+  getDocumentStyle,
   getSelectionStyle,
   textSchema,
 } from './rich-text';
@@ -171,6 +173,11 @@ export class TextElement extends DrawableElement implements SearchableElement {
     return this._editing && this._view
       ? getSelectionStyle(this._view.state, this._style)
       : this._style;
+  }
+  public get selectionToolbarStyle(): TextStyle {
+    return this._editing && this._view && !this._view.state.selection.empty
+      ? getSelectionStyle(this._view.state, this._style)
+      : getDocumentStyle(this._richText, this._style);
   }
   public get boxWidth(): number {
     return this._boxWidth;
@@ -397,7 +404,33 @@ export class TextElement extends DrawableElement implements SearchableElement {
       this._view.focus();
       return;
     }
+
+    this.setWholeDocumentStyle(updates);
+  }
+
+  public setSelectionToolbarStyle(updates: Partial<TextStyle>) {
+    if (this._editing && this._view && !this._view.state.selection.empty) {
+      this.setStyle(updates);
+      return;
+    }
+
+    this.setWholeDocumentStyle(updates);
+  }
+
+  private setWholeDocumentStyle(updates: Partial<TextStyle>) {
     this._style = { ...this._style, ...updates };
+    if (this._view) {
+      this._view.dispatch(applyDocumentStyle(this._view.state, updates));
+      if (this._editing) {
+        this._view.focus();
+      }
+    } else {
+      const state = EditorState.create({
+        schema: textSchema,
+        doc: this._richText,
+      });
+      this._richText = state.apply(applyDocumentStyle(state, updates)).doc;
+    }
     this.recomputeBox();
     this.syncToYMap({
       color: this._style.color,
@@ -405,6 +438,7 @@ export class TextElement extends DrawableElement implements SearchableElement {
       fontFamily: this._style.fontFamily,
       bold: this._style.bold,
       italic: this._style.italic,
+      richText: this._richText.toJSON(),
     });
     // Font size and family change how the text wraps, so the box moves with the style. Notify so the
     // selection outline and toolbar follow.

@@ -297,7 +297,9 @@ export function SelectionToolbar({
             canMoveLower: canvas.canReorderSelection('lower'),
             elementItems: collectElementItems(canvas, strings),
             textElement,
-            textStyle: textElement ? { ...textElement.style } : null,
+            textStyle: textElement
+              ? { ...textElement.selectionToolbarStyle }
+              : null,
             latexElement,
             latexFontSize: latexElement ? latexElement.fontSize : null,
             pdfElement: pdfPageState?.element ?? null,

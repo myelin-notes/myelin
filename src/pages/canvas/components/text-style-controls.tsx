@@ -70,12 +70,12 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
 
   const pickFont = (family: string) => {
     ensureDisplayFont(family);
-    element.setStyle({ fontFamily: family });
+    element.setSelectionToolbarStyle({ fontFamily: family });
     setOpenMenu(null);
   };
 
   const pickColor = (color: string) => {
-    element.setStyle({ color });
+    element.setSelectionToolbarStyle({ color });
     setOpenMenu(null);
   };
 
@@ -84,14 +84,16 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
       <StyleButton
         label={strings.canvas.selectionToolbar.bold}
         active={style.bold}
-        onClick={() => element.setStyle({ bold: !style.bold })}
+        onClick={() => element.setSelectionToolbarStyle({ bold: !style.bold })}
       >
         <BoldIcon className="size-4" />
       </StyleButton>
       <StyleButton
         label={strings.canvas.selectionToolbar.italic}
         active={style.italic}
-        onClick={() => element.setStyle({ italic: !style.italic })}
+        onClick={() =>
+          element.setSelectionToolbarStyle({ italic: !style.italic })
+        }
       >
         <ItalicIcon className="size-4" />
       </StyleButton>
@@ -146,7 +148,7 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
         min={TEXT_FONT_SIZE_MIN}
         max={TEXT_FONT_SIZE_MAX}
         step={TEXT_FONT_SIZE_STEP}
-        onChange={(fontSize) => element.setStyle({ fontSize })}
+        onChange={(fontSize) => element.setSelectionToolbarStyle({ fontSize })}
         preserveFocus
       />
 
@@ -184,7 +186,9 @@ export function TextStyleControls({ element, style }: TextStyleControlsProps) {
                   onClick={() => pickColor(color)}
                   onDelete={() => {
                     if (style.color === color) {
-                      element.setStyle({ color: TEXT_COLORS[0] });
+                      element.setSelectionToolbarStyle({
+                        color: TEXT_COLORS[0],
+                      });
                     }
                     void removeColor(color);
                   }}

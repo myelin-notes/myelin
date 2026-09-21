@@ -1,5 +1,9 @@
 import { type Node as ProseMirrorNode, Schema } from 'prosemirror-model';
 import type { EditorState, Transaction } from 'prosemirror-state';
+import {
+  selectionSomeText,
+  uniformSelectionMarkAttrs,
+} from '../../prosemirror/selection-marks';
 import type { TextStyle } from './element';
 
 export const textSchema = new Schema({
@@ -77,11 +81,47 @@ export function getSelectionStyle(
   state: EditorState,
   base: TextStyle,
 ): TextStyle {
-  const marks = state.storedMarks ?? state.selection.$from.marks();
-  const attributed = marks.find(
-    (mark) => mark.type === textSchema.marks.textStyle,
-  );
-  const attrs = attributed?.attrs;
+  const type = textSchema.marks.textStyle;
+  const attrs = state.selection.empty
+    ? type.isInSet(state.storedMarks ?? state.selection.$from.marks())?.attrs
+    : uniformSelectionMarkAttrs(state, type);
+  const style = resolveStyle(attrs, base);
+  if (!state.selection.empty) {
+    style.bold = selectionSomeText(state, (marks) => {
+      const value = type.isInSet(marks)?.attrs.bold;
+      return typeof value === 'boolean' ? value : base.bold;
+    });
+    style.italic = selectionSomeText(state, (marks) => {
+      const value = type.isInSet(marks)?.attrs.italic;
+      return typeof value === 'boolean' ? value : base.italic;
+    });
+  }
+  return style;
+}
+
+export function getDocumentStyle(
+  doc: ProseMirrorNode,
+  base: TextStyle,
+): TextStyle {
+  let style = base;
+  let foundText = false;
+  doc.descendants((node) => {
+    if (!node.isText || foundText) {
+      return;
+    }
+    foundText = true;
+    const attributed = node.marks.find(
+      (mark) => mark.type === textSchema.marks.textStyle,
+    );
+    style = resolveStyle(attributed?.attrs, base);
+  });
+  return style;
+}
+
+function resolveStyle(
+  attrs: Record<string, unknown> | null | undefined,
+  base: TextStyle,
+): TextStyle {
   return {
     color: typeof attrs?.color === 'string' ? attrs.color : base.color,
     fontSize:
@@ -95,12 +135,19 @@ export function getSelectionStyle(
   };
 }
 
+export function applyDocumentStyle(
+  state: EditorState,
+  updates: Partial<TextStyle>,
+): Transaction {
+  return applyStyleRange(state, updates, 0, state.doc.content.size);
+}
+
 export function applySelectionStyle(
   state: EditorState,
   updates: Partial<TextStyle>,
 ): Transaction {
   const { from, to, empty } = state.selection;
-  let tr = state.tr;
+  const tr = state.tr;
 
   const attributedUpdates = Object.fromEntries(
     (['color', 'fontSize', 'fontFamily', 'bold', 'italic'] as const)
@@ -119,6 +166,26 @@ export function applySelectionStyle(
     return tr.setStoredMarks(
       type.create({ ...current?.attrs, ...attributedUpdates }).addToSet(marks),
     );
+  }
+
+  return applyStyleRange(state, updates, from, to);
+}
+
+function applyStyleRange(
+  state: EditorState,
+  updates: Partial<TextStyle>,
+  from: number,
+  to: number,
+): Transaction {
+  let tr = state.tr;
+  const type = textSchema.marks.textStyle;
+  const attributedUpdates = Object.fromEntries(
+    (['color', 'fontSize', 'fontFamily', 'bold', 'italic'] as const)
+      .filter((key) => updates[key] !== undefined)
+      .map((key) => [key, updates[key]]),
+  );
+  if (Object.keys(attributedUpdates).length === 0) {
+    return tr;
   }
 
   state.doc.nodesBetween(from, to, (node, pos) => {
