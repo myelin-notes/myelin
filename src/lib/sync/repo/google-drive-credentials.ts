@@ -123,8 +123,13 @@ async function readStoredToken(
 async function writeStoredToken(
   credentialId: string,
   token: StoredGoogleDriveToken,
+  options?: { notify?: boolean },
 ): Promise<void> {
-  await vault.write(credentialTokenKey(credentialId), JSON.stringify(token));
+  await vault.write(
+    credentialTokenKey(credentialId),
+    JSON.stringify(token),
+    options,
+  );
 }
 
 export async function clearGoogleDriveToken(
@@ -253,7 +258,7 @@ async function refreshAccessToken(
     payload,
     payload.refresh_token ?? stored.refreshToken,
   );
-  await writeStoredToken(credentialId, next);
+  await writeStoredToken(credentialId, next, { notify: false });
   return next.accessToken;
 }
 

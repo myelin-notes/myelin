@@ -43,13 +43,19 @@ vi.mock('./oauth/redirect', () => ({
 }));
 
 const storedSecrets = new Map<string, string>();
+const credentialWriteOptions: Array<{ notify?: boolean } | undefined> = [];
 
 vi.mock('./credential-vault', () => ({
   createCredentialVault: () => ({
     isAvailable: async () => true,
     read: async (key: string) => storedSecrets.get(key) ?? null,
-    write: async (key: string, value: string) => {
+    write: async (
+      key: string,
+      value: string,
+      options?: { notify?: boolean },
+    ) => {
       storedSecrets.set(key, value);
+      credentialWriteOptions.push(options);
     },
     remove: async (key: string) => {
       storedSecrets.delete(key);
@@ -104,6 +110,7 @@ async function base64UrlSha256(value: string): Promise<string> {
 describe('Google Drive OAuth', () => {
   beforeEach(() => {
     storedSecrets.clear();
+    credentialWriteOptions.length = 0;
     tokenResponses.length = 0;
     tokenRequests.length = 0;
     cancelListener.mockClear();
@@ -155,6 +162,7 @@ describe('Google Drive OAuth', () => {
     );
 
     expect(await hasGoogleDriveToken('default')).toBe(true);
+    expect(credentialWriteOptions).toEqual([undefined]);
     expect(cancelListener).toHaveBeenCalled();
   });
 
@@ -236,6 +244,7 @@ describe('Google Drive OAuth', () => {
     expect(tokenRequests).toHaveLength(1);
     expect(tokenRequests[0]?.grant_type).toBe('refresh_token');
     expect(tokenRequests[0]?.client_secret).toBe('test-google-client-secret');
+    expect(credentialWriteOptions).toEqual([{ notify: false }]);
 
     // The refreshed token is cached, so a later read makes no request.
     expect(await getGoogleDriveToken('default')).toBe('access-2');

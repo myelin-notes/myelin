@@ -116,6 +116,7 @@ export class CachedRepository
   private readonly outbox: CachedRepositoryOutbox;
   private flushPromise: Promise<void> | null = null;
   private flushTimer: number | null = null;
+  private needsRemoteBootstrap = true;
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,
     pendingRemoteWrites: 0,
@@ -217,11 +218,9 @@ export class CachedRepository
     this.startBackgroundSync();
 
     if (!didBootstrapFromRemote) {
-      try {
-        await this.syncCacheFromRemote();
-      } catch (error) {
-        logger.error('Initial remote pull failed', error);
-      }
+      logger.debug('Remote bootstrap will retry during background sync', {
+        repositoryKind: this.kind,
+      });
     }
   }
 
@@ -258,6 +257,9 @@ export class CachedRepository
     }
 
     await this.flushPromise;
+    if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
+      await this.syncCacheFromRemote();
+    }
   }
 
   async dispose(): Promise<void> {
@@ -903,7 +905,7 @@ export class CachedRepository
             message: error.message,
           });
         } else {
-          logger.error('Batched commit failed; falling back', error);
+          logger.warn('Batched commit failed; falling back', error);
         }
         return false;
       }
@@ -1600,6 +1602,7 @@ export class CachedRepository
     remoteSnapshot: RepositorySnapshot,
   ): Promise<void> {
     await this.cache.replaceSnapshot(remoteSnapshot);
+    this.needsRemoteBootstrap = false;
     this.updateRuntimeStatus({
       online: true,
       lastRemoteSyncAt: Date.now(),

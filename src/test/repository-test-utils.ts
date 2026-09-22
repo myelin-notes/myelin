@@ -349,6 +349,7 @@ export interface MemoryGitHubApi {
     text(): Promise<string>;
   }>;
   failNextPut(path: string, status?: number): void;
+  failNextBranch(status: number): void;
   failNextTarball(status: number, retryAfterSeconds: number): void;
   failNextGraphQL(reason: 'network' | 'unknown' | 'head-conflict'): void;
   bumpHeadOidExternally(): string;
@@ -383,6 +384,7 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   let graphqlCallCount = 0;
   let putCallCount = 0;
   let deleteCallCount = 0;
+  let nextBranchFailure: number | null = null;
   let nextTarballFailure: {
     status: number;
     retryAfterSeconds: number;
@@ -503,6 +505,11 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
       }
       const branch = getBranchName(url);
       if (branch !== null) {
+        if (nextBranchFailure !== null) {
+          const status = nextBranchFailure;
+          nextBranchFailure = null;
+          return createTextResponse(status, '{"message":"Not Found"}');
+        }
         return createJsonResponse(200, { commit: { sha: headOid } });
       }
       if (parsed.pathname.includes('/tarball/')) {
@@ -582,6 +589,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     failNextPut(path, status = 409) {
       nextPutFailures.set(path, status);
+    },
+    failNextBranch(status) {
+      nextBranchFailure = status;
     },
     failNextTarball(status, retryAfterSeconds) {
       nextTarballFailure = { status, retryAfterSeconds };

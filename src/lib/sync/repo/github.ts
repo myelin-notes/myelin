@@ -343,6 +343,7 @@ export class GitHubRepository extends BaseRepository {
     const response = await this.fetchWithRateLimitRetry(url);
 
     if (response.status === 404) {
+      await this.getBranchHeadOid();
       return { sha: null, bytes: null };
     }
 

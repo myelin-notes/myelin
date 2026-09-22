@@ -103,6 +103,18 @@ class MemoryRemoteRepository extends BaseRepository {
   }
 }
 
+class FlakyBootstrapRepository extends MemoryRemoteRepository {
+  private shouldFailBootstrap = true;
+
+  override async exportSnapshot() {
+    if (this.shouldFailBootstrap) {
+      this.shouldFailBootstrap = false;
+      throw new Error('temporary bootstrap failure');
+    }
+    return super.exportSnapshot();
+  }
+}
+
 function createDeferred(): { promise: Promise<void>; resolve: () => void } {
   let resolve!: () => void;
   const promise = new Promise<void>((next) => {
@@ -705,6 +717,61 @@ describe('CachedRepository', () => {
 
     const snapshot = await repository.loadDocument(fileId);
     expect(readNoteText(snapshot.update)).toBe('fetched from remote');
+  });
+
+  it('retries a failed bootstrap during the next background flush', async () => {
+    const remote = new FlakyBootstrapRepository();
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/bootstrap-retry-test'),
+      'repositories/bootstrap-retry-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(1);
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: false,
+      lastError: expect.objectContaining({
+        message: 'temporary bootstrap failure',
+      }),
+    });
+
+    await repository.flushPending();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(2);
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: true,
+      lastError: null,
+    });
+  });
+
+  it('retries a failed bootstrap after pending writes flush successfully', async () => {
+    const remote = new FlakyBootstrapRepository();
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/bootstrap-write-retry-test'),
+      'repositories/bootstrap-write-retry-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Created while offline',
+      'mcanvas',
+      null,
+    );
+
+    await repository.flushPending();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(2);
+    expect((await remote.getNode(fileId))?.name).toBe('Created while offline');
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: true,
+      pendingRemoteWrites: 0,
+      lastError: null,
+    });
   });
 
   it('does not immediately resync after a clean remote bootstrap', async () => {

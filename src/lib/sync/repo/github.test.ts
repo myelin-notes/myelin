@@ -42,6 +42,19 @@ describe('GitHubRepository', () => {
     expect(githubApi.readJson(MANIFEST_PATH)).toEqual(createEmptyManifest());
   });
 
+  it('does not create a manifest when the configured branch is inaccessible', async () => {
+    const repository = createRepository();
+    const githubApi = getRepositoryTestGitHubApi();
+    githubApi.failNextBranch(404);
+
+    await expect(repository.initialize()).rejects.toThrow(
+      'GitHub branch request failed (404)',
+    );
+
+    expect(githubApi.putCallCount).toBe(0);
+    expect(githubApi.readJson(MANIFEST_PATH)).toBeNull();
+  });
+
   it('writes manifest and note contents through the transport', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
