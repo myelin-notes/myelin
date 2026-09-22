@@ -93,6 +93,30 @@ function createSurface() {
 }
 
 describe('WebGLPainter resource lifecycle', () => {
+  it('leaves an empty foreground untouched and clears old content once', () => {
+    const { gl, painter } = createSurface();
+    const path = new RenderPath();
+    path.rect(0, 0, 10, 10);
+
+    painter.beginFrame(800, 600, 2);
+    painter.endFrame();
+    expect(gl.clear).not.toHaveBeenCalled();
+
+    painter.beginFrame(800, 600, 2);
+    painter.fillPath(path);
+    painter.endFrame();
+    expect(gl.clear).toHaveBeenCalledTimes(1);
+
+    painter.beginFrame(800, 600, 2);
+    painter.endFrame();
+    expect(gl.clear).toHaveBeenCalledTimes(2);
+
+    painter.beginFrame(800, 600, 2);
+    painter.endFrame();
+    expect(gl.clear).toHaveBeenCalledTimes(2);
+    painter.destroy();
+  });
+
   it('downsamples oversized image uploads without changing crop coordinates', () => {
     const { gl, painter } = createSurface();
     const image = { width: 8192, height: 4096 } as ImageBitmap;

@@ -91,6 +91,8 @@ export class WebGLPainter {
   private frame = 0;
   private dpr = 1;
   private maxTextureSize = 0;
+  private drawing = false;
+  private hasContents = false;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     this.surface = new WebGLSurface(canvas);
@@ -149,12 +151,14 @@ export class WebGLPainter {
   beginFrame(width: number, height: number, dpr: number): boolean {
     const surface = this.surface;
     surface.resize(width, height, dpr);
-    if (!surface.begin()) {
+    if (surface.gl.isContextLost()) {
       return false;
     }
+    this.drawing = false;
     this.dpr = dpr;
     this.frame++;
     if (this.generation !== surface.generation) {
+      this.hasContents = false;
       this.meshes.clear();
       this.textures.clear();
       this.fillProgram = surface.program(VERTEX, FILL, [
@@ -184,6 +188,10 @@ export class WebGLPainter {
   }
 
   endFrame(): void {
+    if (!this.drawing && this.hasContents) {
+      this.surface.begin();
+      this.hasContents = false;
+    }
     const gl = this.surface.gl;
     for (const [key, mesh] of this.meshes) {
       if (this.frame - mesh.lastFrame > (typeof key === 'string' ? 2 : 120)) {
@@ -436,6 +444,11 @@ export class WebGLPainter {
   }
 
   private use(program: Program, origin: Point = { x: 0, y: 0 }): void {
+    if (!this.drawing) {
+      this.surface.begin();
+      this.drawing = true;
+      this.hasContents = true;
+    }
     const gl = this.surface.gl;
     // biome-ignore lint/correctness/useHookAtTopLevel: WebGL API, not a React hook.
     gl.useProgram(program.handle);
