@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { toast } from 'sonner';
 import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
 import {
@@ -12,6 +13,7 @@ import {
   MYELIN_CANVAS_CLIPBOARD_MIME,
 } from '@myelin/editor/clipboard/formats';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { useMessages } from '@myelin/editor/i18n';
 import type { VFSNodeId } from '@/lib/sync';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -50,6 +52,7 @@ export function useCanvasClipboard({
   drawableCanvasRef,
   embedFiles,
 }: UseCanvasClipboardArgs) {
+  const strings = useMessages();
   const controller = useMemo(() => new CanvasClipboardController(), []);
   const copiedCanvasPayloadRef = useRef<string | null>(null);
   const handleMediaPaste = useEffectEvent((event: ClipboardEvent) => {
@@ -156,6 +159,7 @@ export function useCanvasClipboard({
       if (controller.handleCopy(event, adapter)) {
         copiedCanvasPayloadRef.current =
           event.clipboardData?.getData(MYELIN_CANVAS_CLIPBOARD_MIME) ?? null;
+        toast.success(strings.canvas.selectionToolbar.copied);
       }
     };
     const handleCut = (event: ClipboardEvent) => {
@@ -173,11 +177,20 @@ export function useCanvasClipboard({
       document.removeEventListener('cut', handleCut);
       document.removeEventListener('paste', handlePaste);
     };
-  }, [controller, drawableCanvasRef, id]);
+  }, [
+    controller,
+    drawableCanvasRef,
+    id,
+    strings.canvas.selectionToolbar.copied,
+  ]);
 
   return {
     copy: () => {
-      void copy();
+      void (async () => {
+        if (await copy()) {
+          toast.success(strings.canvas.selectionToolbar.copied);
+        }
+      })();
     },
     cut: () => {
       void (async () => {

@@ -832,6 +832,7 @@ const fr: typeof en = {
     selectionToolbar: {
       label: 'Ordre de la sélection',
       copy: 'Copier',
+      copied: 'Copié dans le presse-papiers',
       cut: 'Couper',
       moveHigher: 'Avancer',
       moveLower: 'Reculer',
