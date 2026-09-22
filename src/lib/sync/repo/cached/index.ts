@@ -85,7 +85,7 @@ import {
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
 const MAX_BATCH_OPS = 40;
-const MAX_BATCH_RAW_BYTES = 8 * 1024 * 1024;
+const MAX_BATCH_BYTES = 8 * 1024 * 1024;
 const MAX_BATCH_FILE_BYTES = 100 * 1024 * 1024;
 const MAX_BATCH_FALLBACK_OPS = 2;
 const logger = new Logger('CachedRepository');
@@ -120,9 +120,8 @@ export class CachedRepository
 
   private readonly emptyDocUpdate = Y.encodeStateAsUpdate(new Y.Doc());
   private readonly outbox: CachedRepositoryOutbox;
-  private flushPromise: Promise<void> | null = null;
   private flushTimer: number | null = null;
-  private bulkWriteDepth = 0;
+  private bulkWriting = false;
   private bulkDataChanged = false;
   private needsRemoteBootstrap = true;
   private runtimeStatus: RepositoryRuntimeStatus = {
@@ -180,8 +179,6 @@ export class CachedRepository
   }
 
   private async initializeImpl(): Promise<void> {
-    let didBootstrapFromRemote = false;
-
     const shouldBootstrapFromRemote = await this.withLocalStateLock(
       async () => {
         await this.cache.initialize();
@@ -206,7 +203,6 @@ export class CachedRepository
           }
 
           await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
-          didBootstrapFromRemote = true;
         });
       } catch (error) {
         this.updateRuntimeStatus({
@@ -219,7 +215,7 @@ export class CachedRepository
 
     this.startBackgroundSync();
 
-    if (!didBootstrapFromRemote) {
+    if (this.needsRemoteBootstrap) {
       logger.debug('Remote bootstrap will retry during background sync', {
         repositoryKind: this.kind,
       });
@@ -227,41 +223,27 @@ export class CachedRepository
   }
 
   async refresh(): Promise<void> {
-    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
-      await this.refreshImpl();
-    });
+    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), () =>
+      this.syncCacheFromRemote(),
+    );
   }
 
   async flushPending(): Promise<void> {
     await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
-      await this.flushPendingInternal();
-    });
-  }
-
-  private async refreshImpl(): Promise<void> {
-    await this.syncCacheFromRemote();
-  }
-
-  private async flushPendingInternal(): Promise<void> {
-    if (!this.flushPromise) {
-      this.flushPromise = this.flushPendingImpl()
-        .catch((error) => {
-          this.updateRuntimeStatus({
-            online: false,
-            lastError:
-              error instanceof Error ? error : new Error(String(error)),
-          });
-          throw error;
-        })
-        .finally(() => {
-          this.flushPromise = null;
+      try {
+        await this.flushPendingImpl();
+      } catch (error) {
+        this.updateRuntimeStatus({
+          online: false,
+          lastError: error instanceof Error ? error : new Error(String(error)),
         });
-    }
+        throw error;
+      }
 
-    await this.flushPromise;
-    if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
-      await this.syncCacheFromRemote();
-    }
+      if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
+        await this.syncCacheFromRemote();
+      }
+    });
   }
 
   async dispose(): Promise<void> {
@@ -358,7 +340,7 @@ export class CachedRepository
       await this.outbox.mutate((ops) => {
         queueRemoteWrite(ops, result);
       });
-      if (this.bulkWriteDepth > 0) {
+      if (this.bulkWriting) {
         this.bulkDataChanged = true;
       } else {
         this.updateRuntimeStatus({
@@ -370,20 +352,20 @@ export class CachedRepository
   }
 
   async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.bulkWriteDepth > 0) {
+    if (this.bulkWriting) {
       return this.cache.batchManifestWrites(fn);
     }
 
     const result = await withAsyncKeyedMutex(
       this.remoteSyncMutexKey(),
       async () => {
-        this.bulkWriteDepth += 1;
+        this.bulkWriting = true;
         try {
           return await this.outbox.batchMutations(() =>
             this.cache.batchManifestWrites(fn),
           );
         } finally {
-          this.bulkWriteDepth -= 1;
+          this.bulkWriting = false;
           if (this.bulkDataChanged) {
             this.bulkDataChanged = false;
             this.updateRuntimeStatus({
@@ -816,7 +798,7 @@ export class CachedRepository
     }
 
     this.flushTimer = window.setInterval(() => {
-      if (this.bulkWriteDepth > 0) {
+      if (this.bulkWriting) {
         return;
       }
       void this.flushPending().catch((error) => {
@@ -874,7 +856,8 @@ export class CachedRepository
       await this.applyPendingOp(pending.op);
 
       const removed = await this.withLocalStateLock(async () => {
-        const didRemove = await this.outbox.removeHeadIfUnchanged(pending.op);
+        const didRemove =
+          (await this.outbox.removePrefixIfUnchanged([pending.op])) === 1;
         if (!didRemove) {
           logger.debug(
             'Leaving applied cached pending op queued because the head op changed during remote sync',
@@ -935,21 +918,16 @@ export class CachedRepository
         return true;
       }
 
-      const oversizedAddition = Array.from(plan.additions).find(
-        ([, bytes]) => bytes.byteLength > MAX_BATCH_FILE_BYTES,
-      );
-      if (oversizedAddition) {
-        const [path, bytes] = oversizedAddition;
-        throw new Error(
-          `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MiB file limit.`,
-        );
+      let batchBytes = 0;
+      for (const [path, bytes] of plan.additions) {
+        if (bytes.byteLength > MAX_BATCH_FILE_BYTES) {
+          throw new Error(
+            `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MiB file limit.`,
+          );
+        }
+        batchBytes += bytes.byteLength;
       }
-
-      const rawBytes = Array.from(plan.additions.values()).reduce(
-        (total, bytes) => total + bytes.byteLength,
-        0,
-      );
-      if (rawBytes > MAX_BATCH_RAW_BYTES && plan.resolvedOps.length > 1) {
+      if (batchBytes > MAX_BATCH_BYTES && plan.resolvedOps.length > 1) {
         maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
         continue;
       }
@@ -1020,7 +998,7 @@ export class CachedRepository
     // would let us drain an op whose data we never committed.
     const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
-      const pendingOps = this.outbox.snapshotOps();
+      const pendingOps = this.outbox.snapshotOps(maxOps);
       if (pendingOps.length === 0) {
         return null;
       }
@@ -1029,12 +1007,9 @@ export class CachedRepository
       const ops: PendingOp[] = [];
       const canvasOps: BatchCanvasOperation[] = [];
       const rawOps: BatchRawOperation[] = [];
-      let rawBytes = 0;
+      let batchBytes = 0;
 
       for (const op of pendingOps) {
-        if (ops.length >= maxOps) {
-          break;
-        }
         if (op.kind !== 'push-note') {
           ops.push(op);
           continue;
@@ -1044,38 +1019,30 @@ export class CachedRepository
           ops.push(op);
           continue;
         }
-        let operationBytes: number;
-        if (node.fileType === 'mcanvas' && !op.replaceFile) {
-          const document = await this.cache.loadDocument(op.nodeId);
-          operationBytes = document.update?.byteLength ?? 0;
-          if (rawBytes > 0 && rawBytes + operationBytes > MAX_BATCH_RAW_BYTES) {
-            break;
-          }
-          ops.push(op);
-          canvasOps.push({
-            op,
-            node,
-            snapshot: document,
-          });
-        } else {
-          const bytes = await this.cache.readFileBytes(op.nodeId);
-          operationBytes = bytes?.byteLength ?? 0;
-          if (rawBytes > 0 && rawBytes + operationBytes > MAX_BATCH_RAW_BYTES) {
-            break;
-          }
-          ops.push(op);
-          rawOps.push({
-            op,
-            node,
-            bytes,
-          });
+        const isCanvas = node.fileType === 'mcanvas' && !op.replaceFile;
+        const snapshot = isCanvas
+          ? await this.cache.loadDocument(op.nodeId)
+          : null;
+        const bytes = isCanvas
+          ? null
+          : await this.cache.readFileBytes(op.nodeId);
+        const operationBytes =
+          snapshot?.update?.byteLength ?? bytes?.byteLength ?? 0;
+        if (batchBytes > 0 && batchBytes + operationBytes > MAX_BATCH_BYTES) {
+          break;
         }
         if (operationBytes > MAX_BATCH_FILE_BYTES) {
           throw new Error(
             `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MiB file limit.`,
           );
         }
-        rawBytes += operationBytes;
+        ops.push(op);
+        if (snapshot) {
+          canvasOps.push({ op, node, snapshot });
+        } else {
+          rawOps.push({ op, node, bytes });
+        }
+        batchBytes += operationBytes;
       }
 
       return { ops, cacheManifest, canvasOps, rawOps };

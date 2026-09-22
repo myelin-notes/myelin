@@ -361,21 +361,8 @@ export class CachedRepositoryOutbox {
     };
   }
 
-  snapshotOps(): PendingOp[] {
-    return this.pendingOps.map((op) => structuredClone(op));
-  }
-
-  async removeHeadIfUnchanged(expected: PendingOp): Promise<boolean> {
-    await this.load();
-    const currentOp = this.pendingOps[0];
-    if (!currentOp || !areSameQueueEntry(currentOp, expected)) {
-      this.onPendingWritesChanged(this.pendingOps.length);
-      return false;
-    }
-
-    this.pendingOps.shift();
-    await this.save();
-    return true;
+  snapshotOps(limit = this.pendingOps.length): PendingOp[] {
+    return this.pendingOps.slice(0, limit).map((op) => structuredClone(op));
   }
 
   async removePrefixIfUnchanged(
