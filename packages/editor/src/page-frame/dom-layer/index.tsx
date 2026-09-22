@@ -12,9 +12,10 @@ import {
   PAGE_PADDING,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
-import { PM_UPDATE_EVENT } from '../../events';
+import { NOTE_LINK_OPEN_REQUEST_EVENT, PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
+import { UserPrefs } from '../../user-prefs';
 import { getDevicePixelRatio } from '../../utils';
 import {
   removeStyleIfPresent,
@@ -35,7 +36,10 @@ import type {
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
-import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
+import {
+  NOTE_LINK_SELECTOR,
+  type NoteLinkOpenRequestDetail,
+} from '../pm/markdown/note-links';
 import { positionMathBlockSources } from '../pm/math/block-node-view';
 import {
   getPageFramePmScreenRectForNestedCaret,
@@ -77,6 +81,10 @@ interface FrameRefs {
   viewportDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
   pageChromeDivs: HTMLDivElement[];
+}
+
+interface PageFrameNoteLinkHit extends NoteLinkPreviewHit {
+  openRequest: NoteLinkOpenRequestDetail;
 }
 
 const PAGE_CHROME_STYLE: Record<string, string> = {
@@ -359,7 +367,7 @@ function getNoteLinkPreviewTargetAtPoint(
   frameMap: ReadonlyMap<string, FrameRefs>,
   clientX: number,
   clientY: number,
-): NoteLinkPreviewHit | null {
+): PageFrameNoteLinkHit | null {
   for (const refs of frameMap.values()) {
     const contentRect = getVisualRectForContentRect(
       refs,
@@ -390,7 +398,14 @@ function getNoteLinkPreviewTargetAtPoint(
         title,
         noteId: link.getAttribute('data-note-id') || null,
       };
-      return { target, rect: unionRects(linkRects) };
+      return {
+        target,
+        rect: unionRects(linkRects),
+        openRequest: {
+          ...target,
+          pageFrameId: link.getAttribute('data-page-frame-id') || null,
+        },
+      };
     }
   }
 
@@ -432,6 +447,35 @@ export function PageFrameDomLayer({
   // Views are created eagerly in createFrameRefs, so by the time editingElement is set the view
   // exists. Read inline rather than tracking in state.
   const activeView = editingElement?.pmEditor?.view ?? null;
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (editingElement || !(event.target instanceof HTMLCanvasElement)) {
+        return;
+      }
+
+      const hit = getPreviewTargetAtPoint(event.clientX, event.clientY);
+      if (
+        !hit ||
+        (UserPrefs.get('linkRequireModifier') &&
+          !event.metaKey &&
+          !event.ctrlKey)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      document.dispatchEvent(
+        new CustomEvent<NoteLinkOpenRequestDetail>(
+          NOTE_LINK_OPEN_REQUEST_EVENT,
+          { detail: hit.openRequest },
+        ),
+      );
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [editingElement, getPreviewTargetAtPoint]);
 
   // Sync loop — create/remove/position frame containers each frame
   useEffect(() => {

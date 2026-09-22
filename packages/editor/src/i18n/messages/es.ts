@@ -823,6 +823,7 @@ const es: typeof en = {
     selectionToolbar: {
       label: 'Orden de selección',
       copy: 'Copiar',
+      copied: 'Copiado al portapapeles',
       cut: 'Cortar',
       moveHigher: 'Mover hacia delante',
       moveLower: 'Mover hacia atrás',

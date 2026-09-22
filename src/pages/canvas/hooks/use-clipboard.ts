@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
 } from 'react';
+import { toast } from 'sonner';
 import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
 import {
@@ -12,6 +13,9 @@ import {
   MYELIN_CANVAS_CLIPBOARD_MIME,
 } from '@myelin/editor/clipboard/formats';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import { useMessages } from '@myelin/editor/i18n';
+import { invoke } from '@tauri-apps/api/core';
+import { readText } from '@tauri-apps/plugin-clipboard-manager';
 import type { VFSNodeId } from '@/lib/sync';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -45,11 +49,55 @@ function extractEmbeddableClipboardFiles(event: ClipboardEvent): File[] {
   return files;
 }
 
+async function readClipboardImageFile(): Promise<File> {
+  const response = await invoke<ArrayBuffer | number[]>(
+    'read_clipboard_image_png',
+  );
+  const bytes =
+    response instanceof ArrayBuffer
+      ? response
+      : Uint8Array.from(response).buffer;
+  return new File([bytes], 'clipboard.png', { type: 'image/png' });
+}
+
+async function readNativePasteEvent(
+  copiedCanvasPayload: string | null,
+): Promise<ClipboardEvent | null> {
+  const [textResult, imageResult] = await Promise.allSettled([
+    readText(),
+    readClipboardImageFile(),
+  ]);
+  const clipboardData = new DataTransfer();
+
+  if (textResult.status === 'fulfilled') {
+    clipboardData.setData('text/plain', textResult.value);
+    if (
+      textResult.value === MYELIN_CANVAS_CLIPBOARD_LABEL &&
+      copiedCanvasPayload
+    ) {
+      clipboardData.setData(MYELIN_CANVAS_CLIPBOARD_MIME, copiedCanvasPayload);
+    }
+  }
+  if (imageResult.status === 'fulfilled') {
+    clipboardData.items.add(imageResult.value);
+  }
+  if (clipboardData.items.length === 0) {
+    return null;
+  }
+
+  return new ClipboardEvent('paste', {
+    bubbles: true,
+    cancelable: true,
+    clipboardData,
+  });
+}
+
 export function useCanvasClipboard({
   id,
   drawableCanvasRef,
   embedFiles,
 }: UseCanvasClipboardArgs) {
+  const strings = useMessages();
   const controller = useMemo(() => new CanvasClipboardController(), []);
   const copiedCanvasPayloadRef = useRef<string | null>(null);
   const handleMediaPaste = useEffectEvent((event: ClipboardEvent) => {
@@ -60,6 +108,13 @@ export function useCanvasClipboard({
 
     embedFiles(files);
     return true;
+  });
+  const handlePaste = useEffectEvent((event: ClipboardEvent) => {
+    if (!id) {
+      return;
+    }
+    const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
+    controller.handlePaste(event, adapter, handleMediaPaste);
   });
   const copy = useEffectEvent(async (): Promise<boolean> => {
     if (!id) {
@@ -94,55 +149,9 @@ export function useCanvasClipboard({
       return;
     }
 
-    const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        if (item.types.includes(MYELIN_CANVAS_CLIPBOARD_MIME)) {
-          const payload = await (
-            await item.getType(MYELIN_CANVAS_CLIPBOARD_MIME)
-          ).text();
-          if (controller.pastePayload(payload, adapter)) {
-            return;
-          }
-        }
-      }
-
-      for (const item of items) {
-        if (
-          item.types.includes('text/plain') &&
-          (await (await item.getType('text/plain')).text()) ===
-            MYELIN_CANVAS_CLIPBOARD_LABEL
-        ) {
-          const payload = copiedCanvasPayloadRef.current;
-          if (payload && controller.pastePayload(payload, adapter)) {
-            return;
-          }
-        }
-      }
-
-      const files: File[] = [];
-      for (const item of items) {
-        for (const type of item.types) {
-          if (
-            type.startsWith('image/') ||
-            type.startsWith('audio/') ||
-            type === 'application/pdf'
-          ) {
-            files.push(
-              new File([await item.getType(type)], 'clipboard', { type }),
-            );
-          }
-        }
-      }
-      if (files.length > 0) {
-        embedFiles(files);
-      }
-    } catch {
-      const payload = copiedCanvasPayloadRef.current;
-      if (payload && controller.pastePayload(payload, adapter)) {
-        return;
-      }
+    const event = await readNativePasteEvent(copiedCanvasPayloadRef.current);
+    if (event) {
+      handlePaste(event);
     }
   });
 
@@ -156,13 +165,11 @@ export function useCanvasClipboard({
       if (controller.handleCopy(event, adapter)) {
         copiedCanvasPayloadRef.current =
           event.clipboardData?.getData(MYELIN_CANVAS_CLIPBOARD_MIME) ?? null;
+        toast.success(strings.canvas.selectionToolbar.copied);
       }
     };
     const handleCut = (event: ClipboardEvent) => {
       controller.handleCut(event, adapter);
-    };
-    const handlePaste = (event: ClipboardEvent) => {
-      controller.handlePaste(event, adapter, handleMediaPaste);
     };
 
     document.addEventListener('copy', handleCopy);
@@ -173,11 +180,20 @@ export function useCanvasClipboard({
       document.removeEventListener('cut', handleCut);
       document.removeEventListener('paste', handlePaste);
     };
-  }, [controller, drawableCanvasRef, id]);
+  }, [
+    controller,
+    drawableCanvasRef,
+    id,
+    strings.canvas.selectionToolbar.copied,
+  ]);
 
   return {
     copy: () => {
-      void copy();
+      void (async () => {
+        if (await copy()) {
+          toast.success(strings.canvas.selectionToolbar.copied);
+        }
+      })();
     },
     cut: () => {
       void (async () => {

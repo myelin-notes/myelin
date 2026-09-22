@@ -3,6 +3,7 @@ import type * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ElementType, isBackgroundElement } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
+import { TextElement } from '../elements/text/element';
 import type { VFSNodeId } from '../sync/types';
 import {
   cloneYMap,
@@ -115,6 +116,23 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
 
   public deleteSelection(): void {
     this.canvas?.deleteSelected();
+  }
+
+  public pasteText(text: string): boolean {
+    const canvas = this.canvas;
+    const context = this.getPasteContext();
+    if (!canvas || !context) {
+      return false;
+    }
+
+    const element = canvas.addElement((uuid) => new TextElement(uuid, text));
+    element.setOffset(
+      context.viewportCenter.x - element.boxWidth / 2,
+      context.viewportCenter.y - element.boxHeight / 2,
+    );
+    element.updateBounds();
+    canvas.selectElementsByUuid([element.uuid]);
+    return true;
   }
 
   public pasteSnapshot(

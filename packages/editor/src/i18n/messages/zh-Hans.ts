@@ -794,6 +794,7 @@ const zhHans: typeof en = {
     selectionToolbar: {
       label: '选区层级',
       copy: '复制',
+      copied: '已复制到剪贴板',
       cut: '剪切',
       moveHigher: '前移一层',
       moveLower: '后移一层',
