@@ -37,6 +37,7 @@
     "stronghold:allow-remove-store-record",
     "mcp-bridge:default",
     "pencil:default",
+    "clipboard-manager:allow-read-text",
     {
       "identifier": "http:default",
       "allow": [

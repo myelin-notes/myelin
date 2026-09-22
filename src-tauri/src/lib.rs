@@ -1,6 +1,7 @@
 use tauri::Manager;
 
 mod code_runner;
+mod clipboard;
 mod error_report;
 mod handwriting;
 mod iroh_transport;
@@ -63,6 +64,7 @@ pub fn run() {
 
             Ok(())
         })
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
@@ -102,6 +104,7 @@ pub fn run() {
             code_runner::cancel_run,
             code_runner::poll_output,
             code_runner::release_run,
+            clipboard::read_clipboard_image_png,
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
