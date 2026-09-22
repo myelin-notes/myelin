@@ -2542,6 +2542,11 @@
   resolved "https://registry.yarnpkg.com/@types/katex/-/katex-0.16.8.tgz#80bf3e0814d09a846412a0b0f140946b79c36c3e"
   integrity sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg==
 
+"@types/libtess@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@types/libtess/-/libtess-1.2.0.tgz#f62a87777ade7b64db811789da08f434b0089500"
+  integrity sha512-gAEjXzxexMHoKwCFMfY9SrO3CaWZsN3mf3txXpHoaH4AsPmkFaHRbAbM7L+oM5mTmUxbkG/R0RBqMIB/fA6UEw==
+
 "@types/mdast@^4.0.0", "@types/mdast@^4.0.4":
   version "4.0.4"
   resolved "https://registry.yarnpkg.com/@types/mdast/-/mdast-4.0.4.tgz#7ccf72edd2f1aa7dd3437e180c64373585804dd6"
@@ -4167,6 +4172,11 @@ lib0@^0.2.109, lib0@^0.2.85, lib0@^0.2.99:
   integrity sha512-DeXj9X5xDCjgKLU/7RR+/HQEVzuuEUiwldwOGsHK/sfAfELGWEyTcf0x+uOvCvK3O2zPmZePXWL85vtia6GyZw==
   dependencies:
     isomorphic.js "^0.2.4"
+
+libtess@^1.2.2:
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/libtess/-/libtess-1.2.2.tgz#173eb52a1a57a0238fe48f05d12245074497f898"
+  integrity sha512-Nps8HPeVVcsmJxUvFLKVJcCgcz+1ajPTXDVAVPs6+giOQP4AHV31uZFFkh+CKow/bkB7GbZWKmwmit7myaqDSw==
 
 lightningcss-android-arm64@1.32.0:
   version "1.32.0"

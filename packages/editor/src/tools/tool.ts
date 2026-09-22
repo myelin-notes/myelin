@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import type { DrawingContext } from '../rendering/painter';
 
 export type SvgIcon = LucideIcon;
 export type ToolId = 'select' | 'pen' | 'highlighter' | 'eraser' | 'text';
@@ -51,7 +52,7 @@ export interface ITool {
    * discards can leave this off — the canvas falls back to `interrupt`.
    */
   abort?(canvas: DrawableCanvas): void;
-  drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;
+  drawCursor(ctx: DrawingContext, position: Vector2): void;
   hover?(canvas: DrawableCanvas, position: Vector2): void;
   get icon(): SvgIcon;
   get label(): string;

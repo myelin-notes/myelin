@@ -7,6 +7,7 @@ import type { Vector2 } from '../../drawable-canvas';
 import { codeRunStore } from '../../page-frame/pm/code-block/run-store';
 import { PM_EDITOR_CLASS } from '../../page-frame/pm/constants';
 import { mapPmRectToScreen } from '../../page-frame/pm/screen-rect';
+import type { DrawingContext } from '../../rendering/painter';
 import {
   DrawableElement,
   type ResizeHandle,
@@ -179,7 +180,7 @@ export class CodeOutputElement extends DrawableElement {
   protected updateBoundingBox(): void {}
 
   // DOM-backed card; the canvas pass only paints the connector spline to the source block.
-  protected draw2D(ctx: CanvasRenderingContext2D, deltaTime: number): void {
+  protected draw2D(ctx: DrawingContext, deltaTime: number): void {
     const anchor = this._anchorWorldRect;
     if (!anchor) {
       return;

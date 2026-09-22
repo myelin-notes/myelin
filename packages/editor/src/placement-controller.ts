@@ -1,5 +1,6 @@
 import { getCanvasPalette } from './canvas-theme';
 import type { PlacementGhost, Vector2 } from './drawable-canvas';
+import type { DrawingContext } from './rendering/painter';
 
 /**
  * One-shot placement ghost state, orthogonal to tools: the next primary-button click finalizes
@@ -47,7 +48,7 @@ export class PlacementController {
     this.onPlacementEnd?.();
   }
 
-  public drawGhost(ctx: CanvasRenderingContext2D, worldPos: Vector2): void {
+  public drawGhost(ctx: DrawingContext, worldPos: Vector2): void {
     if (!this._placement) {
       return;
     }

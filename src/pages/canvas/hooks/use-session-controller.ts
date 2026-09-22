@@ -105,8 +105,7 @@ export class CanvasSessionController {
   constructor(
     private readonly repository: ActiveRepository,
     private readonly canvasRef: RefObject<HTMLCanvasElement | null>,
-    private readonly bgHostRef: RefObject<HTMLDivElement | null>,
-    private readonly overlayCanvasRef: RefObject<HTMLCanvasElement | null>,
+    private readonly backgroundCanvasRef: RefObject<HTMLCanvasElement | null>,
     private readonly domOverlayRef: RefObject<HTMLDivElement | null>,
     private readonly drawableCanvasRef: RefObject<DrawableCanvas | null>,
     private readonly canvasToolsRef: RefObject<ITool[]>,
@@ -205,11 +204,8 @@ export class CanvasSessionController {
         this.handlePageFrameRenamed(noteId, uuid, newName);
       });
 
-      if (this.bgHostRef.current) {
-        drawableCanvas.setBackgroundHost(this.bgHostRef.current);
-      }
-      if (this.overlayCanvasRef.current) {
-        drawableCanvas.setOverlayCanvas(this.overlayCanvasRef.current);
+      if (this.backgroundCanvasRef.current) {
+        drawableCanvas.setBackgroundCanvas(this.backgroundCanvasRef.current);
       }
       if (this.domOverlayRef.current) {
         drawableCanvas.setDomOverlayHost(this.domOverlayRef.current);
@@ -409,8 +405,7 @@ interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
   recordingOwnerId: TabId;
   canvasRef: RefObject<HTMLCanvasElement | null>;
-  bgHostRef: RefObject<HTMLDivElement | null>;
-  overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
+  backgroundCanvasRef: RefObject<HTMLCanvasElement | null>;
   domOverlayRef: RefObject<HTMLDivElement | null>;
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
@@ -421,8 +416,7 @@ export function useCanvasSessionController({
   id,
   recordingOwnerId,
   canvasRef,
-  bgHostRef,
-  overlayCanvasRef,
+  backgroundCanvasRef,
   domOverlayRef,
   drawableCanvasRef,
   canvasTools,
@@ -438,8 +432,7 @@ export function useCanvasSessionController({
       new CanvasSessionController(
         repository,
         canvasRef,
-        bgHostRef,
-        overlayCanvasRef,
+        backgroundCanvasRef,
         domOverlayRef,
         drawableCanvasRef,
         canvasToolsRef,
@@ -447,11 +440,10 @@ export function useCanvasSessionController({
         uiServices,
       ),
     [
-      bgHostRef,
+      backgroundCanvasRef,
       canvasRef,
       domOverlayRef,
       drawableCanvasRef,
-      overlayCanvasRef,
       recordingOwnerId,
       repository,
       uiServices,

@@ -3,6 +3,7 @@ import { ADAPTIVE_INK, getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { TextElement, type TextStyle } from '../elements/text/element';
 import type { MessageGetter } from '../i18n';
+import type { DrawingContext } from '../rendering/painter';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { FontEntry, ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -159,7 +160,7 @@ export class TextTool implements ITool {
     this.dragCurrent = null;
   }
 
-  drawCursor(ctx: CanvasRenderingContext2D, _position: Vector2): void {
+  drawCursor(ctx: DrawingContext, _position: Vector2): void {
     if (!(this.dragStart && this.dragCurrent)) {
       return;
     }

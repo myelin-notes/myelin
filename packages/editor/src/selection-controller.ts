@@ -11,6 +11,7 @@ import {
 } from './elements/drawable-element';
 import { PageFrameElement } from './elements/page-frame-element';
 import type { Vector2 } from './geometry';
+import type { DrawingContext } from './rendering/painter';
 
 const SELECTION_HIT_MIN_PX = {
   mouse: 20,
@@ -254,7 +255,7 @@ export class SelectionController {
   }
 
   public drawOverlay(
-    ctx: CanvasRenderingContext2D,
+    ctx: DrawingContext,
     editingElement: DrawableElement | null,
     zoom: number,
   ): void {

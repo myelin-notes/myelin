@@ -3,6 +3,7 @@ import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
+import type { DrawingContext } from '../rendering/painter';
 import type { YDocManager } from '../ydoc-manager';
 import {
   DrawableElement,
@@ -91,7 +92,9 @@ export class ImageElement extends DrawableElement {
       },
       imageData: (v) => {
         const blob = new Blob([(v as Uint8Array).slice()]);
-        this._bitmapDecode = createImageBitmap(blob).then(
+        this._bitmapDecode = createImageBitmap(blob, {
+          premultiplyAlpha: 'premultiply',
+        }).then(
           (bmp) => {
             this._bitmap = bmp;
           },
@@ -120,7 +123,9 @@ export class ImageElement extends DrawableElement {
 
   public async setImageData(data: ArrayBuffer) {
     const blob = new Blob([data]);
-    this._bitmap = await createImageBitmap(blob);
+    this._bitmap = await createImageBitmap(blob, {
+      premultiplyAlpha: 'premultiply',
+    });
     this._naturalWidth = this._bitmap.width;
     this._naturalHeight = this._bitmap.height;
     this._cropX = 0;
@@ -149,7 +154,7 @@ export class ImageElement extends DrawableElement {
     this.box = new DOMRect(0, 0, this._cropW, this._cropH);
   }
 
-  protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
+  protected draw2D(ctx: DrawingContext, _deltaTime: number): void {
     if (!this._bitmap) {
       return;
     }
@@ -226,7 +231,7 @@ export class ImageElement extends DrawableElement {
     x: number,
     y: number,
     _radius: number,
-    _ctx: CanvasRenderingContext2D,
+    _ctx: DrawingContext,
   ): boolean {
     const b = this.box;
     return x >= b.x && x <= b.right && y >= b.y && y <= b.bottom;

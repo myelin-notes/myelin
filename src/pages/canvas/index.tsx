@@ -120,8 +120,7 @@ function CanvasViewInner({
   const strings = useMessages();
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bgHostRef = useRef<HTMLDivElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
@@ -187,8 +186,7 @@ function CanvasViewInner({
     recordingOwnerId,
     thumbnailRootRef,
     canvasRef,
-    bgHostRef,
-    overlayCanvasRef,
+    backgroundCanvasRef,
     domOverlayRef,
     wheelRef,
     drawableCanvasRef,
@@ -588,13 +586,10 @@ function CanvasViewInner({
         className="absolute inset-0 overflow-clip bg-page"
         style={surfaceStyle}
       >
-        {/* Background layer: dot grid, as a repeating CSS background rather
-            than a canvas — panning it is a compositor translate that
-            rasterizes nothing. Position and size are written by CanvasRenderer,
-            which owns the overdraw the pan translate depends on. */}
-        <div
-          ref={bgHostRef}
+        <canvas
+          ref={backgroundCanvasRef}
           data-thumbnail-exclude="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
           style={{ zIndex: 0 }}
         />
 
@@ -617,21 +612,13 @@ function CanvasViewInner({
           className="pointer-events-none absolute inset-0 overflow-hidden"
         />
 
-        {/* Foreground canvas: strokes, images, element content */}
+        {/* Foreground: elements, then selection and tool feedback. */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 block h-full w-full touch-none"
           onDoubleClick={inserts.onCanvasDoubleClick}
         />
       </div>
-
-      {/* Selection overlay canvas: outline + handles. Always above DOM chrome
-          so selection stays visible while editing. */}
-      <canvas
-        ref={overlayCanvasRef}
-        className="pointer-events-none absolute inset-0 block h-full w-full"
-        style={{ zIndex: 12 }}
-      />
 
       {/* Frame chrome controls (hamburger buttons). Each control shares its
           frame’s stacking rank, so a higher element can cover a lower element’s

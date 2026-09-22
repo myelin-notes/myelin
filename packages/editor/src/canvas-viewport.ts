@@ -2,7 +2,6 @@ import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
-// Exported because the background layer sizes its overdraw from the largest tile MAX_ZOOM allows.
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 5;
 

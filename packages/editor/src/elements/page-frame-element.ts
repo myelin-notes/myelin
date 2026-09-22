@@ -33,6 +33,7 @@ import {
   prepareExportOverlays,
 } from '../pdf-element-export';
 import { getPlatform } from '../platform';
+import type { DrawingContext } from '../rendering/painter';
 import { UserPrefs } from '../user-prefs';
 import type { YDocManager } from '../ydoc-manager';
 import type {
@@ -324,7 +325,7 @@ export class PageFrameElement
     x: number,
     y: number,
     _radius: number,
-    _ctx: CanvasRenderingContext2D,
+    _ctx: DrawingContext,
   ): boolean {
     // Chrome (surrounding frame + header) hit area
     if (
@@ -660,7 +661,7 @@ export class PageFrameElement
     this._exportElementsProvider = provider;
   }
 
-  protected draw2D(_ctx: CanvasRenderingContext2D, _deltaTime: number): void {}
+  protected draw2D(_ctx: DrawingContext, _deltaTime: number): void {}
 
   // Prefer the live editor doc: the view is created eagerly for every frame and reflects in-flight
   // edits. Otherwise convert the Y.XmlFragment with the same helper the editor uses.

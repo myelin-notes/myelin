@@ -24,8 +24,7 @@ interface UseCanvasEngineArgs {
   recordingOwnerId: TabId;
   thumbnailRootRef: React.RefObject<HTMLElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  bgHostRef: React.RefObject<HTMLDivElement | null>;
-  overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  backgroundCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
@@ -43,8 +42,7 @@ export function useCanvasEngine({
   recordingOwnerId,
   thumbnailRootRef,
   canvasRef,
-  bgHostRef,
-  overlayCanvasRef,
+  backgroundCanvasRef,
   domOverlayRef,
   wheelRef,
   drawableCanvasRef,
@@ -73,8 +71,7 @@ export function useCanvasEngine({
     id,
     recordingOwnerId,
     canvasRef,
-    bgHostRef,
-    overlayCanvasRef,
+    backgroundCanvasRef,
     domOverlayRef,
     drawableCanvasRef,
     canvasTools,

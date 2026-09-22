@@ -1,5 +1,4 @@
 import type * as Y from 'yjs';
-import { Logger } from '@myelin/shared/logger';
 import { CanvasDocumentBinding } from './canvas-document-binding';
 import { CanvasElementFactory } from './canvas-element-factory';
 import {
@@ -27,6 +26,7 @@ import { catalogs, type MessageGetter } from './i18n/messages';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
+import type { WebGLPainter } from './rendering/painter';
 import { SelectionController } from './selection-controller';
 import type { LivePeersSnapshot } from './sync/live/peers';
 import { createDefaultTools } from './tools/default-tool-registry';
@@ -49,8 +49,6 @@ export interface PlacementGhost {
   onPlace(worldPos: Vector2): void;
 }
 
-const logger = new Logger('DrawableCanvas');
-
 function unionBoundingBoxes(
   elements: readonly DrawableElement[],
 ): DOMRect | null {
@@ -68,7 +66,7 @@ function unionBoundingBoxes(
 }
 
 export class DrawableCanvas {
-  public readonly ctx: CanvasRenderingContext2D;
+  public readonly ctx: WebGLPainter;
   public readonly viewport: CanvasViewport;
   public readonly tools: ITool[];
 
@@ -97,13 +95,9 @@ export class DrawableCanvas {
       | undefined = undefined,
     uiServices?: CanvasUiServices,
   ) {
-    const ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) {
-      logger.error('Failed to get canvas context');
-    }
     this.canvas.style.zIndex = '10';
-    this.ctx = ctx!;
-    this.renderer = new CanvasRenderer(this.ctx, canvas);
+    this.renderer = new CanvasRenderer(canvas);
+    this.ctx = this.renderer.ctx;
     this.viewport = new CanvasViewport(canvas);
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
@@ -191,12 +185,8 @@ export class DrawableCanvas {
     this.elementFactory.setOnPageFrameRenamed(callback);
   }
 
-  public setBackgroundHost(host: HTMLElement): void {
-    this.renderer.setBackgroundHost(host);
-  }
-
-  public setOverlayCanvas(canvas: HTMLCanvasElement): void {
-    this.renderer.setOverlayCanvas(canvas);
+  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
+    this.renderer.setBackgroundCanvas(canvas);
   }
 
   public setDomOverlayHost(host: HTMLElement): void {

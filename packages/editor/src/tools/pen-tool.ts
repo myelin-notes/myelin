@@ -7,6 +7,7 @@ import {
   StrokeElement,
 } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
+import type { DrawingContext } from '../rendering/painter';
 import { recognizeShape } from '../shape-recognizer';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -214,7 +215,7 @@ export class PenTool implements ITool {
     }
   }
 
-  public drawCursor(_ctx: CanvasRenderingContext2D, _position: Vector2): void {}
+  public drawCursor(_ctx: DrawingContext, _position: Vector2): void {}
 
   get icon(): SvgIcon {
     return PenIcon;

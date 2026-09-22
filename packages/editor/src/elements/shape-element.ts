@@ -5,6 +5,7 @@ import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
+import type { DrawingContext } from '../rendering/painter';
 import type { ShapeType } from '../shape-recognizer';
 import {
   DrawableElement,
@@ -356,7 +357,7 @@ export class ShapeElement extends DrawableElement {
     this.syncToYMap({ geom: [...this.geom] });
   }
 
-  protected draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
+  protected draw2D(ctx: DrawingContext, _deltaTime: number): void {
     const g = this.geom;
     if (g.length < 4) {
       return;
@@ -399,7 +400,7 @@ export class ShapeElement extends DrawableElement {
     x: number,
     y: number,
     radius: number,
-    _ctx: CanvasRenderingContext2D,
+    _ctx: DrawingContext,
   ): boolean {
     const g = this.geom;
     const tol = radius + this.style.size / 2;
