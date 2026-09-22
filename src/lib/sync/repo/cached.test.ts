@@ -1332,6 +1332,43 @@ describe('CachedRepository', () => {
     await session.close();
   });
 
+  it('does not auto-drain a non-batched remote after a bulk import', async () => {
+    vi.useFakeTimers();
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository(
+      'repositories/non-batched-bulk-import-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/non-batched-bulk-import-test/outbox.json',
+    );
+    await repository.initialize();
+
+    const importStarted = createDeferred();
+    const releaseImport = createDeferred();
+    let fileId = '';
+    const importPromise = repository.batchManifestWrites(async () => {
+      fileId = await repository.createFile('Imported', 'mcanvas', null);
+      importStarted.resolve();
+      await releaseImport.promise;
+    });
+    await importStarted.promise;
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(await remote.getNode(fileId)).toBeNull();
+
+    releaseImport.resolve();
+    await importPromise;
+    await Promise.resolve();
+
+    expect(await remote.getNode(fileId)).toBeNull();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(2);
+
+    await repository.flushPending();
+    expect(await remote.getNode(fileId)).not.toBeNull();
+  });
+
   it('pulls cached session updates without fetching from the remote', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote note', 'mcanvas', null);

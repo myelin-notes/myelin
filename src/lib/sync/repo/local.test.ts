@@ -3,6 +3,7 @@ import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { serializeDocToMarkdown } from '@myelin/editor/page-frame/markdown/serializer';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
+import { getPlatform } from '@myelin/editor/platform';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import {
   createCanvasNoteState,
@@ -133,6 +134,51 @@ describe('LocalRepository', () => {
     expect(files).toHaveLength(5);
     const reloaded = await repository.loadDocument(files[0].id);
     expect(readNoteText(reloaded.update)).toContain('note');
+  });
+
+  it("skips only the requested file's first indexing pass", async () => {
+    const noteIndex = getPlatform().noteIndex;
+    if (!noteIndex) {
+      throw new Error('fake platform is expected to provide noteIndex');
+    }
+    const reindex = vi.spyOn(noteIndex, 'requestReindex');
+    const repository = new LocalRepository(
+      'repositories/per-file-index-suppression',
+    );
+    await repository.initialize();
+
+    const skippedId = await repository.createFile(
+      'Imported PDF',
+      'mcanvas',
+      null,
+      undefined,
+      { skipNextIndexing: true },
+    );
+    const ordinaryId = await repository.createFile(
+      'Ordinary note',
+      'mcanvas',
+      null,
+    );
+    const imported = createNoteState('pdf');
+    const ordinary = createNoteState('ordinary');
+
+    await repository.pushUpdates(ordinaryId, ordinary.update, {
+      baseRevision: null,
+      localStateVector: ordinary.stateVector,
+    });
+    await repository.pushUpdates(skippedId, imported.update, {
+      baseRevision: null,
+      localStateVector: imported.stateVector,
+    });
+
+    expect(reindex.mock.calls.map(([nodeId]) => nodeId)).toEqual([ordinaryId]);
+
+    const updated = createNoteState('pdf updated');
+    await repository.writeFileBytes(skippedId, updated.update);
+    expect(reindex.mock.calls.map(([nodeId]) => nodeId)).toEqual([
+      ordinaryId,
+      skippedId,
+    ]);
   });
 
   it('registers ancestor tags when a nested tag is added', async () => {

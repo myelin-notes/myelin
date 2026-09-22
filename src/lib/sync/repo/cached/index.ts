@@ -13,6 +13,7 @@ import type { BaseRepository } from '../base';
 import {
   type BatchedCommitTarget,
   BatchHeadConflictError,
+  BatchUnknownError,
   supportsBatchedCommit,
 } from '../batch';
 import type {
@@ -42,6 +43,7 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
   Repository,
@@ -82,6 +84,10 @@ import {
 
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
+const MAX_BATCH_OPS = 40;
+const MAX_BATCH_RAW_BYTES = 8 * 1024 * 1024;
+const MAX_BATCH_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_BATCH_FALLBACK_OPS = 2;
 const logger = new Logger('CachedRepository');
 
 class RemoteNoteCacheMergeError extends Error {
@@ -116,6 +122,8 @@ export class CachedRepository
   private readonly outbox: CachedRepositoryOutbox;
   private flushPromise: Promise<void> | null = null;
   private flushTimer: number | null = null;
+  private bulkWriteDepth = 0;
+  private bulkDataChanged = false;
   private needsRemoteBootstrap = true;
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,
@@ -174,45 +182,39 @@ export class CachedRepository
   private async initializeImpl(): Promise<void> {
     let didBootstrapFromRemote = false;
 
-    await this.withLocalStateLock(async () => {
-      await this.cache.initialize();
-      await this.outbox.load();
-    });
+    const shouldBootstrapFromRemote = await this.withLocalStateLock(
+      async () => {
+        await this.cache.initialize();
+        await this.outbox.load();
+        return !this.outbox.recoveryError && this.outbox.length === 0;
+      },
+    );
     logger.debug('Initialized cached repository cache state', {
       repositoryKind: this.kind,
       outboxPath: this.outboxPath(),
       pendingOps: this.outbox.length,
     });
 
-    try {
-      const remoteSnapshot = await this.remote.exportSnapshot();
+    if (shouldBootstrapFromRemote) {
+      try {
+        const remoteSnapshot = await this.remote.exportSnapshot();
 
-      await this.withLocalStateLock(async () => {
-        await this.outbox.load();
-        if (this.outbox.recoveryError) {
-          logger.error(
-            'Skipped initial remote bootstrap because cached repository outbox requires recovery',
-            this.outbox.recoveryError,
-            {
-              repositoryKind: this.kind,
-              outboxPath: this.outboxPath(),
-            },
-          );
-          return;
-        }
-        if (this.outbox.length !== 0) {
-          return;
-        }
+        await this.withLocalStateLock(async () => {
+          await this.outbox.load();
+          if (this.outbox.recoveryError || this.outbox.length !== 0) {
+            return;
+          }
 
-        await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
-        didBootstrapFromRemote = true;
-      });
-    } catch (error) {
-      this.updateRuntimeStatus({
-        online: false,
-        lastError: error instanceof Error ? error : new Error(String(error)),
-      });
-      logger.error('Initial remote bootstrap failed', error);
+          await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+          didBootstrapFromRemote = true;
+        });
+      } catch (error) {
+        this.updateRuntimeStatus({
+          online: false,
+          lastError: error instanceof Error ? error : new Error(String(error)),
+        });
+        logger.error('Initial remote bootstrap failed', error);
+      }
     }
 
     this.startBackgroundSync();
@@ -356,17 +358,50 @@ export class CachedRepository
       await this.outbox.mutate((ops) => {
         queueRemoteWrite(ops, result);
       });
-      this.updateRuntimeStatus({
-        dataVersion: this.runtimeStatus.dataVersion + 1,
-      });
+      if (this.bulkWriteDepth > 0) {
+        this.bulkDataChanged = true;
+      } else {
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+      }
       return result;
     });
   }
 
   async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    // Batching collapses the cache's per-node manifest saves into one; the outbox still queues an op
-    // per node as before.
-    return this.cache.batchManifestWrites(fn);
+    if (this.bulkWriteDepth > 0) {
+      return this.cache.batchManifestWrites(fn);
+    }
+
+    const result = await withAsyncKeyedMutex(
+      this.remoteSyncMutexKey(),
+      async () => {
+        this.bulkWriteDepth += 1;
+        try {
+          return await this.outbox.batchMutations(() =>
+            this.cache.batchManifestWrites(fn),
+          );
+        } finally {
+          this.bulkWriteDepth -= 1;
+          if (this.bulkDataChanged) {
+            this.bulkDataChanged = false;
+            this.updateRuntimeStatus({
+              dataVersion: this.runtimeStatus.dataVersion + 1,
+            });
+          }
+        }
+      },
+    );
+
+    if (supportsBatchedCommit(this.remote) && this.outbox.length > 0) {
+      queueMicrotask(() => {
+        void this.flushPending().catch((error) => {
+          logger.error('Post-import flush failed', error);
+        });
+      });
+    }
+    return result;
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
@@ -716,19 +751,24 @@ export class CachedRepository
     }
   }
 
-  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+  async openSession(
+    nodeId: VFSNodeId,
+    options: OpenSessionOptions = {},
+  ): Promise<NoteSession> {
     logger.debug('Opening cached repository local session', {
       repositoryKind: this.kind,
       nodeId,
       pendingOps: this.outbox.length,
     });
     const session = await NoteSession.open(nodeId, this);
-    void this.pullOpenSessionUpdates(session).catch((error) => {
-      logger.error('Failed to pull open cached session updates', error, {
-        repositoryKind: this.kind,
-        nodeId,
+    if (!options.skipRemotePull) {
+      void this.pullOpenSessionUpdates(session).catch((error) => {
+        logger.error('Failed to pull open cached session updates', error, {
+          repositoryKind: this.kind,
+          nodeId,
+        });
       });
-    });
+    }
     return session;
   }
 
@@ -776,6 +816,9 @@ export class CachedRepository
     }
 
     this.flushTimer = window.setInterval(() => {
+      if (this.bulkWriteDepth > 0) {
+        return;
+      }
       void this.flushPending().catch((error) => {
         logger.error('Background flush failed', error);
       });
@@ -792,12 +835,16 @@ export class CachedRepository
       logger.debug('Falling back to per-op flush after batched flush failed', {
         repositoryKind: this.kind,
       });
+      await this.flushPerOpImpl(MAX_BATCH_FALLBACK_OPS);
+      return;
     }
 
     await this.flushPerOpImpl();
   }
 
-  private async flushPerOpImpl(): Promise<void> {
+  private async flushPerOpImpl(
+    maxOps = Number.POSITIVE_INFINITY,
+  ): Promise<void> {
     let pendingOps = await this.withLocalStateLock(async () => {
       await this.outbox.load();
       return this.outbox.length;
@@ -808,7 +855,8 @@ export class CachedRepository
       outboxPath: this.outboxPath(),
     });
 
-    while (true) {
+    let appliedOps = 0;
+    while (appliedOps < maxOps) {
       const pending = await this.withLocalStateLock(() =>
         this.outbox.peekHead(),
       );
@@ -858,6 +906,7 @@ export class CachedRepository
       if (!removed) {
         break;
       }
+      appliedOps += 1;
     }
 
     pendingOps = await this.withLocalStateLock(async () => {
@@ -873,14 +922,11 @@ export class CachedRepository
   private async tryFlushBatched(
     remote: BaseRepository & BatchedCommitTarget,
   ): Promise<boolean> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let plan: BatchPlan | null | 'abort-to-rest';
-      try {
-        plan = await this.buildBatchPlan(remote);
-      } catch (error) {
-        logger.error('Failed to build batched flush plan', error);
-        return false;
-      }
+    let maxOps = MAX_BATCH_OPS;
+    let headConflictAttempts = 0;
+
+    while (true) {
+      const plan = await this.buildBatchPlan(remote, maxOps);
 
       if (plan === 'abort-to-rest') {
         return false;
@@ -889,10 +935,33 @@ export class CachedRepository
         return true;
       }
 
+      const oversizedAddition = Array.from(plan.additions).find(
+        ([, bytes]) => bytes.byteLength > MAX_BATCH_FILE_BYTES,
+      );
+      if (oversizedAddition) {
+        const [path, bytes] = oversizedAddition;
+        throw new Error(
+          `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MiB file limit.`,
+        );
+      }
+
+      const rawBytes = Array.from(plan.additions.values()).reduce(
+        (total, bytes) => total + bytes.byteLength,
+        0,
+      );
+      if (rawBytes > MAX_BATCH_RAW_BYTES && plan.resolvedOps.length > 1) {
+        maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
+        continue;
+      }
+
       try {
         await this.commitBatchedPlan(remote, plan);
       } catch (error) {
-        if (error instanceof BatchHeadConflictError && attempt < 1) {
+        if (
+          error instanceof BatchHeadConflictError &&
+          headConflictAttempts < 1
+        ) {
+          headConflictAttempts += 1;
           logger.debug('Batched commit head conflict; retrying once', {
             repositoryKind: this.kind,
             message: error.message,
@@ -904,22 +973,35 @@ export class CachedRepository
             repositoryKind: this.kind,
             message: error.message,
           });
-        } else {
-          logger.warn('Batched commit failed; falling back', error);
+          return false;
         }
-        return false;
+        if (error instanceof BatchUnknownError && plan.resolvedOps.length > 1) {
+          maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
+          headConflictAttempts = 0;
+          logger.warn(
+            'Batched commit failed; retrying a smaller prefix',
+            error,
+            {
+              repositoryKind: this.kind,
+              nextMaxOps: maxOps,
+            },
+          );
+          continue;
+        }
+        throw error;
       }
 
-      await this.drainResolvedOps(plan.resolvedOps);
-      return true;
+      if (!(await this.drainResolvedOps(plan.resolvedOps))) {
+        return true;
+      }
+      maxOps = MAX_BATCH_OPS;
+      headConflictAttempts = 0;
     }
-    // Unreachable: every path inside the loop returns, and the only `continue` is guarded by
-    // `attempt < 1`. Kept for the compiler's all-paths-return check.
-    return false;
   }
 
   private async buildBatchPlan(
     remote: BaseRepository & BatchedCommitTarget,
+    maxOps: number,
   ): Promise<BatchPlan | null | 'abort-to-rest'> {
     // dispose() calls flushPending() on every window close, and the network hops below otherwise add
     // noticeable latency to closing.
@@ -938,51 +1020,77 @@ export class CachedRepository
     // would let us drain an op whose data we never committed.
     const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
-      const ops = this.outbox.snapshotOps();
-      if (ops.length === 0) {
+      const pendingOps = this.outbox.snapshotOps();
+      if (pendingOps.length === 0) {
         return null;
       }
-      const cacheSnapshot = await this.cache.exportSnapshot();
+      const cacheManifest = await this.cache.exportManifest();
 
+      const ops: PendingOp[] = [];
       const canvasOps: BatchCanvasOperation[] = [];
       const rawOps: BatchRawOperation[] = [];
+      let rawBytes = 0;
 
-      for (const op of ops) {
+      for (const op of pendingOps) {
+        if (ops.length >= maxOps) {
+          break;
+        }
         if (op.kind !== 'push-note') {
+          ops.push(op);
           continue;
         }
-        const node = cacheSnapshot.manifest.nodes[op.nodeId];
+        const node = cacheManifest.nodes[op.nodeId];
         if (!node || node.type !== 'file') {
+          ops.push(op);
           continue;
         }
+        let operationBytes: number;
         if (node.fileType === 'mcanvas' && !op.replaceFile) {
+          const document = await this.cache.loadDocument(op.nodeId);
+          operationBytes = document.update?.byteLength ?? 0;
+          if (rawBytes > 0 && rawBytes + operationBytes > MAX_BATCH_RAW_BYTES) {
+            break;
+          }
+          ops.push(op);
           canvasOps.push({
             op,
             node,
-            snapshot: await this.cache.loadDocument(op.nodeId),
+            snapshot: document,
           });
         } else {
+          const bytes = await this.cache.readFileBytes(op.nodeId);
+          operationBytes = bytes?.byteLength ?? 0;
+          if (rawBytes > 0 && rawBytes + operationBytes > MAX_BATCH_RAW_BYTES) {
+            break;
+          }
+          ops.push(op);
           rawOps.push({
             op,
             node,
-            bytes: await this.cache.readFileBytes(op.nodeId),
+            bytes,
           });
         }
+        if (operationBytes > MAX_BATCH_FILE_BYTES) {
+          throw new Error(
+            `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MiB file limit.`,
+          );
+        }
+        rawBytes += operationBytes;
       }
 
-      return { ops, cacheSnapshot, canvasOps, rawOps };
+      return { ops, cacheManifest, canvasOps, rawOps };
     });
 
     if (snapshot === null) {
       return null;
     }
-    const { ops, cacheSnapshot, canvasOps, rawOps } = snapshot;
+    const { ops, cacheManifest, canvasOps, rawOps } = snapshot;
     return createBatchPlan({
       repositoryKind: this.kind,
       remote,
       expectedHeadOid,
       remoteManifest,
-      cacheSnapshot,
+      cacheManifest,
       ops,
       canvasOps,
       rawOps,
@@ -1012,22 +1120,20 @@ export class CachedRepository
     });
   }
 
-  private async drainResolvedOps(ops: PendingOp[]): Promise<void> {
-    await this.withLocalStateLock(async () => {
-      for (const op of ops) {
-        const didRemove = await this.outbox.removeHeadIfUnchanged(op);
-        if (!didRemove) {
-          logger.debug(
-            'Stopped draining batched ops because the head op changed',
-            {
-              repositoryKind: this.kind,
-              opKind: op.kind,
-              nodeId: 'nodeId' in op ? op.nodeId : null,
-              pendingOps: this.outbox.length,
-            },
-          );
-          break;
-        }
+  private async drainResolvedOps(ops: PendingOp[]): Promise<boolean> {
+    return this.withLocalStateLock(async () => {
+      const removedOps = await this.outbox.removePrefixIfUnchanged(ops);
+      const removedAll = removedOps === ops.length;
+      if (!removedAll) {
+        logger.debug(
+          'Stopped draining batched ops because the prefix changed',
+          {
+            repositoryKind: this.kind,
+            resolvedOps: ops.length,
+            removedOps,
+            pendingOps: this.outbox.length,
+          },
+        );
       }
 
       this.updateRuntimeStatus({
@@ -1036,6 +1142,7 @@ export class CachedRepository
         lastRemoteSyncAt: Date.now(),
         lastError: null,
       });
+      return removedAll;
     });
   }
 
@@ -1108,23 +1215,19 @@ export class CachedRepository
   }
 
   private async applyManifestUpsert(nodeId: string): Promise<void> {
-    const cacheSnapshot = await this.withLocalStateLock(() =>
-      this.cache.exportSnapshot(),
+    const cacheManifest = await this.withLocalStateLock(() =>
+      this.cache.exportManifest(),
     );
     await this.remote.applyManifestMutation(
       `Sync manifest node ${nodeId}`,
       (remoteManifest) => {
-        applyCachedManifestUpsert(
-          remoteManifest,
-          cacheSnapshot.manifest,
-          nodeId,
-        );
+        applyCachedManifestUpsert(remoteManifest, cacheManifest, nodeId);
       },
     );
     logger.debug('Applied cached manifest upsert to remote', {
       repositoryKind: this.kind,
       nodeId,
-      cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
+      cacheNodeCount: Object.keys(cacheManifest.nodes).length,
     });
   }
 
@@ -1240,6 +1343,15 @@ export class CachedRepository
       const remoteBytes = await this.remote.readFileBytes(nodeId);
       const remoteRevision = await computeRevision(remoteBytes);
       if (remoteRevision !== op.baseFileRevision) {
+        const localRevision = await computeRevision(bytes);
+        if (remoteRevision === localRevision) {
+          logger.debug('Raw file push was already applied remotely', {
+            repositoryKind: this.kind,
+            nodeId,
+            remoteRevision,
+          });
+          return;
+        }
         await this.createRawFileConflictCopy(
           node,
           bytes ?? new Uint8Array(),

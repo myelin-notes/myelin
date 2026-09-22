@@ -8,7 +8,6 @@ import {
   deleteNodeFromManifest,
   getStoredFilePath,
   MANIFEST_PATH,
-  type RepositorySnapshot,
   setStoredNoteLinks,
   type VFSManifest,
 } from '../shared';
@@ -53,7 +52,7 @@ export interface BatchPlanInput {
   remote: BatchPlanRemote;
   expectedHeadOid: string;
   remoteManifest: VFSManifest;
-  cacheSnapshot: RepositorySnapshot;
+  cacheManifest: VFSManifest;
   ops: PendingOp[];
   canvasOps: BatchCanvasOperation[];
   rawOps: BatchRawOperation[];
@@ -98,6 +97,10 @@ async function hasRawConflict(
     const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
     const remoteRevision = await computeRevision(remoteBytes);
     if (remoteRevision !== entry.op.baseFileRevision) {
+      const localRevision = await computeRevision(entry.bytes);
+      if (remoteRevision === localRevision) {
+        continue;
+      }
       logger.debug('Raw file conflict detected; aborting batch', {
         repositoryKind,
         nodeId: entry.op.nodeId,
@@ -132,7 +135,7 @@ export async function createBatchPlan(
       case 'upsert-manifest-node':
         applyCachedManifestUpsert(
           plan.manifest,
-          input.cacheSnapshot.manifest,
+          input.cacheManifest,
           op.nodeId,
         );
         plan.manifestChanged = true;
@@ -150,28 +153,24 @@ export async function createBatchPlan(
         plan.messages.push(`Delete node ${op.nodeId}`);
         break;
       case 'sync-custom-colors':
-        plan.manifest.colors = structuredClone(
-          input.cacheSnapshot.manifest.colors,
-        );
+        plan.manifest.colors = structuredClone(input.cacheManifest.colors);
         plan.manifestChanged = true;
         plan.messages.push('Sync custom colors');
         break;
       case 'sync-tag-registry':
-        plan.manifest.tagRegistry = [
-          ...input.cacheSnapshot.manifest.tagRegistry,
-        ];
+        plan.manifest.tagRegistry = [...input.cacheManifest.tagRegistry];
         plan.manifestChanged = true;
         plan.messages.push('Sync tag registry');
         break;
       case 'sync-pen-presets':
         plan.manifest.penPresets = structuredClone(
-          input.cacheSnapshot.manifest.penPresets,
+          input.cacheManifest.penPresets,
         );
         plan.manifestChanged = true;
         plan.messages.push('Sync pen presets');
         break;
       case 'push-note': {
-        const node = input.cacheSnapshot.manifest.nodes[op.nodeId];
+        const node = input.cacheManifest.nodes[op.nodeId];
         if (!node || node.type !== 'file') {
           plan.messages.push(`Skip missing node ${op.nodeId}`);
         }

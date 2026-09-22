@@ -452,18 +452,26 @@ export class GitHubRepository extends BaseRepository {
       },
     };
 
-    const response = await fetch(GITHUB_GRAPHQL_URL, {
-      method: 'POST',
-      headers: {
-        ...(await this.authHeaders()),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query:
-          'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
-        variables,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch(GITHUB_GRAPHQL_URL, {
+        method: 'POST',
+        headers: {
+          ...(await this.authHeaders()),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query:
+            'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
+          variables,
+        }),
+      });
+    } catch (error) {
+      throw new BatchUnknownError(
+        'GitHub GraphQL request failed before receiving a response',
+        error,
+      );
+    }
 
     if (!response.ok) {
       throw new BatchUnknownError(

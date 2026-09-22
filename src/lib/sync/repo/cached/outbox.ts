@@ -323,6 +323,8 @@ export function enqueueTagRegistrySync(ops: PendingOp[]): void {
 export class CachedRepositoryOutbox {
   private pendingOps: PendingOp[] = [];
   private recoveryErrorValue: Error | null = null;
+  private mutationBatchDepth = 0;
+  private mutationBatchDirty = false;
   private readonly pathValue: string;
   private readonly repositoryKind: string;
   private readonly onPendingWritesChanged: (count: number) => void;
@@ -376,15 +378,70 @@ export class CachedRepositoryOutbox {
     return true;
   }
 
+  async removePrefixIfUnchanged(
+    expected: readonly PendingOp[],
+  ): Promise<number> {
+    await this.load();
+    let matchingCount = 0;
+    while (
+      matchingCount < expected.length &&
+      matchingCount < this.pendingOps.length &&
+      areSameQueueEntry(this.pendingOps[matchingCount], expected[matchingCount])
+    ) {
+      matchingCount += 1;
+    }
+
+    if (matchingCount === 0) {
+      this.onPendingWritesChanged(this.pendingOps.length);
+      return 0;
+    }
+
+    this.pendingOps.splice(0, matchingCount);
+    await this.save();
+    return matchingCount;
+  }
+
+  async batchMutations<T>(fn: () => Promise<T>): Promise<T> {
+    const outermost = this.mutationBatchDepth === 0;
+    let rollbackOps: PendingOp[] | null = null;
+    if (outermost) {
+      await this.load();
+      rollbackOps = this.snapshotOps();
+    }
+    this.mutationBatchDepth += 1;
+    let succeeded = false;
+    try {
+      const result = await fn();
+      succeeded = true;
+      return result;
+    } finally {
+      this.mutationBatchDepth -= 1;
+      if (outermost) {
+        if (!succeeded && rollbackOps) {
+          this.pendingOps = rollbackOps;
+          this.mutationBatchDirty = false;
+          this.onPendingWritesChanged(this.pendingOps.length);
+        } else if (this.mutationBatchDirty) {
+          await this.save();
+          this.mutationBatchDirty = false;
+        }
+      }
+    }
+  }
+
   async mutate(
     mutator: (ops: PendingOp[]) => void,
     options: { reload?: boolean } = {},
   ): Promise<void> {
-    if (options.reload ?? true) {
+    if (this.mutationBatchDepth === 0 && (options.reload ?? true)) {
       await this.load();
     }
 
     mutator(this.pendingOps);
+    if (this.mutationBatchDepth > 0) {
+      this.mutationBatchDirty = true;
+      return;
+    }
     await this.save();
   }
 

@@ -72,7 +72,9 @@ describe('PDF library import', () => {
       'mcanvas',
       'folder-1',
     );
-    expect(repository.openSession).toHaveBeenCalledWith('canvas-1');
+    expect(repository.openSession).toHaveBeenCalledWith('canvas-1', {
+      skipRemotePull: true,
+    });
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(session.close).toHaveBeenCalledTimes(1);
 
