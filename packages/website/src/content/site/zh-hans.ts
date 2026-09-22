@@ -207,7 +207,7 @@ for step in range(3):
         key: 'mac',
         name: 'macOS',
         label: '下载 macOS 版',
-        sub: 'macOS 10.15 及以上',
+        sub: 'macOS 12 及以上',
       },
       {
         key: 'windows',

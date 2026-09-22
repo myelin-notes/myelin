@@ -205,7 +205,7 @@ for step in range(3):
         key: 'mac',
         name: 'macOS',
         label: 'Télécharger pour macOS',
-        sub: 'macOS 10.15+',
+        sub: 'macOS 12+',
       },
       {
         key: 'windows',
