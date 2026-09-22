@@ -378,6 +378,7 @@ describe('noteLinkMarkdownPlugin', () => {
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(view.dom.dispatchEvent).toHaveBeenCalledOnce();
     expect(dispatchedEvents[0]?.type).toBe(NOTE_LINK_OPEN_REQUEST_EVENT);
+    expect(dispatchedEvents[0]?.bubbles).toBe(true);
     expect(dispatchedEvents[0]?.detail).toEqual({
       title: 'Alpha Note',
       noteId: 'note-1',
