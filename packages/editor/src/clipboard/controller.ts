@@ -1,3 +1,4 @@
+import { MYELIN_CANVAS_CLIPBOARD_LABEL } from './formats';
 import { createCanvasPastePlacementTracker } from './placement';
 import {
   buildCanvasClipboardSnapshot,
@@ -91,6 +92,16 @@ export class CanvasClipboardController {
     }
 
     if (onMediaPaste?.(event)) {
+      event.preventDefault();
+      return true;
+    }
+
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    if (
+      text.trim() &&
+      text !== MYELIN_CANVAS_CLIPBOARD_LABEL &&
+      port.pasteText(text)
+    ) {
       event.preventDefault();
       return true;
     }
