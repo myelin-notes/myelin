@@ -218,13 +218,26 @@ export class CanvasInteractionController {
         );
       }
     });
-    this.state.addStart(InteractState.Moving, () => this.updateCursor());
-    this.state.addEnd(InteractState.Moving, () => this.updateCursor());
+    this.state.addStart(InteractState.Moving, (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        this.host.viewport.beginPanGesture(event.timeStamp);
+      }
+      this.updateCursor();
+    });
+    this.state.addEnd(InteractState.Moving, (event: PointerEvent) => {
+      if (event.pointerType === 'touch') {
+        this.host.viewport.endPanGesture(event.timeStamp);
+      }
+      this.updateCursor();
+    });
     this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
-      this.host.viewport.panBy(
-        event.movementX / this.host.viewport.zoom,
-        event.movementY / this.host.viewport.zoom,
-      );
+      const dx = event.movementX / this.host.viewport.zoom;
+      const dy = event.movementY / this.host.viewport.zoom;
+      if (event.pointerType === 'touch') {
+        this.host.viewport.panGestureBy(dx, dy, event.timeStamp);
+      } else {
+        this.host.viewport.panBy(dx, dy);
+      }
     });
   }
 

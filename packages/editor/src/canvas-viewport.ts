@@ -2,6 +2,16 @@ import type { Vector2 } from './geometry';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
+const PAN_SAMPLE_MAX_AGE_MS = 80;
+const PAN_INERTIA_MIN_SPEED = 0.08;
+const PAN_INERTIA_STOP_SPEED = 0.01;
+const PAN_INERTIA_MAX_SPEED = 3;
+const PAN_INERTIA_DECAY_PER_MS = 0.0045;
+
+interface PanSample extends Vector2 {
+  timeStamp: number;
+}
+
 // Exported because the background layer sizes its overdraw from the largest tile MAX_ZOOM allows.
 export const MIN_ZOOM = 0.05;
 export const MAX_ZOOM = 5;
@@ -42,6 +52,8 @@ export class CanvasViewport {
   // Two-finger touch pan + pinch state
   private _touchPanLast: Vector2 | null = null;
   private _touchPinchLastDist: number | null = null;
+  private _panPosition: Vector2 = { x: 0, y: 0 };
+  private _panSamples: PanSample[] = [];
 
   // iOS fires both streams for one pinch; the touch path owns it there, so gesture* stands down.
   private _touchPinching: boolean = false;
@@ -81,6 +93,7 @@ export class CanvasViewport {
     // Single-finger touch is left alone — DrawableCanvas pans the free canvas with one finger, and
     // in edit mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
+      this.cancelAnimation();
       // Before the suppression bail: gesture* must stand down for any two-finger touch, not just
       // the ones the camera acts on.
       this._touchPinching = evt.touches.length >= 2;
@@ -92,6 +105,7 @@ export class CanvasViewport {
         return;
       }
       if (evt.touches.length >= 2) {
+        this.beginPanGesture(evt.timeStamp);
         const t0 = evt.touches[0];
         const t1 = evt.touches[1];
         this._touchPanLast = {
@@ -135,18 +149,16 @@ export class CanvasViewport {
         return;
       }
       evt.preventDefault();
-      this.cancelAnimation();
 
       // On the free canvas, two-finger drag pans both axes; in edit mode,
       // lock pan to the edited element's page axis (consistent with wheel).
       const dx = avg.x - this._touchPanLast.x;
       const dy = avg.y - this._touchPanLast.y;
-      if (!this.editMode || this.editModePanAxis === 'horizontal') {
-        this._offset.x += dx / this._zoom;
-      }
-      if (!this.editMode || this.editModePanAxis === 'vertical') {
-        this._offset.y += dy / this._zoom;
-      }
+      const panX =
+        !this.editMode || this.editModePanAxis === 'horizontal' ? dx : 0;
+      const panY =
+        !this.editMode || this.editModePanAxis === 'vertical' ? dy : 0;
+      this.applyScreenPan(panX, panY, evt.timeStamp);
       this._touchPanLast = avg;
 
       // Anchored on the midpoint between the fingers. zoomAroundPoint already fires notifyViewChange
@@ -167,9 +179,15 @@ export class CanvasViewport {
 
     this._handleTouchEnd = (evt) => {
       if (evt.touches.length < 2) {
+        const wasPanning = this._touchPanLast != null;
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
         this._touchPinching = false;
+        if (wasPanning && evt.touches.length === 0) {
+          this.endPanGesture(evt.timeStamp);
+        } else if (wasPanning) {
+          this.resetPanGesture();
+        }
       }
     };
 
@@ -309,6 +327,29 @@ export class CanvasViewport {
     this.notifyViewChange();
   }
 
+  public beginPanGesture(timeStamp: number): void {
+    this.cancelAnimation();
+    this._panPosition = { x: 0, y: 0 };
+    this._panSamples = [{ x: 0, y: 0, timeStamp }];
+  }
+
+  public panGestureBy(dx: number, dy: number, timeStamp: number): void {
+    this.applyScreenPan(dx * this._zoom, dy * this._zoom, timeStamp);
+    this.notifyViewChange();
+  }
+
+  public endPanGesture(timeStamp: number): void {
+    const lastSample = this._panSamples.at(-1);
+    if (
+      !lastSample ||
+      timeStamp - lastSample.timeStamp > PAN_SAMPLE_MAX_AGE_MS
+    ) {
+      this.resetPanGesture();
+      return;
+    }
+    this.startPanInertia(timeStamp);
+  }
+
   /** Moves the camera without changing zoom. */
   public animateOffsetTo(offset: Vector2, durationMs: number = 300): void {
     const startOffset = { ...this._offset };
@@ -371,11 +412,11 @@ export class CanvasViewport {
    * from a non-passive listener so the preventDefault below still suppresses browser page zoom.
    */
   public handleWheel(evt: WheelEvent): void {
-    this.cancelAnimation();
     // Stop the browser from scrolling any ancestor / contentEditable; the
     // viewport owns wheel-driven view changes regardless of edit mode.
     evt.preventDefault();
     if (evt.ctrlKey) {
+      this.cancelAnimation();
       // Trackpad pinch (the browser sets ctrlKey) and ctrl+wheel. Anchored on the cursor.
       if (!this._zoomLocked) {
         // Exponential step: each notch multiplies zoom by a constant factor, so it feels equally
@@ -386,14 +427,17 @@ export class CanvasViewport {
         );
       }
     } else {
+      this.cancelAnimation();
       // Two-finger scroll on trackpad / mouse wheel → pan.
       // In edit mode, lock wheel pan to the edited element's page axis.
-      if (!this.editMode || this.editModePanAxis === 'horizontal') {
-        this._offset.x -= evt.deltaX / this._zoom;
-      }
-      if (!this.editMode || this.editModePanAxis === 'vertical') {
-        this._offset.y -= evt.deltaY / this._zoom;
-      }
+      const dx =
+        !this.editMode || this.editModePanAxis === 'horizontal'
+          ? -evt.deltaX
+          : 0;
+      const dy =
+        !this.editMode || this.editModePanAxis === 'vertical' ? -evt.deltaY : 0;
+      this._offset.x += dx / this._zoom;
+      this._offset.y += dy / this._zoom;
       this.notifyViewChange();
     }
   }
@@ -544,6 +588,7 @@ export class CanvasViewport {
   public cancelAnimation(): void {
     this._viewAnim?.stop();
     this._viewAnim = null;
+    this.resetPanGesture();
   }
 
   public destroy(): void {
@@ -624,5 +669,80 @@ export class CanvasViewport {
       x: this.canvas.width / dpr / 2,
       y: this.canvas.height / dpr / 2,
     });
+  }
+
+  private applyScreenPan(dx: number, dy: number, timeStamp: number): void {
+    this._panPosition.x += dx;
+    this._panPosition.y += dy;
+    this._panSamples.push({ ...this._panPosition, timeStamp });
+    const cutoff = timeStamp - PAN_SAMPLE_MAX_AGE_MS;
+    while (
+      this._panSamples.length > 1 &&
+      this._panSamples[0].timeStamp < cutoff
+    ) {
+      this._panSamples.shift();
+    }
+    this._offset.x += dx / this._zoom;
+    this._offset.y += dy / this._zoom;
+  }
+
+  private startPanInertia(startTime: number): void {
+    const firstSample = this._panSamples[0];
+    const lastSample = this._panSamples.at(-1);
+    if (!firstSample || !lastSample) {
+      this.resetPanGesture();
+      return;
+    }
+    const elapsed = lastSample.timeStamp - firstSample.timeStamp;
+    if (elapsed <= 0) {
+      this.resetPanGesture();
+      return;
+    }
+    const sampledVelocity = {
+      x: (lastSample.x - firstSample.x) / elapsed,
+      y: (lastSample.y - firstSample.y) / elapsed,
+    };
+    const speed = Math.hypot(sampledVelocity.x, sampledVelocity.y);
+    if (speed < PAN_INERTIA_MIN_SPEED) {
+      this.resetPanGesture();
+      return;
+    }
+    const scale = Math.min(1, PAN_INERTIA_MAX_SPEED / speed);
+    let velocity = {
+      x: sampledVelocity.x * scale,
+      y: sampledVelocity.y * scale,
+    };
+    let previousTime = startTime;
+    let rafId = 0;
+    const step = (now: number): void => {
+      const elapsed = Math.min(32, Math.max(0, now - previousTime));
+      previousTime = now;
+      const before = { ...this._offset };
+      this._offset.x += (velocity.x * elapsed) / this._zoom;
+      this._offset.y += (velocity.y * elapsed) / this._zoom;
+      this.clampOffsetToContent();
+      this.emitViewChange();
+      if (this._offset.x === before.x) {
+        velocity.x = 0;
+      }
+      if (this._offset.y === before.y) {
+        velocity.y = 0;
+      }
+      const decay = Math.exp(-PAN_INERTIA_DECAY_PER_MS * elapsed);
+      velocity = { x: velocity.x * decay, y: velocity.y * decay };
+      if (Math.hypot(velocity.x, velocity.y) >= PAN_INERTIA_STOP_SPEED) {
+        rafId = requestAnimationFrame(step);
+      } else {
+        this._viewAnim = null;
+      }
+    };
+    rafId = requestAnimationFrame(step);
+    this._viewAnim = { stop: () => cancelAnimationFrame(rafId) };
+    this.resetPanGesture();
+  }
+
+  private resetPanGesture(): void {
+    this._panPosition = { x: 0, y: 0 };
+    this._panSamples = [];
   }
 }

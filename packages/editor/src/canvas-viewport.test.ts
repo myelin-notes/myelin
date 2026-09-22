@@ -27,7 +27,16 @@ function createViewport() {
     return event;
   };
 
-  return { viewport, wheel };
+  const touchStart = () => {
+    const event = {
+      touches: [{}],
+      preventDefault: vi.fn(),
+    } as unknown as TouchEvent;
+    listeners.get('touchstart')?.(event);
+    return event;
+  };
+
+  return { viewport, wheel, touchStart };
 }
 
 describe('CanvasViewport edit-mode wheel panning', () => {
@@ -123,6 +132,114 @@ describe('CanvasViewport offset animation', () => {
     expect(viewport.offset).toEqual({ x: 100, y: -50 });
 
     now.mockRestore();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('CanvasViewport pan inertia', () => {
+  it('uses the native wheel stream without adding synthetic momentum', () => {
+    const requestAnimationFrame = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    const { viewport } = createViewport();
+
+    viewport.handleWheel({
+      ctrlKey: false,
+      deltaMode: 0,
+      deltaX: 0,
+      deltaY: 16,
+      timeStamp: 0,
+      preventDefault: vi.fn(),
+    } as unknown as WheelEvent);
+
+    expect(viewport.offset).toEqual({ x: 0, y: -16 });
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('continues a quick touch pan after release', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      }),
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const { viewport } = createViewport();
+
+    viewport.beginPanGesture(0);
+    viewport.panGestureBy(16, -8, 16);
+    viewport.endPanGesture(16);
+    const releasedAt = { ...viewport.offset };
+    frames.shift()?.(32);
+
+    expect(viewport.offset.x).toBeGreaterThan(releasedAt.x);
+    expect(viewport.offset.y).toBeLessThan(releasedAt.y);
+    expect(viewport.isAnimatingView).toBe(true);
+
+    viewport.destroy();
+    vi.unstubAllGlobals();
+  });
+
+  it('stops precisely after a slow touch pan', () => {
+    const requestAnimationFrame = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
+    const { viewport } = createViewport();
+
+    viewport.beginPanGesture(0);
+    viewport.panGestureBy(1, 0, 16);
+    viewport.endPanGesture(16);
+
+    expect(viewport.offset).toEqual({ x: 1, y: 0 });
+    expect(viewport.isAnimatingView).toBe(false);
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels momentum when a new gesture begins', () => {
+    const frames: FrameRequestCallback[] = [];
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      }),
+    );
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame);
+    const { viewport } = createViewport();
+
+    viewport.beginPanGesture(0);
+    viewport.panGestureBy(16, 0, 16);
+    viewport.endPanGesture(16);
+    viewport.beginPanGesture(20);
+
+    expect(viewport.isAnimatingView).toBe(false);
+    expect(cancelAnimationFrame).toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
+  });
+
+  it('cancels momentum as soon as a finger touches the canvas', () => {
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1),
+    );
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame);
+    const { viewport, touchStart } = createViewport();
+
+    viewport.beginPanGesture(0);
+    viewport.panGestureBy(16, 0, 16);
+    viewport.endPanGesture(16);
+    touchStart();
+
+    expect(viewport.isAnimatingView).toBe(false);
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+
     vi.unstubAllGlobals();
   });
 });
