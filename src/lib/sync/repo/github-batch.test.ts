@@ -9,10 +9,12 @@ import {
 import { BatchUnknownError } from './batch';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github-git-push';
 import { LocalRepository } from './local';
 import { getStoredFilePath } from './shared';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
+vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 function buildRepository(suffix: string) {
   const remote = new GitHubRepository({
@@ -30,467 +32,335 @@ function buildRepository(suffix: string) {
   return { remote, cache, repository };
 }
 
-describe('CachedRepository batched flush via GitHub GraphQL', () => {
+function mockPush() {
+  vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+    getRepositoryTestGitHubApi().applyGitPush(
+      input.additions,
+      input.deletions,
+      input.expectedHeadOid,
+    ),
+  );
+}
+
+describe('CachedRepository GitHub Git pushes', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
     vi.mocked(trackEvent).mockClear();
+    vi.mocked(pushGitHubBatch).mockReset();
+    mockPush();
   });
 
-  it('drains all pending ops in a single GraphQL commit', async () => {
-    const { repository } = buildRepository('batch-happy-path');
+  it('commits small queued changes through embedded Git', async () => {
+    const { repository } = buildRepository('git-small-batch');
     await repository.initialize();
-
-    const api = getRepositoryTestGitHubApi();
-    const baselinePuts = api.putCallCount;
-    const baselineGraphql = api.graphqlCallCount;
-
-    const fileIdA = await repository.createFile('Note A', 'mcanvas', null);
-    const fileIdB = await repository.createFile('Note B', 'mcanvas', null);
-    const noteA = createNoteState('alpha content');
-    const noteB = createNoteState('beta content');
-
-    await repository.pushUpdates(fileIdA, noteA.update, {
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
+    const first = await repository.createFile('First', 'mcanvas', null);
+    const second = await repository.createFile('Second', 'mcanvas', null);
+    const note = createNoteState('content');
+    await repository.pushUpdates(first, note.update, {
       baseRevision: null,
-      localStateVector: noteA.stateVector,
+      localStateVector: note.stateVector,
     });
-    await repository.pushUpdates(fileIdB, noteB.update, {
-      baseRevision: null,
-      localStateVector: noteB.stateVector,
-    });
-
-    await repository.flushPending();
-
-    expect(api.graphqlCallCount - baselineGraphql).toBe(1);
-    expect(api.putCallCount).toBe(baselinePuts);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('retries the batch once on a HEAD OID conflict and succeeds', async () => {
-    const { repository } = buildRepository('batch-conflict-retry');
-    await repository.initialize();
-
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const baselinePuts = api.putCallCount;
-
-    const fileId = await repository.createFile('Retry note', 'mcanvas', null);
-    const note = createNoteState('retry content');
-    await repository.pushUpdates(fileId, note.update, {
+    await repository.pushUpdates(second, note.update, {
       baseRevision: null,
       localStateVector: note.stateVector,
     });
 
-    api.failNextGraphQL('head-conflict');
     await repository.flushPending();
 
-    expect(api.graphqlCallCount - baselineGraphql).toBe(2);
-    expect(api.putCallCount).toBe(baselinePuts);
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - baseline).toBe(1);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('falls back to per-op REST after two consecutive HEAD OID conflicts', async () => {
-    const { repository } = buildRepository('batch-conflict-fallback');
+  it('replans after a branch head conflict and preserves the queued change', async () => {
+    const { repository } = buildRepository('git-conflict');
     await repository.initialize();
+    await repository.createFile('Retry', 'mp4', null, new Uint8Array([1]));
+    const push = vi.mocked(pushGitHubBatch);
+    const baseline = push.mock.calls.length;
+    const write = push.getMockImplementation()!;
+    push.mockImplementationOnce(async () => {
+      getRepositoryTestGitHubApi().bumpHeadOidExternally();
+      return { status: 'head-conflict', commitOid: null, blobShas: {} };
+    });
+    push.mockImplementation(write);
 
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const baselinePuts = api.putCallCount;
+    await repository.flushPending();
 
+    expect(push.mock.calls.length - baseline).toBe(2);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('replans when another writer advances the ref during push', async () => {
+    const { repository } = buildRepository('git-push-ref-conflict');
+    await repository.initialize();
+    await repository.createFile('Retry', 'mp4', null, new Uint8Array([1]));
+    const push = vi.mocked(pushGitHubBatch);
+    const baseline = push.mock.calls.length;
+    push.mockImplementationOnce(async () => {
+      getRepositoryTestGitHubApi().bumpHeadOidExternally();
+      return {
+        status: 'push-failed',
+        commitOid: 'f'.repeat(40),
+        blobShas: {},
+      };
+    });
+
+    await repository.flushPending();
+
+    expect(push.mock.calls.length - baseline).toBe(2);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('keeps a failed push queued and reports only safe metrics', async () => {
+    const { remote, repository } = buildRepository('git-failed');
+    await repository.initialize();
     const fileId = await repository.createFile(
-      'Fallback note',
-      'mcanvas',
-      null,
-    );
-    const note = createNoteState('fallback content');
-    await repository.pushUpdates(fileId, note.update, {
-      baseRevision: null,
-      localStateVector: note.stateVector,
-    });
-
-    api.failNextGraphQL('head-conflict');
-    api.failNextGraphQL('head-conflict');
-    await repository.flushPending();
-
-    expect(api.graphqlCallCount - baselineGraphql).toBe(2);
-    expect(api.putCallCount).toBeGreaterThan(baselinePuts);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('retries smaller GraphQL prefixes after a network failure', async () => {
-    const { repository } = buildRepository('batch-network-fallback');
-    await repository.initialize();
-
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const baselinePuts = api.putCallCount;
-
-    const fileId = await repository.createFile('Net note', 'mcanvas', null);
-    const note = createNoteState('net content');
-    await repository.pushUpdates(fileId, note.update, {
-      baseRevision: null,
-      localStateVector: note.stateVector,
-    });
-
-    api.failNextGraphQL('network');
-    await repository.flushPending();
-
-    expect(api.graphqlCallCount - baselineGraphql).toBe(3);
-    expect(api.putCallCount).toBe(baselinePuts);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('tracks safe request diagnostics when a single-change GraphQL commit fails', async () => {
-    const { repository } = buildRepository('batch-failure-diagnostics');
-    await repository.initialize();
-    const api = getRepositoryTestGitHubApi();
-
-    const fileId = await repository.createFile(
-      'Private note title from GitHub',
+      'Private import title',
       'mp4',
       null,
-      new Uint8Array([1, 2, 3]),
+      new Uint8Array([1]),
     );
     await repository.flushPending();
-    vi.mocked(trackEvent).mockClear();
-    await repository.writeFileBytes(fileId, new Uint8Array([4, 5, 6, 7]));
-    api.failNextGraphQL('http-499');
+    await repository.writeFileBytes(fileId, new Uint8Array(73_873_604));
+    const pushCount = vi.mocked(pushGitHubBatch).mock.calls.length;
+    vi.mocked(pushGitHubBatch).mockRejectedValue(new Error('secret token'));
 
     await expect(repository.flushPending()).rejects.toThrow(
-      'GitHub GraphQL request failed (499)',
+      'GitHub Git push failed (upload)',
     );
 
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
+      0,
+    );
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - pushCount).toBe(1);
     const failure = vi
       .mocked(trackEvent)
       .mock.calls.filter(([event]) => event === 'sync_failed')
       .at(-1)?.[1];
     expect(failure).toMatchObject({
-      error_message: 'GitHub GraphQL request failed (499)',
-      pending_remote_writes: 1,
-      github_graphql_stage: 'http',
-      github_graphql_status: 499,
-      github_graphql_content_type: 'application/json',
-      github_graphql_additions: 2,
-      github_graphql_deletions: 0,
-      github_request_id: 'test-request-id',
+      github_git_stage: 'upload',
+      github_git_additions: 2,
+      pending_remote_writes: expect.any(Number),
     });
-    expect(failure?.github_graphql_request_chars).toBeGreaterThan(0);
-    expect(failure?.github_graphql_file_bytes).toBeGreaterThan(4);
-    expect(failure?.github_graphql_response_chars).toBeGreaterThan(0);
-    expect(JSON.stringify(failure)).not.toContain('Private note title');
+    expect(failure?.github_git_file_bytes).toBeGreaterThan(73_873_604);
+    expect(JSON.stringify(failure)).not.toContain('Private import title');
+    expect(JSON.stringify(failure)).not.toContain('secret token');
+    expect(repository.getRuntimeStatus().lastError?.message).not.toContain(
+      'secret token',
+    );
+    mockPush();
+    await repository.flushPending();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(73_873_604);
   });
 
-  it('does not create a conflict copy after an ambiguous successful commit', async () => {
-    const { remote, repository } = buildRepository('batch-ambiguous-success');
-    await repository.initialize();
-    const commitBatch = remote.commitBatch.bind(remote);
-    let firstCommit = true;
-    vi.spyOn(remote, 'commitBatch').mockImplementation(async (input) => {
-      const result = await commitBatch(input);
-      if (firstCommit) {
-        firstCommit = false;
-        throw new BatchUnknownError('response lost after commit', null);
-      }
-      return result;
+  it('includes only allowlisted native Git failures in diagnostics', async () => {
+    const { remote } = buildRepository('git-native-diagnostics');
+    await remote.initialize();
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git clone failed (Http/Auth)',
+    );
+
+    await expect(
+      remote.commitBatch({
+        additions: [{ path: 'files/note', contents: new Uint8Array([1]) }],
+        deletions: [],
+        message: { headline: 'Sync note' },
+        expectedHeadOid: await remote.getBranchHeadOid(),
+      }),
+    ).rejects.toMatchObject({
+      message: 'GitHub Git push failed (upload: Git clone failed (Http/Auth))',
+      diagnostics: {
+        github_git_reason: 'Git clone failed',
+        github_git_error_class: 'Http',
+        github_git_error_code: 'Auth',
+      },
+    });
+  });
+
+  it('tracks a push rejection and safe REST verification details', async () => {
+    const { remote } = buildRepository('git-push-diagnostics');
+    await remote.initialize();
+    const api = getRepositoryTestGitHubApi();
+    api.failNextCompare(503);
+    vi.mocked(pushGitHubBatch).mockResolvedValueOnce({
+      status: 'push-failed',
+      commitOid: 'f'.repeat(40),
+      blobShas: {},
+      failureReason: 'Git push failed (Net/Timeout)',
     });
 
+    await expect(
+      remote.commitBatch({
+        additions: [],
+        deletions: [{ path: 'files/note' }],
+        message: { headline: 'Delete note' },
+        expectedHeadOid: await remote.getBranchHeadOid(),
+      }),
+    ).rejects.toMatchObject({
+      diagnostics: {
+        github_git_stage: 'verify',
+        github_git_reason: 'Git push failed',
+        github_git_error_class: 'Net',
+        github_git_error_code: 'Timeout',
+        github_rest_status: 503,
+        github_request_id: 'rest-test-id',
+      },
+    });
+  });
+
+  it('does not push twice when the response is lost after a successful write', async () => {
+    const { remote, repository } = buildRepository('git-ambiguous');
+    await repository.initialize();
+    const bytes = new Uint8Array(73_873_604);
+    bytes[0] = 42;
     const fileId = await repository.createFile(
-      'Applied once.bin',
+      'Large import',
       'mp4',
       null,
-      new Uint8Array([4, 5, 6]),
+      new Uint8Array([1]),
     );
     await repository.flushPending();
-
-    const [, localFiles] = await repository.listDirectory(null);
-    const [, remoteFiles] = await remote.listDirectory(null);
-    expect(localFiles.map((file) => file.id)).toEqual([fileId]);
-    expect(remoteFiles.map((file) => file.id)).toEqual([fileId]);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('chunks a large operation count across commits', async () => {
-    const { repository } = buildRepository('batch-large');
-    await repository.initialize();
-
+    await repository.writeFileBytes(fileId, bytes);
     const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-
-    const bytes = new Uint8Array([1, 2, 3]);
-    for (let i = 0; i < 55; i++) {
-      await repository.createFile(`raw-${i}.bin`, 'mp4', null, bytes);
-    }
-
-    await repository.flushPending();
-
-    expect(api.graphqlCallCount - baselineGraphql).toBe(3);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('resumes from the first uncommitted chunk after restart', async () => {
-    const suffix = 'batch-restart';
-    const { remote, repository } = buildRepository(suffix);
-    await repository.initialize();
-    const bytes = new Uint8Array([1, 2, 3]);
-    for (let i = 0; i < 25; i++) {
-      await repository.createFile(`restart-${i}.bin`, 'mp4', null, bytes);
-    }
-
-    const commitBatch = remote.commitBatch.bind(remote);
-    let commitAttempts = 0;
-    const interruptedCommit = vi
-      .spyOn(remote, 'commitBatch')
-      .mockImplementation(async (input) => {
-        commitAttempts += 1;
-        if (commitAttempts > 1) {
-          throw new BatchUnknownError('simulated interruption', null);
-        }
-        return commitBatch(input);
-      });
+    const push = vi.mocked(pushGitHubBatch);
+    const baseline = push.mock.calls.length;
+    push.mockImplementationOnce(async (_config, input) => {
+      api.applyGitPush(input.additions, input.deletions, input.expectedHeadOid);
+      throw new Error('response lost');
+    });
 
     await expect(repository.flushPending()).rejects.toThrow(
-      'simulated interruption',
+      'GitHub Git push failed',
     );
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(10);
-    interruptedCommit.mockRestore();
-    const tarballsBeforeRestart =
-      getRepositoryTestGitHubApi().tarballFetchCount;
-
-    const reopened = buildRepository(suffix).repository;
-    await reopened.initialize();
-    expect(getRepositoryTestGitHubApi().tarballFetchCount).toBe(
-      tarballsBeforeRestart,
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
+      0,
     );
-    await reopened.flushPending();
-
-    expect(reopened.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    expect(getRepositoryTestGitHubApi().graphqlCallCount).toBeGreaterThan(1);
-  });
-
-  it('chunks batches by raw byte size', async () => {
-    const { repository } = buildRepository('batch-byte-limit');
-    await repository.initialize();
-
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const bytes = new Uint8Array(5 * 1024 * 1024);
-
-    for (let i = 0; i < 3; i++) {
-      bytes[0] = i;
-      await repository.createFile(`large-${i}.bin`, 'mp4', null, bytes);
-    }
-
     await repository.flushPending();
 
-    expect(api.graphqlCallCount - baselineGraphql).toBe(3);
+    const path = getStoredFilePath({ id: fileId, fileType: 'mp4' });
+    expect(push.mock.calls.length - baseline).toBe(1);
+    expect(
+      push.mock.calls[baseline]?.[1].additions.some(
+        (addition) => addition.path === path,
+      ),
+    ).toBe(true);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(bytes.length);
+  });
+
+  it('does not create a duplicate whole-queue commit after losing its response', async () => {
+    const { remote, repository } = buildRepository('git-ambiguous-queue');
+    await repository.initialize();
+    await repository.createFile('First', 'mp4', null, new Uint8Array([1]));
+    await repository.createFile('Second', 'mp4', null, new Uint8Array([2]));
+    const api = getRepositoryTestGitHubApi();
+    const push = vi.mocked(pushGitHubBatch);
+    const baseline = push.mock.calls.length;
+    push.mockImplementationOnce(async (_config, input) => {
+      api.applyGitPush(input.additions, input.deletions, input.expectedHeadOid);
+      throw new Error('response lost');
+    });
+
+    await expect(repository.flushPending()).rejects.toThrow(BatchUnknownError);
+    const committedHead = await remote.getBranchHeadOid();
+    await repository.flushPending();
+
+    expect(push.mock.calls.length - baseline).toBe(2);
+    expect(await remote.getBranchHeadOid()).toBe(committedHead);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('uploads a large file as a blob and commits its existing path with the manifest', async () => {
-    const { remote, repository } = buildRepository('batch-single-large-file');
+  it('accepts a push that succeeded but returned a failed response', async () => {
+    const { repository } = buildRepository('git-push-response-lost');
     await repository.initialize();
+    await repository.createFile('Note', 'mp4', null, new Uint8Array([1]));
+    vi.mocked(pushGitHubBatch).mockImplementationOnce(
+      async (_config, input) => ({
+        ...getRepositoryTestGitHubApi().applyGitPush(
+          input.additions,
+          input.deletions,
+          input.expectedHeadOid,
+        ),
+        status: 'push-failed',
+      }),
+    );
 
+    await repository.flushPending();
+
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('commits 105 queued files, including a large file, in one push', async () => {
+    const { remote, repository } = buildRepository('git-large-file');
+    await repository.initialize();
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
+    const bytes = new Uint8Array(73_873_604);
+    bytes[0] = 42;
+    bytes[bytes.length - 1] = 99;
     const fileId = await repository.createFile(
       'Large recording.mp4',
       'mp4',
       null,
-      new Uint8Array([1]),
+      bytes,
     );
+    for (let i = 0; i < 104; i++) {
+      await repository.createFile(
+        `small-${i}`,
+        'mp4',
+        null,
+        new Uint8Array([i]),
+      );
+    }
+
     await repository.flushPending();
 
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - baseline).toBe(1);
+    const path = getStoredFilePath({ id: fileId, fileType: 'mp4' });
     const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const baselinePuts = api.putCallCount;
-    const baselineBlobs = api.blobCreateCount;
-    const baselineRefs = api.refUpdateCount;
-    const bytes = new Uint8Array(8 * 1024 * 1024 + 1);
-    bytes[0] = 42;
-    bytes[bytes.length - 1] = 99;
-
-    await repository.writeFileBytes(fileId, bytes);
-    await repository.flushPending();
-
-    expect(api.graphqlCallCount).toBe(baselineGraphql);
-    expect(api.putCallCount).toBe(baselinePuts);
-    expect(api.blobCreateCount - baselineBlobs).toBe(2);
-    expect(api.refUpdateCount - baselineRefs).toBe(1);
+    expect(api.readBytes(path)?.byteLength).toBe(bytes.byteLength);
+    expect(api.readBytes(path)?.[0]).toBe(42);
+    expect((await remote.readFileBytes(fileId))?.[bytes.length - 1]).toBe(99);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    const storedPath = getStoredFilePath({ id: fileId, fileType: 'mp4' });
-    expect(api.readBytes(storedPath)?.byteLength).toBe(bytes.byteLength);
-    expect(api.readBytes(storedPath)?.[0]).toBe(42);
-
-    const remoteBytes = await remote.readFileBytes(fileId);
-    expect(remoteBytes?.byteLength).toBe(bytes.byteLength);
-    expect(remoteBytes?.[0]).toBe(42);
-    expect(remoteBytes?.[bytes.length - 1]).toBe(99);
   });
 
-  it('routes a single change set by total bytes even when each file is under 8 MiB', async () => {
-    const { remote } = buildRepository('batch-total-byte-limit');
-    await remote.initialize();
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-    const baselineBlobs = api.blobCreateCount;
-
-    await remote.commitBatch({
-      additions: [
-        { path: 'files/first.bin', contents: new Uint8Array(5 * 1024 * 1024) },
-        { path: 'files/second.bin', contents: new Uint8Array(4 * 1024 * 1024) },
-      ],
-      deletions: [],
-      message: { headline: 'Upload two files' },
-      expectedHeadOid: await remote.getBranchHeadOid(),
-    });
-
-    expect(api.graphqlCallCount).toBe(baselineGraphql);
-    expect(api.blobCreateCount - baselineBlobs).toBe(2);
-    expect(api.readBytes('files/first.bin')?.byteLength).toBe(5 * 1024 * 1024);
-    expect(api.readBytes('files/second.bin')?.byteLength).toBe(4 * 1024 * 1024);
-  });
-
-  it('replans a large upload after a ref conflict without dropping its queued operation', async () => {
-    const { remote, repository } = buildRepository('batch-large-ref-conflict');
+  it('retries a failed whole-queue commit after restart', async () => {
+    const suffix = 'git-restart';
+    const { repository } = buildRepository(suffix);
     await repository.initialize();
-    const fileId = await repository.createFile(
-      'Large.mp4',
-      'mp4',
-      null,
-      new Uint8Array([1]),
-    );
-    await repository.flushPending();
-    await repository.writeFileBytes(
-      fileId,
-      new Uint8Array(8 * 1024 * 1024 + 1),
-    );
-    const api = getRepositoryTestGitHubApi();
-    api.failNextGitData('ref-conflict');
-
-    await repository.flushPending();
-
-    expect(api.refUpdateCount).toBe(2);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(
-      8 * 1024 * 1024 + 1,
-    );
-  });
-
-  it.each([
-    'ref-applied-network',
-    'ref-applied-advanced',
-  ] as const)('drains an applied large upload when %s loses its response', async (failure) => {
-    const { remote, repository } = buildRepository(`batch-large-${failure}`);
-    await repository.initialize();
-    const fileId = await repository.createFile(
-      'Large.mp4',
-      'mp4',
-      null,
-      new Uint8Array(8 * 1024 * 1024 + 1),
-    );
-    const api = getRepositoryTestGitHubApi();
-    api.failNextGitData(failure);
-
-    await repository.flushPending();
-
-    expect(api.refUpdateCount).toBe(1);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(
-      8 * 1024 * 1024 + 1,
-    );
-  });
-
-  it('drains an already applied large upload after verification was unavailable', async () => {
-    const { repository } = buildRepository('batch-large-unverifiable');
-    await repository.initialize();
-    const fileId = await repository.createFile(
-      'Large.mp4',
-      'mp4',
-      null,
-      new Uint8Array([1]),
-    );
-    await repository.flushPending();
-    await repository.writeFileBytes(
-      fileId,
-      new Uint8Array(8 * 1024 * 1024 + 1),
-    );
-    const api = getRepositoryTestGitHubApi();
-    api.failNextGitData('ref-applied-unverifiable');
+    for (let i = 0; i < 25; i++) {
+      await repository.createFile(
+        `note-${i}`,
+        'mp4',
+        null,
+        new Uint8Array([i]),
+      );
+    }
+    const push = vi.mocked(pushGitHubBatch);
+    const baseline = push.mock.calls.length;
+    push.mockRejectedValueOnce(new Error('interrupted'));
 
     await expect(repository.flushPending()).rejects.toThrow(
-      'GitHub REST ref request failed',
+      'GitHub Git push failed',
     );
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
-    expect(api.refUpdateCount).toBe(1);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
+      0,
+    );
+    expect(push.mock.calls.length - baseline).toBe(1);
+    mockPush();
+    const reopened = buildRepository(suffix).repository;
+    await reopened.initialize();
+    await reopened.flushPending();
 
-    await repository.flushPending();
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    expect(api.refUpdateCount).toBe(1);
+    expect(reopened.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect(push.mock.calls.length - baseline).toBe(2);
   });
 
-  it('uploads a large canvas without repeating an ambiguous commit', async () => {
-    const { remote, repository } = buildRepository('batch-large-canvas');
-    await repository.initialize();
-    const fileId = await repository.createFile('Imported PDF', 'mcanvas', null);
-    await repository.flushPending();
-    const doc = new Y.Doc();
-    doc.getMap('pdf').set('bytes', new Uint8Array(8 * 1024 * 1024 + 1));
-    await repository.pushUpdates(fileId, Y.encodeStateAsUpdate(doc), {
-      baseRevision: null,
-      localStateVector: Y.encodeStateVector(doc),
-    });
-    const api = getRepositoryTestGitHubApi();
-    api.failNextGitData('ref-applied-unverifiable');
-
-    await expect(repository.flushPending()).rejects.toThrow(
-      'GitHub REST ref request failed',
-    );
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
-    await repository.flushPending();
-
-    expect(api.refUpdateCount).toBe(1);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    const remoteDoc = new Y.Doc();
-    Y.applyUpdate(remoteDoc, (await remote.loadDocument(fileId)).update!);
-    expect(
-      (remoteDoc.getMap('pdf').get('bytes') as Uint8Array).byteLength,
-    ).toBe(8 * 1024 * 1024 + 1);
-  });
-
-  it('keeps a rejected large upload queued and records safe REST diagnostics', async () => {
-    const { repository } = buildRepository('batch-large-400');
-    await repository.initialize();
-    await repository.createFile(
-      'Private note title',
-      'mp4',
-      null,
-      new Uint8Array(8 * 1024 * 1024 + 1),
-    );
-    const api = getRepositoryTestGitHubApi();
-    api.failNextGitData('blob-400');
-
-    await expect(repository.flushPending()).rejects.toThrow(
-      'GitHub REST blob request failed (400)',
-    );
-
-    const failure = vi
-      .mocked(trackEvent)
-      .mock.calls.filter(([event]) => event === 'sync_failed')
-      .at(-1)?.[1];
-    expect(failure).toMatchObject({
-      github_rest_stage: 'blob',
-      github_rest_status: 400,
-      github_rest_content_type: 'application/json',
-      github_request_id: 'rest-test-id',
-    });
-    expect(failure?.github_rest_file_bytes).toBeGreaterThan(8 * 1024 * 1024);
-    expect(failure?.github_rest_request_chars).toBeGreaterThan(8 * 1024 * 1024);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
-    expect(JSON.stringify(failure)).not.toContain('Private note title');
-  });
-
-  it('does not export every cached file while planning a batch', async () => {
-    const { cache, repository } = buildRepository('batch-manifest-only');
+  it('does not export cached files while planning a batch', async () => {
+    const { cache, repository } = buildRepository('git-manifest-only');
     await repository.initialize();
     const exportSnapshot = vi.spyOn(cache, 'exportSnapshot');
-
     await repository.createFile(
       'Note',
       'mcanvas',
@@ -498,15 +368,13 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
       createNoteState('content').update,
     );
     await repository.flushPending();
-
     expect(exportSnapshot).not.toHaveBeenCalled();
   });
 
   it('keeps sync behind an active bulk import', async () => {
-    const { repository } = buildRepository('batch-import-lock');
+    const { repository } = buildRepository('git-import-lock');
     await repository.initialize();
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
     let releaseImport: (() => void) | undefined;
     const importGate = new Promise<void>((resolve) => {
       releaseImport = resolve;
@@ -515,7 +383,6 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     const started = new Promise<void>((resolve) => {
       importStarted = resolve;
     });
-
     const importPromise = repository.batchManifestWrites(async () => {
       await repository.createFile('First', 'mcanvas', null);
       importStarted?.();
@@ -525,127 +392,73 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     await started;
     const flushPromise = repository.flushPending();
     await Promise.resolve();
-
-    expect(api.graphqlCallCount).toBe(baselineGraphql);
-
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length).toBe(baseline);
     releaseImport?.();
     await importPromise;
     await flushPromise;
-
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-    expect(api.graphqlCallCount).toBeGreaterThan(baselineGraphql);
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length).toBeGreaterThan(
+      baseline,
+    );
   });
 
-  it('does not queue remote pulls for files created inside a bulk import', async () => {
-    const { remote, repository } = buildRepository('batch-import-pulls');
+  it('creates a conflict copy after another device changed raw file bytes', async () => {
+    const { remote, repository } = buildRepository('git-raw-conflict');
     await repository.initialize();
-    const pullUpdates = vi.spyOn(remote, 'pullUpdates');
-
-    await repository.batchManifestWrites(async () => {
-      const fileId = await repository.createFile(
-        'Imported note',
-        'mcanvas',
-        null,
-      );
-      const session = await repository.openSession(fileId, {
-        skipRemotePull: true,
-      });
-      session.ydoc.doc.getText('content').insert(0, 'imported');
-      await session.save();
-      await session.close();
-    });
-    await repository.flushPending();
-
-    expect(pullUpdates).not.toHaveBeenCalled();
-  });
-
-  it('does not sync partial state from a failed bulk import', async () => {
-    const { repository } = buildRepository('batch-import-failure');
-    await repository.initialize();
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-
-    await expect(
-      repository.batchManifestWrites(async () => {
-        await repository.createFile('Partial note', 'mcanvas', null);
-        throw new Error('import failed');
-      }),
-    ).rejects.toThrow('import failed');
-    await Promise.resolve();
-
-    expect(api.graphqlCallCount).toBe(baselineGraphql);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-  });
-
-  it('aborts batch and uses REST when a raw-file write has a stale base revision', async () => {
-    const { remote, repository } = buildRepository('batch-raw-conflict');
-    await repository.initialize();
-
-    const api = getRepositoryTestGitHubApi();
-
     const fileId = await repository.createFile(
       'Clip.mp4',
       'mp4',
       null,
-      new Uint8Array([1, 2, 3]),
+      new Uint8Array([1]),
     );
     await repository.flushPending();
-
-    // Simulate another writer changing the raw file on the remote so the local
-    // baseFileRevision the next write captures will be stale.
     await remote.writeFileBytes(fileId, new Uint8Array([7, 8, 9]));
-
-    const baselineGraphql = api.graphqlCallCount;
-    const baselinePuts = api.putCallCount;
-
     await repository.writeFileBytes(fileId, new Uint8Array([4, 5, 6]));
     await repository.flushPending();
 
-    expect(api.graphqlCallCount).toBe(baselineGraphql);
-    expect(api.putCallCount).toBeGreaterThan(baselinePuts);
-    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
-
     const [, files] = await repository.listDirectory(null);
-    const conflictCopy = files.find((f) => f.name !== 'Clip.mp4');
-    expect(conflictCopy).toBeDefined();
+    expect(files.some((file) => file.name !== 'Clip.mp4')).toBe(true);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('updates manifest modifiedAt for canvas pushes routed through the batch', async () => {
-    const { remote, repository } = buildRepository('batch-canvas-manifest');
+  it('updates the manifest modified time with a canvas batch', async () => {
+    const { remote, repository } = buildRepository('git-canvas-manifest');
     await repository.initialize();
-
     const fileId = await repository.createFile('Linked note', 'mcanvas', null);
     await repository.flushPending();
-
-    const remoteNodeBefore = await remote.getNode(fileId);
-    expect(remoteNodeBefore?.type).toBe('file');
-    const modifiedAtBefore =
-      remoteNodeBefore && remoteNodeBefore.type === 'file'
-        ? remoteNodeBefore.modifiedAt
-        : 0;
-
-    const api = getRepositoryTestGitHubApi();
-    const baselineGraphql = api.graphqlCallCount;
-
-    // Advance the wall clock by sleeping enough that Date.now() must move
-    // forward; modifiedAt is timestamp-based.
+    const before = await remote.getNode(fileId);
     await new Promise((resolve) => setTimeout(resolve, 5));
-
-    const note = createNoteState('updated content');
+    const note = createNoteState('updated');
     await repository.pushUpdates(fileId, note.update, {
       baseRevision: null,
       localStateVector: note.stateVector,
     });
     await repository.flushPending();
+    const after = await remote.getNode(fileId);
+    expect(before?.type).toBe('file');
+    expect(after?.type).toBe('file');
+    if (before?.type === 'file' && after?.type === 'file') {
+      expect(after.modifiedAt).toBeGreaterThan(before.modifiedAt);
+    }
+  });
 
-    expect(api.graphqlCallCount - baselineGraphql).toBe(1);
-
-    const remoteNodeAfter = await remote.getNode(fileId);
-    expect(remoteNodeAfter?.type).toBe('file');
-    const modifiedAtAfter =
-      remoteNodeAfter && remoteNodeAfter.type === 'file'
-        ? remoteNodeAfter.modifiedAt
-        : 0;
-    expect(modifiedAtAfter).toBeGreaterThan(modifiedAtBefore);
+  it('keeps an ambiguous canvas update queued until remote state is known', async () => {
+    const { repository } = buildRepository('git-canvas-unknown');
+    await repository.initialize();
+    const fileId = await repository.createFile('Imported PDF', 'mcanvas', null);
+    await repository.flushPending();
+    const doc = new Y.Doc();
+    doc.getMap('pdf').set('bytes', new Uint8Array(1024));
+    await repository.pushUpdates(fileId, Y.encodeStateAsUpdate(doc), {
+      baseRevision: null,
+      localStateVector: Y.encodeStateVector(doc),
+    });
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      new Error('connection closed'),
+    );
+    await expect(repository.flushPending()).rejects.toThrow(BatchUnknownError);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+    await repository.flushPending();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 });

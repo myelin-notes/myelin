@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createGzippedTar,
   createNoteState,
@@ -7,12 +7,15 @@ import {
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github-git-push';
 import {
   createEmptyManifest,
   getNotePath,
   getStoredFilePath,
   MANIFEST_PATH,
 } from './shared';
+
+vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 function createRepository() {
   return new GitHubRepository({
@@ -26,6 +29,14 @@ function createRepository() {
 describe('GitHubRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
+    vi.mocked(pushGitHubBatch).mockReset();
+    vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+      getRepositoryTestGitHubApi().applyGitPush(
+        input.additions,
+        input.deletions,
+        input.expectedHeadOid,
+      ),
+    );
   });
 
   it('initializes missing manifest content as an empty repository', async () => {
@@ -51,8 +62,20 @@ describe('GitHubRepository', () => {
       'GitHub branch request failed (404)',
     );
 
-    expect(githubApi.putCallCount).toBe(0);
+    expect(pushGitHubBatch).not.toHaveBeenCalled();
     expect(githubApi.readJson(MANIFEST_PATH)).toBeNull();
+  });
+
+  it('reports a REST request ID without exposing the response body', async () => {
+    const repository = createRepository();
+    getRepositoryTestGitHubApi().failNextBranch(
+      422,
+      '{"message":"Private note title: malformed request"}',
+    );
+
+    await expect(repository.getBranchHeadOid()).rejects.toMatchObject({
+      message: 'GitHub branch request failed (422) [request rest-test-id]',
+    });
   });
 
   it('writes manifest and note contents through the transport', async () => {
@@ -119,19 +142,25 @@ describe('GitHubRepository', () => {
     const fileId = await repository.createFile('Large.mp4', 'mp4', null, bytes);
     const path = getStoredFilePath({ id: fileId, fileType: 'mp4' });
 
-    expect(api.blobCreateCount).toBe(1);
-    expect(api.refUpdateCount).toBe(1);
+    expect(pushGitHubBatch).toHaveBeenCalled();
     expect(api.readBytes(path)?.byteLength).toBe(bytes.byteLength);
     expect(api.readBytes(path)?.[0]).toBe(7);
     expect(api.readBytes(path)?.[bytes.length - 1]).toBe(9);
   });
 
-  it('retries manifest writes after a conflict response', async () => {
+  it('retries manifest writes after a head conflict', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();
 
     await repository.initialize();
-    githubApi.failNextPut(MANIFEST_PATH);
+    const write = vi.mocked(pushGitHubBatch).getMockImplementation()!;
+    vi.mocked(pushGitHubBatch)
+      .mockResolvedValueOnce({
+        status: 'head-conflict',
+        commitOid: null,
+        blobShas: {},
+      })
+      .mockImplementation(write);
 
     const folderId = await repository.createFolder('Retry folder', null);
     const manifest = githubApi.readJson<{

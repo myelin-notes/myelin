@@ -5,10 +5,10 @@ import {
   type BatchedCommitResult,
   BatchHeadConflictError,
   BatchUnknownError,
-  type GitHubBatchFailureDiagnostics,
-  type GitHubRestFailureDiagnostics,
+  type GitHubGitFailureDiagnostics,
 } from './batch';
 import { getGitHubToken } from './github-credentials';
+import { type GitPushResponse, pushGitHubBatch } from './github-git-push';
 import {
   createEmptyManifest,
   getStoredFilePath,
@@ -37,10 +37,6 @@ interface GitHubContentsResponse {
   encoding?: string;
 }
 
-interface GitHubWriteResponse {
-  content: { sha: string };
-}
-
 interface GitHubRepositoryConfig {
   owner: string;
   repo: string;
@@ -49,23 +45,25 @@ interface GitHubRepositoryConfig {
 }
 
 const GITHUB_API_BASE = 'https://api.github.com';
-const GITHUB_GRAPHQL_URL = `${GITHUB_API_BASE}/graphql`;
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
-const MAX_GRAPHQL_FILE_BYTES = 8 * 1024 * 1024;
-
-// Chunked so multi-MB media doesn't pay a per-byte string-concatenation cost. 0x8000 keeps the
-// apply() argument count well under engine call-stack limits.
-const BASE64_CHUNK_SIZE = 0x8000;
-
-function base64EncodeBytes(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.byteLength; i += BASE64_CHUNK_SIZE) {
-    const chunk = bytes.subarray(i, i + BASE64_CHUNK_SIZE);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
+const SAFE_GIT_REASONS = new Set([
+  'Git staging write failed',
+  'Git push task failed',
+  'Invalid Git push request',
+  'Git push lock unavailable',
+  'Git cache unavailable',
+  'Git clone failed',
+  'Git fetch failed',
+  'Git head unavailable',
+  'Git tree unavailable',
+  'Git blob write failed',
+  'Git tree update failed',
+  'Git commit identity failed',
+  'Git commit failed',
+  'Git push failed',
+  'Git push rejected',
+]);
 
 function base64DecodeToBytes(content: string): Uint8Array {
   const normalized = content.replace(/\n/g, '');
@@ -235,12 +233,12 @@ export class GitHubRepository extends BaseRepository {
     }
 
     const path = getStoredFilePath(node);
-    const payload = await this.getContents(path);
-    if (!payload.sha) {
+    const sha = await this.getContentsSha(path);
+    if (!sha) {
       return;
     }
 
-    await this.deleteContents(path, payload.sha, `Delete file ${nodeId}`);
+    await this.deleteContents(path, sha, `Delete file ${nodeId}`);
   }
 
   private async getFileNode(
@@ -273,8 +271,13 @@ export class GitHubRepository extends BaseRepository {
     label: string,
     response: Response,
   ): Promise<Error> {
-    const body = await response.text().catch(() => '<no response body>');
-    return new Error(`${label} (${response.status}): ${body}`);
+    const requestId = getResponseHeader(response, 'x-github-request-id');
+    const safeRequestId = requestId
+      ?.replace(/[^A-Za-z0-9-]/g, '')
+      .slice(0, 100);
+    return new Error(
+      `${label} (${response.status})${safeRequestId ? ` [request ${safeRequestId}]` : ''}`,
+    );
   }
 
   private fetchWithRateLimitRetry(
@@ -339,10 +342,9 @@ export class GitHubRepository extends BaseRepository {
     return readGzippedTarballEntries(gzipped);
   }
 
-  private async getContents(path: string): Promise<{
-    sha: string | null;
-    bytes: Uint8Array | null;
-  }> {
+  private async getContentsMetadata(
+    path: string,
+  ): Promise<GitHubContentsResponse | null> {
     const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
     const response = await this.sendWithRateLimitRetry(url, async () => ({
       method: 'GET',
@@ -354,14 +356,24 @@ export class GitHubRepository extends BaseRepository {
 
     if (response.status === 404) {
       await this.getBranchHeadOid();
-      return { sha: null, bytes: null };
+      return null;
     }
 
     if (!response.ok) {
       throw await this.failureError('GitHub contents request failed', response);
     }
 
-    const payload = (await response.json()) as GitHubContentsResponse;
+    return (await response.json()) as GitHubContentsResponse;
+  }
+
+  private async getContents(path: string): Promise<{
+    sha: string | null;
+    bytes: Uint8Array | null;
+  }> {
+    const payload = await this.getContentsMetadata(path);
+    if (!payload) {
+      return { sha: null, bytes: null };
+    }
     if (payload.encoding === 'none') {
       const blobUrl = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/git/blobs/${encodeURIComponent(payload.sha)}`;
       let blobResponse = await this.sendWithRateLimitRetry(
@@ -400,79 +412,40 @@ export class GitHubRepository extends BaseRepository {
     return { sha: payload.sha, bytes };
   }
 
+  private async getContentsSha(path: string): Promise<string | null> {
+    return (await this.getContentsMetadata(path))?.sha ?? null;
+  }
+
   private async putContents(
     path: string,
     bytes: Uint8Array,
     sha: string | null,
     message: string,
   ): Promise<string> {
-    if (bytes.byteLength > MAX_GRAPHQL_FILE_BYTES) {
-      for (let attempt = 0; attempt < MAX_MANIFEST_RETRIES; attempt++) {
-        const expectedHeadOid = await this.getBranchHeadOid();
-        const response = await this.sendWithRateLimitRetry(
-          `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`,
-          async () => ({
-            method: 'GET',
-            headers: {
-              ...(await this.authHeaders()),
-              Accept: 'application/vnd.github.object+json',
-            },
-          }),
-        );
-        if (response.status !== 404 && !response.ok) {
-          throw await this.failureError(
-            'GitHub contents request failed',
-            response,
-          );
-        }
-        const currentSha = response.ok
-          ? ((await response.json()) as GitHubContentsResponse).sha
-          : null;
-        if (currentSha !== sha) {
-          throw new Error('GitHub write request failed (409): file changed');
-        }
-        try {
-          const result = await this.commitLargeBatch({
-            additions: [{ path, contents: bytes }],
-            deletions: [],
-            message: { headline: message },
-            expectedHeadOid,
-          });
-          return result.blobShas.get(path)!;
-        } catch (error) {
-          if (
-            !(error instanceof BatchHeadConflictError) ||
-            attempt === MAX_MANIFEST_RETRIES - 1
-          ) {
-            throw error;
-          }
+    for (let attempt = 0; attempt < MAX_MANIFEST_RETRIES; attempt++) {
+      const expectedHeadOid = await this.getBranchHeadOid();
+      const currentSha = await this.getContentsSha(path);
+      if (currentSha !== sha) {
+        throw new Error('GitHub write request failed (409): file changed');
+      }
+      try {
+        const result = await this.commitGitBatch({
+          additions: [{ path, contents: bytes }],
+          deletions: [],
+          message: { headline: message },
+          expectedHeadOid,
+        });
+        return result.blobShas.get(path)!;
+      } catch (error) {
+        if (
+          !(error instanceof BatchHeadConflictError) ||
+          attempt === MAX_MANIFEST_RETRIES - 1
+        ) {
+          throw error;
         }
       }
     }
-
-    const response = await this.sendWithRateLimitRetry(
-      this.contentsUrl(path),
-      async () => ({
-        method: 'PUT',
-        headers: {
-          ...(await this.authHeaders()),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          content: base64EncodeBytes(bytes),
-          branch: this.config.branch,
-          ...(sha ? { sha } : {}),
-        }),
-      }),
-    );
-
-    if (!response.ok) {
-      throw await this.failureError('GitHub write request failed', response);
-    }
-
-    const payload = (await response.json()) as GitHubWriteResponse;
-    return payload.content.sha;
+    throw new Error('GitHub write retries exhausted');
   }
 
   private async deleteContents(
@@ -480,24 +453,31 @@ export class GitHubRepository extends BaseRepository {
     sha: string,
     message: string,
   ): Promise<void> {
-    const response = await this.sendWithRateLimitRetry(
-      this.contentsUrl(path),
-      async () => ({
-        method: 'DELETE',
-        headers: {
-          ...(await this.authHeaders()),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message, sha, branch: this.config.branch }),
-      }),
-    );
-
-    if (response.status === 404) {
-      return;
-    }
-
-    if (!response.ok) {
-      throw await this.failureError('GitHub delete request failed', response);
+    for (let attempt = 0; attempt < MAX_MANIFEST_RETRIES; attempt++) {
+      const expectedHeadOid = await this.getBranchHeadOid();
+      const currentSha = await this.getContentsSha(path);
+      if (!currentSha) {
+        return;
+      }
+      if (currentSha !== sha) {
+        throw new Error('GitHub delete request failed (409): file changed');
+      }
+      try {
+        await this.commitGitBatch({
+          additions: [],
+          deletions: [{ path }],
+          message: { headline: message },
+          expectedHeadOid,
+        });
+        return;
+      } catch (error) {
+        if (
+          !(error instanceof BatchHeadConflictError) ||
+          attempt === MAX_MANIFEST_RETRIES - 1
+        ) {
+          throw error;
+        }
+      }
     }
   }
 
@@ -519,129 +499,10 @@ export class GitHubRepository extends BaseRepository {
   }
 
   async commitBatch(input: BatchedCommitInput): Promise<BatchedCommitResult> {
-    if (
-      input.additions.reduce(
-        (total, addition) => total + addition.contents.byteLength,
-        0,
-      ) > MAX_GRAPHQL_FILE_BYTES
-    ) {
-      return this.commitLargeBatch(input);
-    }
-
-    const additions = input.additions.map((change) => ({
-      path: change.path,
-      contents: base64EncodeBytes(change.contents),
-    }));
-    const variables = {
-      input: {
-        branch: {
-          repositoryNameWithOwner: `${this.config.owner}/${this.config.repo}`,
-          branchName: this.config.branch,
-        },
-        expectedHeadOid: input.expectedHeadOid,
-        message: input.message.body
-          ? { headline: input.message.headline, body: input.message.body }
-          : { headline: input.message.headline },
-        fileChanges: {
-          additions,
-          deletions: input.deletions.map((d) => ({ path: d.path })),
-        },
-      },
-    };
-    const requestBody = JSON.stringify({
-      query:
-        'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
-      variables,
-    });
-    const requestMetrics = {
-      github_graphql_request_chars: requestBody.length,
-      github_graphql_file_bytes: input.additions.reduce(
-        (total, addition) => total + addition.contents.byteLength,
-        0,
-      ),
-      github_graphql_additions: input.additions.length,
-      github_graphql_deletions: input.deletions.length,
-    };
-    const startedAt = Date.now();
-
-    let response: Response;
-    try {
-      response = await fetch(GITHUB_GRAPHQL_URL, {
-        method: 'POST',
-        headers: {
-          ...(await this.authHeaders()),
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      });
-    } catch (error) {
-      throw new BatchUnknownError(
-        'GitHub GraphQL request failed before receiving a response',
-        error,
-        {
-          ...requestMetrics,
-          github_graphql_stage: 'request',
-          github_graphql_duration_ms: Date.now() - startedAt,
-        },
-      );
-    }
-
-    const requestId = response.headers?.get('x-github-request-id');
-    const contentType = response.headers?.get('content-type');
-    const responseMetrics: GitHubBatchFailureDiagnostics = {
-      ...requestMetrics,
-      github_graphql_stage: 'http',
-      github_graphql_duration_ms: Date.now() - startedAt,
-      github_graphql_status: response.status,
-      ...(contentType
-        ? { github_graphql_content_type: contentType.slice(0, 100) }
-        : {}),
-      ...(requestId ? { github_request_id: requestId.slice(0, 100) } : {}),
-    };
-
-    if (!response.ok) {
-      const responseBody = await response
-        .text()
-        .catch(() => '<no response body>');
-      throw new BatchUnknownError(
-        `GitHub GraphQL request failed (${response.status})`,
-        responseBody,
-        {
-          ...responseMetrics,
-          github_graphql_response_chars: responseBody.length,
-        },
-      );
-    }
-
-    const body = (await response.json()) as {
-      data?: { createCommitOnBranch?: { commit?: { oid?: string } } };
-      errors?: Array<{ message?: string; type?: string }>;
-    };
-
-    if (body.errors && body.errors.length > 0) {
-      const firstMessage = body.errors[0]?.message ?? '';
-      if (isHeadConflictMessage(firstMessage)) {
-        throw new BatchHeadConflictError(firstMessage);
-      }
-      throw new BatchUnknownError(
-        `GitHub GraphQL returned errors: ${firstMessage}`,
-        body.errors,
-        { ...responseMetrics, github_graphql_stage: 'graphql' },
-      );
-    }
-
-    const newOid = body.data?.createCommitOnBranch?.commit?.oid;
-    if (!newOid) {
-      throw new BatchUnknownError(
-        'GitHub GraphQL response missing commit oid',
-        body,
-        { ...responseMetrics, github_graphql_stage: 'response' },
-      );
-    }
-    return { newHeadOid: newOid };
+    return this.commitGitBatch(input);
   }
 
-  private async commitLargeBatch(
+  private async commitGitBatch(
     input: BatchedCommitInput,
   ): Promise<BatchedCommitResult & { blobShas: Map<string, string> }> {
     if (
@@ -653,206 +514,129 @@ export class GitHubRepository extends BaseRepository {
         "Cannot sync a file exceeding GitHub's 100 MB blob limit.",
       );
     }
-    const baseUrl = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}`;
     const startedAt = Date.now();
     const metrics = {
-      github_rest_file_bytes: input.additions.reduce(
+      github_git_file_bytes: input.additions.reduce(
         (total, addition) => total + addition.contents.byteLength,
         0,
       ),
-      github_rest_additions: input.additions.length,
-      github_rest_deletions: input.deletions.length,
+      github_git_additions: input.additions.length,
+      github_git_deletions: input.deletions.length,
     };
     const failure = (
-      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
-      message: string,
-      details: unknown = null,
-      extra: Partial<GitHubRestFailureDiagnostics> = {},
-    ) =>
-      new BatchUnknownError(message, details, {
-        ...metrics,
-        github_rest_stage: stage,
-        github_rest_duration_ms: Date.now() - startedAt,
-        ...extra,
-      });
-    const request = async <T>(
-      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
-      url: string,
-      method: 'GET' | 'POST' | 'PATCH',
-      body?: object,
-    ): Promise<T> => {
-      const requestBody = body ? JSON.stringify(body) : undefined;
-      let response: Response;
-      try {
-        response = await this.sendWithRateLimitRetry(url, async () => ({
-          method,
-          headers: {
-            ...(await this.authHeaders()),
-            ...(requestBody ? { 'Content-Type': 'application/json' } : {}),
-          },
-          ...(requestBody ? { body: requestBody } : {}),
-        }));
-      } catch (error) {
-        throw failure(
-          stage,
-          `GitHub REST ${stage} request failed`,
-          error,
-          requestBody ? { github_rest_request_chars: requestBody.length } : {},
-        );
-      }
-      if (!response.ok) {
-        const contentType = getResponseHeader(response, 'content-type');
-        const requestId = getResponseHeader(response, 'x-github-request-id');
-        throw failure(
-          stage,
-          `GitHub REST ${stage} request failed (${response.status})`,
-          null,
-          {
-            github_rest_status: response.status,
-            ...(requestBody
-              ? { github_rest_request_chars: requestBody.length }
-              : {}),
-            ...(contentType
-              ? { github_rest_content_type: contentType.slice(0, 100) }
-              : {}),
-            ...(requestId
-              ? { github_request_id: requestId.slice(0, 100) }
-              : {}),
-          },
-        );
-      }
-      try {
-        return (await response.json()) as T;
-      } catch (error) {
-        throw failure(
-          stage,
-          `GitHub REST ${stage} response was invalid`,
-          error,
-          { github_rest_status: response.status },
-        );
-      }
-    };
-    const requireSha = (
-      sha: unknown,
-      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
-    ): string => {
-      if (typeof sha !== 'string' || !sha) {
-        throw failure(stage, `GitHub REST ${stage} response missing sha`);
-      }
-      return sha;
-    };
-
-    const parent = await request<{ tree: { sha: string } }>(
-      'parent',
-      `${baseUrl}/git/commits/${encodeURIComponent(input.expectedHeadOid)}`,
-      'GET',
-    );
-    const parentTreeSha = requireSha(parent?.tree?.sha, 'parent');
-    const treeEntries: Array<{
-      path: string;
-      mode: '100644';
-      type: 'blob';
-      sha: string | null;
-    }> = [];
-    const blobShas = new Map<string, string>();
-    for (const addition of input.additions) {
-      const blob = await request<{ sha: string }>(
-        'blob',
-        `${baseUrl}/git/blobs`,
-        'POST',
-        { content: base64EncodeBytes(addition.contents), encoding: 'base64' },
+      stage: GitHubGitFailureDiagnostics['github_git_stage'],
+      reason?: string,
+      response?: Response,
+    ) => {
+      const nativeDetail = reason?.match(
+        /^(.+) \(([A-Za-z]{1,40})\/([A-Za-z]{1,40})\)$/,
       );
-      const blobSha = requireSha(blob?.sha, 'blob');
-      treeEntries.push({
-        path: addition.path,
-        mode: '100644',
-        type: 'blob',
-        sha: blobSha,
-      });
-      blobShas.set(addition.path, blobSha);
-    }
-    for (const deletion of input.deletions) {
-      treeEntries.push({
-        path: deletion.path,
-        mode: '100644',
-        type: 'blob',
-        sha: null,
-      });
-    }
-    const tree = await request<{ sha: string }>(
-      'tree',
-      `${baseUrl}/git/trees`,
-      'POST',
-      { base_tree: parentTreeSha, tree: treeEntries },
-    );
-    const treeSha = requireSha(tree?.sha, 'tree');
-    const commit = await request<{ sha: string }>(
-      'commit',
-      `${baseUrl}/git/commits`,
-      'POST',
-      {
-        message: input.message.body
-          ? `${input.message.headline}\n\n${input.message.body}`
-          : input.message.headline,
-        tree: treeSha,
-        parents: [input.expectedHeadOid],
-      },
-    );
-    const commitSha = requireSha(commit?.sha, 'commit');
-
+      const safeReason =
+        reason &&
+        (SAFE_GIT_REASONS.has(reason) ||
+          (nativeDetail && SAFE_GIT_REASONS.has(nativeDetail[1] ?? '')))
+          ? reason
+          : null;
+      const requestId = response
+        ? getResponseHeader(response, 'x-github-request-id')
+            ?.replace(/[^A-Za-z0-9-]/g, '')
+            .slice(0, 100)
+        : null;
+      return new BatchUnknownError(
+        `GitHub Git push failed (${stage}${safeReason ? `: ${safeReason}` : ''})`,
+        null,
+        {
+          ...metrics,
+          github_git_stage: stage,
+          github_git_duration_ms: Date.now() - startedAt,
+          ...(safeReason
+            ? { github_git_reason: nativeDetail?.[1] ?? safeReason }
+            : {}),
+          ...(safeReason && nativeDetail
+            ? {
+                github_git_error_class: nativeDetail[2],
+                github_git_error_code: nativeDetail[3],
+              }
+            : {}),
+          ...(response ? { github_rest_status: response.status } : {}),
+          ...(requestId ? { github_request_id: requestId } : {}),
+        },
+      );
+    };
+    let result: GitPushResponse;
     try {
-      const ref = await request<{ object?: { sha?: string } }>(
-        'ref',
-        `${baseUrl}/git/refs/heads/${this.config.branch.split('/').map(encodeURIComponent).join('/')}`,
-        'PATCH',
-        { sha: commitSha, force: false },
+      result = await pushGitHubBatch(
+        this.config,
+        input,
+        await getGitHubToken(this.config.credentialId),
       );
-      if (ref?.object?.sha !== commitSha) {
-        throw failure('ref', 'GitHub REST ref response missing sha');
-      }
     } catch (error) {
+      throw failure(
+        'upload',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    if (result.status === 'head-conflict') {
+      throw new BatchHeadConflictError('GitHub branch head changed');
+    }
+    if (result.status !== 'pushed' && result.status !== 'push-failed') {
+      throw failure('push');
+    }
+    const commitOid = result.commitOid;
+    if (!commitOid || !/^[a-f0-9]{40}$/i.test(commitOid)) {
+      throw failure('push');
+    }
+    if (result.status === 'push-failed') {
       let observedHead: string;
       try {
         observedHead = await this.getBranchHeadOid();
-        if (observedHead === commitSha) {
-          return { newHeadOid: commitSha, blobShas };
+        if (observedHead !== commitOid) {
+          const baseUrl = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}`;
+          const comparison = await this.fetchWithRateLimitRetry(
+            `${baseUrl}/compare/${encodeURIComponent(commitOid)}...${encodeURIComponent(observedHead)}`,
+          );
+          if (!comparison.ok) {
+            if (
+              observedHead !== input.expectedHeadOid &&
+              comparison.status === 404
+            ) {
+              throw new BatchHeadConflictError('GitHub branch head changed');
+            }
+            throw failure(
+              'verify',
+              result.failureReason ?? undefined,
+              comparison,
+            );
+          }
+          const body = (await comparison.json()) as { status?: string };
+          if (body.status !== 'ahead' && body.status !== 'identical') {
+            if (observedHead !== input.expectedHeadOid) {
+              throw new BatchHeadConflictError('GitHub branch head changed');
+            }
+            throw failure('push', result.failureReason ?? undefined);
+          }
         }
-        const comparison = await request<{ status: string }>(
-          'verify',
-          `${baseUrl}/compare/${encodeURIComponent(commitSha)}...${encodeURIComponent(observedHead)}`,
-          'GET',
-        );
+      } catch (error) {
         if (
-          comparison.status === 'ahead' ||
-          comparison.status === 'identical'
+          error instanceof BatchHeadConflictError ||
+          error instanceof BatchUnknownError
         ) {
-          return { newHeadOid: commitSha, blobShas };
+          throw error;
         }
-      } catch {
-        throw error;
+        throw failure('verify', result.failureReason ?? undefined);
       }
-      const status =
-        error instanceof BatchUnknownError &&
-        error.diagnostics &&
-        'github_rest_status' in error.diagnostics
-          ? error.diagnostics.github_rest_status
-          : undefined;
-      if (
-        observedHead !== input.expectedHeadOid &&
-        (status === 409 || status === 422)
-      ) {
-        throw new BatchHeadConflictError('GitHub branch head changed');
-      }
-      throw error;
     }
-    return { newHeadOid: commitSha, blobShas };
+    if (
+      input.additions.some(
+        (addition) =>
+          !/^[a-f0-9]{40}$/i.test(result.blobShas[addition.path] ?? ''),
+      )
+    ) {
+      throw failure('verify');
+    }
+    return {
+      newHeadOid: commitOid,
+      blobShas: new Map(Object.entries(result.blobShas)),
+    };
   }
-}
-
-function isHeadConflictMessage(message: string): boolean {
-  const lower = message.toLowerCase();
-  if (lower.includes('stale_data')) {
-    return true;
-  }
-  return lower.includes('expected') && lower.includes('oid');
 }

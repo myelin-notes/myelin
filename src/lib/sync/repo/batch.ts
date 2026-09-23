@@ -37,37 +37,23 @@ export class BatchUnknownError extends Error {
   constructor(
     message: string,
     public readonly details: unknown,
-    public readonly diagnostics?:
-      | GitHubBatchFailureDiagnostics
-      | GitHubRestFailureDiagnostics,
+    public readonly diagnostics?: GitHubGitFailureDiagnostics,
   ) {
     super(message);
     this.name = 'BatchUnknownError';
   }
 }
 
-export interface GitHubRestFailureDiagnostics {
-  github_rest_stage: 'blob' | 'parent' | 'tree' | 'commit' | 'ref' | 'verify';
-  github_rest_file_bytes: number;
-  github_rest_additions: number;
-  github_rest_deletions: number;
-  github_rest_duration_ms: number;
+export interface GitHubGitFailureDiagnostics {
+  github_git_stage: 'upload' | 'push' | 'verify';
+  github_git_reason?: string;
+  github_git_error_class?: string;
+  github_git_error_code?: string;
+  github_git_file_bytes: number;
+  github_git_additions: number;
+  github_git_deletions: number;
+  github_git_duration_ms: number;
   github_rest_status?: number;
-  github_rest_request_chars?: number;
-  github_rest_content_type?: string;
-  github_request_id?: string;
-}
-
-export interface GitHubBatchFailureDiagnostics {
-  github_graphql_stage: 'request' | 'http' | 'graphql' | 'response';
-  github_graphql_request_chars: number;
-  github_graphql_file_bytes: number;
-  github_graphql_additions: number;
-  github_graphql_deletions: number;
-  github_graphql_duration_ms: number;
-  github_graphql_status?: number;
-  github_graphql_content_type?: string;
-  github_graphql_response_chars?: number;
   github_request_id?: string;
 }
 

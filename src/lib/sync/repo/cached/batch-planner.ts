@@ -56,7 +56,6 @@ export interface BatchPlanInput {
   ops: PendingOp[];
   canvasOps: BatchCanvasOperation[];
   rawOps: BatchRawOperation[];
-  now?: number;
 }
 
 export type BatchPlanResult = BatchPlan | 'abort-to-rest';
@@ -134,15 +133,21 @@ export async function createBatchPlan(
 
   for (const op of input.ops) {
     switch (op.kind) {
-      case 'upsert-manifest-node':
+      case 'upsert-manifest-node': {
+        const previousModifiedAt = plan.manifest.nodes[op.nodeId]?.modifiedAt;
         applyCachedManifestUpsert(
           plan.manifest,
           input.cacheManifest,
           op.nodeId,
         );
+        const node = plan.manifest.nodes[op.nodeId];
+        if (node && previousModifiedAt !== undefined) {
+          node.modifiedAt = Math.max(node.modifiedAt, previousModifiedAt);
+        }
         plan.manifestChanged = true;
         plan.messages.push(`Upsert node ${op.nodeId}`);
         break;
+      }
       case 'delete-manifest-node':
         for (const fileId of op.deletedFileIds) {
           const node = plan.manifest.nodes[fileId];
@@ -181,8 +186,6 @@ export async function createBatchPlan(
     }
   }
 
-  const fileSavedAt = input.now ?? Date.now();
-
   if (input.rawOps.length > 0) {
     const alreadyApplied = await checkRawConflicts(
       input.remote,
@@ -217,7 +220,10 @@ export async function createBatchPlan(
       }
       const manifestNode = plan.manifest.nodes[entry.node.id];
       if (manifestNode && manifestNode.type === 'file') {
-        manifestNode.modifiedAt = fileSavedAt;
+        manifestNode.modifiedAt = Math.max(
+          manifestNode.modifiedAt,
+          entry.node.modifiedAt,
+        );
         plan.manifestChanged = true;
       }
     }
@@ -248,6 +254,7 @@ export async function createBatchPlan(
             bytes.every((byte, index) => byte === remoteBytes[index]),
           links: extractStoredNoteLinks(doc),
           name: entry.node.name,
+          modifiedAt: entry.node.modifiedAt,
         };
       },
     );
@@ -259,7 +266,10 @@ export async function createBatchPlan(
       plan.messages.push(`Update note ${mergedNote.name}`);
       const manifestNode = plan.manifest.nodes[mergedNote.nodeId];
       if (manifestNode && manifestNode.type === 'file') {
-        manifestNode.modifiedAt = fileSavedAt;
+        manifestNode.modifiedAt = Math.max(
+          manifestNode.modifiedAt,
+          mergedNote.modifiedAt,
+        );
         setStoredNoteLinks(plan.manifest, mergedNote.nodeId, mergedNote.links);
         plan.manifestChanged = true;
       }

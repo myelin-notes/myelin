@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import {
   createCanvasNoteState,
   createNoteState,
+  getRepositoryTestGitHubApi,
   getRepositoryTestStorage,
   readNoteText,
   resetRepositoryTestDoubles,
@@ -10,6 +11,7 @@ import {
 import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github-git-push';
 import { LocalRepository } from './local';
 import {
   computeRevision,
@@ -18,6 +20,8 @@ import {
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities, VFSFileNode, VFSNodeId } from './types';
+
+vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 class MemoryRemoteRepository extends BaseRepository {
   public readonly kind = 'memory-remote';
@@ -1831,6 +1835,13 @@ describe('CachedRepository', () => {
   });
 
   it('serializes concurrent initialize calls that target the same outbox', async () => {
+    vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+      getRepositoryTestGitHubApi().applyGitPush(
+        input.additions,
+        input.deletions,
+        input.expectedHeadOid,
+      ),
+    );
     const createRemote = () =>
       new GitHubRepository({
         owner: 'myelin',

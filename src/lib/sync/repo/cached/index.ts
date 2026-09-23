@@ -85,8 +85,6 @@ import {
 
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
-const MAX_BATCH_OPS = 40;
-const MAX_BATCH_BYTES = 8 * 1024 * 1024;
 const MAX_BATCH_FILE_BYTES = 100_000_000;
 const MAX_BATCH_FALLBACK_OPS = 2;
 const logger = new Logger('CachedRepository');
@@ -906,11 +904,10 @@ export class CachedRepository
   private async tryFlushBatched(
     remote: BaseRepository & BatchedCommitTarget,
   ): Promise<boolean> {
-    let maxOps = MAX_BATCH_OPS;
     let headConflictAttempts = 0;
 
     while (true) {
-      const plan = await this.buildBatchPlan(remote, maxOps);
+      const plan = await this.buildBatchPlan(remote);
 
       if (plan === 'abort-to-rest') {
         return false;
@@ -919,18 +916,12 @@ export class CachedRepository
         return true;
       }
 
-      let batchBytes = 0;
       for (const [path, bytes] of plan.additions) {
         if (bytes.byteLength > MAX_BATCH_FILE_BYTES) {
           throw new Error(
             `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MB file limit.`,
           );
         }
-        batchBytes += bytes.byteLength;
-      }
-      if (batchBytes > MAX_BATCH_BYTES && plan.resolvedOps.length > 1) {
-        maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
-        continue;
       }
 
       try {
@@ -947,9 +938,6 @@ export class CachedRepository
           });
           continue;
         }
-        if (batchBytes > MAX_BATCH_BYTES) {
-          throw error;
-        }
         if (error instanceof BatchHeadConflictError) {
           logger.debug('Batched commit head conflict twice; falling back', {
             repositoryKind: this.kind,
@@ -957,33 +945,18 @@ export class CachedRepository
           });
           return false;
         }
-        if (error instanceof BatchUnknownError && plan.resolvedOps.length > 1) {
-          maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
-          headConflictAttempts = 0;
-          logger.warn(
-            'Batched commit failed; retrying a smaller prefix',
-            error,
-            {
-              repositoryKind: this.kind,
-              nextMaxOps: maxOps,
-            },
-          );
-          continue;
-        }
         throw error;
       }
 
       if (!(await this.drainResolvedOps(plan.resolvedOps))) {
         return true;
       }
-      maxOps = MAX_BATCH_OPS;
       headConflictAttempts = 0;
     }
   }
 
   private async buildBatchPlan(
     remote: BaseRepository & BatchedCommitTarget,
-    maxOps: number,
   ): Promise<BatchPlan | null | 'abort-to-rest'> {
     // dispose() calls flushPending() on every window close, and the network hops below otherwise add
     // noticeable latency to closing.
@@ -1002,7 +975,7 @@ export class CachedRepository
     // would let us drain an op whose data we never committed.
     const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
-      const pendingOps = this.outbox.snapshotOps(maxOps);
+      const pendingOps = this.outbox.snapshotOps();
       if (pendingOps.length === 0) {
         return null;
       }
@@ -1011,8 +984,6 @@ export class CachedRepository
       const ops: PendingOp[] = [];
       const canvasOps: BatchCanvasOperation[] = [];
       const rawOps: BatchRawOperation[] = [];
-      let batchBytes = 0;
-
       for (const op of pendingOps) {
         if (op.kind !== 'push-note') {
           ops.push(op);
@@ -1032,9 +1003,6 @@ export class CachedRepository
           : await this.cache.readFileBytes(op.nodeId);
         const operationBytes =
           snapshot?.update?.byteLength ?? bytes?.byteLength ?? 0;
-        if (batchBytes > 0 && batchBytes + operationBytes > MAX_BATCH_BYTES) {
-          break;
-        }
         if (operationBytes > MAX_BATCH_FILE_BYTES) {
           throw new Error(
             `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MB file limit.`,
@@ -1046,7 +1014,6 @@ export class CachedRepository
         } else {
           rawOps.push({ op, node, bytes });
         }
-        batchBytes += operationBytes;
       }
 
       return { ops, cacheManifest, canvasOps, rawOps };

@@ -35,6 +35,8 @@ describe('createBatchPlan', () => {
     const remoteManifest = createEmptyManifest();
     remoteManifest.nodes[node.id] = structuredClone(node);
     const cacheManifest = structuredClone(remoteManifest);
+    node.modifiedAt = 123;
+    cacheManifest.nodes[node.id] = structuredClone(node);
 
     const remoteDoc = new Y.Doc();
     remoteDoc.getMap('remote').set('value', 'remote');
@@ -64,7 +66,6 @@ describe('createBatchPlan', () => {
         },
       ],
       rawOps: [],
-      now: 123,
     });
 
     expect(plan).not.toBe('abort-to-rest');
