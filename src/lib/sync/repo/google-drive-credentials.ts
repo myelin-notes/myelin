@@ -9,6 +9,10 @@ import {
 } from '@/lib/env';
 import { createCredentialVault } from './credential-vault';
 import {
+  type GoogleDriveFailureDiagnostics,
+  GoogleDriveRequestError,
+} from './google-drive-error';
+import {
   credentialTokenKey,
   normalizeCredentialId,
   OAuthClient,
@@ -170,33 +174,67 @@ interface GoogleTokenResponse {
 // status is parsed rather than treated as a transport failure.
 async function postTokenRequest(
   entries: Record<string, string>,
-): Promise<{ payload: GoogleTokenResponse; error: string | null }> {
-  const response = await fetch(GOOGLE_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: encodeFormBody(entries),
-  });
+  stage: 'token_refresh' | 'token_exchange',
+): Promise<{
+  payload: GoogleTokenResponse;
+  error: string | null;
+  diagnostics: GoogleDriveFailureDiagnostics;
+}> {
+  const body = encodeFormBody(entries);
+  const startedAt = Date.now();
+  let response: Response;
+  try {
+    response = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+  } catch {
+    throw new GoogleDriveRequestError('Google token request failed', {
+      google_drive_stage: stage,
+      google_drive_method: 'POST',
+      google_drive_request_chars: body.length,
+      google_drive_duration_ms: Date.now() - startedAt,
+      google_drive_attempts: 1,
+    });
+  }
 
   const text = await response.text().catch(() => '');
+  const requestId = response.headers?.get('x-goog-request-id');
+  const contentType = response.headers?.get('content-type');
+  const diagnostics: GoogleDriveFailureDiagnostics = {
+    google_drive_stage: stage,
+    google_drive_method: 'POST',
+    google_drive_request_chars: body.length,
+    google_drive_duration_ms: Date.now() - startedAt,
+    google_drive_attempts: 1,
+    google_drive_status: response.status,
+    google_drive_response_chars: text.length,
+    ...(contentType
+      ? { google_drive_content_type: contentType.slice(0, 100) }
+      : {}),
+    ...(requestId ? { google_drive_request_id: requestId.slice(0, 100) } : {}),
+  };
   let payload: GoogleTokenResponse = {};
   try {
     payload = text ? (JSON.parse(text) as GoogleTokenResponse) : {};
   } catch {
-    throw new Error(
-      `Google token request returned an unreadable response (${response.status}): ${text}`,
+    throw new GoogleDriveRequestError(
+      `Google token request returned an unreadable response (${response.status})`,
+      diagnostics,
     );
   }
 
   if (payload.error) {
-    return { payload, error: payload.error };
+    return { payload, error: payload.error, diagnostics };
   }
   if (!response.ok) {
-    return { payload, error: `http_${response.status}` };
+    return { payload, error: `http_${response.status}`, diagnostics };
   }
-  return { payload, error: null };
+  return { payload, error: null, diagnostics };
 }
 
 function tokenErrorMessage(
@@ -229,28 +267,37 @@ async function refreshAccessToken(
   credentialId: string,
   stored: StoredGoogleDriveToken,
 ): Promise<string> {
-  const { payload, error } = await postTokenRequest({
-    ...clientCredentialEntries(),
-    refresh_token: stored.refreshToken,
-    grant_type: 'refresh_token',
-  });
+  const { payload, error, diagnostics } = await postTokenRequest(
+    {
+      ...clientCredentialEntries(),
+      refresh_token: stored.refreshToken,
+      grant_type: 'refresh_token',
+    },
+    'token_refresh',
+  );
 
   if (error === 'invalid_grant') {
     // The grant was revoked or expired; the stored refresh token is dead, so
     // drop it and make the UI show a disconnected account rather than retrying.
     logger.warn('Google Drive refresh token rejected; clearing credential');
     await clearGoogleDriveToken(credentialId);
-    throw new Error(
+    throw new GoogleDriveRequestError(
       'Google Drive access expired. Sign in again from Settings.',
+      { ...diagnostics, google_drive_error_code: 'invalid_grant' },
     );
   }
   if (error) {
-    throw new Error(
-      tokenErrorMessage('token refresh', error, payload.error_description),
+    const code = /^[a-zA-Z0-9_]{1,64}$/.test(error) ? error : 'unknown';
+    throw new GoogleDriveRequestError(
+      tokenErrorMessage('token refresh', code),
+      { ...diagnostics, google_drive_error_code: code },
     );
   }
   if (!payload.access_token) {
-    throw new Error('Google token refresh returned no access token.');
+    throw new GoogleDriveRequestError(
+      'Google token refresh returned no access token.',
+      diagnostics,
+    );
   }
 
   // A refresh response usually omits refresh_token; keep the one we hold.
@@ -299,13 +346,16 @@ async function exchangeGoogleDriveCode({
   codeVerifier,
   redirectUri,
 }: OAuthExchange): Promise<OAuthResult> {
-  const { payload, error } = await postTokenRequest({
-    ...clientCredentialEntries(),
-    code,
-    code_verifier: codeVerifier,
-    redirect_uri: redirectUri,
-    grant_type: 'authorization_code',
-  });
+  const { payload, error } = await postTokenRequest(
+    {
+      ...clientCredentialEntries(),
+      code,
+      code_verifier: codeVerifier,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    },
+    'token_exchange',
+  );
 
   if (error) {
     return {

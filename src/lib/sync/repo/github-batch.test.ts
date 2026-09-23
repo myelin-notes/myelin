@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { trackEvent } from '@/lib/analytics';
 import {
   createNoteState,
   getRepositoryTestGitHubApi,
@@ -8,6 +9,8 @@ import { BatchUnknownError } from './batch';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
+
+vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
 function buildRepository(suffix: string) {
   const remote = new GitHubRepository({
@@ -28,6 +31,7 @@ function buildRepository(suffix: string) {
 describe('CachedRepository batched flush via GitHub GraphQL', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
+    vi.mocked(trackEvent).mockClear();
   });
 
   it('drains all pending ops in a single GraphQL commit', async () => {
@@ -131,6 +135,46 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     expect(api.graphqlCallCount - baselineGraphql).toBe(3);
     expect(api.putCallCount).toBe(baselinePuts);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('tracks safe request diagnostics when a single-change GraphQL commit fails', async () => {
+    const { repository } = buildRepository('batch-failure-diagnostics');
+    await repository.initialize();
+    const api = getRepositoryTestGitHubApi();
+
+    const fileId = await repository.createFile(
+      'Private note title from GitHub',
+      'mp4',
+      null,
+      new Uint8Array([1, 2, 3]),
+    );
+    await repository.flushPending();
+    vi.mocked(trackEvent).mockClear();
+    await repository.writeFileBytes(fileId, new Uint8Array([4, 5, 6, 7]));
+    api.failNextGraphQL('http-499');
+
+    await expect(repository.flushPending()).rejects.toThrow(
+      'GitHub GraphQL request failed (499)',
+    );
+
+    const failure = vi
+      .mocked(trackEvent)
+      .mock.calls.filter(([event]) => event === 'sync_failed')
+      .at(-1)?.[1];
+    expect(failure).toMatchObject({
+      error_message: 'GitHub GraphQL request failed (499)',
+      pending_remote_writes: 1,
+      github_graphql_stage: 'http',
+      github_graphql_status: 499,
+      github_graphql_content_type: 'application/json',
+      github_graphql_additions: 2,
+      github_graphql_deletions: 0,
+      github_request_id: 'test-request-id',
+    });
+    expect(failure?.github_graphql_request_chars).toBeGreaterThan(0);
+    expect(failure?.github_graphql_file_bytes).toBeGreaterThan(4);
+    expect(failure?.github_graphql_response_chars).toBeGreaterThan(0);
+    expect(JSON.stringify(failure)).not.toContain('Private note title');
   });
 
   it('does not create a conflict copy after an ambiguous successful commit', async () => {

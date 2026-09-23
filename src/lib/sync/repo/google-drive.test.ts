@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { trackEvent } from '@/lib/analytics';
 import {
   createNoteState,
   getRepositoryTestGoogleDriveApi,
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { CachedRepository } from './cached';
 import { GoogleDriveRepository } from './google-drive';
+import { LocalRepository } from './local';
 import type { VFSManifest } from './shared';
+
+vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
 function createRepository(): GoogleDriveRepository {
   return new GoogleDriveRepository({
@@ -40,6 +45,7 @@ function injectExternalNode(nodeId: string): void {
 describe('GoogleDriveRepository', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
+    vi.mocked(trackEvent).mockClear();
   });
 
   afterEach(() => {
@@ -59,6 +65,38 @@ describe('GoogleDriveRepository', () => {
     await settled;
 
     expect(drive.requestCount).toBe(2);
+  });
+
+  it('tracks safe Drive response diagnostics on sync failure', async () => {
+    const remote = createRepository();
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/drive-diagnostics'),
+      'repositories/drive-diagnostics/outbox.json',
+    );
+    await repository.initialize();
+    await repository.createFile('Private note title', 'mcanvas', null);
+    getRepositoryTestGoogleDriveApi().rateLimitEveryRequest(429, 0);
+
+    await expect(repository.flushPending()).rejects.toThrow(/429/);
+
+    const failure = vi
+      .mocked(trackEvent)
+      .mock.calls.filter(([event]) => event === 'sync_failed')
+      .at(-1)?.[1];
+    expect(failure).toMatchObject({
+      repository_kind: 'google-drive',
+      pending_remote_writes: 2,
+      google_drive_stage: 'api_request',
+      google_drive_method: 'GET',
+      google_drive_attempts: 4,
+      google_drive_status: 429,
+      google_drive_retry_after: '0',
+    });
+    expect(failure?.google_drive_operation).toMatch(/^Google Drive /);
+    expect(failure?.google_drive_duration_ms).toBeGreaterThanOrEqual(0);
+    expect(failure?.google_drive_response_chars).toBeGreaterThan(0);
+    expect(JSON.stringify(failure)).not.toContain('Private note title');
   });
 
   it('stops waiting out a rate limit once disposed', async () => {

@@ -40,11 +40,16 @@ function createJsonResponse(status: number, payload: unknown) {
   };
 }
 
-function createTextResponse(status: number, body: string) {
+function createTextResponse(
+  status: number,
+  body: string,
+  headers?: Record<string, string>,
+) {
   const bytes = new TextEncoder().encode(body);
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     async json() {
       return JSON.parse(body) as unknown;
     },
@@ -351,7 +356,9 @@ export interface MemoryGitHubApi {
   failNextPut(path: string, status?: number): void;
   failNextBranch(status: number): void;
   failNextTarball(status: number, retryAfterSeconds: number): void;
-  failNextGraphQL(reason: 'network' | 'unknown' | 'head-conflict'): void;
+  failNextGraphQL(
+    reason: 'network' | 'unknown' | 'head-conflict' | 'http-499',
+  ): void;
   bumpHeadOidExternally(): string;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
@@ -389,8 +396,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     status: number;
     retryAfterSeconds: number;
   } | null = null;
-  const nextGraphqlFailures: Array<'network' | 'unknown' | 'head-conflict'> =
-    [];
+  const nextGraphqlFailures: Array<
+    'network' | 'unknown' | 'head-conflict' | 'http-499'
+  > = [];
 
   function bumpHeadOid(): string {
     headOidCounter += 1;
@@ -432,6 +440,16 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
       const reason = nextGraphqlFailures.shift()!;
       if (reason === 'network') {
         return createTextResponse(503, '{"message":"Service Unavailable"}');
+      }
+      if (reason === 'http-499') {
+        return createTextResponse(
+          499,
+          '{"message":"Private note title from GitHub"}',
+          {
+            'content-type': 'application/json',
+            'x-github-request-id': 'test-request-id',
+          },
+        );
       }
       if (reason === 'head-conflict') {
         return createJsonResponse(200, {

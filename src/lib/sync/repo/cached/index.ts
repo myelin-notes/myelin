@@ -21,6 +21,7 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from '../config';
+import { GoogleDriveRequestError } from '../google-drive-error';
 import type { LocalRepository } from '../local';
 import {
   addChild,
@@ -1705,8 +1706,12 @@ export class CachedRepository
           ? 'conflict'
           : 'other';
       trackEvent('sync_failed', {
+        repository_kind: this.kind,
         error_type: errorType,
         error_message: error.message.slice(0, 200),
+        pending_remote_writes: this.outbox.length,
+        ...(error instanceof BatchUnknownError ? error.diagnostics : {}),
+        ...(error instanceof GoogleDriveRequestError ? error.diagnostics : {}),
       });
     }
     this.runtimeStatus = { ...this.runtimeStatus, ...patch };

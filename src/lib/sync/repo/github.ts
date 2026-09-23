@@ -5,6 +5,7 @@ import {
   type BatchedCommitResult,
   BatchHeadConflictError,
   BatchUnknownError,
+  type GitHubBatchFailureDiagnostics,
 } from './batch';
 import { getGitHubToken } from './github-credentials';
 import {
@@ -451,6 +452,21 @@ export class GitHubRepository extends BaseRepository {
         },
       },
     };
+    const requestBody = JSON.stringify({
+      query:
+        'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
+      variables,
+    });
+    const requestMetrics = {
+      github_graphql_request_chars: requestBody.length,
+      github_graphql_file_bytes: input.additions.reduce(
+        (total, addition) => total + addition.contents.byteLength,
+        0,
+      ),
+      github_graphql_additions: input.additions.length,
+      github_graphql_deletions: input.deletions.length,
+    };
+    const startedAt = Date.now();
 
     let response: Response;
     try {
@@ -460,23 +476,44 @@ export class GitHubRepository extends BaseRepository {
           ...(await this.authHeaders()),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query:
-            'mutation($input: CreateCommitOnBranchInput!) { createCommitOnBranch(input: $input) { commit { oid } } }',
-          variables,
-        }),
+        body: requestBody,
       });
     } catch (error) {
       throw new BatchUnknownError(
         'GitHub GraphQL request failed before receiving a response',
         error,
+        {
+          ...requestMetrics,
+          github_graphql_stage: 'request',
+          github_graphql_duration_ms: Date.now() - startedAt,
+        },
       );
     }
 
+    const requestId = response.headers?.get('x-github-request-id');
+    const contentType = response.headers?.get('content-type');
+    const responseMetrics: GitHubBatchFailureDiagnostics = {
+      ...requestMetrics,
+      github_graphql_stage: 'http',
+      github_graphql_duration_ms: Date.now() - startedAt,
+      github_graphql_status: response.status,
+      ...(contentType
+        ? { github_graphql_content_type: contentType.slice(0, 100) }
+        : {}),
+      ...(requestId ? { github_request_id: requestId.slice(0, 100) } : {}),
+    };
+
     if (!response.ok) {
+      const responseBody = await response
+        .text()
+        .catch(() => '<no response body>');
       throw new BatchUnknownError(
         `GitHub GraphQL request failed (${response.status})`,
-        await response.text().catch(() => '<no response body>'),
+        responseBody,
+        {
+          ...responseMetrics,
+          github_graphql_response_chars: responseBody.length,
+        },
       );
     }
 
@@ -493,6 +530,7 @@ export class GitHubRepository extends BaseRepository {
       throw new BatchUnknownError(
         `GitHub GraphQL returned errors: ${firstMessage}`,
         body.errors,
+        { ...responseMetrics, github_graphql_stage: 'graphql' },
       );
     }
 
@@ -501,6 +539,7 @@ export class GitHubRepository extends BaseRepository {
       throw new BatchUnknownError(
         'GitHub GraphQL response missing commit oid',
         body,
+        { ...responseMetrics, github_graphql_stage: 'response' },
       );
     }
     return { newHeadOid: newOid };

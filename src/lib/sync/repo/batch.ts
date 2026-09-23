@@ -37,10 +37,24 @@ export class BatchUnknownError extends Error {
   constructor(
     message: string,
     public readonly details: unknown,
+    public readonly diagnostics?: GitHubBatchFailureDiagnostics,
   ) {
     super(message);
     this.name = 'BatchUnknownError';
   }
+}
+
+export interface GitHubBatchFailureDiagnostics {
+  github_graphql_stage: 'request' | 'http' | 'graphql' | 'response';
+  github_graphql_request_chars: number;
+  github_graphql_file_bytes: number;
+  github_graphql_additions: number;
+  github_graphql_deletions: number;
+  github_graphql_duration_ms: number;
+  github_graphql_status?: number;
+  github_graphql_content_type?: string;
+  github_graphql_response_chars?: number;
+  github_request_id?: string;
 }
 
 export function supportsBatchedCommit<

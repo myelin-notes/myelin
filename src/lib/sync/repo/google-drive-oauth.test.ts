@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetch } from '@tauri-apps/plugin-http';
+import { GoogleDriveRequestError } from './google-drive-error';
 import type { OAuthCallbackParams } from './oauth/redirect';
 
 // The shared setup replaces this module wholesale for consumers that only need
@@ -249,6 +251,66 @@ describe('Google Drive OAuth', () => {
     // The refreshed token is cached, so a later read makes no request.
     expect(await getGoogleDriveToken('default')).toBe('access-2');
     expect(tokenRequests).toHaveLength(1);
+  });
+
+  it('keeps safe diagnostics when token refresh fails before a response', async () => {
+    storedSecrets.set(
+      'token:default',
+      JSON.stringify({
+        accessToken: 'stale',
+        refreshToken: 'private-refresh-token',
+        expiresAtMs: Date.now() - 1_000,
+      }),
+    );
+    vi.mocked(fetch).mockRejectedValueOnce(
+      new Error('private-refresh-token was not sent'),
+    );
+
+    const error = await getGoogleDriveToken('default').catch((value) => value);
+    expect(error).toBeInstanceOf(GoogleDriveRequestError);
+    expect(error.diagnostics).toMatchObject({
+      google_drive_stage: 'token_refresh',
+      google_drive_method: 'POST',
+      google_drive_attempts: 1,
+    });
+    expect(error.diagnostics.google_drive_request_chars).toBeGreaterThan(0);
+    expect(JSON.stringify(error.diagnostics)).not.toContain(
+      'private-refresh-token',
+    );
+
+    tokenResponses.push({ access_token: 'access-2', expires_in: 3600 });
+    await expect(getGoogleDriveToken('default')).resolves.toBe('access-2');
+  });
+
+  it('records a rejected refresh code without its response description', async () => {
+    storedSecrets.set(
+      'token:default',
+      JSON.stringify({
+        accessToken: 'stale',
+        refreshToken: 'private-refresh-token',
+        expiresAtMs: Date.now() - 1_000,
+      }),
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'private account detail',
+        }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const error = await getGoogleDriveToken('default').catch((value) => value);
+    expect(error).toBeInstanceOf(GoogleDriveRequestError);
+    expect(error.diagnostics).toMatchObject({
+      google_drive_stage: 'token_refresh',
+      google_drive_status: 400,
+      google_drive_error_code: 'invalid_grant',
+      google_drive_content_type: 'application/json',
+    });
+    expect(JSON.stringify(error.diagnostics)).not.toContain('private');
+    expect(await hasGoogleDriveToken('default')).toBe(false);
   });
 
   it('cancelling tears the redirect listener down', async () => {
