@@ -33,6 +33,7 @@ interface ResponseHeaders {
 interface GitHubContentsResponse {
   sha: string;
   content?: string | null;
+  encoding?: string;
 }
 
 interface GitHubWriteResponse {
@@ -341,7 +342,13 @@ export class GitHubRepository extends BaseRepository {
     bytes: Uint8Array | null;
   }> {
     const url = `${this.contentsUrl(path)}?ref=${encodeURIComponent(this.config.branch)}`;
-    const response = await this.fetchWithRateLimitRetry(url);
+    const response = await this.sendWithRateLimitRetry(url, async () => ({
+      method: 'GET',
+      headers: {
+        ...(await this.authHeaders()),
+        Accept: 'application/vnd.github.object+json',
+      },
+    }));
 
     if (response.status === 404) {
       await this.getBranchHeadOid();
@@ -353,6 +360,40 @@ export class GitHubRepository extends BaseRepository {
     }
 
     const payload = (await response.json()) as GitHubContentsResponse;
+    if (payload.encoding === 'none') {
+      const blobUrl = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}/git/blobs/${encodeURIComponent(payload.sha)}`;
+      let blobResponse = await this.sendWithRateLimitRetry(
+        blobUrl,
+        async () => ({
+          method: 'GET',
+          headers: {
+            ...(await this.authHeaders()),
+            Accept: 'application/vnd.github.raw+json',
+          },
+          maxRedirections: 0,
+        }),
+      );
+      if (blobResponse.status >= 300 && blobResponse.status < 400) {
+        const location = getResponseHeader(blobResponse, 'location');
+        if (!location) {
+          throw await this.failureError(
+            'GitHub blob redirect missing Location',
+            blobResponse,
+          );
+        }
+        blobResponse = await fetch(location, { method: 'GET' });
+      }
+      if (!blobResponse.ok) {
+        throw await this.failureError(
+          'GitHub blob request failed',
+          blobResponse,
+        );
+      }
+      return {
+        sha: payload.sha,
+        bytes: new Uint8Array(await blobResponse.arrayBuffer()),
+      };
+    }
     const bytes = payload.content ? base64DecodeToBytes(payload.content) : null;
     return { sha: payload.sha, bytes };
   }

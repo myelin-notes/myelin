@@ -283,6 +283,38 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
+  it('uses REST for a single file larger than the GraphQL batch limit', async () => {
+    const { remote, repository } = buildRepository('batch-single-large-file');
+    await repository.initialize();
+
+    const fileId = await repository.createFile(
+      'Large recording.mp4',
+      'mp4',
+      null,
+      new Uint8Array([1]),
+    );
+    await repository.flushPending();
+
+    const api = getRepositoryTestGitHubApi();
+    const baselineGraphql = api.graphqlCallCount;
+    const baselinePuts = api.putCallCount;
+    const bytes = new Uint8Array(8 * 1024 * 1024 + 1);
+    bytes[0] = 42;
+    bytes[bytes.length - 1] = 99;
+
+    await repository.writeFileBytes(fileId, bytes);
+    await repository.flushPending();
+
+    expect(api.graphqlCallCount).toBe(baselineGraphql);
+    expect(api.putCallCount).toBeGreaterThan(baselinePuts);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+
+    const remoteBytes = await remote.readFileBytes(fileId);
+    expect(remoteBytes?.byteLength).toBe(bytes.byteLength);
+    expect(remoteBytes?.[0]).toBe(42);
+    expect(remoteBytes?.[bytes.length - 1]).toBe(99);
+  });
+
   it('does not export every cached file while planning a batch', async () => {
     const { cache, repository } = buildRepository('batch-manifest-only');
     await repository.initialize();

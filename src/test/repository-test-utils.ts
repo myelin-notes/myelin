@@ -544,6 +544,21 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         return createBinaryResponse(200, bytes);
       }
 
+      const blobSha = parsed.pathname.match(/\/git\/blobs\/([^/]+)$/)?.[1];
+      if (blobSha) {
+        const entry = [...files.values()].find(({ sha }) => sha === blobSha);
+        if (!entry) {
+          return createTextResponse(404, '{"message":"Not Found"}');
+        }
+        if (init.headers?.Accept !== 'application/vnd.github.raw+json') {
+          return createTextResponse(
+            415,
+            '{"message":"Unsupported media type"}',
+          );
+        }
+        return createBinaryResponse(200, entry.bytes);
+      }
+
       const path = getContentsPath(url);
       if (path === null) {
         throw new Error(`Unsupported GitHub URL: ${url}`);
@@ -553,6 +568,20 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         const entry = files.get(path);
         if (!entry) {
           return createTextResponse(404, '{"message":"Not Found"}');
+        }
+        if (entry.bytes.byteLength > 1024 * 1024) {
+          if (init.headers?.Accept !== 'application/vnd.github.object+json') {
+            return createTextResponse(
+              415,
+              '{"message":"Unsupported media type"}',
+            );
+          }
+          return createJsonResponse(200, {
+            sha: entry.sha,
+            size: entry.bytes.byteLength,
+            content: '',
+            encoding: 'none',
+          });
         }
         return createJsonResponse(200, {
           sha: entry.sha,

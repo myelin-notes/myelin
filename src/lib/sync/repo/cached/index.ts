@@ -815,7 +815,7 @@ export class CachedRepository
       if (ok) {
         return;
       }
-      logger.debug('Falling back to per-op flush after batched flush failed', {
+      logger.debug('Using per-op flush after batched flush could not proceed', {
         repositoryKind: this.kind,
       });
       await this.flushPerOpImpl(MAX_BATCH_FALLBACK_OPS);
@@ -928,7 +928,10 @@ export class CachedRepository
         }
         batchBytes += bytes.byteLength;
       }
-      if (batchBytes > MAX_BATCH_BYTES && plan.resolvedOps.length > 1) {
+      if (batchBytes > MAX_BATCH_BYTES) {
+        if (plan.resolvedOps.length === 1) {
+          return false;
+        }
         maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
         continue;
       }
