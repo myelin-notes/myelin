@@ -70,9 +70,9 @@ it('stages large bytes in bounded writes and completes partial writes', async ()
   bytes[bytes.length - 1] = 9;
   vi.mocked(invoke).mockImplementation(async (_command, args) => {
     const request = (args as { request: { stagingId: string } }).request;
-    expect(storage.readBinary(`git-sync/${request.stagingId}/0`)).toEqual(
-      bytes,
-    );
+    const staged = storage.readBinary(`git-sync/${request.stagingId}/0`);
+    expect(staged).toHaveLength(bytes.length);
+    expect(staged?.every((byte, index) => byte === bytes[index])).toBe(true);
     return { status: 'pushed', commitOid: 'a'.repeat(40), blobShas: {} };
   });
 
