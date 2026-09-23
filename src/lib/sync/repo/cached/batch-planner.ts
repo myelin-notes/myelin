@@ -85,11 +85,12 @@ async function mapWithConcurrency<T, U>(
   return results;
 }
 
-async function hasRawConflict(
+async function checkRawConflicts(
   remote: BatchPlanRemote,
   rawOps: readonly BatchRawOperation[],
   repositoryKind: string,
-): Promise<boolean> {
+): Promise<Set<VFSNodeId> | null> {
+  const alreadyApplied = new Set<VFSNodeId>();
   for (const entry of rawOps) {
     if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
       continue;
@@ -99,6 +100,7 @@ async function hasRawConflict(
     if (remoteRevision !== entry.op.baseFileRevision) {
       const localRevision = await computeRevision(entry.bytes);
       if (remoteRevision === localRevision) {
+        alreadyApplied.add(entry.op.nodeId);
         continue;
       }
       logger.debug('Raw file conflict detected; aborting batch', {
@@ -107,10 +109,10 @@ async function hasRawConflict(
         baseFileRevision: entry.op.baseFileRevision,
         remoteRevision,
       });
-      return true;
+      return null;
     }
   }
-  return false;
+  return alreadyApplied;
 }
 
 /**
@@ -182,12 +184,18 @@ export async function createBatchPlan(
   const fileSavedAt = input.now ?? Date.now();
 
   if (input.rawOps.length > 0) {
-    if (
-      await hasRawConflict(input.remote, input.rawOps, input.repositoryKind)
-    ) {
+    const alreadyApplied = await checkRawConflicts(
+      input.remote,
+      input.rawOps,
+      input.repositoryKind,
+    );
+    if (alreadyApplied === null) {
       return 'abort-to-rest';
     }
     for (const entry of input.rawOps) {
+      if (alreadyApplied.has(entry.op.nodeId)) {
+        continue;
+      }
       if (entry.op.replaceFile && !entry.bytes) {
         return 'abort-to-rest';
       }
@@ -221,23 +229,32 @@ export async function createBatchPlan(
       4,
       async (entry) => {
         const remoteSnapshot = await input.remote.loadDocument(entry.op.nodeId);
+        const remoteBytes = remoteSnapshot.update;
         const doc = new Y.Doc();
-        if (remoteSnapshot.update && remoteSnapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, remoteSnapshot.update);
+        if (remoteBytes && remoteBytes.byteLength > 0) {
+          Y.applyUpdate(doc, remoteBytes);
         }
         if (entry.snapshot.update && entry.snapshot.update.byteLength > 0) {
           Y.applyUpdate(doc, entry.snapshot.update);
         }
+        const bytes = Y.encodeStateAsUpdate(doc);
         return {
           nodeId: entry.node.id,
           path: getStoredFilePath(entry.node),
-          bytes: Y.encodeStateAsUpdate(doc),
+          bytes,
+          alreadyApplied:
+            !!remoteBytes &&
+            bytes.byteLength === remoteBytes.byteLength &&
+            bytes.every((byte, index) => byte === remoteBytes[index]),
           links: extractStoredNoteLinks(doc),
           name: entry.node.name,
         };
       },
     );
     for (const mergedNote of merged) {
+      if (mergedNote.alreadyApplied) {
+        continue;
+      }
       plan.additions.set(mergedNote.path, mergedNote.bytes);
       plan.messages.push(`Update note ${mergedNote.name}`);
       const manifestNode = plan.manifest.nodes[mergedNote.nodeId];

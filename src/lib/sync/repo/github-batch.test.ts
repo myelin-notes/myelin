@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as Y from 'yjs';
 import { trackEvent } from '@/lib/analytics';
 import {
   createNoteState,
@@ -9,6 +10,7 @@ import { BatchUnknownError } from './batch';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
 import { LocalRepository } from './local';
+import { getStoredFilePath } from './shared';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 
@@ -283,7 +285,7 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
-  it('uses REST for a single file larger than the GraphQL batch limit', async () => {
+  it('uploads a large file as a blob and commits its existing path with the manifest', async () => {
     const { remote, repository } = buildRepository('batch-single-large-file');
     await repository.initialize();
 
@@ -298,6 +300,8 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     const api = getRepositoryTestGitHubApi();
     const baselineGraphql = api.graphqlCallCount;
     const baselinePuts = api.putCallCount;
+    const baselineBlobs = api.blobCreateCount;
+    const baselineRefs = api.refUpdateCount;
     const bytes = new Uint8Array(8 * 1024 * 1024 + 1);
     bytes[0] = 42;
     bytes[bytes.length - 1] = 99;
@@ -306,13 +310,180 @@ describe('CachedRepository batched flush via GitHub GraphQL', () => {
     await repository.flushPending();
 
     expect(api.graphqlCallCount).toBe(baselineGraphql);
-    expect(api.putCallCount).toBeGreaterThan(baselinePuts);
+    expect(api.putCallCount).toBe(baselinePuts);
+    expect(api.blobCreateCount - baselineBlobs).toBe(2);
+    expect(api.refUpdateCount - baselineRefs).toBe(1);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    const storedPath = getStoredFilePath({ id: fileId, fileType: 'mp4' });
+    expect(api.readBytes(storedPath)?.byteLength).toBe(bytes.byteLength);
+    expect(api.readBytes(storedPath)?.[0]).toBe(42);
 
     const remoteBytes = await remote.readFileBytes(fileId);
     expect(remoteBytes?.byteLength).toBe(bytes.byteLength);
     expect(remoteBytes?.[0]).toBe(42);
     expect(remoteBytes?.[bytes.length - 1]).toBe(99);
+  });
+
+  it('routes a single change set by total bytes even when each file is under 8 MiB', async () => {
+    const { remote } = buildRepository('batch-total-byte-limit');
+    await remote.initialize();
+    const api = getRepositoryTestGitHubApi();
+    const baselineGraphql = api.graphqlCallCount;
+    const baselineBlobs = api.blobCreateCount;
+
+    await remote.commitBatch({
+      additions: [
+        { path: 'files/first.bin', contents: new Uint8Array(5 * 1024 * 1024) },
+        { path: 'files/second.bin', contents: new Uint8Array(4 * 1024 * 1024) },
+      ],
+      deletions: [],
+      message: { headline: 'Upload two files' },
+      expectedHeadOid: await remote.getBranchHeadOid(),
+    });
+
+    expect(api.graphqlCallCount).toBe(baselineGraphql);
+    expect(api.blobCreateCount - baselineBlobs).toBe(2);
+    expect(api.readBytes('files/first.bin')?.byteLength).toBe(5 * 1024 * 1024);
+    expect(api.readBytes('files/second.bin')?.byteLength).toBe(4 * 1024 * 1024);
+  });
+
+  it('replans a large upload after a ref conflict without dropping its queued operation', async () => {
+    const { remote, repository } = buildRepository('batch-large-ref-conflict');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Large.mp4',
+      'mp4',
+      null,
+      new Uint8Array([1]),
+    );
+    await repository.flushPending();
+    await repository.writeFileBytes(
+      fileId,
+      new Uint8Array(8 * 1024 * 1024 + 1),
+    );
+    const api = getRepositoryTestGitHubApi();
+    api.failNextGitData('ref-conflict');
+
+    await repository.flushPending();
+
+    expect(api.refUpdateCount).toBe(2);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(
+      8 * 1024 * 1024 + 1,
+    );
+  });
+
+  it.each([
+    'ref-applied-network',
+    'ref-applied-advanced',
+  ] as const)('drains an applied large upload when %s loses its response', async (failure) => {
+    const { remote, repository } = buildRepository(`batch-large-${failure}`);
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Large.mp4',
+      'mp4',
+      null,
+      new Uint8Array(8 * 1024 * 1024 + 1),
+    );
+    const api = getRepositoryTestGitHubApi();
+    api.failNextGitData(failure);
+
+    await repository.flushPending();
+
+    expect(api.refUpdateCount).toBe(1);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect((await remote.readFileBytes(fileId))?.byteLength).toBe(
+      8 * 1024 * 1024 + 1,
+    );
+  });
+
+  it('drains an already applied large upload after verification was unavailable', async () => {
+    const { repository } = buildRepository('batch-large-unverifiable');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Large.mp4',
+      'mp4',
+      null,
+      new Uint8Array([1]),
+    );
+    await repository.flushPending();
+    await repository.writeFileBytes(
+      fileId,
+      new Uint8Array(8 * 1024 * 1024 + 1),
+    );
+    const api = getRepositoryTestGitHubApi();
+    api.failNextGitData('ref-applied-unverifiable');
+
+    await expect(repository.flushPending()).rejects.toThrow(
+      'GitHub REST ref request failed',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+    expect(api.refUpdateCount).toBe(1);
+
+    await repository.flushPending();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect(api.refUpdateCount).toBe(1);
+  });
+
+  it('uploads a large canvas without repeating an ambiguous commit', async () => {
+    const { remote, repository } = buildRepository('batch-large-canvas');
+    await repository.initialize();
+    const fileId = await repository.createFile('Imported PDF', 'mcanvas', null);
+    await repository.flushPending();
+    const doc = new Y.Doc();
+    doc.getMap('pdf').set('bytes', new Uint8Array(8 * 1024 * 1024 + 1));
+    await repository.pushUpdates(fileId, Y.encodeStateAsUpdate(doc), {
+      baseRevision: null,
+      localStateVector: Y.encodeStateVector(doc),
+    });
+    const api = getRepositoryTestGitHubApi();
+    api.failNextGitData('ref-applied-unverifiable');
+
+    await expect(repository.flushPending()).rejects.toThrow(
+      'GitHub REST ref request failed',
+    );
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+    await repository.flushPending();
+
+    expect(api.refUpdateCount).toBe(1);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    const remoteDoc = new Y.Doc();
+    Y.applyUpdate(remoteDoc, (await remote.loadDocument(fileId)).update!);
+    expect(
+      (remoteDoc.getMap('pdf').get('bytes') as Uint8Array).byteLength,
+    ).toBe(8 * 1024 * 1024 + 1);
+  });
+
+  it('keeps a rejected large upload queued and records safe REST diagnostics', async () => {
+    const { repository } = buildRepository('batch-large-400');
+    await repository.initialize();
+    await repository.createFile(
+      'Private note title',
+      'mp4',
+      null,
+      new Uint8Array(8 * 1024 * 1024 + 1),
+    );
+    const api = getRepositoryTestGitHubApi();
+    api.failNextGitData('blob-400');
+
+    await expect(repository.flushPending()).rejects.toThrow(
+      'GitHub REST blob request failed (400)',
+    );
+
+    const failure = vi
+      .mocked(trackEvent)
+      .mock.calls.filter(([event]) => event === 'sync_failed')
+      .at(-1)?.[1];
+    expect(failure).toMatchObject({
+      github_rest_stage: 'blob',
+      github_rest_status: 400,
+      github_rest_content_type: 'application/json',
+      github_request_id: 'rest-test-id',
+    });
+    expect(failure?.github_rest_file_bytes).toBeGreaterThan(8 * 1024 * 1024);
+    expect(failure?.github_rest_request_chars).toBeGreaterThan(8 * 1024 * 1024);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+    expect(JSON.stringify(failure)).not.toContain('Private note title');
   });
 
   it('does not export every cached file while planning a batch', async () => {

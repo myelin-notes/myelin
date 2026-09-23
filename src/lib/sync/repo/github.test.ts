@@ -109,6 +109,23 @@ describe('GitHubRepository', () => {
     );
   });
 
+  it('writes large files through Git blobs for direct repository writes', async () => {
+    const repository = createRepository();
+    const api = getRepositoryTestGitHubApi();
+    const bytes = new Uint8Array(8 * 1024 * 1024 + 1);
+    bytes[0] = 7;
+    bytes[bytes.length - 1] = 9;
+
+    const fileId = await repository.createFile('Large.mp4', 'mp4', null, bytes);
+    const path = getStoredFilePath({ id: fileId, fileType: 'mp4' });
+
+    expect(api.blobCreateCount).toBe(1);
+    expect(api.refUpdateCount).toBe(1);
+    expect(api.readBytes(path)?.byteLength).toBe(bytes.byteLength);
+    expect(api.readBytes(path)?.[0]).toBe(7);
+    expect(api.readBytes(path)?.[bytes.length - 1]).toBe(9);
+  });
+
   it('retries manifest writes after a conflict response', async () => {
     const repository = createRepository();
     const githubApi = getRepositoryTestGitHubApi();

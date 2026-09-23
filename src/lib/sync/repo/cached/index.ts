@@ -87,7 +87,7 @@ const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
 const MAX_BATCH_OPS = 40;
 const MAX_BATCH_BYTES = 8 * 1024 * 1024;
-const MAX_BATCH_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_BATCH_FILE_BYTES = 100_000_000;
 const MAX_BATCH_FALLBACK_OPS = 2;
 const logger = new Logger('CachedRepository');
 
@@ -923,15 +923,12 @@ export class CachedRepository
       for (const [path, bytes] of plan.additions) {
         if (bytes.byteLength > MAX_BATCH_FILE_BYTES) {
           throw new Error(
-            `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MiB file limit.`,
+            `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MB file limit.`,
           );
         }
         batchBytes += bytes.byteLength;
       }
-      if (batchBytes > MAX_BATCH_BYTES) {
-        if (plan.resolvedOps.length === 1) {
-          return false;
-        }
+      if (batchBytes > MAX_BATCH_BYTES && plan.resolvedOps.length > 1) {
         maxOps = Math.max(1, Math.floor(plan.resolvedOps.length / 2));
         continue;
       }
@@ -949,6 +946,9 @@ export class CachedRepository
             message: error.message,
           });
           continue;
+        }
+        if (batchBytes > MAX_BATCH_BYTES) {
+          throw error;
         }
         if (error instanceof BatchHeadConflictError) {
           logger.debug('Batched commit head conflict twice; falling back', {
@@ -1037,7 +1037,7 @@ export class CachedRepository
         }
         if (operationBytes > MAX_BATCH_FILE_BYTES) {
           throw new Error(
-            `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MiB file limit.`,
+            `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MB file limit.`,
           );
         }
         ops.push(op);
@@ -1072,6 +1072,9 @@ export class CachedRepository
     remote: BatchedCommitTarget,
     plan: BatchPlan,
   ): Promise<void> {
+    if (plan.additions.size === 0 && plan.deletions.size === 0) {
+      return;
+    }
     const opCount = plan.resolvedOps.length;
     const headline =
       opCount === 1 && plan.messages[0]

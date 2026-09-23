@@ -359,6 +359,14 @@ export interface MemoryGitHubApi {
   failNextGraphQL(
     reason: 'network' | 'unknown' | 'head-conflict' | 'http-499',
   ): void;
+  failNextGitData(
+    reason:
+      | 'blob-400'
+      | 'ref-conflict'
+      | 'ref-applied-network'
+      | 'ref-applied-advanced'
+      | 'ref-applied-unverifiable',
+  ): void;
   bumpHeadOidExternally(): string;
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
@@ -366,6 +374,8 @@ export interface MemoryGitHubApi {
   readonly tarballFetchCount: number;
   readonly graphqlCallCount: number;
   readonly putCallCount: number;
+  readonly blobCreateCount: number;
+  readonly refUpdateCount: number;
   readonly deleteCallCount: number;
   readonly headOid: string;
 }
@@ -390,7 +400,22 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   let tarballFetchCount = 0;
   let graphqlCallCount = 0;
   let putCallCount = 0;
+  let blobCreateCount = 0;
+  let refUpdateCount = 0;
   let deleteCallCount = 0;
+  let nextGitDataFailure:
+    | 'blob-400'
+    | 'ref-conflict'
+    | 'ref-applied-network'
+    | 'ref-applied-advanced'
+    | 'ref-applied-unverifiable'
+    | null = null;
+  const blobs = new Map<string, Uint8Array>();
+  const trees = new Map<
+    string,
+    Map<string, { sha: string; bytes: Uint8Array }>
+  >();
+  const commits = new Map<string, { tree: string; parent: string }>();
   let nextBranchFailure: number | null = null;
   let nextTarballFailure: {
     status: number;
@@ -401,8 +426,10 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   > = [];
 
   function bumpHeadOid(): string {
+    const parent = headOid;
     headOidCounter += 1;
     headOid = `oid-${headOidCounter}`;
+    commits.set(headOid, { tree: `tree-${headOid}`, parent });
     return headOid;
   }
 
@@ -544,6 +571,128 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         return createBinaryResponse(200, bytes);
       }
 
+      if (parsed.pathname.endsWith('/git/blobs') && init.method === 'POST') {
+        blobCreateCount += 1;
+        if (nextGitDataFailure === 'blob-400') {
+          nextGitDataFailure = null;
+          return createTextResponse(
+            400,
+            '{"message":"Private note title: malformed request"}',
+            {
+              'content-type': 'application/json',
+              'x-github-request-id': 'rest-test-id',
+            },
+          );
+        }
+        const body = JSON.parse(String(init.body ?? '{}')) as {
+          content: string;
+          encoding: string;
+        };
+        if (body.encoding !== 'base64') {
+          return createTextResponse(400, '{"message":"Invalid encoding"}');
+        }
+        const sha = `sha-${++revision}`;
+        blobs.set(sha, new Uint8Array(Buffer.from(body.content, 'base64')));
+        return createJsonResponse(201, { sha });
+      }
+
+      const gitCommitSha = parsed.pathname.match(
+        /\/git\/commits\/([^/]+)$/,
+      )?.[1];
+      if (gitCommitSha && init.method === 'GET') {
+        return createJsonResponse(200, {
+          tree: { sha: `tree-${gitCommitSha}` },
+        });
+      }
+
+      if (parsed.pathname.endsWith('/git/trees') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body ?? '{}')) as {
+          tree: Array<{ path: string; sha: string | null }>;
+        };
+        const snapshot = new Map(files);
+        for (const entry of body.tree) {
+          if (entry.sha === null) {
+            snapshot.delete(entry.path);
+          } else {
+            const bytes = blobs.get(entry.sha);
+            if (!bytes) {
+              return createTextResponse(400, '{"message":"Unknown blob"}');
+            }
+            snapshot.set(entry.path, { sha: entry.sha, bytes });
+          }
+        }
+        const sha = `tree-created-${++revision}`;
+        trees.set(sha, snapshot);
+        return createJsonResponse(201, { sha });
+      }
+
+      if (parsed.pathname.endsWith('/git/commits') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body ?? '{}')) as {
+          tree: string;
+          parents: string[];
+        };
+        if (!trees.has(body.tree)) {
+          return createTextResponse(400, '{"message":"Unknown tree"}');
+        }
+        const sha = `oid-created-${++revision}`;
+        commits.set(sha, { tree: body.tree, parent: body.parents[0] ?? '' });
+        return createJsonResponse(201, { sha });
+      }
+
+      if (
+        parsed.pathname.includes('/git/refs/heads/') &&
+        init.method === 'PATCH'
+      ) {
+        refUpdateCount += 1;
+        const body = JSON.parse(String(init.body ?? '{}')) as {
+          sha: string;
+          force: boolean;
+        };
+        const commit = commits.get(body.sha);
+        if (nextGitDataFailure === 'ref-conflict') {
+          nextGitDataFailure = null;
+          bumpHeadOid();
+        }
+        if (body.force || !commit || commit.parent !== headOid) {
+          return createTextResponse(409, '{"message":"Head changed"}');
+        }
+        files.clear();
+        for (const [path, entry] of trees.get(commit.tree) ?? []) {
+          files.set(path, entry);
+        }
+        headOid = body.sha;
+        if (nextGitDataFailure === 'ref-applied-unverifiable') {
+          nextGitDataFailure = null;
+          nextBranchFailure = 503;
+          throw new Error('response lost');
+        }
+        if (nextGitDataFailure === 'ref-applied-advanced') {
+          nextGitDataFailure = null;
+          bumpHeadOid();
+          throw new Error('response lost');
+        }
+        if (nextGitDataFailure === 'ref-applied-network') {
+          nextGitDataFailure = null;
+          throw new Error('response lost');
+        }
+        return createJsonResponse(200, { object: { sha: headOid } });
+      }
+
+      const compare = parsed.pathname.match(/\/compare\/([^/]+)\.\.\.([^/]+)$/);
+      if (compare && init.method === 'GET') {
+        const base = decodeURIComponent(compare[1] ?? '');
+        let current = decodeURIComponent(compare[2] ?? '');
+        while (commits.has(current)) {
+          if (current === base) {
+            break;
+          }
+          current = commits.get(current)?.parent ?? '';
+        }
+        return createJsonResponse(200, {
+          status: current === base ? 'ahead' : 'diverged',
+        });
+      }
+
       const blobSha = parsed.pathname.match(/\/git\/blobs\/([^/]+)$/)?.[1];
       if (blobSha) {
         const entry = [...files.values()].find(({ sha }) => sha === blobSha);
@@ -646,6 +795,9 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     failNextGraphQL(reason) {
       nextGraphqlFailures.push(reason);
     },
+    failNextGitData(reason) {
+      nextGitDataFailure = reason;
+    },
     bumpHeadOidExternally() {
       return bumpHeadOid();
     },
@@ -671,6 +823,12 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     get putCallCount() {
       return putCallCount;
+    },
+    get blobCreateCount() {
+      return blobCreateCount;
+    },
+    get refUpdateCount() {
+      return refUpdateCount;
     },
     get deleteCallCount() {
       return deleteCallCount;

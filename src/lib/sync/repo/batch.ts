@@ -37,11 +37,25 @@ export class BatchUnknownError extends Error {
   constructor(
     message: string,
     public readonly details: unknown,
-    public readonly diagnostics?: GitHubBatchFailureDiagnostics,
+    public readonly diagnostics?:
+      | GitHubBatchFailureDiagnostics
+      | GitHubRestFailureDiagnostics,
   ) {
     super(message);
     this.name = 'BatchUnknownError';
   }
+}
+
+export interface GitHubRestFailureDiagnostics {
+  github_rest_stage: 'blob' | 'parent' | 'tree' | 'commit' | 'ref' | 'verify';
+  github_rest_file_bytes: number;
+  github_rest_additions: number;
+  github_rest_deletions: number;
+  github_rest_duration_ms: number;
+  github_rest_status?: number;
+  github_rest_request_chars?: number;
+  github_rest_content_type?: string;
+  github_request_id?: string;
 }
 
 export interface GitHubBatchFailureDiagnostics {
