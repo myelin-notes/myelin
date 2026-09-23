@@ -47,4 +47,36 @@ describe('viewport state cache', () => {
       [noteId]: { zoom: 2, offset: { x: 50, y: 25 } },
     });
   });
+
+  it('waits until viewport movement stops before writing', async () => {
+    vi.useFakeTimers();
+    try {
+      const write = vi.fn(async () => {});
+      const { setPlatform } = await import('@myelin/editor/platform');
+      setPlatform(
+        createFakePlatform({
+          artifactCache: {
+            getUrl: async () => null,
+            read: async () => null,
+            write,
+            remove: async () => {},
+          },
+        }),
+      );
+      const { readViewportState, saveViewportState } = await import(
+        './viewport-state-cache'
+      );
+      await readViewportState(noteId);
+
+      for (let i = 0; i < 4; i++) {
+        saveViewportState(noteId, { zoom: 1 + i, offset: { x: i, y: 0 } });
+        await vi.advanceTimersByTimeAsync(200);
+      }
+      expect(write).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(250);
+      expect(write).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

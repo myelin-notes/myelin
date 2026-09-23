@@ -20,8 +20,7 @@ interface RectLike {
 /**
  * Map a rect from PM/contenteditable space into viewport screen pixels.
  *
- * The page-frame viewport applies `zoom: devicePixelRatio` (NOT reflected in getBoundingClientRect)
- * plus `transform: scale(canvasZoom / dpr)` (IS reflected), and anchors on the frame's real
+ * The page-frame viewport scales with the canvas zoom. Anchor on the frame's real
  * on-screen rect rather than assuming the editor origin sits at viewport (0,0).
  */
 export function mapPmRectToScreen(
@@ -54,7 +53,7 @@ function mapViewRectToScreen(
   rect: { left: number; top: number; right: number; bottom: number },
 ): PageFramePmScreenRect | null {
   const contentDiv = view.dom.closest<HTMLElement>(`.${PM_EDITOR_CLASS}`);
-  // frame > viewport (zoom + scale) > content > view.dom
+  // frame > viewport (scale) > content > view.dom
   const frameDiv = contentDiv?.parentElement?.parentElement ?? null;
   if (!(contentDiv && frameDiv)) {
     return null;

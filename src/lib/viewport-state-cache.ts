@@ -66,7 +66,7 @@ async function write(): Promise<void> {
 
 function scheduleWrite(): void {
   if (writeTimer) {
-    return;
+    clearTimeout(writeTimer);
   }
   writeTimer = setTimeout(() => {
     writeTimer = null;

@@ -517,22 +517,16 @@ export function PageFrameDomLayer({
         );
         removeStyleIfPresent(refs.frameDiv, 'transform');
 
-        // World-sized. A fixed CSS zoom of devicePixelRatio makes WebKit rasterise the compositing
-        // layer at DPR^2, giving crisp text at every canvas zoom. The constant zoom keeps text metrics
-        // and line breaks fixed; variable canvas zoom is handled by transform: scale() (post-layout GPU).
-        // Not cheap in the abstract — on a 2x display one blank page rasterizes ~9.6MP against ~2.8MP
-        // visible — but measured free while panning on iPad (promoted layer moves its texture), and
-        // worth ~5ms/frame only while zooming.
-        const dpr = getDevicePixelRatio();
+        // Rasterize at device resolution; CSS zoom by DPR made one blank page a 9.6MP layer
+        // on a 2x iPad, which is expensive to rescale during a pinch.
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
-        setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
         // Quantized like the boxes above: the chrome root supplies the remainder, so between two steps
         // this transform holds still and its subtree is not repainted.
         setStyleIfChanged(
           refs.viewportDiv,
           'transform',
-          `scale(${rasterZoom / dpr})`,
+          `scale(${rasterZoom})`,
         );
 
         if (frame.editing) {
