@@ -1,9 +1,7 @@
-import * as Y from 'yjs';
 import {
   NODES_DELETED_EVENT,
   type NodesDeletedDetail,
 } from '@myelin/editor/events';
-import { summarizeYDoc } from '@myelin/editor/note/state-summary';
 import { getPlatform, type ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
@@ -21,6 +19,7 @@ import type {
   RepositoryStatusSource,
 } from './config';
 import { MAX_PEN_PRESETS } from './config';
+import { processDocumentAsync } from './document-worker';
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
@@ -95,20 +94,6 @@ function emitNodesDeleted(ids: VFSNodeId[]): void {
   }
   const detail: NodesDeletedDetail = { ids };
   window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
-}
-
-function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) {
-    return false;
-  }
-
-  for (let index = 0; index < left.byteLength; index += 1) {
-    if (left[index] !== right[index]) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export abstract class BaseRepository
@@ -928,43 +913,18 @@ export abstract class BaseRepository
   }
 
   async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Loaded repository document snapshot', {
-      repositoryKind: this.kind,
-      nodeId,
-      revision: remote.revision,
-      byteLength: remote.bytes?.byteLength ?? 0,
-      stateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-    return {
-      update: remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
+    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
+    const result = await processDocumentAsync({ bytes });
+    return { update: result.update, stateVector: result.stateVector, revision };
   }
 
   async pullUpdates(
     nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Pulled repository document snapshot', {
-      repositoryKind: this.kind,
-      nodeId,
-      revision: remote.revision,
-      requestedStateVectorByteLength: stateVector?.byteLength ?? 0,
-      byteLength: remote.bytes?.byteLength ?? 0,
-      stateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-    return {
-      update: stateVector
-        ? Y.encodeStateAsUpdate(remote.doc, stateVector)
-        : remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
+    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
+    const result = await processDocumentAsync({ bytes, stateVector });
+    return { update: result.update, stateVector: result.stateVector, revision };
   }
 
   async pushUpdates(
@@ -972,93 +932,49 @@ export abstract class BaseRepository
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Pushing repository document updates', {
-      repositoryKind: this.kind,
-      nodeId,
-      baseRevision: options.baseRevision,
-      remoteRevision: remote.revision,
-      updateByteLength: update.byteLength,
-      localStateVectorByteLength: options.localStateVector?.byteLength ?? 0,
-      remoteStateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-
+    const remote = await this.readYjsSyncBytes(nodeId);
     if (options.baseRevision !== remote.revision) {
-      logger.debug(
-        'Rejected repository document push because revision changed',
-        {
-          repositoryKind: this.kind,
-          nodeId,
-          baseRevision: options.baseRevision,
-          remoteRevision: remote.revision,
-          remoteStateVectorByteLength: remote.stateVector.byteLength,
-          ...summarizeYDoc(remote.doc),
-        },
-      );
+      const result = await processDocumentAsync({
+        bytes: remote.bytes,
+        stateVector: options.localStateVector,
+      });
       return {
         accepted: false,
         changed: false,
-        remoteUpdate: options.localStateVector
-          ? Y.encodeStateAsUpdate(remote.doc, options.localStateVector)
-          : remote.bytes,
-        stateVector: remote.stateVector,
+        remoteUpdate: result.update,
+        stateVector: result.stateVector,
         revision: remote.revision,
         update: remote.bytes,
       };
     }
 
-    const previousBytes = Y.encodeStateAsUpdate(remote.doc);
-    if (update.byteLength > 0) {
-      Y.applyUpdate(remote.doc, update);
-    }
-    const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
-    const stateVector = Y.encodeStateVector(remote.doc);
-
-    if (byteArraysEqual(previousBytes, mergedBytes)) {
-      logger.debug('Accepted no-op repository document push', {
-        repositoryKind: this.kind,
+    const result = await processDocumentAsync({ bytes: remote.bytes, update });
+    let revision = remote.revision;
+    if (result.changed) {
+      revision = await this.saveFileBytes(
         nodeId,
-        revision: remote.revision,
-        stateVectorByteLength: stateVector.byteLength,
-        ...summarizeYDoc(remote.doc),
-      });
-      return {
-        accepted: true,
-        changed: false,
-        remoteUpdate: null,
-        stateVector,
-        revision: remote.revision,
-        update: remote.bytes,
-      };
+        result.update!,
+        remote.revision,
+        `Update note ${nodeId}`,
+      );
+      if (revision !== null) {
+        await this.onFileSaved(nodeId, result.links);
+      }
     }
-
-    const links = extractStoredNoteLinks(remote.doc);
-    const revision = await this.saveFileBytes(
-      nodeId,
-      mergedBytes,
-      remote.revision,
-      `Update note ${nodeId}`,
-    );
-    if (revision !== null) {
-      await this.onFileSaved(nodeId, links);
-    }
-
     logger.debug('Accepted repository document push', {
       repositoryKind: this.kind,
       nodeId,
       revision,
-      stateVectorByteLength: stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
+      changed: result.changed,
+      updateByteLength: result.update?.byteLength ?? 0,
     });
-
     return {
       accepted: true,
-      changed: true,
+      changed: result.changed,
       remoteUpdate: null,
-      stateVector,
+      stateVector: result.stateVector,
       revision,
-      update: mergedBytes,
+      update: result.update,
     };
   }
 
@@ -1099,10 +1015,8 @@ export abstract class BaseRepository
     );
   }
 
-  private async readYjsSyncState(nodeId: VFSNodeId): Promise<{
+  private async readYjsSyncBytes(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
-    doc: Y.Doc;
-    stateVector: Uint8Array;
     revision: string | null;
   }> {
     const node = await this.getNode(nodeId);
@@ -1110,14 +1024,7 @@ export abstract class BaseRepository
       throw new Error(`Cannot open ${node.fileType} files as canvas sessions.`);
     }
 
-    const { bytes, revision } = await this.loadFileBytes(nodeId);
-    const doc = createDocFromBytes(bytes);
-    return {
-      bytes,
-      doc,
-      stateVector: Y.encodeStateVector(doc),
-      revision,
-    };
+    return this.loadFileBytes(nodeId);
   }
 
   private async extractStoredNoteLinksForBytes(

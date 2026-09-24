@@ -252,6 +252,7 @@ export abstract class DrawableElement {
   protected _scale: Vector2 = { x: 1, y: 1 };
   private _offset: Vector2 = { x: 0, y: 0 };
   private selected: boolean = false;
+  private worldBounds: DOMRect | null = null;
   private _hidden: boolean = false;
   private _locked: boolean = false;
   public onSelectionChanged?: () => void;
@@ -490,19 +491,28 @@ export abstract class DrawableElement {
     return this.selected;
   }
 
-  /** World-space bounding box (local * scale + offset) */
+  /** Read-only world-space bounds; reused until the geometry changes. */
   public get boundingBox(): DOMRect {
     const raw = this.localBoundingBox;
     const x1 = raw.x * this._scale.x + this._offset.x;
     const y1 = raw.y * this._scale.y + this._offset.y;
     const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
     const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
-    return new DOMRect(
-      Math.min(x1, x2),
-      Math.min(y1, y2),
-      Math.abs(x2 - x1),
-      Math.abs(y2 - y1),
-    );
+    const x = Math.min(x1, x2);
+    const y = Math.min(y1, y2);
+    const width = Math.abs(x2 - x1);
+    const height = Math.abs(y2 - y1);
+    const cached = this.worldBounds;
+    if (
+      !cached ||
+      cached.x !== x ||
+      cached.y !== y ||
+      cached.width !== width ||
+      cached.height !== height
+    ) {
+      this.worldBounds = new DOMRect(x, y, width, height);
+    }
+    return this.worldBounds!;
   }
 
   // Same geometry as intersecting `boundingBox`, but without the DOMRect it allocates — the
