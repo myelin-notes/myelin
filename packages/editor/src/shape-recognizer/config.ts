@@ -40,7 +40,3 @@ export const LINE_HORIZONTAL_SNAP_DEG = 5;
 
 /** Confidence below this gate yields no recognition. */
 export const MIN_CONFIDENCE = 0.7;
-
-/** Acceptable width/height aspect range for a rectangle. */
-export const RECT_ASPECT_MIN = 0.33;
-export const RECT_ASPECT_MAX = 3;

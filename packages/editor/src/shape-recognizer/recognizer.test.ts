@@ -167,6 +167,25 @@ describe('recognizeShape', () => {
     expect(r?.shapeType).toBe('rect');
   });
 
+  it('classifies a wide, short rectangle', () => {
+    for (const h of [40, 16]) {
+      expect(
+        recognizeShape(rectStroke(0, 0, 200, h))?.shapeType,
+        `height ${h}`,
+      ).toBe('rect');
+      expect(
+        recognizeShape(jitter(rectStroke(0, 0, 200, h), 2))?.shapeType,
+        `jittered height ${h}`,
+      ).toBe('rect');
+    }
+  });
+
+  it('does not classify a flat ellipse as a rectangle', () => {
+    expect(recognizeShape(ellipseStroke(100, 10, 100, 10))?.shapeType).not.toBe(
+      'rect',
+    );
+  });
+
   it('classifies a square with rounded corners as rect, not ellipse', () => {
     // A real hand rounds the corners of a square, pushing circularity to ~0.86 — past ELLIPSE_STRONG —
     // and hiding the corners from the turn-angle detector. Only the bbox fill ratio still says "box".
