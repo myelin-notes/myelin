@@ -24,6 +24,7 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
         setDomOverlayHost: vi.fn(),
         setOnPageFrameRenamed: vi.fn(),
         setLivePeers: vi.fn(),
+        switchTool: vi.fn(),
         destroy: vi.fn(),
       };
     }),
@@ -87,6 +88,41 @@ afterEach(() => {
 });
 
 describe('CanvasSessionController', () => {
+  it('restores the selected tool when switching notes in a pane', async () => {
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn(async (id: VFSNodeId) => createSession(id)),
+      getNode: vi.fn().mockResolvedValue(undefined),
+      searchNodes: vi.fn(),
+    };
+    const drawableCanvasRef: ControllerDrawableCanvasRef = { current: null };
+    const selectedToolIndexRef = { current: 0 };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      drawableCanvasRef,
+      { current: [] },
+      '',
+      { openChromeMenu: vi.fn(), openExportDialog: vi.fn() },
+      selectedToolIndexRef,
+    );
+
+    await controller.open('note-a');
+    selectedToolIndexRef.current = 1;
+    await controller.open('note-b');
+
+    const firstCanvas = drawableCanvasCtor.mock.results[0]?.value;
+    const secondCanvas = drawableCanvasCtor.mock.results[1]?.value;
+    expect(firstCanvas.switchTool).not.toHaveBeenCalled();
+    expect(secondCanvas.switchTool).toHaveBeenCalledWith(1);
+    expect(drawableCanvasRef.current).toBe(secondCanvas);
+
+    await controller.dispose();
+  });
+
   it('does not add elements when opening an empty canvas', async () => {
     const session = createSession('note-1');
     const repository = {
