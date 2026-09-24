@@ -147,6 +147,7 @@ describe('touch editing', () => {
 describe('tablet selection routing', () => {
   type TestableInteraction = {
     onPointerDown(event: PointerEvent): void;
+    onPointerMove(event: PointerEvent): void;
     onPointerUp(event: PointerEvent): void;
     destroy(): void;
   };
@@ -163,19 +164,23 @@ describe('tablet selection routing', () => {
       finish: vi.fn(),
       interrupt: vi.fn(),
     } as unknown as ITool;
+    const viewport = {
+      getPoint: () => ({ x: 10, y: 10 }),
+      getScreenPoint: () => ({ x: 10, y: 10 }),
+      offset: { x: 0, y: 0 },
+      zoom: 1,
+      panBy: vi.fn(),
+      beginPanGesture: vi.fn(),
+      panGestureBy: vi.fn(),
+      endPanGesture: vi.fn(),
+      setView: vi.fn(),
+    };
     const interaction = new CanvasInteractionController({
       drawableCanvas: {
         shouldUseSelectToolForTouch: () => selectionClaimsTouch,
       } as never,
       canvas,
-      viewport: {
-        getPoint: () => ({ x: 10, y: 10 }),
-        zoom: 1,
-        panBy: vi.fn(),
-        beginPanGesture: vi.fn(),
-        panGestureBy: vi.fn(),
-        endPanGesture: vi.fn(),
-      } as never,
+      viewport: viewport as never,
       getActiveTool: () => tool,
       setActiveTool: () => {},
       getTools: () => [tool],
@@ -187,7 +192,7 @@ describe('tablet selection routing', () => {
       enterEditAtPoint: () => false,
       refreshRendererSize: () => {},
     }) as unknown as TestableInteraction;
-    return { interaction, tool };
+    return { interaction, tool, viewport };
   }
 
   afterEach(() => {
@@ -237,6 +242,118 @@ describe('tablet selection routing', () => {
 
     expect(tool.start).toHaveBeenCalledWith(expect.anything(), event);
     expect(tool.finish).toHaveBeenCalled();
+    interaction.destroy();
+  });
+
+  it('keeps another touch from moving or ending a pen stroke', () => {
+    const { interaction, tool } = makeInteraction(false);
+    const pen = {
+      pointerId: 1,
+      pointerType: 'pen',
+      buttons: 1,
+      timeStamp: 1,
+      type: 'pointerdown',
+    } as PointerEvent;
+    const touch = {
+      pointerId: 2,
+      pointerType: 'touch',
+      timeStamp: 2,
+      type: 'pointermove',
+    } as PointerEvent;
+
+    interaction.onPointerDown(pen);
+    vi.mocked(tool.update).mockClear();
+    interaction.onPointerMove(touch);
+    expect(tool.update).not.toHaveBeenCalled();
+    interaction.onPointerUp({ ...touch, type: 'pointerup' } as PointerEvent);
+    interaction.onPointerMove({
+      ...pen,
+      timeStamp: 3,
+      type: 'pointermove',
+    } as PointerEvent);
+
+    expect(tool.update).toHaveBeenCalledTimes(1);
+    expect(tool.finish).not.toHaveBeenCalled();
+    interaction.onPointerUp({ ...pen, type: 'pointerup' } as PointerEvent);
+    expect(tool.finish).toHaveBeenCalledTimes(1);
+    interaction.destroy();
+  });
+
+  it('ignores a broad palm contact before the pen touches down', () => {
+    UserPrefs.set('inputMode', 'pen');
+    const { interaction, viewport, tool } = makeInteraction(false);
+    const palm = {
+      pointerId: 2,
+      pointerType: 'touch',
+      width: 80,
+      height: 20,
+    } as PointerEvent;
+    interaction.onPointerDown(palm);
+
+    expect(viewport.beginPanGesture).not.toHaveBeenCalled();
+    expect(tool.start).not.toHaveBeenCalled();
+    interaction.onPointerUp({ ...palm, type: 'pointerup' } as PointerEvent);
+    interaction.onPointerDown({
+      ...palm,
+      pointerId: 3,
+      width: 20,
+      height: 20,
+    } as PointerEvent);
+    expect(viewport.beginPanGesture).toHaveBeenCalledTimes(1);
+    interaction.destroy();
+  });
+
+  it('rolls back a pan when a touch grows into a broad contact', () => {
+    UserPrefs.set('inputMode', 'pen');
+    const { interaction, viewport } = makeInteraction(false);
+    const touch = {
+      pointerId: 2,
+      pointerType: 'touch',
+      width: 20,
+      height: 20,
+      movementX: 0,
+      movementY: 0,
+      timeStamp: 1,
+    } as PointerEvent;
+
+    interaction.onPointerDown(touch);
+    interaction.onPointerMove({
+      ...touch,
+      width: 80,
+      type: 'pointermove',
+    } as PointerEvent);
+
+    expect(viewport.setView).toHaveBeenCalledWith({
+      zoom: 1,
+      offset: { x: 0, y: 0 },
+    });
+    interaction.destroy();
+  });
+
+  it('rolls back a touch pan when Android cancels it as a palm', () => {
+    UserPrefs.set('inputMode', 'pen');
+    const { interaction, viewport } = makeInteraction(false);
+    const touch = {
+      pointerId: 2,
+      pointerType: 'touch',
+      width: 20,
+      height: 20,
+      movementX: 0,
+      movementY: 0,
+      timeStamp: 1,
+    } as PointerEvent;
+
+    interaction.onPointerDown(touch);
+    interaction.onPointerUp({
+      ...touch,
+      type: 'pointercancel',
+    } as PointerEvent);
+
+    expect(viewport.setView).toHaveBeenCalledWith({
+      zoom: 1,
+      offset: { x: 0, y: 0 },
+    });
+    expect(viewport.endPanGesture).not.toHaveBeenCalled();
     interaction.destroy();
   });
 });

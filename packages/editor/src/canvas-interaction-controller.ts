@@ -55,6 +55,7 @@ export class CanvasInteractionController {
   private readonly palm = new PalmRejection();
   private readonly input = new InputModeController();
   private readonly activeTouchPointers = new Set<number>();
+  private touchPanStartOffset: Vector2 | null = null;
   private screenPosition: Vector2 = { x: 0, y: 0 };
   private lastTouchTapTime = 0;
   private lastTouchTapScreenPos: Vector2 = { x: 0, y: 0 };
@@ -64,6 +65,7 @@ export class CanvasInteractionController {
   private eraserButtonsHeld = false;
   private eraserOverrideApplied = false;
   private penContactOpen = false;
+  private interactionPointer: { id: number; pen: boolean } | null = null;
   private lastToolSampleTime = 0;
   private toolCursor = 'default';
   private appliedCursor: string | null = null;
@@ -190,6 +192,7 @@ export class CanvasInteractionController {
 
   private initStates(): void {
     this.state.addEnd(InteractState.UsingTool, (event) => {
+      this.interactionPointer = null;
       if (this.abortingInteraction) {
         const tool = this.selectedTool;
         if (tool.abort) {
@@ -203,6 +206,10 @@ export class CanvasInteractionController {
       this.host.stopUndoCapturing();
     });
     this.state.addStart(InteractState.UsingTool, (event: PointerEvent) => {
+      this.interactionPointer = {
+        id: event.pointerId,
+        pen: event.pointerType === 'pen',
+      };
       this.host.stopUndoCapturing();
       this.lastToolSampleTime = event.timeStamp;
       this.selectedTool.start(this.host.drawableCanvas, event);
@@ -219,12 +226,28 @@ export class CanvasInteractionController {
       }
     });
     this.state.addStart(InteractState.Moving, (event: PointerEvent) => {
+      this.interactionPointer = { id: event.pointerId, pen: false };
       if (event.pointerType === 'touch') {
+        this.touchPanStartOffset = { ...this.host.viewport.offset };
         this.host.viewport.beginPanGesture(event.timeStamp);
       }
       this.updateCursor();
     });
     this.state.addEnd(InteractState.Moving, (event: PointerEvent) => {
+      this.interactionPointer = null;
+      const startOffset = this.touchPanStartOffset;
+      this.touchPanStartOffset = null;
+      if (
+        startOffset &&
+        (event.type === 'pointercancel' || this.palm.penContact)
+      ) {
+        this.host.viewport.setView({
+          zoom: this.host.viewport.zoom,
+          offset: startOffset,
+        });
+        this.updateCursor();
+        return;
+      }
       if (event.pointerType === 'touch') {
         this.host.viewport.endPanGesture(event.timeStamp);
       }
@@ -242,11 +265,21 @@ export class CanvasInteractionController {
   }
 
   private onPointerMove(event: PointerEvent): void {
+    if (
+      event.pointerType === 'touch' &&
+      this.palm.isPalm(event.pointerId, event.width, event.height)
+    ) {
+      this.rejectActiveTouch(event);
+      return;
+    }
     if (this.palm.isKnownPalm(event.pointerId)) {
       return;
     }
     this.syncEraserOverride(event);
     this.syncPenChordedContact(event);
+    if (!this.ownsInteraction(event)) {
+      return;
+    }
     this.screenPosition = this.host.viewport.getScreenPoint(event);
     this.state.update(event);
     if (event.target === this.host.canvas) {
@@ -259,6 +292,12 @@ export class CanvasInteractionController {
   }
 
   private onPointerDown(event: PointerEvent): void {
+    if (
+      event.pointerType === 'touch' &&
+      this.palm.isPalm(event.pointerId, event.width, event.height)
+    ) {
+      return;
+    }
     if (this.host.isPlacementActive()) {
       if (event.button === 0) {
         this.host.placeAt(this.host.viewport.getPoint(event));
@@ -298,9 +337,6 @@ export class CanvasInteractionController {
   }
 
   private startTouchInteraction(event: PointerEvent): void {
-    if (this.palm.isPalm(event.pointerId)) {
-      return;
-    }
     this.activeTouchPointers.add(event.pointerId);
     if (this.activeTouchPointers.size >= 2) {
       this.touchTapCandidate = null;
@@ -351,6 +387,9 @@ export class CanvasInteractionController {
     if (this.palm.pointerUp(event.pointerId, event.pointerType === 'pen')) {
       return;
     }
+    if (!this.ownsInteraction(event)) {
+      return;
+    }
     const tap = this.touchTapCandidate;
     this.touchTapCandidate = null;
     if (
@@ -377,6 +416,36 @@ export class CanvasInteractionController {
       this.abortInteraction();
       this.state.change(InteractState.Idle, event);
     }
+  }
+
+  private rejectActiveTouch(event: PointerEvent): void {
+    this.activeTouchPointers.delete(event.pointerId);
+    if (this.interactionPointer?.id !== event.pointerId) {
+      return;
+    }
+    this.touchTapCandidate = null;
+    if (this.state.current === InteractState.UsingTool) {
+      this.abortInteraction();
+    } else if (this.state.current === InteractState.Moving) {
+      const startOffset = this.touchPanStartOffset;
+      this.state.change(InteractState.Idle, event);
+      if (startOffset) {
+        this.host.viewport.setView({
+          zoom: this.host.viewport.zoom,
+          offset: startOffset,
+        });
+      }
+    }
+  }
+
+  private ownsInteraction(event: PointerEvent): boolean {
+    const owner = this.interactionPointer;
+    // Android can renumber a stylus mid-gesture.
+    return (
+      owner === null ||
+      owner.id === event.pointerId ||
+      (owner.pen && event.pointerType === 'pen')
+    );
   }
 
   private syncPenChordedContact(event: PointerEvent): void {
