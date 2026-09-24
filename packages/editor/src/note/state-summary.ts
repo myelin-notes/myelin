@@ -116,10 +116,10 @@ export function summarizeDrawableElements(
 }
 
 export function summarizeYDoc(doc: Y.Doc) {
-  const elements = doc.getArray<Y.Map<unknown>>('elements');
+  const elements = doc.getArray<Y.Map<unknown>>('elements').toArray();
 
   return summarizeElements(elements.length, (position) => {
-    const yMap = elements.get(position);
+    const yMap = elements[position];
     return {
       uuid: (yMap?.get('uuid') as string | undefined) ?? null,
       type: (yMap?.get('type') as number | undefined) ?? null,

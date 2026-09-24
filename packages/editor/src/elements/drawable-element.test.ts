@@ -131,3 +131,21 @@ describe('intersectsWorldRect', () => {
     expect(stroke.intersectsWorldRect(VIEW, 0)).toBe(true);
   });
 });
+
+it('reuses unchanged world bounds and refreshes them for live ink and transforms', () => {
+  const stroke = new StrokeElement('bounds', [], false, STYLE);
+  stroke.addPoint(10, 20, 0.5);
+  const original = stroke.boundingBox;
+  expect(stroke.boundingBox).toBe(original);
+  stroke.addPoint(100, 200, 0.5);
+  const grown = stroke.boundingBox;
+  expect(grown.right).toBeGreaterThan(original.right);
+  expect(stroke.boundingBox).toBe(grown);
+  stroke.offset.x += 30;
+  expect(stroke.boundingBox.x).toBe(grown.x + 30);
+  stroke.scale.x = -2;
+  const local = stroke.localBoundingBox;
+  expect(stroke.boundingBox.x).toBe(local.right * -2 + 30);
+  expect(stroke.boundingBox.width).toBe(local.width * 2);
+  expect(original.right).toBeLessThan(grown.right);
+});
