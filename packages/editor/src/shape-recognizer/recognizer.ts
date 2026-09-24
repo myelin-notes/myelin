@@ -15,8 +15,6 @@ import {
   MIN_CONFIDENCE,
   MIN_LINE_SPAN,
   MIN_POINTS,
-  RECT_ASPECT_MAX,
-  RECT_ASPECT_MIN,
   RECT_MAX_CIRC,
   RECT_MIN_FILL,
   RESAMPLE_N,
@@ -274,12 +272,18 @@ export function recognizeShape(
   if (longSide <= 1e-6 || L <= 1e-6) {
     return null;
   }
+  const closeRatio = span / L;
+  const closed = closeRatio < CLOSED_RATIO;
 
   // LINE first — most robust and most distinct.
   const { maxDev, a, b } = lineFitDeviation(pts);
   const deviationRatio = maxDev / longSide;
   const lineSpan = dist(a, b);
-  if (deviationRatio < LINE_DEVIATION_RATIO && lineSpan >= MIN_LINE_SPAN) {
+  if (
+    !closed &&
+    deviationRatio < LINE_DEVIATION_RATIO &&
+    lineSpan >= MIN_LINE_SPAN
+  ) {
     // Acceptance is governed solely by LINE_DEVIATION_RATIO. The generic MIN_CONFIDENCE gate used for
     // closed shapes is deliberately NOT applied: combined with the linear confidence falloff it shrank
     // the effective straightness tolerance to ~1.8%, so freehand lines silently failed to snap.
@@ -299,10 +303,7 @@ export function recognizeShape(
     };
   }
 
-  const closeRatio = span / L;
-  const closed = closeRatio < CLOSED_RATIO;
   const C = circularity(pts);
-  const aspect = box.h <= 1e-9 ? Number.POSITIVE_INFINITY : box.w / box.h;
   // For corner detection on a closed stroke, drop a duplicated final vertex so
   // the wrap-around turn at the start corner isn't masked by a zero-length edge.
   const cornerPts =
@@ -316,12 +317,7 @@ export function recognizeShape(
   // Fill precedence: a closed stroke that fills its bounding box is a rect. Checked before
   // circularity because a hand-drawn square's corners round off enough to read as "very circular"
   // (and hide from the corner detector) long before its fill drops near an ellipse's π/4.
-  if (
-    closed &&
-    fill >= RECT_MIN_FILL &&
-    aspect >= RECT_ASPECT_MIN &&
-    aspect <= RECT_ASPECT_MAX
-  ) {
+  if (closed && fill >= RECT_MIN_FILL) {
     return {
       shapeType: 'rect',
       geom: [box.minX, box.minY, box.w, box.h],
@@ -347,13 +343,7 @@ export function recognizeShape(
     };
   }
 
-  if (
-    closed &&
-    cornerCount === 4 &&
-    aspect >= RECT_ASPECT_MIN &&
-    aspect <= RECT_ASPECT_MAX &&
-    C < RECT_MAX_CIRC
-  ) {
+  if (closed && cornerCount === 4 && C < RECT_MAX_CIRC) {
     const confidence = Math.min(1, 0.7 + (1 - closeRatio) * 0.3);
     if (confidence >= MIN_CONFIDENCE) {
       return {
