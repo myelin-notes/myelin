@@ -155,6 +155,71 @@ describe('resolveNoteLinkIdByTitle', () => {
 });
 
 describe('searchNoteLinkAutocompleteItems', () => {
+  it.each([
+    'Alpha',
+    'Alpha/Be',
+    'Alpha\\/Be',
+  ])('completes slash-containing names for %j and resolves the inserted target', async (query) => {
+    const folder = createFolderNode('folder-projects', 'Projects');
+    const note = createFileNode('note-slash', 'Alpha/Beta', folder.id);
+    const repository = {
+      searchNodes: vi.fn(async () => [toResult(note)]),
+      getNodesByName: vi.fn(async (name: string) =>
+        name === note.name ? [note] : [],
+      ),
+      getFolderChain: vi.fn(async () => [folder]),
+    };
+
+    const items = await searchNoteLinkAutocompleteItems(
+      repository,
+      query,
+      8,
+      new AbortController().signal,
+    );
+
+    expect(items).toHaveLength(1);
+    expect(items[0].insertText).toBe(
+      query === 'Alpha/Be' ? 'Projects/Alpha\\/Beta' : 'Alpha\\/Beta',
+    );
+    await expect(
+      resolveNoteLinkIdByTitle(repository, items[0].insertText!),
+    ).resolves.toBe(note.id);
+  });
+
+  it('escapes each folder and canvas name when disambiguating duplicate titles', async () => {
+    const folder = createFolderNode('folder-projects', 'Work/Projects');
+    const notes = [
+      createFileNode('nested', 'Alpha/Beta', folder.id),
+      createFileNode('archive', 'Alpha/Beta', 'archive-folder'),
+    ];
+    const repository = {
+      searchNodes: vi.fn(async () => notes.map(toResult)),
+      getNodesByName: vi.fn(async (name: string) =>
+        notes.filter((note) => note.name === name),
+      ),
+      getFolderChain: vi.fn(async (id: string | null) =>
+        id === folder.id
+          ? [folder]
+          : [createFolderNode('archive-folder', 'Archive')],
+      ),
+    };
+    const items = await searchNoteLinkAutocompleteItems(
+      repository,
+      'Alpha',
+      8,
+      new AbortController().signal,
+    );
+    expect(items.map((item) => item.insertText)).toEqual([
+      'Work\\/Projects/Alpha\\/Beta',
+      'Archive/Alpha\\/Beta',
+    ]);
+    for (const item of items) {
+      await expect(
+        resolveNoteLinkIdByTitle(repository, item.insertText!),
+      ).resolves.toBe(item.id);
+    }
+  });
+
   it('filters path queries by folder path and inserts the full path', async () => {
     const projectFolder = createFolderNode('folder-projects', 'Projects');
     const archiveFolder = createFolderNode('folder-archive', 'Archive');
@@ -242,6 +307,29 @@ describe('searchNoteLinkAutocompleteItems', () => {
         insertText: 'Beta',
       },
     ]);
+  });
+
+  it('completes frames in a canvas whose name contains a slash', async () => {
+    const repository = {
+      searchNodes: vi.fn(async () => [
+        toResult(createFileNode('note-slash', 'Alpha/Beta', null)),
+      ]),
+      getFolderChain: vi.fn(async () => []),
+      loadDocument: vi.fn(async () =>
+        createSnapshot(createPageFrameUpdate(['Draft'])),
+      ),
+    };
+    const items = await searchNoteLinkAutocompleteItems(
+      repository,
+      'Alpha\\/Beta#Dr',
+      8,
+      new AbortController().signal,
+    );
+    expect(repository.searchNodes).toHaveBeenCalledWith('Alpha/Beta');
+    expect(items[0]).toMatchObject({
+      insertText: 'Alpha\\/Beta#Draft',
+      pageFrameId: 'frame-0',
+    });
   });
 
   it('suggests page-frame names after a note target fragment', async () => {

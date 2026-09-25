@@ -1,8 +1,8 @@
 import { ElementType } from '../../elements/element-type';
 import { normalizePageFrameDisplayName } from '../../elements/page-frame-constants';
 import {
-  escapeNoteLinkPath,
   escapeNoteLinkSegment,
+  splitNoteLinkPath,
   splitNoteLinkTargetFrame,
   unescapeNoteLinkSegment,
 } from '../../note/link-syntax';
@@ -51,6 +51,7 @@ interface NoteLinkAutocompleteMatch {
   note: VFSFileNode;
   folderPath: string;
   linkPath: string;
+  escapedPath: string;
 }
 
 interface NoteLinkPageFrameQuery {
@@ -59,9 +60,9 @@ interface NoteLinkPageFrameQuery {
 }
 
 function parseNoteLinkQuery(query: string): NoteLinkPathQuery {
-  const segments = query
-    .split('/')
-    .map((segment) => unescapeNoteLinkSegment(segment).trim());
+  const segments = splitNoteLinkPath(query).map((segment) =>
+    unescapeNoteLinkSegment(segment).trim(),
+  );
   if (segments.length <= 1) {
     return {
       isPath: false,
@@ -112,12 +113,15 @@ function normalizePathQuery(value: string): string {
 async function getNoteLinkPath(
   repository: Pick<Repository, 'getFolderChain'>,
   note: VFSFileNode,
-): Promise<{ folderPath: string; linkPath: string }> {
+): Promise<{ folderPath: string; linkPath: string; escapedPath: string }> {
   const folders = await repository.getFolderChain(note.parentId);
   const folderPath = folders.map((folder) => folder.name).join('/');
 
   return {
     folderPath,
+    escapedPath: [...folders.map((folder) => folder.name), note.name]
+      .map(escapeNoteLinkSegment)
+      .join('/'),
     linkPath: folderPath ? `${folderPath}/${note.name}` : note.name,
   };
 }
@@ -274,10 +278,14 @@ async function searchNoteAutocompleteItems(
   }
 
   const matchingNotes = parsedQuery.isPath
-    ? pathMatches.filter(({ linkPath }) =>
-        normalizePathQuery(linkPath).startsWith(
-          normalizePathQuery(parsedQuery.pathQuery),
-        ),
+    ? pathMatches.filter(
+        ({ note, linkPath }) =>
+          normalizePathQuery(linkPath).startsWith(
+            normalizePathQuery(parsedQuery.pathQuery),
+          ) ||
+          normalizePathQuery(note.name).startsWith(
+            normalizePathQuery(unescapeNoteLinkSegment(query).trim()),
+          ),
       )
     : pathMatches;
 
@@ -285,14 +293,14 @@ async function searchNoteAutocompleteItems(
     ? matchingNotes.slice(0, limit)
     : matchingNotes;
 
-  return limitedMatches.map(({ note, folderPath, linkPath }) => {
+  return limitedMatches.map(({ note, folderPath, escapedPath }) => {
     const useFullPath =
       parsedQuery.isPath || (titleCounts.get(note.name) ?? 0) > 1;
     return {
       id: note.id,
       title: note.name,
       subtitle: folderPath.split('/').join(' / ') || 'Root',
-      insertText: escapeNoteLinkPath(useFullPath ? linkPath : note.name),
+      insertText: useFullPath ? escapedPath : escapeNoteLinkSegment(note.name),
     };
   });
 }

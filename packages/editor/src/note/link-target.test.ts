@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { parseNoteLinkTarget } from './link-target';
 
 describe('parseNoteLinkTarget', () => {
+  it.each([
+    ['Alpha\\/Beta', false, 'Alpha/Beta', 'Alpha/Beta'],
+    ['Projects/Alpha\\/Beta', true, 'Projects/Alpha/Beta', 'Alpha/Beta'],
+    ['Alpha\\\\/Beta', true, 'Alpha\\/Beta', 'Beta'],
+    ['Alpha\\\\\\/Beta', false, 'Alpha\\/Beta', 'Alpha\\/Beta'],
+    ['\\/Alpha\\/\\/Beta\\/', false, '/Alpha//Beta/', '/Alpha//Beta/'],
+  ])('preserves literal slash segments in %j', (target, isPath, path, noteName) => {
+    expect(parseNoteLinkTarget(`${target}#Frame`)).toEqual({
+      isPath,
+      path,
+      noteName,
+      pageFrameName: 'Frame',
+    });
+  });
+
   it('parses a bare note name', () => {
     expect(parseNoteLinkTarget('Alpha')).toEqual({
       isPath: false,
