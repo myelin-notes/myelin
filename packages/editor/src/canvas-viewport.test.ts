@@ -27,17 +27,42 @@ function createViewport() {
     return event;
   };
 
-  const touchStart = () => {
+  const touchStart = (touches: object[] = [{}]) => {
     const event = {
-      touches: [{}],
+      touches,
       preventDefault: vi.fn(),
     } as unknown as TouchEvent;
     listeners.get('touchstart')?.(event);
     return event;
   };
 
-  return { viewport, wheel, touchStart };
+  const touchMove = (touches: object[]) => {
+    const event = {
+      touches,
+      preventDefault: vi.fn(),
+    } as unknown as TouchEvent;
+    listeners.get('touchmove')?.(event);
+    return event;
+  };
+
+  return { viewport, wheel, touchStart, touchMove };
 }
+
+describe('CanvasViewport palm rejection', () => {
+  it('does not pinch or pan from a broad touch contact', () => {
+    const { viewport, touchStart, touchMove } = createViewport();
+    const touches = [
+      { clientX: 100, clientY: 100, radiusX: 40, radiusY: 10 },
+      { clientX: 200, clientY: 200, radiusX: 10, radiusY: 10 },
+    ];
+
+    touchStart(touches);
+    touchMove([touches[0], { ...touches[1], clientX: 250, clientY: 250 }]);
+
+    expect(viewport.offset).toEqual({ x: 0, y: 0 });
+    expect(viewport.zoom).toBe(1);
+  });
+});
 
 describe('CanvasViewport edit-mode wheel panning', () => {
   it('does not depend on DrawableCanvas exports', async () => {
