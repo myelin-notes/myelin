@@ -7,7 +7,7 @@ import {
   getImportParentId,
   getParentPath,
 } from './import-tree';
-import { importPdfFile, PDF_EXTENSION_RE } from './pdf';
+import { importPdfBytes, PDF_EXTENSION_RE } from './pdf';
 
 export const GOODNOTES_ZIP_FILE_ACCEPT =
   'application/zip,application/x-zip-compressed,.zip';
@@ -171,14 +171,19 @@ export async function importGoodnotesZip({
           total: pdfEntries.length,
           fileName: entry.fileName,
         });
-        const importedId = await importPdfFile({
-          file: new File([entry.bytes as BlobPart], entry.fileName, {
-            type: 'application/pdf',
-          }),
-          repository,
-          parentId: getImportParentId(parentId, folderIds, entry.folderPath),
-          fallbackTitle,
-        });
+        let importedId: VFSNodeId;
+        try {
+          importedId = await importPdfBytes({
+            bytes: entry.bytes,
+            fileName: entry.fileName,
+            repository,
+            parentId: getImportParentId(parentId, folderIds, entry.folderPath),
+            fallbackTitle,
+            skipIndexing: true,
+          });
+        } finally {
+          entry.bytes = new Uint8Array();
+        }
         if (!entry.folderPath) {
           rootFileIds.push(importedId);
         }
@@ -195,5 +200,9 @@ export async function importGoodnotesZip({
       await repository.deleteNode(nodeId).catch(() => {});
     }
     throw error;
+  } finally {
+    for (const entry of pdfEntries) {
+      entry.bytes = new Uint8Array();
+    }
   }
 }

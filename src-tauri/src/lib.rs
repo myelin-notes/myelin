@@ -3,6 +3,7 @@ use tauri::Manager;
 mod code_runner;
 mod clipboard;
 mod error_report;
+mod github_push;
 mod handwriting;
 mod iroh_transport;
 mod mcp_server;
@@ -109,6 +110,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
+            github_push::github_push_batch,
         ]);
 
     #[cfg(not(target_os = "ios"))]

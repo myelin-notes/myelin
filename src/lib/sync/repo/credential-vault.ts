@@ -14,6 +14,32 @@ const logger = new Logger('CredentialVault');
 const SECURE_STORAGE_UNAVAILABLE_ERROR =
   'Encrypted credential storage is unavailable on this device.';
 
+export interface CredentialChange {
+  clientName: string;
+  key: string;
+}
+
+export interface CredentialWriteOptions {
+  notify?: boolean;
+}
+
+const credentialChangeListeners = new Set<(change: CredentialChange) => void>();
+
+export function subscribeCredentialChanges(
+  listener: (change: CredentialChange) => void,
+): () => void {
+  credentialChangeListeners.add(listener);
+  return () => {
+    credentialChangeListeners.delete(listener);
+  };
+}
+
+function notifyCredentialChange(change: CredentialChange): void {
+  for (const listener of credentialChangeListeners) {
+    listener(change);
+  }
+}
+
 export interface CredentialVaultOptions {
   /** Stronghold snapshot file, created under the app data directory. */
   filename: string;
@@ -27,7 +53,11 @@ export interface CredentialVault {
   /** Whether the vault can be opened at all on this device. */
   isAvailable(): Promise<boolean>;
   read(key: string): Promise<string | null>;
-  write(key: string, value: string): Promise<void>;
+  write(
+    key: string,
+    value: string,
+    options?: CredentialWriteOptions,
+  ): Promise<void>;
   remove(key: string): Promise<void>;
   /** True once if a stale, undecryptable vault was discarded, so the UI can show a one-time notice. */
   consumeDiscarded(): boolean;
@@ -155,18 +185,22 @@ export function createCredentialVault(
         return new TextDecoder().decode(bytes).trim() || null;
       });
     },
-    async write(key, value) {
+    async write(key, value, writeOptions) {
       await withStore(async (store, stronghold) => {
         const bytes = Array.from(new TextEncoder().encode(value));
         await store.insert(key, bytes);
         await stronghold.save();
       });
+      if (writeOptions?.notify !== false) {
+        notifyCredentialChange({ clientName: options.clientName, key });
+      }
     },
     async remove(key) {
       await withStore(async (store, stronghold) => {
         await store.remove(key);
         await stronghold.save();
       });
+      notifyCredentialChange({ clientName: options.clientName, key });
     },
     consumeDiscarded() {
       const value = discarded;

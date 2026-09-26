@@ -2,15 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCanvasNoteState,
   createNoteState,
+  getRepositoryTestGitHubApi,
   getRepositoryTestGoogleDriveApi,
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import type { BaseRepository } from './base';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github-git-push';
 import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 import type { VFSFolderNode } from './types';
+
+vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 const repositoryCases: {
   name: string;
@@ -44,6 +48,13 @@ describe('Repository business logic parity', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
     vi.useRealTimers();
+    vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+      getRepositoryTestGitHubApi().applyGitPush(
+        input.additions,
+        input.deletions,
+        input.expectedHeadOid,
+      ),
+    );
   });
 
   for (const { name, createRepository } of repositoryCases) {

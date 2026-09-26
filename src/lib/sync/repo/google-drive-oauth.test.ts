@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fetch } from '@tauri-apps/plugin-http';
+import { GoogleDriveRequestError } from './google-drive-error';
 import type { OAuthCallbackParams } from './oauth/redirect';
 
 // The shared setup replaces this module wholesale for consumers that only need
@@ -43,13 +45,19 @@ vi.mock('./oauth/redirect', () => ({
 }));
 
 const storedSecrets = new Map<string, string>();
+const credentialWriteOptions: Array<{ notify?: boolean } | undefined> = [];
 
 vi.mock('./credential-vault', () => ({
   createCredentialVault: () => ({
     isAvailable: async () => true,
     read: async (key: string) => storedSecrets.get(key) ?? null,
-    write: async (key: string, value: string) => {
+    write: async (
+      key: string,
+      value: string,
+      options?: { notify?: boolean },
+    ) => {
       storedSecrets.set(key, value);
+      credentialWriteOptions.push(options);
     },
     remove: async (key: string) => {
       storedSecrets.delete(key);
@@ -104,6 +112,7 @@ async function base64UrlSha256(value: string): Promise<string> {
 describe('Google Drive OAuth', () => {
   beforeEach(() => {
     storedSecrets.clear();
+    credentialWriteOptions.length = 0;
     tokenResponses.length = 0;
     tokenRequests.length = 0;
     cancelListener.mockClear();
@@ -155,6 +164,7 @@ describe('Google Drive OAuth', () => {
     );
 
     expect(await hasGoogleDriveToken('default')).toBe(true);
+    expect(credentialWriteOptions).toEqual([undefined]);
     expect(cancelListener).toHaveBeenCalled();
   });
 
@@ -236,10 +246,71 @@ describe('Google Drive OAuth', () => {
     expect(tokenRequests).toHaveLength(1);
     expect(tokenRequests[0]?.grant_type).toBe('refresh_token');
     expect(tokenRequests[0]?.client_secret).toBe('test-google-client-secret');
+    expect(credentialWriteOptions).toEqual([{ notify: false }]);
 
     // The refreshed token is cached, so a later read makes no request.
     expect(await getGoogleDriveToken('default')).toBe('access-2');
     expect(tokenRequests).toHaveLength(1);
+  });
+
+  it('keeps safe diagnostics when token refresh fails before a response', async () => {
+    storedSecrets.set(
+      'token:default',
+      JSON.stringify({
+        accessToken: 'stale',
+        refreshToken: 'private-refresh-token',
+        expiresAtMs: Date.now() - 1_000,
+      }),
+    );
+    vi.mocked(fetch).mockRejectedValueOnce(
+      new Error('private-refresh-token was not sent'),
+    );
+
+    const error = await getGoogleDriveToken('default').catch((value) => value);
+    expect(error).toBeInstanceOf(GoogleDriveRequestError);
+    expect(error.diagnostics).toMatchObject({
+      google_drive_stage: 'token_refresh',
+      google_drive_method: 'POST',
+      google_drive_attempts: 1,
+    });
+    expect(error.diagnostics.google_drive_request_chars).toBeGreaterThan(0);
+    expect(JSON.stringify(error.diagnostics)).not.toContain(
+      'private-refresh-token',
+    );
+
+    tokenResponses.push({ access_token: 'access-2', expires_in: 3600 });
+    await expect(getGoogleDriveToken('default')).resolves.toBe('access-2');
+  });
+
+  it('records a rejected refresh code without its response description', async () => {
+    storedSecrets.set(
+      'token:default',
+      JSON.stringify({
+        accessToken: 'stale',
+        refreshToken: 'private-refresh-token',
+        expiresAtMs: Date.now() - 1_000,
+      }),
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'private account detail',
+        }),
+        { status: 400, headers: { 'content-type': 'application/json' } },
+      ),
+    );
+
+    const error = await getGoogleDriveToken('default').catch((value) => value);
+    expect(error).toBeInstanceOf(GoogleDriveRequestError);
+    expect(error.diagnostics).toMatchObject({
+      google_drive_stage: 'token_refresh',
+      google_drive_status: 400,
+      google_drive_error_code: 'invalid_grant',
+      google_drive_content_type: 'application/json',
+    });
+    expect(JSON.stringify(error.diagnostics)).not.toContain('private');
+    expect(await hasGoogleDriveToken('default')).toBe(false);
   });
 
   it('cancelling tears the redirect listener down', async () => {

@@ -10,6 +10,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { BaseRepository } from './base';
 import { getGoogleDriveToken } from './google-drive-credentials';
+import { GoogleDriveRequestError } from './google-drive-error';
 import {
   createEmptyManifest,
   FILES_DIR,
@@ -167,20 +168,43 @@ async function driveRequest(
   options: { allowNotFound?: boolean } = {},
 ): Promise<Response | null> {
   let sleptMs = 0;
+  const startedAt = Date.now();
+  const requestMetrics = {
+    google_drive_stage: 'api_request' as const,
+    google_drive_operation: label,
+    google_drive_method: init.method,
+    ...(typeof init.body === 'string'
+      ? { google_drive_request_chars: init.body.length }
+      : init.body
+        ? { google_drive_request_bytes: init.body.byteLength }
+        : {}),
+  };
 
   for (let attempt = 0; attempt < MAX_REQUEST_ATTEMPTS; attempt++) {
     const accessToken = await getGoogleDriveToken(ctx.credentialId);
-    const response = await fetch(url, {
-      ...init,
-      // DOM types only accept ArrayBuffer-backed views; a plain Uint8Array is
-      // fine at runtime.
-      body: init.body as BodyInit | undefined,
-      headers: {
-        ...init.headers,
-        Authorization: `Bearer ${accessToken}`,
-      },
-      signal: ctx.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...init,
+        // DOM types only accept ArrayBuffer-backed views; a plain Uint8Array is
+        // fine at runtime.
+        body: init.body as BodyInit | undefined,
+        headers: {
+          ...init.headers,
+          Authorization: `Bearer ${accessToken}`,
+        },
+        signal: ctx.signal,
+      });
+    } catch {
+      throw new GoogleDriveRequestError(
+        `${label} before receiving a response`,
+        {
+          ...requestMetrics,
+          google_drive_duration_ms: Date.now() - startedAt,
+          google_drive_attempts: attempt + 1,
+        },
+      );
+    }
 
     if (response.ok) {
       return response;
@@ -195,7 +219,40 @@ async function driveRequest(
       sleptMs + delayMs > MAX_TOTAL_RETRY_DELAY_MS
     ) {
       const body = await response.text().catch(() => '<no response body>');
-      throw new Error(`${label} (${response.status}): ${body}`);
+      let errorCode: string | undefined;
+      try {
+        const payload = JSON.parse(body) as {
+          error?: { status?: string };
+        };
+        const code = payload.error?.status;
+        if (code && /^[A-Z_]{1,64}$/.test(code)) {
+          errorCode = code;
+        }
+      } catch {
+        // Non-JSON error responses still retain their status and size below.
+      }
+      const requestId =
+        response.headers?.get('x-goog-request-id') ??
+        response.headers?.get('x-guploader-uploadid');
+      const contentType = response.headers?.get('content-type');
+      const retryAfter = response.headers?.get('retry-after');
+      throw new GoogleDriveRequestError(`${label} (${response.status})`, {
+        ...requestMetrics,
+        google_drive_duration_ms: Date.now() - startedAt,
+        google_drive_attempts: attempt + 1,
+        google_drive_status: response.status,
+        google_drive_response_chars: body.length,
+        ...(errorCode ? { google_drive_error_code: errorCode } : {}),
+        ...(contentType
+          ? { google_drive_content_type: contentType.slice(0, 100) }
+          : {}),
+        ...(requestId
+          ? { google_drive_request_id: requestId.slice(0, 100) }
+          : {}),
+        ...(retryAfter
+          ? { google_drive_retry_after: retryAfter.slice(0, 100) }
+          : {}),
+      });
     }
 
     sleptMs += delayMs;
