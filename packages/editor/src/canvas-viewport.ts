@@ -1,5 +1,4 @@
 import type { Vector2 } from './geometry';
-import { isBroadTouch } from './palm-rejection';
 
 type EditModePanAxis = 'vertical' | 'horizontal';
 
@@ -91,11 +90,6 @@ export class CanvasViewport {
       return Math.hypot(dx, dy);
     };
 
-    const hasBroadTouch = (evt: TouchEvent): boolean =>
-      Array.from(evt.touches).some((touch) =>
-        isBroadTouch(touch.radiusX * 2, touch.radiusY * 2),
-      );
-
     // Single-finger touch is left alone — DrawableCanvas pans the free canvas with one finger, and
     // in edit mode the contentEditable uses it for cursor placement / selection.
     this._handleTouchStart = (evt) => {
@@ -103,9 +97,8 @@ export class CanvasViewport {
       // Before the suppression bail: gesture* must stand down for any two-finger touch, not just
       // the ones the camera acts on.
       this._touchPinching = evt.touches.length >= 2;
-      // A hand resting on the screen while the stylus draws reads as a multi-touch blob, which would
-      // pinch and pan the camera out from under the stroke.
-      if (this._touchSuppressedProvider?.() || hasBroadTouch(evt)) {
+      // A hand resting near the stylus reads as multi-touch and could pan or pinch the camera.
+      if (this._touchSuppressedProvider?.()) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
         return;
@@ -129,7 +122,7 @@ export class CanvasViewport {
     this._handleTouchMove = (evt) => {
       // Drop the anchors rather than just bail: fingers still down when suppression lifts would pan
       // by everything they travelled while the pen was on the page, snapping the camera.
-      if (this._touchSuppressedProvider?.() || hasBroadTouch(evt)) {
+      if (this._touchSuppressedProvider?.()) {
         this._touchPanLast = null;
         this._touchPinchLastDist = null;
         return;

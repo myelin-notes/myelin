@@ -19,13 +19,36 @@ describe('PalmRejection', () => {
     expect(palm.isPalm(FINGER)).toBe(false);
   });
 
-  it('rejects a broad contact without stylus contact until it lifts', () => {
+  it('rejects touch while the pen hovers without touching down', () => {
     const palm = new PalmRejection();
-    expect(palm.isPalm(FINGER, 20, 20)).toBe(false);
-    expect(palm.isPalm(PALM, 80, 20)).toBe(true);
+    palm.penHoverStart([]);
+    expect(palm.isPalm(PALM)).toBe(true);
     expect(palm.suppressed).toBe(true);
+    palm.penHoverEnd();
+    expect(palm.isPalm(PALM)).toBe(true);
     expect(palm.pointerUp(PALM)).toBe(true);
+    expect(palm.suppressed).toBe(true);
+    vi.advanceTimersByTime(200);
     expect(palm.suppressed).toBe(false);
+  });
+
+  it('rejects a touch that lands just after hover ends', () => {
+    const palm = new PalmRejection();
+    palm.penHoverStart([]);
+    palm.penHoverEnd();
+
+    expect(palm.isPalm(PALM)).toBe(true);
+    vi.advanceTimersByTime(200);
+    expect(palm.isPalm(PALM)).toBe(true);
+    expect(palm.suppressed).toBe(true);
+    palm.pointerUp(PALM);
+    expect(palm.isPalm(FINGER)).toBe(false);
+  });
+
+  it('reclassifies a touch already down when the pen enters hover range', () => {
+    const palm = new PalmRejection();
+    palm.penHoverStart([PALM]);
+    expect(palm.isKnownPalm(PALM)).toBe(true);
   });
 
   it('rejects a touch that lands while the stylus is down', () => {
@@ -50,9 +73,11 @@ describe('PalmRejection', () => {
     palm.pointerUp(PEN);
 
     vi.advanceTimersByTime(5000);
-    expect(palm.suppressed).toBe(false);
+    expect(palm.suppressed).toBe(true);
     // The hand never left, so it must not wake up as a fresh gesture.
     expect(palm.isPalm(PALM)).toBe(true);
+    palm.pointerUp(PALM);
+    expect(palm.suppressed).toBe(false);
   });
 
   it('holds touch off through the grace window, then releases it', () => {

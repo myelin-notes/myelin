@@ -196,6 +196,7 @@ describe('tablet selection routing', () => {
   }
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     UserPrefs.set('inputMode', 'touch');
   });
@@ -279,54 +280,71 @@ describe('tablet selection routing', () => {
     interaction.destroy();
   });
 
-  it('ignores a broad palm contact before the pen touches down', () => {
+  it('ignores touch while the pen hovers and resumes after it leaves', () => {
+    vi.useFakeTimers();
     UserPrefs.set('inputMode', 'pen');
     const { interaction, viewport, tool } = makeInteraction(false);
-    const palm = {
+    window.dispatchEvent(
+      Object.assign(new Event('pointerover'), {
+        pointerType: 'pen',
+        buttons: 0,
+      }),
+    );
+    const touch = {
       pointerId: 2,
       pointerType: 'touch',
-      width: 80,
-      height: 20,
     } as PointerEvent;
-    interaction.onPointerDown(palm);
+    interaction.onPointerDown(touch);
 
     expect(viewport.beginPanGesture).not.toHaveBeenCalled();
     expect(tool.start).not.toHaveBeenCalled();
-    interaction.onPointerUp({ ...palm, type: 'pointerup' } as PointerEvent);
+    interaction.onPointerUp({ ...touch, type: 'pointerup' } as PointerEvent);
+    window.dispatchEvent(
+      Object.assign(new Event('pointerout'), {
+        pointerType: 'pen',
+        relatedTarget: null,
+      }),
+    );
+    vi.advanceTimersByTime(200);
     interaction.onPointerDown({
-      ...palm,
+      ...touch,
       pointerId: 3,
-      width: 20,
-      height: 20,
     } as PointerEvent);
     expect(viewport.beginPanGesture).toHaveBeenCalledTimes(1);
     interaction.destroy();
   });
 
-  it('rolls back a pan when a touch grows into a broad contact', () => {
+  it('rolls back a touch pan when the pen begins hovering', () => {
     UserPrefs.set('inputMode', 'pen');
     const { interaction, viewport } = makeInteraction(false);
     const touch = {
       pointerId: 2,
       pointerType: 'touch',
-      width: 20,
-      height: 20,
       movementX: 0,
       movementY: 0,
       timeStamp: 1,
     } as PointerEvent;
 
     interaction.onPointerDown(touch);
-    interaction.onPointerMove({
-      ...touch,
-      width: 80,
-      type: 'pointermove',
-    } as PointerEvent);
+    window.dispatchEvent(
+      Object.assign(new Event('pointerover'), {
+        pointerType: 'pen',
+        buttons: 1,
+      }),
+    );
+    expect(viewport.setView).not.toHaveBeenCalled();
+    window.dispatchEvent(
+      Object.assign(new Event('pointermove'), {
+        pointerType: 'pen',
+        buttons: 0,
+      }),
+    );
 
     expect(viewport.setView).toHaveBeenCalledWith({
       zoom: 1,
       offset: { x: 0, y: 0 },
     });
+    expect(viewport.endPanGesture).not.toHaveBeenCalled();
     interaction.destroy();
   });
 

@@ -74,6 +74,8 @@ export class CanvasInteractionController {
 
   private readonly handlePointerDown: (event: PointerEvent) => void;
   private readonly handlePointerMove: (event: PointerEvent) => void;
+  private readonly handlePointerOver: (event: PointerEvent) => void;
+  private readonly handlePointerOut: (event: PointerEvent) => void;
   private readonly handlePointerUp: (event: PointerEvent) => void;
   private readonly handleStylusTouch: (event: TouchEvent) => void;
   private readonly handleResize: () => void;
@@ -82,6 +84,20 @@ export class CanvasInteractionController {
     this.initStates();
     this.handlePointerMove = (event) => this.onPointerMove(event);
     this.handlePointerDown = (event) => this.onPointerDown(event);
+    this.handlePointerOver = (event) => {
+      if (
+        event.pointerType === 'pen' &&
+        event.buttons === 0 &&
+        !this.palm.penHover
+      ) {
+        this.beginPenHover(event);
+      }
+    };
+    this.handlePointerOut = (event) => {
+      if (event.pointerType === 'pen' && event.relatedTarget === null) {
+        this.palm.penHoverEnd();
+      }
+    };
     this.handlePointerUp = (event) => this.onPointerUp(event);
     this.handleStylusTouch = (event) => {
       if (event.cancelable && isStylusTouch(event)) {
@@ -92,6 +108,8 @@ export class CanvasInteractionController {
       this.host.refreshRendererSize();
     };
     window.addEventListener('pointermove', this.handlePointerMove);
+    window.addEventListener('pointerover', this.handlePointerOver);
+    window.addEventListener('pointerout', this.handlePointerOut);
     this.host.canvas.addEventListener('pointerdown', this.handlePointerDown);
     window.addEventListener('pointerup', this.handlePointerUp);
     window.addEventListener('pointercancel', this.handlePointerUp);
@@ -181,6 +199,8 @@ export class CanvasInteractionController {
 
   public destroy(): void {
     window.removeEventListener('pointermove', this.handlePointerMove);
+    window.removeEventListener('pointerover', this.handlePointerOver);
+    window.removeEventListener('pointerout', this.handlePointerOut);
     this.host.canvas.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('pointerup', this.handlePointerUp);
     window.removeEventListener('pointercancel', this.handlePointerUp);
@@ -239,7 +259,9 @@ export class CanvasInteractionController {
       this.touchPanStartOffset = null;
       if (
         startOffset &&
-        (event.type === 'pointercancel' || this.palm.penContact)
+        (event.type === 'pointercancel' ||
+          this.palm.penContact ||
+          this.palm.penHover)
       ) {
         this.host.viewport.setView({
           zoom: this.host.viewport.zoom,
@@ -266,11 +288,11 @@ export class CanvasInteractionController {
 
   private onPointerMove(event: PointerEvent): void {
     if (
-      event.pointerType === 'touch' &&
-      this.palm.isPalm(event.pointerId, event.width, event.height)
+      event.pointerType === 'pen' &&
+      event.buttons === 0 &&
+      !this.palm.penHover
     ) {
-      this.rejectActiveTouch(event);
-      return;
+      this.beginPenHover(event);
     }
     if (this.palm.isKnownPalm(event.pointerId)) {
       return;
@@ -292,10 +314,7 @@ export class CanvasInteractionController {
   }
 
   private onPointerDown(event: PointerEvent): void {
-    if (
-      event.pointerType === 'touch' &&
-      this.palm.isPalm(event.pointerId, event.width, event.height)
-    ) {
+    if (event.pointerType === 'touch' && this.palm.isPalm(event.pointerId)) {
       return;
     }
     if (this.host.isPlacementActive()) {
@@ -384,6 +403,9 @@ export class CanvasInteractionController {
 
   private onPointerUp(event: PointerEvent): void {
     this.activeTouchPointers.delete(event.pointerId);
+    if (event.type === 'pointercancel' && event.pointerType === 'pen') {
+      this.palm.penHoverEnd();
+    }
     if (this.palm.pointerUp(event.pointerId, event.pointerType === 'pen')) {
       return;
     }
@@ -410,31 +432,20 @@ export class CanvasInteractionController {
 
   private beginPenContact(event: PointerEvent): void {
     this.palm.penDown(event.pointerId, this.activeTouchPointers);
+    this.rejectActiveTouches(event);
+  }
+
+  private beginPenHover(event: PointerEvent): void {
+    this.palm.penHoverStart(this.activeTouchPointers);
+    this.rejectActiveTouches(event);
+  }
+
+  private rejectActiveTouches(event: PointerEvent): void {
     if (this.activeTouchPointers.size > 0) {
       this.activeTouchPointers.clear();
       this.touchTapCandidate = null;
       this.abortInteraction();
       this.state.change(InteractState.Idle, event);
-    }
-  }
-
-  private rejectActiveTouch(event: PointerEvent): void {
-    this.activeTouchPointers.delete(event.pointerId);
-    if (this.interactionPointer?.id !== event.pointerId) {
-      return;
-    }
-    this.touchTapCandidate = null;
-    if (this.state.current === InteractState.UsingTool) {
-      this.abortInteraction();
-    } else if (this.state.current === InteractState.Moving) {
-      const startOffset = this.touchPanStartOffset;
-      this.state.change(InteractState.Idle, event);
-      if (startOffset) {
-        this.host.viewport.setView({
-          zoom: this.host.viewport.zoom,
-          offset: startOffset,
-        });
-      }
     }
   }
 

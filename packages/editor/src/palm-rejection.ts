@@ -1,47 +1,46 @@
-// Covers only a hand settling into a *new* contact just after the tip leaves — one already resting
-// is a known palm. That lands within a few frames; every ms beyond is time the user cannot pan.
+// Bridges brief gaps after pen hover or contact ends; a longer window delays intentional finger pan.
 const GRACE_MS = 150;
-const PALM_CONTACT_MIN_PX = 64;
 
-export function isBroadTouch(width: number, height: number): boolean {
-  return Math.max(width, height) >= PALM_CONTACT_MIN_PX;
-}
-
-/** Rejects broad touch contacts and touches during or just after stylus contact. */
+/** Rejects touches while a stylus hovers, contacts the screen, or has just lifted. */
 export class PalmRejection {
   private penPointerId: number | null = null;
-  private penLiftedAt: number = 0;
+  private penLiftedAt = -Infinity;
+  private hoveringPen = false;
+  private penHoverLeftAt = -Infinity;
   private readonly palmIds = new Set<number>();
-  private readonly broadPalmIds = new Set<number>();
 
   public get penContact(): boolean {
     return this.penPointerId !== null;
   }
 
+  public get penHover(): boolean {
+    return this.hoveringPen;
+  }
+
   public get suppressed(): boolean {
     return (
       this.penPointerId !== null ||
-      this.broadPalmIds.size > 0 ||
-      Date.now() - this.penLiftedAt < GRACE_MS
+      this.hoveringPen ||
+      this.palmIds.size > 0 ||
+      (this.penHoverLeftAt !== -Infinity &&
+        Date.now() - this.penHoverLeftAt < GRACE_MS) ||
+      (this.penLiftedAt !== -Infinity &&
+        Date.now() - this.penLiftedAt < GRACE_MS)
     );
   }
 
-  // Broad contacts and touches that begin under the pen stay rejected until they lift. A touch
-  // arriving only in the grace window becomes usable after the window closes.
-  public isPalm(
-    pointerId: number,
-    width: number = 0,
-    height: number = 0,
-  ): boolean {
-    if (isBroadTouch(width, height)) {
-      this.palmIds.add(pointerId);
-      this.broadPalmIds.add(pointerId);
-      return true;
-    }
+  // Touches under pen hover, including its exit grace, stay rejected until lift. After contact,
+  // a new touch becomes usable when the grace window closes.
+  public isPalm(pointerId: number): boolean {
     if (this.palmIds.has(pointerId)) {
       return true;
     }
-    if (this.penPointerId !== null) {
+    if (
+      this.penPointerId !== null ||
+      this.hoveringPen ||
+      (this.penHoverLeftAt !== -Infinity &&
+        Date.now() - this.penHoverLeftAt < GRACE_MS)
+    ) {
       this.palmIds.add(pointerId);
       return true;
     }
@@ -50,6 +49,21 @@ export class PalmRejection {
 
   public isKnownPalm(pointerId: number): boolean {
     return this.palmIds.has(pointerId);
+  }
+
+  public penHoverStart(activeTouchIds: Iterable<number>): void {
+    this.hoveringPen = true;
+    for (const id of activeTouchIds) {
+      this.palmIds.add(id);
+    }
+  }
+
+  public penHoverEnd(): void {
+    if (!this.hoveringPen) {
+      return;
+    }
+    this.hoveringPen = false;
+    this.penHoverLeftAt = Date.now();
   }
 
   // Anything already on the screen is the hand the stylus rests on — the palm usually lands a moment
@@ -76,7 +90,6 @@ export class PalmRejection {
       this.penPointerId = null;
       this.penLiftedAt = Date.now();
     }
-    this.broadPalmIds.delete(pointerId);
     return this.palmIds.delete(pointerId);
   }
 }

@@ -48,16 +48,17 @@ function createViewport() {
   return { viewport, wheel, touchStart, touchMove };
 }
 
-describe('CanvasViewport palm rejection', () => {
-  it('does not pinch or pan from a broad touch contact', () => {
+describe('CanvasViewport palm suppression', () => {
+  it('does not pan or pinch while touch is suppressed', () => {
     const { viewport, touchStart, touchMove } = createViewport();
+    viewport.setTouchSuppressedProvider(() => true);
     const touches = [
-      { clientX: 100, clientY: 100, radiusX: 40, radiusY: 10 },
-      { clientX: 200, clientY: 200, radiusX: 10, radiusY: 10 },
+      { clientX: 100, clientY: 100 },
+      { clientX: 200, clientY: 200 },
     ];
 
     touchStart(touches);
-    touchMove([touches[0], { ...touches[1], clientX: 250, clientY: 250 }]);
+    touchMove([touches[0], { clientX: 250, clientY: 250 }]);
 
     expect(viewport.offset).toEqual({ x: 0, y: 0 });
     expect(viewport.zoom).toBe(1);
