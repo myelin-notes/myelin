@@ -105,3 +105,96 @@ describe('CachedRepositoryOutbox.load', () => {
     expect(outbox.length).toBe(1);
   });
 });
+
+describe('CachedRepositoryOutbox mutations', () => {
+  it('persists a bulk mutation batch once', async () => {
+    fsState.readTextFile.mockResolvedValue('[]');
+    const outbox = makeOutbox();
+
+    await outbox.batchMutations(async () => {
+      await outbox.mutate((ops) => {
+        ops.push(validOp);
+      });
+      await outbox.mutate((ops) => {
+        ops.push({
+          kind: 'upsert-manifest-node',
+          nodeId: 'node-2',
+          queueRevision: 'rev-2',
+        });
+      });
+    });
+
+    expect(fsState.readTextFile).toHaveBeenCalledTimes(1);
+    expect(fsState.writeTextFile).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fsState.writeTextFile.mock.calls[0][1])).toHaveLength(2);
+  });
+
+  it('restores the original queue when a bulk mutation batch fails', async () => {
+    fsState.readTextFile.mockResolvedValue(JSON.stringify([validOp]));
+    const outbox = makeOutbox();
+
+    await expect(
+      outbox.batchMutations(async () => {
+        await outbox.mutate((ops) => {
+          ops.push({
+            kind: 'upsert-manifest-node',
+            nodeId: 'partial-import',
+            queueRevision: 'partial-revision',
+          });
+        });
+        throw new Error('import failed');
+      }),
+    ).rejects.toThrow('import failed');
+
+    expect(outbox.snapshotOps()).toEqual([validOp]);
+    expect(fsState.writeTextFile).not.toHaveBeenCalled();
+  });
+
+  it('removes a verified prefix with one outbox write', async () => {
+    const second: PendingOp = {
+      kind: 'upsert-manifest-node',
+      nodeId: 'node-2',
+      queueRevision: 'rev-2',
+    };
+    const third: PendingOp = {
+      kind: 'upsert-manifest-node',
+      nodeId: 'node-3',
+      queueRevision: 'rev-3',
+    };
+    fsState.readTextFile.mockResolvedValue(
+      JSON.stringify([validOp, second, third]),
+    );
+    const outbox = makeOutbox();
+
+    await expect(
+      outbox.removePrefixIfUnchanged([validOp, second]),
+    ).resolves.toBe(2);
+
+    expect(fsState.readTextFile).toHaveBeenCalledTimes(1);
+    expect(fsState.writeTextFile).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fsState.writeTextFile.mock.calls[0][1])).toEqual([third]);
+  });
+
+  it('removes only the unchanged part of a prefix', async () => {
+    const changedSecond: PendingOp = {
+      kind: 'upsert-manifest-node',
+      nodeId: 'node-2',
+      queueRevision: 'new-revision',
+    };
+    fsState.readTextFile.mockResolvedValue(
+      JSON.stringify([validOp, changedSecond]),
+    );
+    const outbox = makeOutbox();
+
+    await expect(
+      outbox.removePrefixIfUnchanged([
+        validOp,
+        { ...changedSecond, queueRevision: 'old-revision' },
+      ]),
+    ).resolves.toBe(1);
+
+    expect(JSON.parse(fsState.writeTextFile.mock.calls[0][1])).toEqual([
+      changedSecond,
+    ]);
+  });
+});

@@ -188,7 +188,7 @@ function drawPlaybackWaveformCanvas(
 interface AudioPlayerViewProps {
   elementId: string;
   recordingOwnerId: string;
-  audioBytes: Uint8Array | null;
+  audioBuffer: ArrayBuffer | null;
   duration: number;
   mimeType: string;
   waveform: Float32Array | null;
@@ -213,7 +213,7 @@ interface AudioPlayerViewProps {
 }
 
 interface AudioPlayerInteractionOptions {
-  audioBytes: Uint8Array | null;
+  audioBuffer: ArrayBuffer | null;
   hasTranscript: boolean;
   isCreator: boolean;
   recordingState: RecordingState;
@@ -229,13 +229,13 @@ export interface AudioPlayerInteractionState {
 }
 
 export function getAudioPlayerInteractionState({
-  audioBytes,
+  audioBuffer,
   hasTranscript,
   isCreator,
   recordingState,
   slot,
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
-  const hasAudio = Boolean(audioBytes);
+  const hasAudio = Boolean(audioBuffer);
   const isWaitingForRemoteAudio = !hasAudio && !isCreator;
   const isProcessingRecording = recordingState === 'processing';
   const isCaptionsLoading =
@@ -254,7 +254,7 @@ export function getAudioPlayerInteractionState({
 export function AudioPlayerView({
   elementId,
   recordingOwnerId,
-  audioBytes,
+  audioBuffer,
   duration,
   mimeType,
   waveform,
@@ -300,7 +300,7 @@ export function AudioPlayerView({
   const hasTranscript = segments.length > 0;
   const activeIndex = activeSegmentIndex(segments, currentTime);
   const claimInput: TranscriptionCoordinationInput = {
-    hasAudio: Boolean(audioBytes),
+    hasAudio: Boolean(audioBuffer),
     hasTranscript,
     claimPeerId: transcribingPeerId,
     localPeerId,
@@ -310,9 +310,9 @@ export function AudioPlayerView({
     remotePeers,
   };
   const slot = getTranscriptionSlotState(claimInput);
-  const showCaptionsButton = Boolean(audioBytes);
+  const showCaptionsButton = Boolean(audioBuffer);
   const interaction = getAudioPlayerInteractionState({
-    audioBytes,
+    audioBuffer,
     hasTranscript,
     isCreator,
     recordingState,
@@ -366,7 +366,7 @@ export function AudioPlayerView({
   // Drop the player bound to the previous blob when a new one arrives
   // (re-recording or a remote Yjs update), and on unmount.
   useEffect(() => {
-    if (!audioBytes) {
+    if (!audioBuffer) {
       return;
     }
     return () => {
@@ -383,7 +383,7 @@ export function AudioPlayerView({
       setShowTranscript(false);
       setFollowPlayhead(true);
     };
-  }, [audioBytes]);
+  }, [audioBuffer]);
 
   const attemptAutoPickup = useEffectEvent(() => {
     if (
@@ -527,7 +527,7 @@ export function AudioPlayerView({
 
   /** The player for the current blob, created on first use. `null` while no audio has arrived. */
   function ensureAudio(): HTMLAudioElement | null {
-    if (!audioBytes) {
+    if (!audioBuffer) {
       return null;
     }
 
@@ -545,11 +545,10 @@ export function AudioPlayerView({
     }
 
     if (!objectUrlRef.current) {
-      const buf = audioBytes.buffer.slice(
-        audioBytes.byteOffset,
-        audioBytes.byteOffset + audioBytes.byteLength,
-      ) as ArrayBuffer;
-      const blob = new Blob([buf], mimeType ? { type: mimeType } : undefined);
+      const blob = new Blob(
+        [audioBuffer],
+        mimeType ? { type: mimeType } : undefined,
+      );
       objectUrlRef.current = URL.createObjectURL(blob);
       audioElRef.current.src = objectUrlRef.current;
     }
@@ -596,14 +595,14 @@ export function AudioPlayerView({
   // recording only.
   async function handleTranscribe() {
     const transcription = getPlatform().transcription;
-    if (!audioBytes || !transcription || !canTranscribeHere(claimInput)) {
+    if (!audioBuffer || !transcription || !canTranscribeHere(claimInput)) {
       return;
     }
     setIsTranscribing(true);
     setNotice(null);
     onTranscriptionClaimed();
     try {
-      const { buffer } = await decodeAudio(audioBytes);
+      const { buffer } = await decodeAudio(new Uint8Array(audioBuffer));
       const session = await transcription.startBufferSession(elementId, buffer);
       if (!session) {
         // Backend unavailable (e.g. bundled model missing).
@@ -665,7 +664,7 @@ export function AudioPlayerView({
     }
     if (isRecording) {
       stopRecording();
-    } else if (audioBytes) {
+    } else if (audioBuffer) {
       if (isPlaying) {
         pausePlayback();
       } else {
@@ -680,7 +679,7 @@ export function AudioPlayerView({
     ? SquareIcon
     : interaction.isProcessingRecording
       ? LoaderCircle
-      : audioBytes
+      : audioBuffer
         ? isPlaying
           ? PauseIcon
           : PlayIcon
@@ -695,7 +694,7 @@ export function AudioPlayerView({
         : isRecording
           ? formatTime(currentTime)
           : (notice ??
-            (audioBytes
+            (audioBuffer
               ? `${formatTime(currentTime)} / ${formatTime(duration)}`
               : interaction.isWaitingForRemoteAudio
                 ? strings.waitingForRecording
@@ -719,7 +718,7 @@ export function AudioPlayerView({
       ? strings.processingRecording
       : isRecording
         ? strings.stopRecording
-        : audioBytes
+        : audioBuffer
           ? isPlaying
             ? strings.pauseAudio
             : strings.playAudio

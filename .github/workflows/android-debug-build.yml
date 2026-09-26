@@ -66,6 +66,7 @@ jobs:
           for v in ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK ANDROID_NDK_LATEST_HOME NDK_HOME; do
             echo "$v=$NDK_PATH" >> "$GITHUB_ENV"
           done
+          echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

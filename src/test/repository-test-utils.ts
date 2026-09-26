@@ -40,11 +40,16 @@ function createJsonResponse(status: number, payload: unknown) {
   };
 }
 
-function createTextResponse(status: number, body: string) {
+function createTextResponse(
+  status: number,
+  body: string,
+  headers?: Record<string, string>,
+) {
   const bytes = new TextEncoder().encode(body);
   return {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers(headers),
     async json() {
       return JSON.parse(body) as unknown;
     },
@@ -109,7 +114,10 @@ export interface MemoryStorage {
       create?: boolean;
       truncate?: boolean;
     },
-  ): Promise<{ close(): Promise<void> }>;
+  ): Promise<{
+    write(data: Uint8Array): Promise<number>;
+    close(): Promise<void>;
+  }>;
   readDir(path: string): Promise<
     Array<{
       name: string;
@@ -258,8 +266,23 @@ function createMemoryStorage(root: string = '/app-data'): MemoryStorage {
         textFiles.delete(resolved);
         binaryFiles.set(resolved, new Uint8Array());
       }
+      const chunks = [binaryFiles.get(resolved) ?? new Uint8Array()];
       return {
-        async close() {},
+        async write(data) {
+          chunks.push(new Uint8Array(data));
+          return data.byteLength;
+        },
+        async close() {
+          const bytes = new Uint8Array(
+            chunks.reduce((total, chunk) => total + chunk.byteLength, 0),
+          );
+          let offset = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          binaryFiles.set(resolved, bytes);
+        },
       };
     },
     readDir: async (path) => collectDirectEntries(resolve(path)),
@@ -348,17 +371,23 @@ export interface MemoryGitHubApi {
     arrayBuffer(): Promise<ArrayBuffer>;
     text(): Promise<string>;
   }>;
-  failNextPut(path: string, status?: number): void;
+  failNextBranch(status: number, body?: string): void;
+  failNextCompare(status: number): void;
   failNextTarball(status: number, retryAfterSeconds: number): void;
-  failNextGraphQL(reason: 'network' | 'unknown' | 'head-conflict'): void;
   bumpHeadOidExternally(): string;
+  applyGitPush(
+    additions: Array<{ path: string; contents: Uint8Array }>,
+    deletions: Array<{ path: string }>,
+    expectedHeadOid?: string,
+  ): {
+    status: 'pushed' | 'head-conflict';
+    commitOid: string | null;
+    blobShas: Record<string, string>;
+  };
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
   setTarball(gzippedTarBytes: Uint8Array): void;
   readonly tarballFetchCount: number;
-  readonly graphqlCallCount: number;
-  readonly putCallCount: number;
-  readonly deleteCallCount: number;
   readonly headOid: string;
 }
 
@@ -374,25 +403,24 @@ function buildTarballFromFiles(
 
 function createMemoryGitHubApi(): MemoryGitHubApi {
   const files = new Map<string, { sha: string; bytes: Uint8Array }>();
-  const nextPutFailures = new Map<string, number>();
   let revision = 0;
-  let headOid = 'oid-0';
+  let headOid = '0'.repeat(40);
   let headOidCounter = 0;
   let tarball: Uint8Array | null = null;
   let tarballFetchCount = 0;
-  let graphqlCallCount = 0;
-  let putCallCount = 0;
-  let deleteCallCount = 0;
+  const commits = new Map<string, { parent: string }>();
+  let nextBranchFailure: { status: number; body: string } | null = null;
+  let nextCompareFailure: number | null = null;
   let nextTarballFailure: {
     status: number;
     retryAfterSeconds: number;
   } | null = null;
-  const nextGraphqlFailures: Array<'network' | 'unknown' | 'head-conflict'> =
-    [];
 
   function bumpHeadOid(): string {
+    const parent = headOid;
     headOidCounter += 1;
-    headOid = `oid-${headOidCounter}`;
+    headOid = headOidCounter.toString(16).padStart(40, '0');
+    commits.set(headOid, { parent });
     return headOid;
   }
 
@@ -417,92 +445,53 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   }
 
   function write(path: string, bytes: Uint8Array): string {
-    const sha = `sha-${++revision}`;
+    const sha = (++revision).toString(16).padStart(40, '0');
     files.set(path, { sha, bytes: new Uint8Array(bytes) });
     return sha;
   }
 
-  async function handleGraphQL(init: {
-    body?: BodyInit | null;
-  }): Promise<ReturnType<typeof createJsonResponse>> {
-    graphqlCallCount += 1;
-    if (nextGraphqlFailures.length > 0) {
-      const reason = nextGraphqlFailures.shift()!;
-      if (reason === 'network') {
-        return createTextResponse(503, '{"message":"Service Unavailable"}');
-      }
-      if (reason === 'head-conflict') {
-        return createJsonResponse(200, {
-          errors: [
-            {
-              message: `Expected head oid forced-mismatch but got ${headOid}`,
-            },
-          ],
-        });
-      }
-      return createJsonResponse(200, {
-        errors: [{ message: 'Unexpected error' }],
-      });
-    }
-
-    const body = JSON.parse(String(init.body ?? '{}')) as {
-      query?: string;
-      variables?: {
-        input?: {
-          expectedHeadOid?: string;
-          fileChanges?: {
-            additions?: Array<{ path: string; contents: string }>;
-            deletions?: Array<{ path: string }>;
-          };
-        };
-      };
-    };
-
-    if (!body.query?.includes('createCommitOnBranch')) {
-      return createJsonResponse(200, {
-        errors: [{ message: `Unsupported GraphQL operation` }],
-      });
-    }
-
-    const input = body.variables?.input;
-    if (!input) {
-      return createJsonResponse(200, {
-        errors: [{ message: 'Missing input' }],
-      });
-    }
-
-    if (input.expectedHeadOid && input.expectedHeadOid !== headOid) {
-      return createJsonResponse(200, {
-        errors: [
-          {
-            message: `Expected head oid ${input.expectedHeadOid} but got ${headOid}`,
-          },
-        ],
-      });
-    }
-
-    for (const deletion of input.fileChanges?.deletions ?? []) {
-      files.delete(deletion.path);
-    }
-    for (const addition of input.fileChanges?.additions ?? []) {
-      const bytes = new Uint8Array(Buffer.from(addition.contents, 'base64'));
-      write(addition.path, bytes);
-    }
-
-    const newOid = bumpHeadOid();
-    return createJsonResponse(200, {
-      data: { createCommitOnBranch: { commit: { oid: newOid } } },
-    });
-  }
-
   return {
+    applyGitPush(additions, deletions, expectedHeadOid) {
+      if (expectedHeadOid && expectedHeadOid !== headOid) {
+        return { status: 'head-conflict', commitOid: null, blobShas: {} };
+      }
+      let changed = false;
+      for (const deletion of deletions) {
+        changed = files.delete(deletion.path) || changed;
+      }
+      const blobShas: Record<string, string> = {};
+      for (const addition of additions) {
+        const current = files.get(addition.path);
+        if (
+          current &&
+          current.bytes.byteLength === addition.contents.byteLength &&
+          current.bytes.every(
+            (byte, index) => byte === addition.contents[index],
+          )
+        ) {
+          blobShas[addition.path] = current.sha;
+        } else {
+          blobShas[addition.path] = write(addition.path, addition.contents);
+          changed = true;
+        }
+      }
+      return {
+        status: 'pushed',
+        commitOid: changed ? bumpHeadOid() : headOid,
+        blobShas,
+      };
+    },
     async fetch(url, init) {
       const parsed = new URL(url);
-      if (parsed.pathname === '/graphql') {
-        return handleGraphQL(init);
-      }
       const branch = getBranchName(url);
       if (branch !== null) {
+        if (nextBranchFailure !== null) {
+          const failure = nextBranchFailure;
+          nextBranchFailure = null;
+          return createTextResponse(failure.status, failure.body, {
+            'x-github-request-id': 'rest-test-id',
+          });
+        }
         return createJsonResponse(200, { commit: { sha: headOid } });
       }
       if (parsed.pathname.includes('/tarball/')) {
@@ -519,6 +508,43 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         return createBinaryResponse(200, bytes);
       }
 
+      const compare = parsed.pathname.match(/\/compare\/([^/]+)\.\.\.([^/]+)$/);
+      if (compare && init.method === 'GET') {
+        if (nextCompareFailure !== null) {
+          const status = nextCompareFailure;
+          nextCompareFailure = null;
+          return createTextResponse(status, '', {
+            'x-github-request-id': 'rest-test-id',
+          });
+        }
+        const base = decodeURIComponent(compare[1] ?? '');
+        let current = decodeURIComponent(compare[2] ?? '');
+        while (commits.has(current)) {
+          if (current === base) {
+            break;
+          }
+          current = commits.get(current)?.parent ?? '';
+        }
+        return createJsonResponse(200, {
+          status: current === base ? 'ahead' : 'diverged',
+        });
+      }
+
+      const blobSha = parsed.pathname.match(/\/git\/blobs\/([^/]+)$/)?.[1];
+      if (blobSha) {
+        const entry = [...files.values()].find(({ sha }) => sha === blobSha);
+        if (!entry) {
+          return createTextResponse(404, '{"message":"Not Found"}');
+        }
+        if (init.headers?.Accept !== 'application/vnd.github.raw+json') {
+          return createTextResponse(
+            415,
+            '{"message":"Unsupported media type"}',
+          );
+        }
+        return createBinaryResponse(200, entry.bytes);
+      }
+
       const path = getContentsPath(url);
       if (path === null) {
         throw new Error(`Unsupported GitHub URL: ${url}`);
@@ -529,65 +555,36 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
         if (!entry) {
           return createTextResponse(404, '{"message":"Not Found"}');
         }
+        if (entry.bytes.byteLength > 1024 * 1024) {
+          if (init.headers?.Accept !== 'application/vnd.github.object+json') {
+            return createTextResponse(
+              415,
+              '{"message":"Unsupported media type"}',
+            );
+          }
+          return createJsonResponse(200, {
+            sha: entry.sha,
+            size: entry.bytes.byteLength,
+            content: '',
+            encoding: 'none',
+          });
+        }
         return createJsonResponse(200, {
           sha: entry.sha,
           content: Buffer.from(entry.bytes).toString('base64'),
         });
       }
 
-      if (init.method === 'PUT') {
-        putCallCount += 1;
-        const forcedStatus = nextPutFailures.get(path);
-        if (forcedStatus) {
-          nextPutFailures.delete(path);
-          return createTextResponse(forcedStatus, '{"message":"Conflict"}');
-        }
-
-        const payload = JSON.parse(String(init.body ?? '{}')) as {
-          content?: string;
-          sha?: string;
-        };
-        const existing = files.get(path);
-        if (existing && payload.sha && payload.sha !== existing.sha) {
-          return createTextResponse(409, '{"message":"SHA mismatch"}');
-        }
-        const bytes = new Uint8Array(
-          Buffer.from(payload.content ?? '', 'base64'),
-        );
-        const sha = write(path, bytes);
-        bumpHeadOid();
-        return createJsonResponse(200, {
-          content: { sha },
-        });
-      }
-
-      if (init.method === 'DELETE') {
-        deleteCallCount += 1;
-        const payload = JSON.parse(String(init.body ?? '{}')) as {
-          sha?: string;
-        };
-        const existing = files.get(path);
-        if (!existing) {
-          return createTextResponse(404, '{"message":"Not Found"}');
-        }
-        if (payload.sha && payload.sha !== existing.sha) {
-          return createTextResponse(409, '{"message":"SHA mismatch"}');
-        }
-        files.delete(path);
-        bumpHeadOid();
-        return createJsonResponse(200, {});
-      }
-
       throw new Error(`Unsupported GitHub method: ${init.method}`);
     },
-    failNextPut(path, status = 409) {
-      nextPutFailures.set(path, status);
+    failNextBranch(status, body = '{"message":"Not Found"}') {
+      nextBranchFailure = { status, body };
+    },
+    failNextCompare(status) {
+      nextCompareFailure = status;
     },
     failNextTarball(status, retryAfterSeconds) {
       nextTarballFailure = { status, retryAfterSeconds };
-    },
-    failNextGraphQL(reason) {
-      nextGraphqlFailures.push(reason);
     },
     bumpHeadOidExternally() {
       return bumpHeadOid();
@@ -608,15 +605,6 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     get tarballFetchCount() {
       return tarballFetchCount;
-    },
-    get graphqlCallCount() {
-      return graphqlCallCount;
-    },
-    get putCallCount() {
-      return putCallCount;
-    },
-    get deleteCallCount() {
-      return deleteCallCount;
     },
     get headOid() {
       return headOid;

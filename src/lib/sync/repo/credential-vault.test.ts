@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UserPrefs } from '@myelin/editor/user-prefs';
-import { createCredentialVault } from './credential-vault';
+import {
+  createCredentialVault,
+  subscribeCredentialChanges,
+} from './credential-vault';
 
 interface FakeSnapshot {
   password: string;
@@ -101,6 +104,37 @@ describe('createCredentialVault', () => {
 
     await vault.remove('token:default');
     expect(await vault.read('token:default')).toBeNull();
+  });
+
+  it('notifies subscribers when credentials change', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeCredentialChanges(listener);
+    const vault = createCredentialVault(OPTIONS);
+
+    await vault.write('token:default', 'secret-value');
+    await vault.remove('token:default');
+
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(listener).toHaveBeenNthCalledWith(1, {
+      clientName: 'test',
+      key: 'token:default',
+    });
+    expect(listener).toHaveBeenNthCalledWith(2, {
+      clientName: 'test',
+      key: 'token:default',
+    });
+    unsubscribe();
+  });
+
+  it('can rotate a stored secret without notifying subscribers', async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeCredentialChanges(listener);
+    const vault = createCredentialVault(OPTIONS);
+
+    await vault.write('token:default', 'rotated-value', { notify: false });
+
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
   });
 
   it('generates the vault password once and reuses it', async () => {
