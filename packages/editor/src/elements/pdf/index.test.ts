@@ -140,10 +140,14 @@ describe('PdfElement', () => {
         throw new Error('hidden bounds should not be read');
       },
     } as DrawableElement;
-    pdf.setExportElementsProvider(() => [upper, pdf, upper, hidden]);
+    const offscreen = {
+      hidden: false,
+      boundingBox: new DOMRect(1000, 1000, 20, 20),
+    } as DrawableElement;
+    pdf.setExportElementsProvider(() => [upper, pdf, upper, offscreen, hidden]);
 
     const coverage = pdf as unknown as {
-      getCoveringBounds(): DOMRect[];
+      getCoveringBounds(viewport: CanvasViewport): DOMRect[];
       isChromeButtonCovered(
         x: number,
         y: number,
@@ -152,11 +156,13 @@ describe('PdfElement', () => {
         bounds: readonly DOMRect[],
       ): boolean;
     };
-    const bounds = coverage.getCoveringBounds();
     const viewport = {
       offset: { x: 0, y: 0 },
       zoom: 1,
+      getWorldRect: () => new DOMRect(0, 0, 100, 100),
     } as CanvasViewport;
+    const bounds = coverage.getCoveringBounds(viewport);
+    expect(bounds).toHaveLength(1);
     expect(reads).toBe(1);
     expect(coverage.isChromeButtonCovered(20, 20, 10, viewport, bounds)).toBe(
       true,
