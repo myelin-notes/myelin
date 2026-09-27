@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, mkdir, open, remove } from '@tauri-apps/plugin-fs';
 import type { BatchedCommitInput } from './batch';
 
-const STAGING_CHUNK_BYTES = 1024 * 1024;
+const STAGING_CHUNK_BYTES = 16 * 1024;
 
 export interface GitPushResponse {
   status: 'pushed' | 'head-conflict' | 'push-failed';
@@ -31,21 +31,22 @@ export async function pushGitHubBatch(
         truncate: true,
       });
       try {
-        for (
-          let offset = 0;
-          offset < addition.contents.byteLength;
-          offset += STAGING_CHUNK_BYTES
-        ) {
-          let chunk = addition.contents.subarray(
-            offset,
-            offset + STAGING_CHUNK_BYTES,
+        for (let offset = 0; offset < addition.contents.byteLength; ) {
+          const written = await file.write(
+            addition.contents.subarray(offset, offset + STAGING_CHUNK_BYTES),
           );
-          while (chunk.byteLength > 0) {
-            const written = await file.write(chunk);
-            if (written <= 0) {
-              throw new Error('Git staging write failed');
-            }
-            chunk = chunk.subarray(written);
+          if (written <= 0) {
+            throw new Error('Git staging write failed');
+          }
+          offset += written;
+          if (offset < addition.contents.byteLength) {
+            await new Promise<void>((resolve) => {
+              if (document.visibilityState === 'visible') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+              } else {
+                setTimeout(resolve, 0);
+              }
+            });
           }
         }
       } finally {
