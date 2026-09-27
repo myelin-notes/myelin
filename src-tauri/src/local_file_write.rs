@@ -8,21 +8,25 @@ use std::{
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tauri::{AppHandle, Manager};
 
-#[tauri::command(async)]
-pub fn write_local_file_chunk(
+#[tauri::command]
+pub async fn write_local_file_chunk(
     app: AppHandle,
     relative_path: String,
     offset: u64,
     bytes_base64: String,
 ) -> Result<(), String> {
-    let bytes = STANDARD
-        .decode(bytes_base64)
-        .map_err(|error| error.to_string())?;
     let root = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    write_chunk(&root, Path::new(&relative_path), offset, &bytes)
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = STANDARD
+            .decode(bytes_base64)
+            .map_err(|error| error.to_string())?;
+        write_chunk(&root, Path::new(&relative_path), offset, &bytes)
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 fn write_chunk(root: &Path, relative_path: &Path, offset: u64, bytes: &[u8]) -> Result<(), String> {
