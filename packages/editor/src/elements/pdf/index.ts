@@ -474,16 +474,9 @@ export class PdfElement
     const viewRect = viewport.getWorldRect();
     const bounds: DOMRect[] = [];
     for (let i = elementIndex + 1; i < elements.length; i++) {
-      if (!elements[i].hidden) {
-        const box = elements[i].boundingBox;
-        if (
-          box.left < viewRect.right &&
-          box.right > viewRect.left &&
-          box.top < viewRect.bottom &&
-          box.bottom > viewRect.top
-        ) {
-          bounds.push(box);
-        }
+      const element = elements[i];
+      if (!element.hidden && element.intersectsWorldRect(viewRect, 0)) {
+        bounds.push(element.boundingBox);
       }
     }
     return bounds;
