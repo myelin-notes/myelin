@@ -21,7 +21,6 @@ import {
 import {
   compareExplorerNodes,
   ExplorerModel,
-  type ExplorerSearchMode,
   type ExplorerSortMode,
   sortExplorerNodes,
 } from '@/pages/library/explorer/explorer-model';
@@ -36,7 +35,6 @@ const ROOT_KEY: string | null = null;
 const NO_COLLAPSED_IDS: ReadonlySet<string> = new Set();
 
 export type SortMode = ExplorerSortMode;
-export type SearchMode = ExplorerSearchMode;
 
 export interface SidebarTreeHandle {
   reload: () => Promise<void>;
@@ -116,7 +114,6 @@ interface SidebarTreeProps {
   ref?: React.Ref<SidebarTreeHandle>;
   sortMode: SortMode;
   searchQuery: string;
-  searchMode: SearchMode;
   filterTags: string[];
   onImport: (parentId: string) => void;
   importDisabled: boolean;
@@ -129,7 +126,6 @@ export function SidebarTree({
   ref,
   sortMode,
   searchQuery,
-  searchMode,
   filterTags,
   onImport,
   importDisabled,
@@ -217,7 +213,6 @@ export function SidebarTree({
       const result = await explorer.refresh({
         folderId: ROOT_KEY,
         searchQuery: trimmedQuery,
-        searchMode,
         filterTags,
       });
       if (!result) {
@@ -234,7 +229,7 @@ export function SidebarTree({
     } catch (err) {
       logger.error('Failed to load search results', err);
     }
-  }, [filterTags, explorer, loadAncestors, ready, searchMode, trimmedQuery]);
+  }, [filterTags, explorer, loadAncestors, ready, trimmedQuery]);
 
   // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers

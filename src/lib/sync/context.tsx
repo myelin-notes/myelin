@@ -5,7 +5,6 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
 import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import {
@@ -15,10 +14,7 @@ import {
 import { createRepository } from './repo/factory';
 import { credentialTokenKey } from './repo/oauth/client';
 import { isRepositoryFullyConfigured } from './repo/readiness';
-import {
-  getRepositoryConfigIdentity,
-  getRepositoryStorageKey,
-} from './repo/repository-backends';
+import { getRepositoryConfigIdentity } from './repo/repository-backends';
 import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
@@ -178,33 +174,6 @@ export function RepositoryProvider({
           ...current,
           initializing: false,
         }));
-
-        // Hydrate the search corpus and backfill any unindexed notes in the
-        // background. The index cache is namespaced per repository; Rust skips
-        // notes whose content hash is unchanged. Both engines are optional
-        // platform capabilities; absence means no indexing on this client.
-        const { noteIndex, handwriting } = getPlatform();
-        handwriting?.init(getRepositoryStorageKey(resolvedConfig));
-        if (noteIndex || handwriting) {
-          void (
-            noteIndex?.init(getRepositoryStorageKey(resolvedConfig)) ??
-            Promise.resolve()
-          )
-            .then(() => repository.listIndexBackfillItems())
-            .then((items) => {
-              // A repo switch may have run cleanup (reset + next init) while
-              // this chain was resolving; bail so we don't backfill the
-              // previous repo's items under the now-current repo.
-              if (disposed) {
-                return;
-              }
-              noteIndex?.startBackfill(items);
-              handwriting?.startBackfill(items);
-            })
-            .catch((error) => {
-              logger.error('Failed to start note-index backfill', error);
-            });
-        }
       } catch (error) {
         if (disposed) {
           return;
@@ -226,9 +195,6 @@ export function RepositoryProvider({
         window.clearTimeout(readinessRetryTimer);
       }
       unsubscribeStatus();
-      // Drop the previous repo's search corpus so it can't leak into the next.
-      getPlatform().noteIndex?.reset();
-      getPlatform().handwriting?.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });

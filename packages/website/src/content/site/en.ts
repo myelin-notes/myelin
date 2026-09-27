@@ -94,7 +94,7 @@ for step in range(3):
     audioBody:
       'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so every recording is searchable and no audio leaves your machine.',
     searchBody:
-      'Full-text and semantic search run locally, on a bundled all-MiniLM-L6-v2 model. Handwriting is recognized on macOS through Apple’s Vision framework, and audio transcripts are searchable too.',
+      'Everything stays local on your machine, with optional sync and collaboration when you need it.',
     // Content of the mock app cards standing in for real screenshots
     // (see world-layer.tsx).
     audioMock: {
@@ -169,7 +169,7 @@ for step in range(3):
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',
-      'Search, semantic embeddings, and handwriting OCR (macOS) all run on your own machine.',
+      'Your notes stay on your own machine.',
       'Bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
       'Import from Obsidian or GoodNotes, export to PDF, images, or JSON, and read every line of source on GitHub.',
     ],
@@ -274,7 +274,7 @@ Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one sectio
 
 ## Does it work offline?
 
-Fully. Editing, full-text and semantic search, handwriting recognition, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
+Fully. Editing, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
 
 ## What about iPhone, iPad, and Android?
 

@@ -27,7 +27,6 @@ import { useImports } from '@/pages/library/import/use-imports';
 import { useSidebar } from './context';
 import { SidebarTags } from './sidebar-tags';
 import {
-  type SearchMode,
   SidebarTree,
   type SidebarTreeHandle,
   type SortMode,
@@ -44,7 +43,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   const treeRef = useRef<SidebarTreeHandle>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTags = useMemo(() => [...activeTags], [activeTags]);
@@ -91,10 +89,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     setSortMode(
       (prev) => SORT_MODES[(SORT_MODES.indexOf(prev) + 1) % SORT_MODES.length],
     );
-  }, []);
-
-  const toggleSearchMode = useCallback(() => {
-    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
   }, []);
 
   const handleNewFolder = useCallback(() => {
@@ -178,23 +172,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
               <X className="size-3.5" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={toggleSearchMode}
-            aria-pressed={searchMode === 'semantic'}
-            aria-label={strings.library.semanticSearchLabel}
-            className={cn(
-              'flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1 font-medium text-[11px] transition-colors duration-150',
-              searchMode === 'semantic'
-                ? 'bg-tag-active text-text-on-dark'
-                : 'bg-surface text-text-muted ring-1 ring-border-subtle/70 hover:text-text-primary',
-            )}
-          >
-            <Search className="size-3" />
-            {searchMode === 'semantic'
-              ? strings.sidebar.searchModeSemantic
-              : strings.sidebar.searchModeText}
-          </button>
         </div>
       </div>
 
@@ -255,7 +232,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           ref={treeRef}
           sortMode={sortMode}
           searchQuery={searchQuery}
-          searchMode={searchMode}
           filterTags={filterTags}
           importDisabled={imports.importDisabled}
           onImport={(parentId) => {

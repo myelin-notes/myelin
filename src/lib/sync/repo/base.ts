@@ -4,7 +4,6 @@ import {
   type NodesDeletedDetail,
 } from '@myelin/editor/events';
 import { summarizeYDoc } from '@myelin/editor/note/state-summary';
-import { getPlatform, type ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
@@ -36,7 +35,6 @@ import {
   getChildrenIds,
   getFileVersionNodes,
   getFolderChain,
-  getIndexCandidateFileNodes,
   getNodesByAnyTag,
   getNodesByExactName,
   getNoteGraph,
@@ -44,7 +42,6 @@ import {
   getStats,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
-  isIndexCandidateFileNode,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -52,7 +49,6 @@ import {
   normalizeCustomColor,
   type RepositorySnapshot,
   searchNodeResults,
-  searchNodeResultsSemantically,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -84,8 +80,6 @@ import type {
 } from './types';
 
 const logger = new Logger('BaseRepository');
-const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
-const EMPTY_CONTENT: ReadonlyMap<VFSNodeId, string> = new Map();
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
 // for non-DOM contexts (tests, background workers) where `window` is absent.
@@ -132,13 +126,10 @@ export abstract class BaseRepository
     (status: RepositoryRuntimeStatus) => void
   >();
 
-  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index over
-  // the whole corpus each time. Keyed on the manifest reference, the mutation counter, and the
-  // note-index content revision, so it rebuilds exactly when the searchable corpus changes.
+  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index.
   private nodeSearchCache: {
     manifest: VFSManifest;
     dataVersion: number;
-    contentRevision: number;
     index: SearchIndex<VFSNode>;
   } | null = null;
 
@@ -153,7 +144,6 @@ export abstract class BaseRepository
   // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
   // be replay-safe: ids and any values the caller kept are minted outside the mutator.
   private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
-  private readonly skipNextIndexingNodeIds = new Set<VFSNodeId>();
 
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
@@ -195,34 +185,16 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
-    let candidateFileType: FileType | null = null;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
-        // Offer non-system files to the engine; it decides by type what to index.
-        // Version-history snapshots are system nodes and are never offered.
-        if (isIndexCandidateFileNode(node)) {
-          candidateFileType = node.fileType;
-        }
         // Snapshots are system nodes; their links must not enter the graph.
         if (node.fileType === 'mcanvas' && !node.system && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
-
-    const skipIndexing = this.skipNextIndexingNodeIds.delete(nodeId);
-    if (candidateFileType !== null && !skipIndexing) {
-      const { noteIndex, handwriting } = getPlatform();
-      if (noteIndex || handwriting) {
-        const path = await this.getStoredAbsolutePath(nodeId);
-        if (path) {
-          noteIndex?.requestReindex(nodeId, path, candidateFileType);
-          handwriting?.requestRecognize(nodeId, path, candidateFileType);
-        }
-      }
-    }
   }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
@@ -402,51 +374,24 @@ export abstract class BaseRepository
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifest();
-    const noteIndex = getPlatform().noteIndex;
-    // Semantic search needs the index capability; fall back to name search.
-    if (options.mode === 'semantic' && query.trim() && noteIndex) {
-      const queryEmbedding = await noteIndex.embedSearchQuery(query);
-      const limit = options.limit ?? DEFAULT_SEMANTIC_SEARCH_LIMIT;
-      return searchNodeResultsSemantically(
-        manifest,
-        query,
-        queryEmbedding,
-        noteIndex.getContent(),
-        noteIndex.getEmbeddings(),
-      ).slice(0, limit);
-    }
-    const content = noteIndex?.getContent() ?? EMPTY_CONTENT;
-    const index = this.getNodeSearchIndex(
-      manifest,
-      content,
-      noteIndex ? noteIndex.contentRevision() : 0,
-    );
-    return searchNodeResults(manifest, query, content, index).slice(
-      0,
-      options.limit,
-    );
+    const index = this.getNodeSearchIndex(manifest);
+    return searchNodeResults(manifest, query, index).slice(0, options.limit);
   }
 
-  // Rebuilt only when the searchable corpus (manifest nodes or indexed content) has changed.
-  private getNodeSearchIndex(
-    manifest: VFSManifest,
-    content: ReadonlyMap<VFSNodeId, string>,
-    contentRevision: number,
-  ): SearchIndex<VFSNode> {
+  // Rebuilt only when the manifest changes.
+  private getNodeSearchIndex(manifest: VFSManifest): SearchIndex<VFSNode> {
     const cache = this.nodeSearchCache;
     if (
       cache &&
       cache.manifest === manifest &&
-      cache.dataVersion === this.runtimeStatus.dataVersion &&
-      cache.contentRevision === contentRevision
+      cache.dataVersion === this.runtimeStatus.dataVersion
     ) {
       return cache.index;
     }
-    const index = createNodeSearchIndex(manifest, content);
+    const index = createNodeSearchIndex(manifest);
     this.nodeSearchCache = {
       manifest,
       dataVersion: this.runtimeStatus.dataVersion,
-      contentRevision,
       index,
     };
     return index;
@@ -455,18 +400,6 @@ export abstract class BaseRepository
   async getNodesByName(name: string): Promise<VFSNode[]> {
     const { manifest } = await this.loadManifest();
     return getNodesByExactName(manifest, name);
-  }
-
-  async listIndexBackfillItems(): Promise<ReindexItem[]> {
-    const { manifest } = await this.loadManifest();
-    const items: ReindexItem[] = [];
-    for (const node of getIndexCandidateFileNodes(manifest)) {
-      const path = await this.getStoredAbsolutePath(node.id);
-      if (path) {
-        items.push({ nodeId: node.id, path, fileType: node.fileType });
-      }
-    }
-    return items;
   }
 
   async getNodesByAnyTag(
@@ -546,9 +479,6 @@ export abstract class BaseRepository
       );
       addChild(manifest, parentId, id);
     });
-    if (options?.skipNextIndexing) {
-      this.skipNextIndexingNodeIds.add(id);
-    }
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
     }
@@ -675,7 +605,6 @@ export abstract class BaseRepository
   }
 
   async deleteNode(nodeId: string): Promise<void> {
-    this.skipNextIndexingNodeIds.delete(nodeId);
     const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
       deleteNodeFromManifest(manifest, nodeId),
     );
@@ -684,14 +613,8 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
-        await getPlatform().noteIndex?.removeIndex(file.id);
-        await getPlatform().handwriting?.removeRecognition(file.id);
       }),
     );
-
-    for (const file of deletedFiles) {
-      this.skipNextIndexingNodeIds.delete(file.id);
-    }
 
     emitNodesDeleted(deletedFiles.map((file) => file.id));
   }

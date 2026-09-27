@@ -51,7 +51,6 @@
     "targets": ["app", "dmg", "appimage", "nsis"],
     "createUpdaterArtifacts": true,
     "resources": {
-      "resources/embedding-models/": "embedding-models/",
       "resources/scribble-models/": "scribble-models/",
       "resources/LICENSES/": "LICENSES/"
     },

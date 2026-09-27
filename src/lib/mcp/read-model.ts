@@ -403,8 +403,7 @@ function summarizeStrokeGroup(
 
   return {
     kind: 'stroke-group',
-    // Ink carries no text of its own; recognition first, pixels as the fallback.
-    reader: 'read_handwriting',
+    reader: 'screenshot_canvas',
     count: boxes.length,
     bounds: roundBounds({
       x: minX,
@@ -459,10 +458,7 @@ function summarizeElement(
   return summarizeUnknown(yMap);
 }
 
-function noteReadModelFromLoaded(
-  loaded: LoadedMcpNote,
-  options: { indexedText?: string | null } = {},
-): McpNoteReadModel {
+function noteReadModelFromLoaded(loaded: LoadedMcpNote): McpNoteReadModel {
   const elements: McpNoteElementSummary[] = [];
   const strokeBoxes: [number, number, number, number][] = [];
   // Where the first stroke sat, so the collapsed group keeps document order.
@@ -489,7 +485,6 @@ function noteReadModelFromLoaded(
 
   return {
     note: loaded.metadata,
-    indexedText: options.indexedText ?? null,
     elements,
   };
 }
@@ -497,12 +492,8 @@ function noteReadModelFromLoaded(
 export async function buildMcpNoteReadModel(
   repository: ReadableRepository,
   noteId: VFSNodeId,
-  options: { indexedText?: string | null } = {},
 ): Promise<McpNoteReadModel> {
-  return noteReadModelFromLoaded(
-    await loadMcpNote(repository, noteId),
-    options,
-  );
+  return noteReadModelFromLoaded(await loadMcpNote(repository, noteId));
 }
 
 function pageFrameContentFromYMap(
@@ -657,10 +648,9 @@ export async function readMcpPdf(
 export async function readMcpNoteFull(
   repository: ReadableRepository,
   noteId: VFSNodeId,
-  options: { indexedText?: string | null } = {},
 ): Promise<McpNoteFullReadModel> {
   const loaded = await loadMcpNote(repository, noteId);
-  const note = noteReadModelFromLoaded(loaded, options);
+  const note = noteReadModelFromLoaded(loaded);
 
   // Index every element yMap once so the per-element content builders below
   // don't each re-scan ydoc.elements (which would be O(elements²)).

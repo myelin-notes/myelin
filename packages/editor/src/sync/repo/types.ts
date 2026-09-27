@@ -1,4 +1,3 @@
-import type { ReindexItem } from '../../platform';
 import type { VFSNodeId } from '../types';
 import type { FileType } from './file-types';
 
@@ -68,8 +67,6 @@ export type VFSSystemMetadata =
 
 export interface CreateFileOptions {
   system?: VFSSystemMetadata;
-  /** Skip indexing the first successful content save for this file. */
-  skipNextIndexing?: boolean;
 }
 
 export interface FileVersion {
@@ -127,11 +124,9 @@ export interface NodeSearchResult {
   contentSnippet: string | null;
   /** Lowercased document terms that matched the query, for highlighting. */
   matchedTerms: string[];
-  searchMode?: 'lexical' | 'semantic';
 }
 
 export interface SearchNodesOptions {
-  mode?: 'lexical' | 'semantic';
   limit?: number;
 }
 
@@ -159,8 +154,6 @@ export interface Repository {
    * search, so it must not pay to rebuild a MiniSearch index on every document change.
    */
   getNodesByName(name: string): Promise<VFSNode[]>;
-  /** Candidate notes for the content-index startup backfill. */
-  listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(
     tags: string[],
     folderId?: VFSNodeId | null,

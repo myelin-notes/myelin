@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
-import { getPlatform } from '@myelin/editor/platform';
 import { LocalRepository } from '@/lib/sync/repo/local';
 import {
   getRepositoryTestStorage,
@@ -153,14 +152,6 @@ describe('Goodnotes ZIP import', () => {
       { type: 'application/zip' },
     );
     const scanned = await readGoodnotesZipEntries(zipFile);
-    const noteIndex = getPlatform().noteIndex;
-    const handwriting = getPlatform().handwriting;
-    if (!noteIndex || !handwriting) {
-      throw new Error('fake platform indexing services are required');
-    }
-    const reindex = vi.spyOn(noteIndex, 'requestReindex');
-    const recognize = vi.spyOn(handwriting, 'requestRecognize');
-
     const result = await importGoodnotesZip({
       scanned,
       repository,
@@ -173,8 +164,6 @@ describe('Goodnotes ZIP import', () => {
     expect(scanned.pdfEntries.every((entry) => entry.bytes.length === 0)).toBe(
       true,
     );
-    expect(reindex).not.toHaveBeenCalled();
-    expect(recognize).not.toHaveBeenCalled();
 
     const [rootFolders] = await repository.listDirectory(null);
     expect(rootFolders.map((folder) => folder.name)).toEqual(['Math']);

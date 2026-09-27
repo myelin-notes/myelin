@@ -24,7 +24,6 @@ import {
 } from '@/lib/sync';
 import {
   ExplorerModel,
-  type ExplorerSearchMode,
   type ExplorerSortMode,
   sortExplorerNodes,
 } from './explorer-model';
@@ -52,7 +51,6 @@ export interface ExplorerTreeHandle {
 
 export type SortMode = ExplorerSortMode;
 export type ViewMode = 'tree' | 'grid';
-export type SearchMode = ExplorerSearchMode;
 
 interface ExplorerTreeProps {
   ref?: React.Ref<ExplorerTreeHandle>;
@@ -64,7 +62,6 @@ interface ExplorerTreeProps {
   sortMode?: SortMode;
   viewMode?: ViewMode;
   searchQuery?: string;
-  searchMode?: SearchMode;
   filterTags?: string[];
   onCreateCanvas?: () => void;
 }
@@ -78,7 +75,6 @@ export function ExplorerTree({
   sortMode = 'name-asc',
   viewMode = 'tree',
   searchQuery,
-  searchMode = 'lexical',
   filterTags,
   onCreateCanvas,
 }: ExplorerTreeProps) {
@@ -113,7 +109,6 @@ export function ExplorerTree({
       const result = await explorer.refresh({
         folderId: currentFolderId,
         searchQuery: searchQuery ?? '',
-        searchMode,
         filterTags: filterTags ?? [],
       });
       if (!result) {
@@ -137,7 +132,6 @@ export function ExplorerTree({
     isFiltering,
     isSearching,
     repositorySetupState,
-    searchMode,
     searchQuery,
   ]);
   const reloadNow = useEffectEvent(() => {

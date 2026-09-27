@@ -1,7 +1,6 @@
 import { useEffect, useEffectEvent } from 'react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
-import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -73,8 +72,6 @@ export function McpRuntime() {
   const handleToolCall = useEffectEvent((payload: McpBridgeToolCallPayload) => {
     const service = new McpToolService({
       repository,
-      indexedTextByNode: getPlatform().noteIndex?.getContent() ?? new Map(),
-      handwriting: getPlatform().handwriting,
       allowDirectWrites: () => allowDirectWrites,
     });
     trackEvent('mcp_tool_called', { tool_name: payload.toolName });
