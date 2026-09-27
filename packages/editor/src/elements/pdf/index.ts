@@ -412,7 +412,7 @@ export class PdfElement
       contentWidth,
       zoom,
     });
-    const coveringBounds = this.getCoveringBounds();
+    const coveringBounds = this.getCoveringBounds(viewport);
     this._chrome?.sync({
       screenX,
       screenY,
@@ -465,16 +465,25 @@ export class PdfElement
     this.chromeController.setZIndex(zIndex);
   }
 
-  private getCoveringBounds(): DOMRect[] {
+  private getCoveringBounds(viewport: CanvasViewport): DOMRect[] {
     const elements = this._exportElementsProvider?.();
     const elementIndex = elements?.indexOf(this) ?? -1;
     if (!elements || elementIndex < 0) {
       return [];
     }
+    const viewRect = viewport.getWorldRect();
     const bounds: DOMRect[] = [];
     for (let i = elementIndex + 1; i < elements.length; i++) {
       if (!elements[i].hidden) {
-        bounds.push(elements[i].boundingBox);
+        const box = elements[i].boundingBox;
+        if (
+          box.left < viewRect.right &&
+          box.right > viewRect.left &&
+          box.top < viewRect.bottom &&
+          box.bottom > viewRect.top
+        ) {
+          bounds.push(box);
+        }
       }
     }
     return bounds;
