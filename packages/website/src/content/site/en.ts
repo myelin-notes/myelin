@@ -90,11 +90,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Record it. Find it.\nEven your handwriting.',
+    heading: 'Record it. Transcribe it.\nFind it on the canvas.',
     audioBody:
-      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so every recording is searchable and no audio leaves your machine.',
+      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
-      'Everything stays local on your machine, with optional sync and collaboration when you need it.',
+      'Search your library by note title and tags. Within an open canvas, find text and audio transcripts.',
     // Content of the mock app cards standing in for real screenshots
     // (see world-layer.tsx).
     audioMock: {
@@ -106,22 +106,17 @@ for step in range(3):
       match: 'myelin sheath',
     },
     searchMock: {
-      query: 'node of ranvier',
+      query: 'Lecture 12',
       results: [
         {
           kind: 'page',
           title: 'Lecture 12 · Action potentials',
-          snippet: '…the signal jumps between nodes of Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Whiteboard · myelination sketch',
-          snippet: 'Handwriting match, OCR on-device',
+          snippet: 'Canvas note',
         },
         {
           kind: 'audio',
           title: 'Recording · Lecture 12',
-          snippet: 'Transcript match at 31:42',
+          snippet: 'Canvas note',
         },
       ],
     },

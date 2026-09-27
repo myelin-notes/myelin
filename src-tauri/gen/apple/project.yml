@@ -31,6 +31,9 @@ targets:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
+        excludes:
+          - "**/*.a"
+        buildPhase: none
       - path: myelin_iOS
       - path: assets
         buildPhase: resources

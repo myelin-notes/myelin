@@ -179,7 +179,6 @@ export async function importGoodnotesZip({
             repository,
             parentId: getImportParentId(parentId, folderIds, entry.folderPath),
             fallbackTitle,
-            skipIndexing: true,
           });
         } finally {
           entry.bytes = new Uint8Array();
