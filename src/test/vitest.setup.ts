@@ -99,6 +99,7 @@ vi.mock('@/lib/sync/repo/google-drive-credentials', () => ({
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => path,
+  isTauri: () => false,
 }));
 
 vi.mock('@tauri-apps/api/path', async () => {

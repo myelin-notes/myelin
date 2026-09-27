@@ -1,4 +1,5 @@
 import { Logger } from '@myelin/shared/logger';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -215,6 +216,33 @@ export class LocalRepository extends BaseRepository {
       // One large Tauri IPC payload blocked the renderer for ~3s in the canvas trace.
       if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
         await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+      } else if (isTauri()) {
+        // FileHandle.write wraps each byte array in JSON; raw IPC keeps each bounded chunk binary.
+        for (
+          let offset = 0;
+          offset < bytes.byteLength;
+          offset += MAX_IPC_WRITE_BYTES
+        ) {
+          await invoke(
+            'write_local_file_chunk',
+            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+            {
+              headers: {
+                'x-relative-path': filePath,
+                'x-offset': String(offset),
+              },
+            },
+          );
+          if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
+            await new Promise<void>((resolve) => {
+              if (document.visibilityState === 'visible') {
+                requestAnimationFrame(() => setTimeout(resolve, 0));
+              } else {
+                setTimeout(resolve, 0);
+              }
+            });
+          }
+        }
       } else {
         const file = await open(filePath, {
           write: true,
