@@ -128,6 +128,17 @@ fn push_batch_to_url(
     let _lock = GIT_PUSH_LOCK
         .lock()
         .map_err(|_| "Git push lock unavailable")?;
+    #[cfg(any(target_os = "android", test))]
+    {
+        let cert_path = stage.with_file_name("cacert.pem");
+        std::fs::write(&cert_path, include_bytes!("../resources/cacert.pem"))
+            .map_err(|_| "Git CA bundle unavailable")?;
+        if cfg!(target_os = "android") {
+            // All Git network operations in this app use GIT_PUSH_LOCK.
+            unsafe { git2::opts::set_ssl_cert_file(cert_path.as_path()) }
+                .map_err(|_| "Git TLS certificates unavailable")?;
+        }
+    }
     let token = request.token;
     let mut fetch_callbacks = RemoteCallbacks::new();
     fetch_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
@@ -374,6 +385,10 @@ mod tests {
         )
         .expect("push succeeds");
         assert_eq!(result.status, "pushed");
+        assert_eq!(
+            fs::read(root.join("cacert.pem")).expect("Git CA bundle"),
+            include_bytes!("../resources/cacert.pem")
+        );
         let pushed = git2::Repository::open_bare(&bare_path).expect("pushed repository");
         let pushed_head = pushed
             .find_reference("refs/heads/main")
