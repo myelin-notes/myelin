@@ -29,6 +29,14 @@ import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 const logger = new Logger('LocalRepository');
 const MAX_IPC_WRITE_BYTES = 64 * 1024;
 
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
 // Deliberately just the byte count. This used to run canvas bytes through `summarizeNoteBytes`,
 // which decodes the whole note into a throwaway Y.Doc — on both the read and the write of every
 // save, on the thread that has to paint the next ink frame.
@@ -217,22 +225,19 @@ export class LocalRepository extends BaseRepository {
       if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
         await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
       } else if (isTauri()) {
-        // FileHandle.write wraps each byte array in JSON; raw IPC keeps each bounded chunk binary.
+        // Android has no raw IPC body; base64 is smaller than FileHandle.write's JSON byte array.
         for (
           let offset = 0;
           offset < bytes.byteLength;
           offset += MAX_IPC_WRITE_BYTES
         ) {
-          await invoke(
-            'write_local_file_chunk',
-            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
-            {
-              headers: {
-                'x-relative-path': filePath,
-                'x-offset': String(offset),
-              },
-            },
-          );
+          await invoke('write_local_file_chunk', {
+            relativePath: filePath,
+            offset,
+            bytesBase64: encodeBase64(
+              bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+            ),
+          });
           if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
             await new Promise<void>((resolve) => {
               if (document.visibilityState === 'visible') {
