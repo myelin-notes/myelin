@@ -61,7 +61,13 @@ describe('PdfPageRenderScheduler', () => {
     scheduler.request(params);
     expect(render).not.toHaveBeenCalled();
     expect(visibleCanvas).toMatchObject({ width: 100, height: 200 });
-    vi.advanceTimersByTime(120);
+    const pending = surface.pendingRender;
+    vi.advanceTimersByTime(60);
+    scheduler.request({ ...params, fastScroll: true });
+    expect(surface.pendingRender).toBe(pending);
+    vi.advanceTimersByTime(60);
+    expect(render).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(60);
     expect(visibleCanvas).toMatchObject({ width: 100, height: 200 });
     await Promise.resolve();
     await Promise.resolve();
