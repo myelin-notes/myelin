@@ -101,7 +101,6 @@ describe('CanvasSessionController', () => {
       { current: {} as HTMLCanvasElement },
       { current: null },
       { current: null },
-      { current: null },
       drawableCanvasRef,
       { current: [] },
       '',
