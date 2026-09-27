@@ -350,7 +350,7 @@ export class StrokeElement extends DrawableElement {
 
     ctx.fillStyle = resolveInkColor(this.style.color);
     if (ctx instanceof WebGLPainter) {
-      ctx.fillPath(this.gpuPath);
+      ctx.fillPath(this.gpuPath, `stroke:${this.uuid}`);
     } else {
       ctx.fill(this.cachedPath);
     }

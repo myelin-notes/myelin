@@ -23,6 +23,14 @@ interface Mesh {
   count: number;
   origin: Point;
   lastFrame: number;
+  path?: RenderPath;
+}
+
+interface PendingMesh {
+  submitted: RenderPath | null;
+  requestId: number;
+  lastFrame: number;
+  ready?: { path: RenderPath; vertices: Float32Array; origin: Point };
 }
 
 interface ImageTexture {
@@ -62,6 +70,8 @@ void main() {
   color = sampleColor * u_alpha;
 }`;
 
+const ASYNC_PATH_POINTS = 1024;
+
 function initialState(): PaintState {
   return {
     fillStyle: '#000000',
@@ -83,6 +93,11 @@ export class WebGLPainter {
   private readonly stack: PaintState[] = [];
   private path = new RenderPath();
   private readonly meshes = new Map<RenderPath | string, Mesh>();
+  private readonly pendingMeshes = new Map<RenderPath | string, PendingMesh>();
+  private readonly pendingRequests = new Map<number, RenderPath | string>();
+  private worker: Worker | null = null;
+  private workerFailed = false;
+  private nextRequestId = 0;
   private readonly textures = new Map<ImageBitmap, ImageTexture>();
   private fillProgram!: Program;
   private imageProgram!: Program;
@@ -160,6 +175,8 @@ export class WebGLPainter {
     if (this.generation !== surface.generation) {
       this.hasContents = false;
       this.meshes.clear();
+      this.pendingMeshes.clear();
+      this.pendingRequests.clear();
       this.textures.clear();
       this.fillProgram = surface.program(VERTEX, FILL, [
         'u_size',
@@ -194,9 +211,15 @@ export class WebGLPainter {
     }
     const gl = this.surface.gl;
     for (const [key, mesh] of this.meshes) {
-      if (this.frame - mesh.lastFrame > (typeof key === 'string' ? 2 : 120)) {
+      if (this.frame - mesh.lastFrame > (mesh.path ? 120 : 2)) {
         gl.deleteBuffer(mesh.buffer);
         this.meshes.delete(key);
+      }
+    }
+    for (const [key, pending] of this.pendingMeshes) {
+      if (this.frame - pending.lastFrame > 120) {
+        this.pendingRequests.delete(pending.requestId);
+        this.pendingMeshes.delete(key);
       }
     }
     for (const [key, texture] of this.textures) {
@@ -277,9 +300,57 @@ export class WebGLPainter {
     this.drawPath(this.path, JSON.stringify(this.path.contours), false);
   }
 
-  /** Treat the supplied path as immutable; a changed stroke must supply a new path. */
-  fillPath(path: RenderPath): void {
-    this.drawPath(path, path, false);
+  /** Treat the supplied path as immutable; key identifies successive versions of one stroke. */
+  fillPath(path: RenderPath, key: RenderPath | string = path): void {
+    let mesh = this.meshes.get(key);
+    if (mesh?.path === path) {
+      const pending = this.pendingMeshes.get(key);
+      if (pending) {
+        this.pendingRequests.delete(pending.requestId);
+        this.pendingMeshes.delete(key);
+      }
+      this.paintMesh(mesh, false);
+      return;
+    }
+    const large = path.contours.some(
+      (contour) => contour.points.length >= ASYNC_PATH_POINTS,
+    );
+    if (!large || this.workerFailed || typeof Worker === 'undefined') {
+      const pending = this.pendingMeshes.get(key);
+      if (pending) {
+        this.pendingRequests.delete(pending.requestId);
+      }
+      this.pendingMeshes.delete(key);
+      this.drawPath(path, key, false, true);
+      return;
+    }
+
+    let pending = this.pendingMeshes.get(key);
+    if (!pending) {
+      pending = {
+        submitted: null,
+        requestId: 0,
+        lastFrame: this.frame,
+      };
+      this.pendingMeshes.set(key, pending);
+    }
+    pending.lastFrame = this.frame;
+    if (pending.ready) {
+      const ready = pending.ready;
+      pending.ready = undefined;
+      mesh = this.uploadMesh(key, ready.path, ready.vertices, ready.origin);
+    }
+    if (mesh?.path === path) {
+      this.pendingMeshes.delete(key);
+      this.paintMesh(mesh, false);
+      return;
+    }
+    if (!pending.submitted) {
+      this.queueTessellation(key, path, pending);
+    }
+    if (mesh) {
+      this.paintMesh(mesh, false);
+    }
   }
 
   stroke(): void {
@@ -298,9 +369,15 @@ export class WebGLPainter {
     path: RenderPath,
     key: RenderPath | string,
     stroke: boolean,
+    replace = false,
   ): void {
     const gl = this.surface.gl;
     let mesh = this.meshes.get(key);
+    if (mesh && replace) {
+      gl.deleteBuffer(mesh.buffer);
+      this.meshes.delete(key);
+      mesh = undefined;
+    }
     if (!mesh) {
       const contours = stroke
         ? strokeContours(path.contours, {
@@ -318,17 +395,45 @@ export class WebGLPainter {
         localVertices[i] = vertices[i] - origin.x;
         localVertices[i + 1] = vertices[i + 1] - origin.y;
       }
-      const buffer = gl.createBuffer()!;
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      gl.bufferData(gl.ARRAY_BUFFER, localVertices, gl.STATIC_DRAW);
-      mesh = {
-        buffer,
-        count: localVertices.length / 2,
+      mesh = this.uploadMesh(
+        key,
+        path,
+        localVertices,
         origin,
-        lastFrame: this.frame,
-      };
-      this.meshes.set(key, mesh);
+        key instanceof RenderPath || replace,
+      );
     }
+    this.paintMesh(mesh, stroke);
+  }
+
+  private uploadMesh(
+    key: RenderPath | string,
+    path: RenderPath,
+    vertices: Float32Array,
+    origin: Point,
+    persistent = true,
+  ): Mesh {
+    const gl = this.surface.gl;
+    const previous = this.meshes.get(key);
+    if (previous) {
+      gl.deleteBuffer(previous.buffer);
+    }
+    const buffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+    const mesh = {
+      buffer,
+      count: vertices.length / 2,
+      origin,
+      lastFrame: this.frame,
+      path: persistent ? path : undefined,
+    };
+    this.meshes.set(key, mesh);
+    return mesh;
+  }
+
+  private paintMesh(mesh: Mesh, stroke: boolean): void {
+    const gl = this.surface.gl;
     mesh.lastFrame = this.frame;
     if (!mesh.count) {
       return;
@@ -349,6 +454,59 @@ export class WebGLPainter {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.disableVertexAttribArray(1);
     gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+  }
+
+  private queueTessellation(
+    key: RenderPath | string,
+    path: RenderPath,
+    pending: PendingMesh,
+  ): void {
+    if (!this.worker) {
+      this.worker = new Worker(
+        new URL('./tessellate.worker.ts', import.meta.url),
+        { type: 'module' },
+      );
+      this.worker.onmessage = (
+        event: MessageEvent<{
+          requestId: number;
+          vertices: Float32Array;
+          origin: Point;
+        }>,
+      ) => {
+        const key = this.pendingRequests.get(event.data.requestId);
+        if (key === undefined) {
+          return;
+        }
+        this.pendingRequests.delete(event.data.requestId);
+        const item = this.pendingMeshes.get(key);
+        if (item?.requestId === event.data.requestId) {
+          item.ready = { ...event.data, path: item.submitted! };
+          item.submitted = null;
+        }
+      };
+      this.worker.onerror = () => {
+        this.worker?.terminate();
+        this.worker = null;
+        this.workerFailed = true;
+        this.pendingMeshes.clear();
+        this.pendingRequests.clear();
+      };
+    }
+    pending.submitted = path;
+    pending.requestId = ++this.nextRequestId;
+    this.pendingRequests.set(pending.requestId, key);
+    const contours = path.contours.map((contour) => {
+      const coords = new Float64Array(contour.points.length * 2);
+      contour.points.forEach((point, index) => {
+        coords[index * 2] = point.x;
+        coords[index * 2 + 1] = point.y;
+      });
+      return coords;
+    });
+    this.worker.postMessage(
+      { requestId: pending.requestId, contours },
+      contours.map((contour) => contour.buffer),
+    );
   }
 
   drawImage(image: ImageBitmap, dx: number, dy: number): void;
@@ -467,6 +625,9 @@ export class WebGLPainter {
   }
 
   destroy(): void {
+    this.worker?.terminate();
+    this.pendingMeshes.clear();
+    this.pendingRequests.clear();
     const gl = this.surface.gl;
     for (const mesh of this.meshes.values()) {
       gl.deleteBuffer(mesh.buffer);

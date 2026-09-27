@@ -241,4 +241,81 @@ describe('WebGLPainter resource lifecycle', () => {
     expect(Math.abs(transform[3])).toBeLessThanOrEqual(10);
     painter.destroy();
   });
+
+  it('tessellates large strokes off the drawing thread and retains the old mesh while editing', () => {
+    class FakeWorker {
+      postMessage = vi.fn();
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      terminate = vi.fn();
+      constructor() {
+        workers.push(this);
+      }
+    }
+    const workers: FakeWorker[] = [];
+    vi.stubGlobal('Worker', FakeWorker);
+    try {
+      const { gl, painter } = createSurface();
+      const small = new RenderPath();
+      small.rect(0, 0, 10, 10);
+      const large = (offset: number) => {
+        const path = new RenderPath();
+        path.moveTo(offset, 0);
+        for (let i = 1; i < 1100; i++) {
+          path.lineTo(offset + i, i % 2);
+        }
+        path.closePath();
+        return path;
+      };
+      const first = large(0);
+      const latest = large(10);
+
+      painter.beginFrame(800, 600, 1);
+      painter.fillPath(small, 'stroke:test');
+      painter.endFrame();
+      painter.beginFrame(800, 600, 1);
+      painter.fillPath(first, 'stroke:test');
+      painter.fillPath(latest, 'stroke:test');
+      painter.endFrame();
+      expect(gl.bufferData).toHaveBeenCalledTimes(1);
+      expect(gl.drawArrays).toHaveBeenCalledTimes(3);
+      expect(workers[0].postMessage).toHaveBeenCalledTimes(1);
+      const firstRequest = workers[0].postMessage.mock.calls[0][0];
+      expect(firstRequest.contours[0]).toBeInstanceOf(Float64Array);
+
+      workers[0].onmessage?.({
+        data: {
+          requestId: firstRequest.requestId,
+          vertices: new Float32Array([0, 0, 1, 0, 0, 1]),
+          origin: { x: 0, y: 0 },
+        },
+      } as MessageEvent);
+      painter.beginFrame(800, 600, 1);
+      painter.fillPath(latest, 'stroke:test');
+      painter.endFrame();
+      expect(workers[0].postMessage).toHaveBeenCalledTimes(2);
+      expect(gl.bufferData).toHaveBeenCalledTimes(2);
+
+      const latestRequest = workers[0].postMessage.mock.calls[1][0];
+      workers[0].onmessage?.({
+        data: {
+          requestId: latestRequest.requestId,
+          vertices: new Float32Array([0, 0, 2, 0, 0, 2]),
+          origin: { x: 10, y: 0 },
+        },
+      } as MessageEvent);
+      painter.beginFrame(800, 600, 1);
+      painter.fillPath(latest, 'stroke:test');
+      painter.endFrame();
+      expect(gl.bufferData).toHaveBeenCalledTimes(3);
+      expect(gl.deleteBuffer).toHaveBeenCalledTimes(2);
+      expect(gl.uniform4fv).toHaveBeenLastCalledWith(
+        'u_transform',
+        [1, 1, 10, 0],
+      );
+      painter.destroy();
+      expect(workers[0].terminate).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
