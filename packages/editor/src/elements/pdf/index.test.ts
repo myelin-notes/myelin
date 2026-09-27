@@ -129,21 +129,28 @@ describe('PdfElement', () => {
     let reads = 0;
     const upper = {
       hidden: false,
+      intersectsWorldRect: () => true,
       get boundingBox(): DOMRect {
         reads++;
         return new DOMRect(10, 10, 20, 20);
       },
-    } as DrawableElement;
+    } as unknown as DrawableElement;
     const hidden = {
       hidden: true,
+      intersectsWorldRect: () => {
+        throw new Error('hidden elements should not be tested');
+      },
       get boundingBox(): DOMRect {
         throw new Error('hidden bounds should not be read');
       },
-    } as DrawableElement;
+    } as unknown as DrawableElement;
     const offscreen = {
       hidden: false,
-      boundingBox: new DOMRect(1000, 1000, 20, 20),
-    } as DrawableElement;
+      intersectsWorldRect: () => false,
+      get boundingBox(): DOMRect {
+        throw new Error('offscreen bounds should not be read');
+      },
+    } as unknown as DrawableElement;
     pdf.setExportElementsProvider(() => [upper, pdf, upper, offscreen, hidden]);
 
     const coverage = pdf as unknown as {
