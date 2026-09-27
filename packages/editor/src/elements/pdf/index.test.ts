@@ -8,6 +8,7 @@ import {
   type Mock,
   vi,
 } from 'vitest';
+import type { CanvasViewport } from '../../canvas-viewport';
 import {
   getPdfDocumentPageSizes,
   openPdfDocument,
@@ -16,6 +17,7 @@ import {
   renderPdfPageToCanvas,
 } from '../../pdf-renderer';
 import { LOCAL_ORIGIN, YDocManager } from '../../ydoc-manager';
+import type { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { PAGE_GAP } from '../page-frame-constants';
 import { PdfElement } from './index';
@@ -122,6 +124,49 @@ afterEach(() => {
 });
 
 describe('PdfElement', () => {
+  it('reads later visible element bounds once for all chrome buttons', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    let reads = 0;
+    const upper = {
+      hidden: false,
+      get boundingBox(): DOMRect {
+        reads++;
+        return new DOMRect(10, 10, 20, 20);
+      },
+    } as DrawableElement;
+    const hidden = {
+      hidden: true,
+      get boundingBox(): DOMRect {
+        throw new Error('hidden bounds should not be read');
+      },
+    } as DrawableElement;
+    pdf.setExportElementsProvider(() => [upper, pdf, upper, hidden]);
+
+    const coverage = pdf as unknown as {
+      getCoveringBounds(): DOMRect[];
+      isChromeButtonCovered(
+        x: number,
+        y: number,
+        size: number,
+        viewport: CanvasViewport,
+        bounds: readonly DOMRect[],
+      ): boolean;
+    };
+    const bounds = coverage.getCoveringBounds();
+    const viewport = {
+      offset: { x: 0, y: 0 },
+      zoom: 1,
+    } as CanvasViewport;
+    expect(reads).toBe(1);
+    expect(coverage.isChromeButtonCovered(20, 20, 10, viewport, bounds)).toBe(
+      true,
+    );
+    expect(coverage.isChromeButtonCovered(100, 100, 10, viewport, bounds)).toBe(
+      false,
+    );
+    expect(reads).toBe(1);
+  });
+
   it('does not dirty stored metadata that matches the opened PDF', async () => {
     const ydoc = new YDocManager();
     const pageSizes = [{ w: 612, h: 792 }];

@@ -412,6 +412,7 @@ export class PdfElement
       contentWidth,
       zoom,
     });
+    const coveringBounds = this.getCoveringBounds();
     this._chrome?.sync({
       screenX,
       screenY,
@@ -423,6 +424,7 @@ export class PdfElement
         menuRect.top + menuRect.size / 2,
         menuRect.size,
         viewport,
+        coveringBounds,
       ),
     });
     const rasterZoom = quantizeRasterZoom(zoom);
@@ -448,7 +450,13 @@ export class PdfElement
       pageLayout: this.model.pageLayout,
       layout,
       isCovered: (screenX, screenY, size) =>
-        this.isChromeButtonCovered(screenX, screenY, size, viewport),
+        this.isChromeButtonCovered(
+          screenX,
+          screenY,
+          size,
+          viewport,
+          coveringBounds,
+        ),
     });
   }
 
@@ -457,30 +465,33 @@ export class PdfElement
     this.chromeController.setZIndex(zIndex);
   }
 
+  private getCoveringBounds(): DOMRect[] {
+    const elements = this._exportElementsProvider?.();
+    const elementIndex = elements?.indexOf(this) ?? -1;
+    if (!elements || elementIndex < 0) {
+      return [];
+    }
+    const bounds: DOMRect[] = [];
+    for (let i = elementIndex + 1; i < elements.length; i++) {
+      if (!elements[i].hidden) {
+        bounds.push(elements[i].boundingBox);
+      }
+    }
+    return bounds;
+  }
+
   private isChromeButtonCovered(
     screenX: number,
     screenY: number,
     size: number,
     viewport: CanvasViewport,
+    coveringBounds: readonly DOMRect[],
   ): boolean {
-    const elements = this._exportElementsProvider?.();
-    if (!elements) {
-      return false;
-    }
-    const elementIndex = elements.indexOf(this);
-    if (elementIndex < 0) {
-      return false;
-    }
     const left = screenX - size / 2;
     const top = screenY - size / 2;
     const right = left + size;
     const bottom = top + size;
-    for (let i = elementIndex + 1; i < elements.length; i++) {
-      const element = elements[i];
-      if (element.hidden) {
-        continue;
-      }
-      const bounds = element.boundingBox;
+    for (const bounds of coveringBounds) {
       const elementLeft = (bounds.left + viewport.offset.x) * viewport.zoom;
       const elementTop = (bounds.top + viewport.offset.y) * viewport.zoom;
       const elementRight = elementLeft + bounds.width * viewport.zoom;
