@@ -492,6 +492,46 @@ describe('LocalRepository', () => {
     expect(storage.readBinary(storedPath)).toBeNull();
   });
 
+  it('writes large files in bounded IPC chunks', async () => {
+    const repository = new LocalRepository('repositories/chunked-write-test');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+    const storage = getRepositoryTestStorage();
+    const open = storage.open.bind(storage);
+    const writeSizes: number[] = [];
+    const openSpy = vi
+      .spyOn(storage, 'open')
+      .mockImplementation(async (path, options) => {
+        const file = await open(path, options);
+        return {
+          ...file,
+          write: async (data) => {
+            writeSizes.push(data.byteLength);
+            return file.write(data);
+          },
+        };
+      });
+    const bytes = new Uint8Array(128 * 1024 + 17).fill(7);
+
+    await repository.writeFileBytes(fileId, bytes);
+
+    expect(writeSizes).toEqual([64 * 1024, 64 * 1024, 17]);
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ truncate: true }),
+    );
+    expect(
+      storage.readBinary(
+        `repositories/chunked-write-test/files/${getStoredFileName({ id: fileId, fileType: 'png' })}`,
+      ),
+    ).toEqual(bytes);
+  });
+
   it('removes stored note bytes when a file is deleted', async () => {
     const repository = new LocalRepository('repositories/delete-test');
     await repository.initialize();

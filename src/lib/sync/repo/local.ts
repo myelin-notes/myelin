@@ -26,6 +26,7 @@ import {
 import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
+const MAX_IPC_WRITE_BYTES = 64 * 1024;
 
 // Deliberately just the byte count. This used to run canvas bytes through `summarizeNoteBytes`,
 // which decodes the whole note into a throwaway Y.Doc — on both the read and the write of every
@@ -211,7 +212,30 @@ export class LocalRepository extends BaseRepository {
         FILES_DIR,
         getStoredFileName(node),
       );
-      await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+      // One large Tauri IPC payload blocked the renderer for ~3s in the canvas trace.
+      if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
+        await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+      } else {
+        const file = await open(filePath, {
+          write: true,
+          create: true,
+          truncate: true,
+          baseDir: BaseDirectory.AppData,
+        });
+        try {
+          for (
+            let offset = 0;
+            offset < bytes.byteLength;
+            offset += MAX_IPC_WRITE_BYTES
+          ) {
+            await file.write(
+              bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+            );
+          }
+        } finally {
+          await file.close();
+        }
+      }
       const revision = await computeRevision(bytes);
       logger.debug('Saved local note bytes to disk', {
         nodeId,
