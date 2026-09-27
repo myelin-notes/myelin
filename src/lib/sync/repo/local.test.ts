@@ -540,8 +540,8 @@ describe('LocalRepository', () => {
     ).toEqual(bytes);
   });
 
-  it('sends large Tauri saves as raw chunks', async () => {
-    const repository = new LocalRepository('repositories/raw-chunk-test');
+  it('sends large Tauri saves as paced base64 chunks', async () => {
+    const repository = new LocalRepository('repositories/base64-chunk-test');
     await repository.initialize();
     const fileId = await repository.createFile(
       'Photo.png',
@@ -552,8 +552,7 @@ describe('LocalRepository', () => {
     const ipc = vi.fn(
       async (
         _cmd: string,
-        _chunk: Uint8Array,
-        _options: { headers: Record<string, string> },
+        _args: { relativePath: string; offset: number; bytesBase64: string },
       ) => {},
     );
     const frames: FrameRequestCallback[] = [];
@@ -564,7 +563,10 @@ describe('LocalRepository', () => {
       frames.push(callback);
       return frames.length;
     });
-    const bytes = new Uint8Array(128 * 1024 + 17).fill(7);
+    const bytes = Uint8Array.from(
+      { length: 128 * 1024 + 17 },
+      (_, index) => index % 251,
+    );
 
     try {
       const save = repository.writeFileBytes(fileId, bytes);
@@ -579,19 +581,24 @@ describe('LocalRepository', () => {
 
     expect(ipc).toHaveBeenCalledTimes(3);
     expect(
-      ipc.mock.calls.map(([, chunk, options]) => [
-        chunk.byteLength,
-        options.headers['x-offset'],
+      ipc.mock.calls.map(([, args]) => [
+        atob(args.bytesBase64).length,
+        args.offset,
       ]),
     ).toEqual([
-      [64 * 1024, '0'],
-      [64 * 1024, String(64 * 1024)],
-      [17, String(128 * 1024)],
+      [64 * 1024, 0],
+      [64 * 1024, 64 * 1024],
+      [17, 128 * 1024],
     ]);
     expect(ipc.mock.calls[0][0]).toBe('write_local_file_chunk');
-    expect(ipc.mock.calls[0][2].headers['x-relative-path']).toBe(
-      `repositories/raw-chunk-test/files/${fileId}.png`,
+    expect(ipc.mock.calls[0][1].relativePath).toBe(
+      `repositories/base64-chunk-test/files/${fileId}.png`,
     );
+    expect(
+      Uint8Array.from(atob(ipc.mock.calls[0][1].bytesBase64), (char) =>
+        char.charCodeAt(0),
+      ),
+    ).toEqual(bytes.subarray(0, 64 * 1024));
   });
 
   it('removes stored note bytes when a file is deleted', async () => {

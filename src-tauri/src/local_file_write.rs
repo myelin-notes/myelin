@@ -5,34 +5,24 @@ use std::{
     path::{Component, Path},
 };
 
-use tauri::{
-    ipc::{InvokeBody, Request},
-    AppHandle, Manager,
-};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use tauri::{AppHandle, Manager};
 
 #[tauri::command(async)]
-pub fn write_local_file_chunk(app: AppHandle, request: Request<'_>) -> Result<(), String> {
-    let relative_path = request
-        .headers()
-        .get("x-relative-path")
-        .and_then(|value| value.to_str().ok())
-        .ok_or("missing x-relative-path header")?;
-    let relative_path = Path::new(relative_path);
-    let offset: u64 = request
-        .headers()
-        .get("x-offset")
-        .and_then(|value| value.to_str().ok())
-        .ok_or("missing x-offset header")?
-        .parse()
-        .map_err(|_| "invalid x-offset header")?;
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err("expected raw file bytes".into());
-    };
+pub fn write_local_file_chunk(
+    app: AppHandle,
+    relative_path: String,
+    offset: u64,
+    bytes_base64: String,
+) -> Result<(), String> {
+    let bytes = STANDARD
+        .decode(bytes_base64)
+        .map_err(|error| error.to_string())?;
     let root = app
         .path()
         .app_data_dir()
         .map_err(|error| error.to_string())?;
-    write_chunk(&root, relative_path, offset, bytes)
+    write_chunk(&root, Path::new(&relative_path), offset, &bytes)
 }
 
 fn write_chunk(root: &Path, relative_path: &Path, offset: u64, bytes: &[u8]) -> Result<(), String> {
@@ -81,7 +71,7 @@ mod tests {
     use std::{fs, path::Path};
 
     #[test]
-    fn writes_raw_chunks_in_order_and_rejects_traversal() {
+    fn writes_chunks_in_order_and_rejects_traversal() {
         let root = std::env::temp_dir().join(format!("myelin-file-write-{}", std::process::id()));
         fs::create_dir_all(root.join("files")).unwrap();
         let path = Path::new("files/note.myelin");
