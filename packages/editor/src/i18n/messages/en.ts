@@ -816,6 +816,7 @@ const en = {
     selectionToolbar: {
       label: 'Selection order',
       copy: 'Copy',
+      copied: 'Copied to clipboard',
       cut: 'Cut',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',

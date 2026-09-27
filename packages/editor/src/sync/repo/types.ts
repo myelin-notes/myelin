@@ -68,6 +68,8 @@ export type VFSSystemMetadata =
 
 export interface CreateFileOptions {
   system?: VFSSystemMetadata;
+  /** Skip indexing the first successful content save for this file. */
+  skipNextIndexing?: boolean;
 }
 
 export interface FileVersion {

@@ -1,7 +1,61 @@
-import { describe, expect, it } from 'vitest';
+import type { ReactElement } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CanvasViewport } from '../../canvas-viewport';
+import type { Vector2 } from '../../geometry';
 import { YDocManager } from '../../ydoc-manager';
 import { ElementType } from '../element-type';
 import { AudioElement } from './element';
+
+const render = vi.hoisted(() => vi.fn());
+vi.mock('react-dom/client', () => ({
+  createRoot: () => ({ render, unmount: vi.fn() }),
+}));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  render.mockClear();
+});
+
+it('passes long recordings to React without enumerable byte properties', () => {
+  vi.stubGlobal('document', {
+    createElement: () => ({
+      dataset: {},
+      style: { getPropertyValue: () => '', setProperty: vi.fn() },
+    }),
+  });
+  const host = {
+    closest: () => null,
+    appendChild: vi.fn(),
+  } as unknown as HTMLElement;
+  const viewport = {
+    zoom: 1,
+    worldToScreen: (point: Vector2) => point,
+  } as CanvasViewport;
+  const element = new AudioElement('long-audio', 'peer-a');
+  element.syncDOM(viewport, host);
+  const bytes = new Uint8Array(20 * 1024 * 1024);
+  bytes[0] = 123;
+  bytes[bytes.length - 1] = 234;
+
+  element.setAudioData(
+    bytes,
+    'recording.webm',
+    1200,
+    'audio/webm',
+    new Float32Array(80),
+  );
+
+  const view = render.mock.lastCall![0] as ReactElement<{
+    children: ReactElement<{ audioBuffer: ArrayBuffer }>;
+  }>;
+  const buffer = view.props.children.props.audioBuffer;
+  expect(buffer).toBeInstanceOf(ArrayBuffer);
+  expect(Object.keys(buffer)).toEqual([]);
+  expect(buffer.byteLength).toBe(bytes.byteLength);
+  expect(new Uint8Array(buffer)[0]).toBe(123);
+  expect(new Uint8Array(buffer)[bytes.length - 1]).toBe(234);
+  expect(buffer).toBe(element.audioData!.buffer);
+});
 
 describe('AudioElement ownership', () => {
   it('includes the local peer as creator when created locally', () => {

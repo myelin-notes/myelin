@@ -34,7 +34,7 @@ function recordingFileName(mimeType: string): string {
 }
 
 export class AudioElement extends DrawableElement implements SearchableElement {
-  private _audioData: Uint8Array | null = null;
+  private _audioData: Uint8Array<ArrayBuffer> | null = null;
   private _fileName: string = '';
   private _duration: number = 0;
   private _mimeType: string = '';
@@ -398,6 +398,7 @@ export class AudioElement extends DrawableElement implements SearchableElement {
     if (!this._reactRoot) {
       return;
     }
+    // React dev timing enumerates typed-array props byte by byte; pass the opaque buffer.
     flushSync(() => {
       this._reactRoot!.render(
         <I18nProvider>
@@ -405,7 +406,7 @@ export class AudioElement extends DrawableElement implements SearchableElement {
             elementId={this.uuid}
             recordingOwnerId={this._recordingOwnerId}
             onRecordingSaved={this._onRecordingSaved}
-            audioBytes={this._audioData}
+            audioBuffer={this._audioData?.buffer ?? null}
             duration={this._duration}
             mimeType={this._mimeType}
             waveform={this._waveform}

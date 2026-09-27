@@ -191,6 +191,7 @@ function CanvasViewInner({
     wheelRef,
     drawableCanvasRef,
     canvasTools: toolState.canvasTools,
+    selectedToolIndex: toolState.selectedToolIndex,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
     onCanvasPointerDown: toolState.hideOptions,
     onInsertFrame: inserts.onInsertFrame,

@@ -29,6 +29,7 @@ interface UseCanvasEngineArgs {
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
+  selectedToolIndex: number;
   setSelectedToolIndex: (i: number) => void;
   onCanvasPointerDown: () => void;
   onInsertFrame: () => void;
@@ -47,6 +48,7 @@ export function useCanvasEngine({
   wheelRef,
   drawableCanvasRef,
   canvasTools,
+  selectedToolIndex,
   setSelectedToolIndex,
   onCanvasPointerDown,
   onInsertFrame,
@@ -75,6 +77,7 @@ export function useCanvasEngine({
     domOverlayRef,
     drawableCanvasRef,
     canvasTools,
+    selectedToolIndex,
     uiServices,
   });
   const canvasViewState = useDrawableCanvasViewState(drawableCanvasRef.current);

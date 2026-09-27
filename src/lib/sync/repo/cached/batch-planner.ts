@@ -8,7 +8,6 @@ import {
   deleteNodeFromManifest,
   getStoredFilePath,
   MANIFEST_PATH,
-  type RepositorySnapshot,
   setStoredNoteLinks,
   type VFSManifest,
 } from '../shared';
@@ -53,11 +52,10 @@ export interface BatchPlanInput {
   remote: BatchPlanRemote;
   expectedHeadOid: string;
   remoteManifest: VFSManifest;
-  cacheSnapshot: RepositorySnapshot;
+  cacheManifest: VFSManifest;
   ops: PendingOp[];
   canvasOps: BatchCanvasOperation[];
   rawOps: BatchRawOperation[];
-  now?: number;
 }
 
 export type BatchPlanResult = BatchPlan | 'abort-to-rest';
@@ -86,11 +84,12 @@ async function mapWithConcurrency<T, U>(
   return results;
 }
 
-async function hasRawConflict(
+async function checkRawConflicts(
   remote: BatchPlanRemote,
   rawOps: readonly BatchRawOperation[],
   repositoryKind: string,
-): Promise<boolean> {
+): Promise<Set<VFSNodeId> | null> {
+  const alreadyApplied = new Set<VFSNodeId>();
   for (const entry of rawOps) {
     if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
       continue;
@@ -98,16 +97,21 @@ async function hasRawConflict(
     const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
     const remoteRevision = await computeRevision(remoteBytes);
     if (remoteRevision !== entry.op.baseFileRevision) {
+      const localRevision = await computeRevision(entry.bytes);
+      if (remoteRevision === localRevision) {
+        alreadyApplied.add(entry.op.nodeId);
+        continue;
+      }
       logger.debug('Raw file conflict detected; aborting batch', {
         repositoryKind,
         nodeId: entry.op.nodeId,
         baseFileRevision: entry.op.baseFileRevision,
         remoteRevision,
       });
-      return true;
+      return null;
     }
   }
-  return false;
+  return alreadyApplied;
 }
 
 /**
@@ -129,15 +133,21 @@ export async function createBatchPlan(
 
   for (const op of input.ops) {
     switch (op.kind) {
-      case 'upsert-manifest-node':
+      case 'upsert-manifest-node': {
+        const previousModifiedAt = plan.manifest.nodes[op.nodeId]?.modifiedAt;
         applyCachedManifestUpsert(
           plan.manifest,
-          input.cacheSnapshot.manifest,
+          input.cacheManifest,
           op.nodeId,
         );
+        const node = plan.manifest.nodes[op.nodeId];
+        if (node && previousModifiedAt !== undefined) {
+          node.modifiedAt = Math.max(node.modifiedAt, previousModifiedAt);
+        }
         plan.manifestChanged = true;
         plan.messages.push(`Upsert node ${op.nodeId}`);
         break;
+      }
       case 'delete-manifest-node':
         for (const fileId of op.deletedFileIds) {
           const node = plan.manifest.nodes[fileId];
@@ -150,28 +160,24 @@ export async function createBatchPlan(
         plan.messages.push(`Delete node ${op.nodeId}`);
         break;
       case 'sync-custom-colors':
-        plan.manifest.colors = structuredClone(
-          input.cacheSnapshot.manifest.colors,
-        );
+        plan.manifest.colors = structuredClone(input.cacheManifest.colors);
         plan.manifestChanged = true;
         plan.messages.push('Sync custom colors');
         break;
       case 'sync-tag-registry':
-        plan.manifest.tagRegistry = [
-          ...input.cacheSnapshot.manifest.tagRegistry,
-        ];
+        plan.manifest.tagRegistry = [...input.cacheManifest.tagRegistry];
         plan.manifestChanged = true;
         plan.messages.push('Sync tag registry');
         break;
       case 'sync-pen-presets':
         plan.manifest.penPresets = structuredClone(
-          input.cacheSnapshot.manifest.penPresets,
+          input.cacheManifest.penPresets,
         );
         plan.manifestChanged = true;
         plan.messages.push('Sync pen presets');
         break;
       case 'push-note': {
-        const node = input.cacheSnapshot.manifest.nodes[op.nodeId];
+        const node = input.cacheManifest.nodes[op.nodeId];
         if (!node || node.type !== 'file') {
           plan.messages.push(`Skip missing node ${op.nodeId}`);
         }
@@ -180,15 +186,19 @@ export async function createBatchPlan(
     }
   }
 
-  const fileSavedAt = input.now ?? Date.now();
-
   if (input.rawOps.length > 0) {
-    if (
-      await hasRawConflict(input.remote, input.rawOps, input.repositoryKind)
-    ) {
+    const alreadyApplied = await checkRawConflicts(
+      input.remote,
+      input.rawOps,
+      input.repositoryKind,
+    );
+    if (alreadyApplied === null) {
       return 'abort-to-rest';
     }
     for (const entry of input.rawOps) {
+      if (alreadyApplied.has(entry.op.nodeId)) {
+        continue;
+      }
       if (entry.op.replaceFile && !entry.bytes) {
         return 'abort-to-rest';
       }
@@ -210,7 +220,10 @@ export async function createBatchPlan(
       }
       const manifestNode = plan.manifest.nodes[entry.node.id];
       if (manifestNode && manifestNode.type === 'file') {
-        manifestNode.modifiedAt = fileSavedAt;
+        manifestNode.modifiedAt = Math.max(
+          manifestNode.modifiedAt,
+          entry.node.modifiedAt,
+        );
         plan.manifestChanged = true;
       }
     }
@@ -222,28 +235,41 @@ export async function createBatchPlan(
       4,
       async (entry) => {
         const remoteSnapshot = await input.remote.loadDocument(entry.op.nodeId);
+        const remoteBytes = remoteSnapshot.update;
         const doc = new Y.Doc();
-        if (remoteSnapshot.update && remoteSnapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, remoteSnapshot.update);
+        if (remoteBytes && remoteBytes.byteLength > 0) {
+          Y.applyUpdate(doc, remoteBytes);
         }
         if (entry.snapshot.update && entry.snapshot.update.byteLength > 0) {
           Y.applyUpdate(doc, entry.snapshot.update);
         }
+        const bytes = Y.encodeStateAsUpdate(doc);
         return {
           nodeId: entry.node.id,
           path: getStoredFilePath(entry.node),
-          bytes: Y.encodeStateAsUpdate(doc),
+          bytes,
+          alreadyApplied:
+            !!remoteBytes &&
+            bytes.byteLength === remoteBytes.byteLength &&
+            bytes.every((byte, index) => byte === remoteBytes[index]),
           links: extractStoredNoteLinks(doc),
           name: entry.node.name,
+          modifiedAt: entry.node.modifiedAt,
         };
       },
     );
     for (const mergedNote of merged) {
+      if (mergedNote.alreadyApplied) {
+        continue;
+      }
       plan.additions.set(mergedNote.path, mergedNote.bytes);
       plan.messages.push(`Update note ${mergedNote.name}`);
       const manifestNode = plan.manifest.nodes[mergedNote.nodeId];
       if (manifestNode && manifestNode.type === 'file') {
-        manifestNode.modifiedAt = fileSavedAt;
+        manifestNode.modifiedAt = Math.max(
+          manifestNode.modifiedAt,
+          mergedNote.modifiedAt,
+        );
         setStoredNoteLinks(plan.manifest, mergedNote.nodeId, mergedNote.links);
         plan.manifestChanged = true;
       }

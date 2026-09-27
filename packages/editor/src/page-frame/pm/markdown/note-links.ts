@@ -554,6 +554,7 @@ export function noteLinkMarkdownPlugin(
           new CustomEvent<NoteLinkOpenRequestDetail>(
             NOTE_LINK_OPEN_REQUEST_EVENT,
             {
+              bubbles: true,
               detail: {
                 title,
                 noteId: noteLinkElement.getAttribute('data-note-id') || null,

@@ -17,6 +17,7 @@ export async function createCanvasFile({
   parentId,
   title,
   label,
+  skipIndexing = false,
   build,
 }: {
   repository: Repository;
@@ -25,6 +26,8 @@ export async function createCanvasFile({
   title: string;
   /** Names the source in log messages, e.g. 'Markdown'. */
   label: string;
+  /** Skip indexing the initial imported content. */
+  skipIndexing?: boolean;
   build: (ydoc: YDocManager) => void | Promise<void>;
 }): Promise<VFSNodeId> {
   let createdId: VFSNodeId | null = null;
@@ -32,8 +35,12 @@ export async function createCanvasFile({
 
   try {
     const name = await repository.getUniqueFileName(title, parentId);
-    createdId = await repository.createFile(name, 'mcanvas', parentId);
-    session = await repository.openSession(createdId);
+    createdId = skipIndexing
+      ? await repository.createFile(name, 'mcanvas', parentId, undefined, {
+          skipNextIndexing: true,
+        })
+      : await repository.createFile(name, 'mcanvas', parentId);
+    session = await repository.openSession(createdId, { skipRemotePull: true });
     await build(session.ydoc);
     await session.save();
     await session.close();

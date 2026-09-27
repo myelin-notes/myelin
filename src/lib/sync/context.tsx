@@ -8,7 +8,13 @@ import {
 import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
 import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
+import {
+  type CredentialChange,
+  subscribeCredentialChanges,
+} from './repo/credential-vault';
 import { createRepository } from './repo/factory';
+import { credentialTokenKey } from './repo/oauth/client';
+import { isRepositoryFullyConfigured } from './repo/readiness';
 import {
   getRepositoryConfigIdentity,
   getRepositoryStorageKey,
@@ -25,6 +31,21 @@ import {
 import { RepositoryShutdownGate } from './shutdown-gate';
 
 const logger = new Logger('RepositoryProvider');
+const READINESS_RETRY_DELAY_MS = 30_000;
+
+function credentialChangeAffectsConfig(
+  change: CredentialChange,
+  config: RepositoryConfig,
+): boolean {
+  if (config.kind === 'local') {
+    return false;
+  }
+
+  return (
+    change.clientName === config.kind &&
+    change.key === credentialTokenKey(config.credentialId)
+  );
+}
 
 function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
   return {
@@ -95,6 +116,18 @@ export function RepositoryProvider({
     return subscribeRepositoryConfig(setResolvedConfigIfChanged);
   }, [config, setResolvedConfigIfChanged]);
 
+  useEffect(
+    () =>
+      subscribeCredentialChanges((change) => {
+        setResolvedConfig((current) =>
+          credentialChangeAffectsConfig(change, current)
+            ? { ...current }
+            : current,
+        );
+      }),
+    [],
+  );
+
   useEffect(() => {
     setStatus(
       mergeRuntimeStatus(
@@ -104,6 +137,7 @@ export function RepositoryProvider({
     );
 
     let disposed = false;
+    let readinessRetryTimer: number | null = null;
     const unsubscribeStatus = repository.subscribeStatus((runtimeStatus) => {
       if (disposed) {
         return;
@@ -112,9 +146,30 @@ export function RepositoryProvider({
       setStatus((current) => mergeRuntimeStatus(current, runtimeStatus));
     });
 
-    void repository
-      .initialize()
-      .then(() => {
+    const initialize = async (): Promise<void> => {
+      try {
+        const ready = await isRepositoryFullyConfigured(resolvedConfig);
+        if (disposed) {
+          return;
+        }
+
+        if (!ready) {
+          setStatus((current) => ({
+            ...current,
+            initializing: false,
+            online: false,
+            lastError: null,
+          }));
+          if (typeof window !== 'undefined') {
+            readinessRetryTimer = window.setTimeout(() => {
+              void initialize();
+            }, READINESS_RETRY_DELAY_MS);
+          }
+          return;
+        }
+
+        setStatus((current) => ({ ...current, initializing: true }));
+        await repository.initialize();
         if (disposed) {
           return;
         }
@@ -150,8 +205,7 @@ export function RepositoryProvider({
               logger.error('Failed to start note-index backfill', error);
             });
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         if (disposed) {
           return;
         }
@@ -161,10 +215,16 @@ export function RepositoryProvider({
           initializing: false,
           lastError: error instanceof Error ? error : new Error(String(error)),
         }));
-      });
+      }
+    };
+
+    void initialize();
 
     return () => {
       disposed = true;
+      if (readinessRetryTimer !== null) {
+        window.clearTimeout(readinessRetryTimer);
+      }
       unsubscribeStatus();
       // Drop the previous repo's search corpus so it can't leak into the next.
       getPlatform().noteIndex?.reset();

@@ -54,6 +54,7 @@ export interface CanvasClipboardPort {
   getSelection(): CanvasClipboardSelection | null;
   getPasteContext(): CanvasPasteContext | null;
   deleteSelection(): void;
+  pasteText(text: string): boolean;
   pasteSnapshot(
     snapshot: CanvasClipboardSnapshot,
     placement: CanvasPastePlacement,

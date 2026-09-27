@@ -66,6 +66,7 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
   Repository,
@@ -137,6 +138,7 @@ export abstract class BaseRepository
   // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
   // be replay-safe: ids and any values the caller kept are minted outside the mutator.
   private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
+  private readonly skipNextIndexingNodeIds = new Set<VFSNodeId>();
 
   protected abstract loadManifestImpl(): Promise<{
     manifest: VFSManifest;
@@ -195,7 +197,8 @@ export abstract class BaseRepository
       }
     });
 
-    if (candidateFileType !== null) {
+    const skipIndexing = this.skipNextIndexingNodeIds.delete(nodeId);
+    if (candidateFileType !== null && !skipIndexing) {
       const { noteIndex, handwriting } = getPlatform();
       if (noteIndex || handwriting) {
         const path = await this.getStoredAbsolutePath(nodeId);
@@ -239,6 +242,11 @@ export abstract class BaseRepository
       manifest: snapshotManifest,
       notes: Object.fromEntries(noteEntries),
     };
+  }
+
+  async exportManifest(): Promise<VFSManifest> {
+    const { manifest } = await this.loadManifest();
+    return structuredClone(manifest);
   }
 
   // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
@@ -523,6 +531,9 @@ export abstract class BaseRepository
       );
       addChild(manifest, parentId, id);
     });
+    if (options?.skipNextIndexing) {
+      this.skipNextIndexingNodeIds.add(id);
+    }
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
     }
@@ -649,6 +660,7 @@ export abstract class BaseRepository
   }
 
   async deleteNode(nodeId: string): Promise<void> {
+    this.skipNextIndexingNodeIds.delete(nodeId);
     const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
       deleteNodeFromManifest(manifest, nodeId),
     );
@@ -661,6 +673,10 @@ export abstract class BaseRepository
         await getPlatform().handwriting?.removeRecognition(file.id);
       }),
     );
+
+    for (const file of deletedFiles) {
+      this.skipNextIndexingNodeIds.delete(file.id);
+    }
 
     emitNodesDeleted(deletedFiles.map((file) => file.id));
   }
@@ -885,7 +901,10 @@ export abstract class BaseRepository
     });
   }
 
-  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+  async openSession(
+    nodeId: VFSNodeId,
+    _options: OpenSessionOptions = {},
+  ): Promise<NoteSession> {
     logger.debug('Opening repository-backed note session', {
       repositoryKind: this.kind,
       nodeId,

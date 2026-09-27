@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { createEmptyManifest, getStoredFilePath } from '../shared';
+import {
+  computeRevision,
+  createEmptyManifest,
+  getStoredFilePath,
+} from '../shared';
 import type { FileType, VFSFileNode } from '../types';
 import { type BatchPlanRemote, createBatchPlan } from './batch-planner';
 
@@ -31,6 +35,8 @@ describe('createBatchPlan', () => {
     const remoteManifest = createEmptyManifest();
     remoteManifest.nodes[node.id] = structuredClone(node);
     const cacheManifest = structuredClone(remoteManifest);
+    node.modifiedAt = 123;
+    cacheManifest.nodes[node.id] = structuredClone(node);
 
     const remoteDoc = new Y.Doc();
     remoteDoc.getMap('remote').set('value', 'remote');
@@ -46,7 +52,7 @@ describe('createBatchPlan', () => {
       remote,
       expectedHeadOid: 'head-1',
       remoteManifest,
-      cacheSnapshot: { manifest: cacheManifest, notes: { [node.id]: null } },
+      cacheManifest,
       ops: [{ kind: 'push-note', nodeId: node.id, queueRevision: 'queue-1' }],
       canvasOps: [
         {
@@ -60,7 +66,6 @@ describe('createBatchPlan', () => {
         },
       ],
       rawOps: [],
-      now: 123,
     });
 
     expect(plan).not.toBe('abort-to-rest');
@@ -93,10 +98,7 @@ describe('createBatchPlan', () => {
         remote,
         expectedHeadOid: 'head-1',
         remoteManifest,
-        cacheSnapshot: {
-          manifest: structuredClone(remoteManifest),
-          notes: { [node.id]: new Uint8Array([4]) },
-        },
+        cacheManifest: structuredClone(remoteManifest),
         ops: [
           {
             kind: 'push-note',
@@ -120,5 +122,35 @@ describe('createBatchPlan', () => {
         ],
       }),
     ).resolves.toBe('abort-to-rest');
+  });
+
+  it('recognizes a raw file already applied by an ambiguous commit', async () => {
+    const node = createFileNode('clip-applied', 'mp4');
+    const remoteManifest = createEmptyManifest();
+    remoteManifest.nodes[node.id] = structuredClone(node);
+    const localBytes = new Uint8Array([4, 5, 6]);
+    const remote: BatchPlanRemote = {
+      readFileBytes: vi.fn(async () => new Uint8Array(localBytes)),
+      loadDocument: vi.fn(),
+    };
+    const op = {
+      kind: 'push-note' as const,
+      nodeId: node.id,
+      baseFileRevision: await computeRevision(new Uint8Array([1, 2, 3])),
+      queueRevision: 'queue-applied',
+    };
+
+    const plan = await createBatchPlan({
+      repositoryKind: 'test',
+      remote,
+      expectedHeadOid: 'head-2',
+      remoteManifest,
+      cacheManifest: structuredClone(remoteManifest),
+      ops: [op],
+      canvasOps: [],
+      rawOps: [{ op, node, bytes: localBytes }],
+    });
+
+    expect(plan).not.toBe('abort-to-rest');
   });
 });

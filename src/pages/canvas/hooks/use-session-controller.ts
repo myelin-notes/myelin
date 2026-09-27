@@ -114,6 +114,7 @@ export class CanvasSessionController {
       openChromeMenu: () => {},
       openExportDialog: () => {},
     },
+    private readonly selectedToolIndexRef: RefObject<number> = { current: 0 },
   ) {}
 
   subscribe = (listener: () => void): (() => void) => {
@@ -196,6 +197,10 @@ export class CanvasSessionController {
         },
         canvasUiServices,
       );
+      // CanvasView keeps its toolbar state across tabs, while each new canvas starts on Select.
+      if (this.selectedToolIndexRef.current !== 0) {
+        drawableCanvas.switchTool(this.selectedToolIndexRef.current);
+      }
       const viewportState = await readViewportState(noteId);
       if (viewportState) {
         drawableCanvas.viewport.setView(viewportState);
@@ -409,6 +414,7 @@ interface UseCanvasSessionControllerArgs {
   domOverlayRef: RefObject<HTMLDivElement | null>;
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
+  selectedToolIndex: number;
   uiServices: CanvasUiServices;
 }
 
@@ -420,12 +426,15 @@ export function useCanvasSessionController({
   domOverlayRef,
   drawableCanvasRef,
   canvasTools,
+  selectedToolIndex,
   uiServices,
 }: UseCanvasSessionControllerArgs) {
   const repository = useRepository();
 
   const canvasToolsRef = useRef(canvasTools);
   canvasToolsRef.current = canvasTools;
+  const selectedToolIndexRef = useRef(selectedToolIndex);
+  selectedToolIndexRef.current = selectedToolIndex;
 
   const controller = useMemo(
     () =>
@@ -438,6 +447,7 @@ export function useCanvasSessionController({
         canvasToolsRef,
         recordingOwnerId,
         uiServices,
+        selectedToolIndexRef,
       ),
     [
       backgroundCanvasRef,
