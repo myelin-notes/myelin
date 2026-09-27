@@ -504,6 +504,7 @@ describe('LocalRepository', () => {
     const storage = getRepositoryTestStorage();
     const open = storage.open.bind(storage);
     const writeSizes: number[] = [];
+    let writes = 0;
     const openSpy = vi
       .spyOn(storage, 'open')
       .mockImplementation(async (path, options) => {
@@ -512,7 +513,9 @@ describe('LocalRepository', () => {
           ...file,
           write: async (data) => {
             writeSizes.push(data.byteLength);
-            return file.write(data);
+            return file.write(
+              writes++ === 0 ? data.subarray(0, data.byteLength / 2) : data,
+            );
           },
         };
       });
@@ -520,7 +523,7 @@ describe('LocalRepository', () => {
 
     await repository.writeFileBytes(fileId, bytes);
 
-    expect(writeSizes).toEqual([64 * 1024, 64 * 1024, 17]);
+    expect(writeSizes).toEqual([64 * 1024, 64 * 1024, 32 * 1024 + 17]);
     expect(openSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ truncate: true }),

@@ -223,14 +223,14 @@ export class LocalRepository extends BaseRepository {
           baseDir: BaseDirectory.AppData,
         });
         try {
-          for (
-            let offset = 0;
-            offset < bytes.byteLength;
-            offset += MAX_IPC_WRITE_BYTES
-          ) {
-            await file.write(
+          for (let offset = 0; offset < bytes.byteLength; ) {
+            const written = await file.write(
               bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
             );
+            if (written === 0) {
+              throw new Error('Could not write local file bytes');
+            }
+            offset += written;
           }
         } finally {
           await file.close();
