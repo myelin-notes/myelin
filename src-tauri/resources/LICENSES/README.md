@@ -1,7 +1,13 @@
 # Third-party licenses
 
 This directory is bundled with the application and contains license texts for
-third-party model and font assets redistributed with Myelin Notes.
+third-party assets redistributed with Myelin Notes.
+
+## CA certificates
+
+| Bundled asset | License file | Upstream source |
+| --- | --- | --- |
+| `cacert.pem` | `Mozilla-CA-MPL-2.0.txt` | https://curl.se/docs/caextract.html |
 
 ## Transcription models
 
