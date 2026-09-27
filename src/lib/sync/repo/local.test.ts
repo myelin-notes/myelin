@@ -24,6 +24,11 @@ import {
   MANIFEST_PATH,
 } from './shared';
 
+vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tauri-apps/api/core')>()),
+  convertFileSrc: (path: string) => path,
+}));
+
 function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
   if (!update || update.byteLength === 0) {
     return '';
@@ -533,6 +538,60 @@ describe('LocalRepository', () => {
         `repositories/chunked-write-test/files/${getStoredFileName({ id: fileId, fileType: 'png' })}`,
       ),
     ).toEqual(bytes);
+  });
+
+  it('sends large Tauri saves as raw chunks', async () => {
+    const repository = new LocalRepository('repositories/raw-chunk-test');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+    const ipc = vi.fn(
+      async (
+        _cmd: string,
+        _chunk: Uint8Array,
+        _options: { headers: Record<string, string> },
+      ) => {},
+    );
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('isTauri', true);
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke: ipc } });
+    vi.stubGlobal('document', { visibilityState: 'visible' });
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const bytes = new Uint8Array(128 * 1024 + 17).fill(7);
+
+    try {
+      const save = repository.writeFileBytes(fileId, bytes);
+      await vi.waitFor(() => expect(ipc).toHaveBeenCalledTimes(1));
+      frames.shift()?.(0);
+      await vi.waitFor(() => expect(ipc).toHaveBeenCalledTimes(2));
+      frames.shift()?.(0);
+      await save;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(ipc).toHaveBeenCalledTimes(3);
+    expect(
+      ipc.mock.calls.map(([, chunk, options]) => [
+        chunk.byteLength,
+        options.headers['x-offset'],
+      ]),
+    ).toEqual([
+      [64 * 1024, '0'],
+      [64 * 1024, String(64 * 1024)],
+      [17, String(128 * 1024)],
+    ]);
+    expect(ipc.mock.calls[0][0]).toBe('write_local_file_chunk');
+    expect(ipc.mock.calls[0][2].headers['x-relative-path']).toBe(
+      `repositories/raw-chunk-test/files/${fileId}.png`,
+    );
   });
 
   it('removes stored note bytes when a file is deleted', async () => {

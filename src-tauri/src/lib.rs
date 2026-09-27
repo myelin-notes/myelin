@@ -6,6 +6,7 @@ mod error_report;
 mod github_push;
 mod handwriting;
 mod iroh_transport;
+mod local_file_write;
 mod mcp_server;
 mod note_index;
 mod oauth_loopback;
@@ -84,6 +85,7 @@ pub fn run() {
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
+            local_file_write::write_local_file_chunk,
             pdf_export::export_pdf,
             workspace_export::export_obsidian_vault,
             mcp_server::mcp_start,
