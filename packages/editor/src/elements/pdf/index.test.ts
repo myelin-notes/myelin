@@ -180,6 +180,25 @@ describe('PdfElement', () => {
     expect(reads).toBe(1);
   });
 
+  it('skips cover elements when the PDF chrome is offscreen', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const upper = {
+      hidden: false,
+      intersectsWorldRect: () => {
+        throw new Error('offscreen PDF should not scan cover elements');
+      },
+    } as unknown as DrawableElement;
+    pdf.setExportElementsProvider(() => [pdf, upper]);
+    const viewport = {
+      getWorldRect: () => new DOMRect(1000, 1000, 100, 100),
+    } as CanvasViewport;
+
+    const coverage = pdf as unknown as {
+      getCoveringBounds(viewport: CanvasViewport): DOMRect[];
+    };
+    expect(coverage.getCoveringBounds(viewport)).toEqual([]);
+  });
+
   it('does not dirty stored metadata that matches the opened PDF', async () => {
     const ydoc = new YDocManager();
     const pageSizes = [{ w: 612, h: 792 }];

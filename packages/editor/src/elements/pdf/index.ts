@@ -466,12 +466,15 @@ export class PdfElement
   }
 
   private getCoveringBounds(viewport: CanvasViewport): DOMRect[] {
+    const viewRect = viewport.getWorldRect();
+    if (!this.intersectsWorldRect(viewRect, 0)) {
+      return [];
+    }
     const elements = this._exportElementsProvider?.();
     const elementIndex = elements?.indexOf(this) ?? -1;
     if (!elements || elementIndex < 0) {
       return [];
     }
-    const viewRect = viewport.getWorldRect();
     const bounds: DOMRect[] = [];
     for (let i = elementIndex + 1; i < elements.length; i++) {
       const element = elements[i];
