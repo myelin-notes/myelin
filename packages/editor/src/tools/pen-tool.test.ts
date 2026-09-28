@@ -480,6 +480,25 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(created).toHaveLength(1);
   });
 
+  it('keeps one pending dwell timer while the pen moves', () => {
+    const { canvas } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const setTimer = vi.spyOn(globalThis, 'setTimeout');
+
+    feed(
+      tool,
+      canvas,
+      Array.from({ length: 40 }, (_, i) => [i * 5, 0]),
+    );
+
+    expect(
+      setTimer.mock.calls.filter(([, delay]) => delay === 600),
+    ).toHaveLength(1);
+    tool.finish(canvas, {} as PointerEvent);
+    setTimer.mockRestore();
+  });
+
   it('uses screen-space movement for the dwell slop when zoomed', () => {
     const { canvas, created, removeElement } = makeCanvas({ zoom: 5 });
     const tool = makeTool();

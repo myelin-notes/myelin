@@ -46,6 +46,7 @@ export class PenTool implements ITool {
   /** World-space handle the pen keeps steering after the snap, until release. */
   private snapDrag: SnapDrag | null = null;
   private dwellTimer: ReturnType<typeof setTimeout> | null = null;
+  private dwellDueAt = 0;
 
   get id(): ToolId {
     return 'pen';
@@ -83,20 +84,29 @@ export class PenTool implements ITool {
       this.usePressure ? event.pressure : undefined,
     );
 
-    // Every meaningful move resets the anchor and re-arms a single timer, so recognition fires exactly
-    // once per stationary hold even when pointermove stops firing for a still pen.
+    // Keep one timer while moving; re-arming on every pointer sample stalls fast ink.
     if (
       this.dwellAnchor === null ||
       distance(position, this.dwellAnchor) >
         DWELL_MOVE_PX / (canvas.viewport?.zoom ?? 1)
     ) {
-      this.clearDwellTimer();
       this.dwellAnchor = { x: position.x, y: position.y };
       this.recognitionAttemptedForAnchor = false;
-      this.dwellTimer = setTimeout(() => {
-        this.tryRecognize(canvas);
-      }, DWELL_MS);
+      this.dwellDueAt = Date.now() + DWELL_MS;
+      if (this.dwellTimer === null) {
+        this.dwellTimer = setTimeout(() => this.onDwellTimer(canvas), DWELL_MS);
+      }
     }
+  }
+
+  private onDwellTimer(canvas: DrawableCanvas): void {
+    const remaining = this.dwellDueAt - Date.now();
+    if (remaining > 0) {
+      this.dwellTimer = setTimeout(() => this.onDwellTimer(canvas), remaining);
+      return;
+    }
+    this.dwellTimer = null;
+    this.tryRecognize(canvas);
   }
 
   private tryRecognize(canvas: DrawableCanvas): void {
