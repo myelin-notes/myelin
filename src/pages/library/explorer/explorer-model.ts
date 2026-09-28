@@ -19,8 +19,6 @@ export type ExplorerSortMode =
   | 'modified'
   | 'created';
 
-export type ExplorerSearchMode = 'lexical' | 'semantic';
-
 export type ExplorerSetupState = 'checking' | 'ready' | 'setup-required';
 
 export interface ExplorerRepository {
@@ -31,7 +29,7 @@ export interface ExplorerRepository {
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
   searchNodes(
     query: string,
-    options?: { mode?: ExplorerSearchMode },
+    options?: { limit?: number },
   ): Promise<NodeSearchResult[]>;
   getNodesByAnyTag(
     tags: string[],
@@ -57,7 +55,6 @@ export type ExplorerCanvasFileCreator = (
 export interface ExplorerQuery {
   folderId: VFSNodeId | null;
   searchQuery: string;
-  searchMode: ExplorerSearchMode;
   filterTags: readonly string[];
 }
 
@@ -144,9 +141,7 @@ export class ExplorerModel {
       let searchMatches: ReadonlyMap<VFSNodeId, NodeSearchResult> = new Map();
 
       if (searchQuery) {
-        let results = await this.repository.searchNodes(searchQuery, {
-          mode: query.searchMode,
-        });
+        let results = await this.repository.searchNodes(searchQuery);
         if (query.filterTags.length > 0) {
           results = results.filter((result) =>
             nodeMatchesAnyTag(result.node.tags, query.filterTags),

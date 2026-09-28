@@ -26,7 +26,7 @@ export function toSegments(value: unknown): TranscriptSegment[] {
   return segments;
 }
 
-/** The flat transcript, as search and the note index consume it. */
+/** The flat transcript used by audio editing and export. */
 export function segmentsToText(segments: readonly TranscriptSegment[]): string {
   return segments.map((segment) => segment.text).join(' ');
 }

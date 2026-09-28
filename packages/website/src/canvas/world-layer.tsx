@@ -3,7 +3,6 @@ import {
   MousePointer2 as CursorIcon,
   FileText as FileTextIcon,
   Mic as MicIcon,
-  PenLine as PenLineIcon,
   Search as SearchIcon,
 } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
@@ -154,7 +153,6 @@ export function AudioCardMock({ x, y }: WorldPos) {
 
 const RESULT_ICONS = {
   page: FileTextIcon,
-  ink: PenLineIcon,
   audio: MicIcon,
 } as const;
 

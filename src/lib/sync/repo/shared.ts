@@ -1,9 +1,7 @@
 import * as Y from 'yjs';
-import type { NoteEmbedding } from '@myelin/editor/platform';
 import {
   createSearchIndex,
   type SearchField,
-  type SearchHit,
   type SearchIndex,
 } from '@/lib/search';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
@@ -343,11 +341,7 @@ export function getFolderChain(
   return chain;
 }
 
-const SNIPPET_RADIUS = 80;
-
-function nodeSearchFields(
-  indexContent?: ReadonlyMap<VFSNodeId, string>,
-): SearchField<VFSNode>[] {
+function nodeSearchFields(): SearchField<VFSNode>[] {
   return [
     { name: 'name', weight: 4, getValue: (node) => node.name },
     { name: 'tags', weight: 3, getValue: (node) => node.tags },
@@ -356,11 +350,6 @@ function nodeSearchFields(
       name: 'fileType',
       getValue: (node) => (node.type === 'file' ? node.fileType : ''),
     },
-    {
-      name: 'content',
-      weight: 2,
-      getValue: (node) => indexContent?.get(node.id) ?? '',
-    },
   ];
 }
 
@@ -368,146 +357,26 @@ function nodeSearchFields(
 // re-tokenizing every node's name, tags and indexed content on each query.
 export function createNodeSearchIndex(
   manifest: VFSManifest,
-  indexContent?: ReadonlyMap<VFSNodeId, string>,
 ): SearchIndex<VFSNode> {
   return createSearchIndex({
     items: Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
     getId: (node) => node.id,
-    fields: nodeSearchFields(indexContent),
+    fields: nodeSearchFields(),
   });
-}
-
-// Returns null when the match came only from name/tags.
-function buildContentSnippet(
-  content: string | undefined,
-  hit: SearchHit<VFSNode>,
-): string | null {
-  if (!content) {
-    return null;
-  }
-  const contentTerms = Object.entries(hit.match)
-    .filter(([, fields]) => fields.includes('content'))
-    .map(([term]) => term.toLowerCase());
-  if (contentTerms.length === 0) {
-    return null;
-  }
-
-  const lower = content.toLowerCase();
-  let index = -1;
-  for (const term of contentTerms) {
-    const at = lower.indexOf(term);
-    if (at !== -1 && (index === -1 || at < index)) {
-      index = at;
-    }
-  }
-  if (index === -1) {
-    return null;
-  }
-
-  const start = Math.max(0, index - SNIPPET_RADIUS);
-  const end = Math.min(content.length, index + SNIPPET_RADIUS);
-  let snippet = content.slice(start, end).replace(/\s+/g, ' ').trim();
-  if (start > 0) {
-    snippet = `...${snippet}`;
-  }
-  if (end < content.length) {
-    snippet = `${snippet}...`;
-  }
-  return snippet;
 }
 
 export function searchNodeResults(
   manifest: VFSManifest,
   query: string,
-  indexContent?: ReadonlyMap<VFSNodeId, string>,
   index?: SearchIndex<VFSNode>,
 ): NodeSearchResult[] {
-  const searchIndex = index ?? createNodeSearchIndex(manifest, indexContent);
+  const searchIndex = index ?? createNodeSearchIndex(manifest);
   return searchIndex.search(query).map((hit) => ({
     node: hit.item,
     score: hit.score,
-    contentSnippet: buildContentSnippet(indexContent?.get(hit.item.id), hit),
+    contentSnippet: null,
     matchedTerms: hit.terms,
-    searchMode: 'lexical',
   }));
-}
-
-export function searchNodeResultsSemantically(
-  manifest: VFSManifest,
-  query: string,
-  queryEmbedding: NoteEmbedding,
-  indexContent: ReadonlyMap<VFSNodeId, string>,
-  indexEmbeddings: ReadonlyMap<VFSNodeId, NoteEmbedding>,
-): NodeSearchResult[] {
-  if (!query.trim()) {
-    return searchNodeResults(manifest, query, indexContent);
-  }
-
-  const hits = Object.values(manifest.nodes).flatMap((node) => {
-    if (isSystemNode(node) || node.type !== 'file') {
-      return [];
-    }
-    const content = indexContent.get(node.id);
-    const embedding = indexEmbeddings.get(node.id);
-    if (
-      !content ||
-      !embedding ||
-      embedding.model !== queryEmbedding.model ||
-      embedding.dim !== queryEmbedding.dim
-    ) {
-      return [];
-    }
-    const score = cosineSimilarity(queryEmbedding.vector, embedding.vector);
-    if (score <= 0) {
-      return [];
-    }
-    return [
-      {
-        node,
-        score,
-        contentSnippet: buildSemanticSnippet(content),
-        matchedTerms: [],
-        searchMode: 'semantic' as const,
-      },
-    ];
-  });
-
-  return hits.sort((a, b) => b.score - a.score);
-}
-
-function cosineSimilarity(
-  left: readonly number[],
-  right: readonly number[],
-): number {
-  if (left.length !== right.length || left.length === 0) {
-    return 0;
-  }
-
-  let dot = 0;
-  let leftNorm = 0;
-  let rightNorm = 0;
-  for (let index = 0; index < left.length; index++) {
-    const a = left[index] ?? 0;
-    const b = right[index] ?? 0;
-    dot += a * b;
-    leftNorm += a * a;
-    rightNorm += b * b;
-  }
-  if (leftNorm === 0 || rightNorm === 0) {
-    return 0;
-  }
-  return dot / Math.sqrt(leftNorm * rightNorm);
-}
-
-function buildSemanticSnippet(content: string): string | null {
-  const snippet = content.replace(/\s+/g, ' ').trim();
-  if (!snippet) {
-    return null;
-  }
-  if (snippet.length <= SNIPPET_RADIUS * 2) {
-    return snippet;
-  }
-  return `${snippet.slice(0, SNIPPET_RADIUS * 2).trimEnd()}...`;
 }
 
 export function getNodesByExactName(
@@ -632,22 +501,6 @@ export function getRecentFiles(
     )
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
     .slice(0, limit);
-}
-
-// The engine (Rust `IndexProvider::applies_to`) is the authority on which file types get indexed;
-// this only excludes system nodes (e.g. version-history snapshots), which the engine can't
-// recognize from a path + file type alone.
-export function isIndexCandidateFileNode(
-  node: VFSNode | null | undefined,
-): node is VFSFileNode {
-  return node?.type === 'file' && !isSystemNode(node);
-}
-
-/** User files to offer the index engine on backfill (engine filters by type). */
-export function getIndexCandidateFileNodes(
-  manifest: VFSManifest,
-): VFSFileNode[] {
-  return Object.values(manifest.nodes).filter(isIndexCandidateFileNode);
 }
 
 export function getBacklinks(

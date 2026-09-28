@@ -83,14 +83,12 @@ export async function importPdfBytes({
   repository,
   parentId,
   fallbackTitle,
-  skipIndexing = false,
 }: {
   bytes: Uint8Array;
   fileName: string;
   repository: Repository;
   parentId: string | null;
   fallbackTitle: string;
-  skipIndexing?: boolean;
 }): Promise<VFSNodeId> {
   const pageSizes = await getPdfPageSizes(bytes);
   return createCanvasFile({
@@ -98,7 +96,6 @@ export async function importPdfBytes({
     parentId,
     title: getPdfCanvasTitle(fileName, fallbackTitle),
     label: 'PDF',
-    skipIndexing,
     build: (ydoc) => {
       addPdfElementToYDoc(ydoc, bytes, fileName, pageSizes);
     },

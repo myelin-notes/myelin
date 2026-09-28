@@ -57,7 +57,7 @@ export function linkHref(id: LinkId): string {
 }
 
 interface SearchResultMock {
-  kind: 'page' | 'ink' | 'audio';
+  kind: 'page' | 'audio';
   title: string;
   snippet: string;
 }

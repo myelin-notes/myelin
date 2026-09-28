@@ -26,8 +26,6 @@ const fr: typeof en = {
   },
   sidebar: {
     searchPlaceholder: 'Rechercher dans votre bibliothèque...',
-    searchModeText: 'Texte',
-    searchModeSemantic: 'Sémantique',
     explorer: 'Explorateur',
     tags: 'Étiquettes',
     collapse: 'Réduire la barre latérale',
@@ -101,7 +99,6 @@ const fr: typeof en = {
         'Un bug ou une idée ? Dites-le-nous dans un court formulaire.',
     },
     searchPlaceholder: 'Rechercher dans le studio...',
-    semanticSearchLabel: 'Recherche sémantique',
     explorer: 'Explorateur',
     sortLabel: (label: string) => `Tri : ${label}`,
     sortModes: {

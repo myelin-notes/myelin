@@ -134,7 +134,7 @@ function CanvasViewInner({
     selectedToolIndex: toolState.selectedToolIndex,
     toggleOptions: toolState.toggleOptions,
   });
-  const canvasSearch = useCanvasSearch(drawableCanvasRef, id);
+  const canvasSearch = useCanvasSearch(drawableCanvasRef);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;

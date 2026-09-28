@@ -82,69 +82,6 @@ export interface TranscriptionCapability {
   ): Promise<AudioTranscriptionSession | null>;
 }
 
-/** One reindex/recognition request, as passed to the host engine. */
-export interface ReindexItem {
-  nodeId: VFSNodeId;
-  path: string;
-  fileType: string;
-}
-
-export interface NoteEmbedding {
-  model: string;
-  dim: number;
-  vector: number[];
-}
-
-export interface NoteIndexCapability {
-  /** Point the index at a repository. Pair with {@link reset} on teardown. */
-  init(repoId: string): Promise<void>;
-  reset(): void;
-  /** The synchronous index corpus, keyed by node id, for the search layer. */
-  getContent(): ReadonlyMap<VFSNodeId, string>;
-  /** The search layer keys its cached index on this, rebuilding only when the content changes. */
-  contentRevision(): number;
-  getEmbeddings(): ReadonlyMap<VFSNodeId, NoteEmbedding>;
-  embedSearchQuery(query: string): Promise<NoteEmbedding>;
-  /** Queue a single note for (debounced) reindexing. */
-  requestReindex(nodeId: VFSNodeId, path: string, fileType: string): void;
-  /** Hand the engine a batch of stale/missing candidates (startup backfill). */
-  startBackfill(items: ReindexItem[]): void;
-  removeIndex(nodeId: VFSNodeId): Promise<void>;
-}
-
-/**
- * Each line carries the recognized `text` plus the strokes it came from, so canvas search can
- * match handwriting and navigate to it.
- */
-export interface RecognizedPage {
-  nodeId: VFSNodeId;
-  sourceHash: string;
-  schemaVersion: number;
-  lines: RecognizedLine[];
-  updatedAt: number;
-}
-
-export interface RecognizedLine {
-  text: string;
-  /** `[x, y, w, h]` in canvas coordinates. */
-  bbox: [number, number, number, number];
-  strokeIds: string[];
-  hash: string;
-}
-
-export interface HandwritingCapability {
-  /** Point recognition at a repository. Pair with {@link reset} on teardown. */
-  init(repoId: string): void;
-  reset(): void;
-  /** Queue a single note for (debounced) handwriting recognition. */
-  requestRecognize(nodeId: VFSNodeId, path: string, fileType: string): void;
-  /** Hand the engine a batch of candidates (startup backfill). */
-  startBackfill(items: ReindexItem[]): void;
-  /** A node's recognized handwriting, or null if it has none yet. */
-  readPage(nodeId: VFSNodeId): Promise<RecognizedPage | null>;
-  removeRecognition(nodeId: VFSNodeId): Promise<void>;
-}
-
 export interface CodeRunnerCapability {
   runCode(request: RunCodeRequest): Promise<void>;
   cancelRun(executionId: string): Promise<void>;
@@ -180,9 +117,7 @@ export interface Platform {
     handler: (payload: T) => void,
   ): Promise<Unsubscribe>;
   transcription?: TranscriptionCapability;
-  handwriting?: HandwritingCapability;
   codeRunner?: CodeRunnerCapability;
   pdfExport?: PdfExportCapability;
-  noteIndex?: NoteIndexCapability;
   createLiveTransport?(noteId: VFSNodeId): LiveDiscoveryTransport;
 }

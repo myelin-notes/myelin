@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
-  BrainCircuit,
   CalendarPlus,
   ChevronRight,
   Clock,
@@ -21,12 +20,6 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { trackEvent } from '@/lib/analytics';
 import { openNote } from '@/lib/note/navigation';
 import {
@@ -47,10 +40,7 @@ import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
-import type {
-  ExplorerSearchMode as SearchMode,
-  ExplorerSortMode as SortMode,
-} from './explorer/explorer-model';
+import type { ExplorerSortMode as SortMode } from './explorer/explorer-model';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
@@ -79,7 +69,6 @@ export function MobileLibrary() {
   const scrollRef = useRef<HTMLElement | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -194,10 +183,6 @@ export function MobileLibrary() {
     setViewMode((mode) => (mode === 'tree' ? 'grid' : 'tree'));
   }, []);
 
-  const toggleSearchMode = useCallback(() => {
-    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
-  }, []);
-
   // ExplorerTree.startNewFolder/startNewFile fire their onChanged (bound to
   // refreshMeta) internally after the write, so there's no need to refresh again.
   const handleNewFolder = useCallback(() => {
@@ -310,31 +295,6 @@ export function MobileLibrary() {
                     <X className="size-3.5" />
                   </button>
                 )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          onClick={toggleSearchMode}
-                          aria-label={strings.library.semanticSearchLabel}
-                          aria-pressed={searchMode === 'semantic'}
-                          className={cn(
-                            'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
-                            searchMode === 'semantic'
-                              ? 'bg-tag-active text-text-on-dark'
-                              : 'text-text-muted hover:bg-surface hover:text-text-primary',
-                          )}
-                        >
-                          <BrainCircuit className="size-3.5" />
-                        </button>
-                      }
-                    />
-                    <TooltipContent side="top">
-                      {strings.library.semanticSearchLabel}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
               </div>
 
               <div className="flex items-center justify-between">
@@ -456,7 +416,6 @@ export function MobileLibrary() {
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
-                searchMode={searchMode}
                 filterTags={filterTags}
                 onCreateCanvas={() =>
                   handleNewFile(

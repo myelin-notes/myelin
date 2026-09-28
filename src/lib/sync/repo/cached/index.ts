@@ -1,5 +1,4 @@
 import * as Y from 'yjs';
-import type { ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
@@ -290,10 +289,6 @@ export class CachedRepository
 
   async getNodesByName(name: string): Promise<VFSNode[]> {
     return this.cache.getNodesByName(name);
-  }
-
-  async listIndexBackfillItems(): Promise<ReindexItem[]> {
-    return this.cache.listIndexBackfillItems();
   }
 
   async getNodesByAnyTag(

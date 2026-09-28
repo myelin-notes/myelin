@@ -90,11 +90,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Record it. Find it.\nEven your handwriting.',
+    heading: 'Record it. Transcribe it.\nFind it on the canvas.',
     audioBody:
-      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so every recording is searchable and no audio leaves your machine.',
+      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
-      'Full-text and semantic search run locally, on a bundled all-MiniLM-L6-v2 model. Handwriting is recognized on macOS through Apple’s Vision framework, and audio transcripts are searchable too.',
+      'Search your library by note title and tags. Within an open canvas, find text and audio transcripts.',
     // Content of the mock app cards standing in for real screenshots
     // (see world-layer.tsx).
     audioMock: {
@@ -106,22 +106,17 @@ for step in range(3):
       match: 'myelin sheath',
     },
     searchMock: {
-      query: 'node of ranvier',
+      query: 'Lecture 12',
       results: [
         {
           kind: 'page',
           title: 'Lecture 12 · Action potentials',
-          snippet: '…the signal jumps between nodes of Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Whiteboard · myelination sketch',
-          snippet: 'Handwriting match, OCR on-device',
+          snippet: 'Canvas note',
         },
         {
           kind: 'audio',
           title: 'Recording · Lecture 12',
-          snippet: 'Transcript match at 31:42',
+          snippet: 'Canvas note',
         },
       ],
     },
@@ -169,7 +164,7 @@ for step in range(3):
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',
-      'Search, semantic embeddings, and handwriting OCR (macOS) all run on your own machine.',
+      'Your notes stay on your own machine.',
       'Bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
       'Import from Obsidian or GoodNotes, export to PDF, images, or JSON, and read every line of source on GitHub.',
     ],
@@ -274,7 +269,7 @@ Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one sectio
 
 ## Does it work offline?
 
-Fully. Editing, full-text and semantic search, handwriting recognition, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
+Fully. Editing, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
 
 ## What about iPhone, iPad, and Android?
 

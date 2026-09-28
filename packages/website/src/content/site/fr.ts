@@ -83,11 +83,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Enregistrez. Retrouvez.\nMême votre écriture.',
+    heading: 'Enregistrez. Transcrivez.\nRetrouvez sur le canevas.',
     audioBody:
-      'Enregistrez cours ou réunions sur le canevas. Un modèle Whisper base intégré les transcrit sur l’appareil : chaque enregistrement devient cherchable et aucun audio ne quitte votre machine.',
+      'Enregistrez cours ou réunions sur le canevas. Un modèle Whisper base intégré les transcrit sur l’appareil : vous pouvez retrouver des mots dans la transcription sans envoyer l’audio ailleurs.',
     searchBody:
-      'La recherche plein texte et sémantique tourne en local, sur un modèle all-MiniLM-L6-v2 intégré. L’écriture manuscrite est reconnue sur macOS via le framework Vision d’Apple, et les transcriptions audio sont cherchables aussi.',
+      'Recherchez des notes par titre et par étiquette dans la bibliothèque. Dans un canevas ouvert, retrouvez le texte et les transcriptions audio.',
     audioMock: {
       title: 'Cours 12 · Potentiels d’action',
       duration: '48:12',
@@ -97,22 +97,17 @@ for step in range(3):
       match: 'gaine de myéline',
     },
     searchMock: {
-      query: 'nœud de ranvier',
+      query: 'Cours 12',
       results: [
         {
           kind: 'page',
           title: 'Cours 12 · Potentiels d’action',
-          snippet: '…le signal saute entre les nœuds de Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Tableau blanc · schéma de myélinisation',
-          snippet: 'Correspondance manuscrite, OCR sur l’appareil',
+          snippet: 'Note sur le canevas',
         },
         {
           kind: 'audio',
           title: 'Enregistrement · Cours 12',
-          snippet: 'Correspondance dans la transcription à 31:42',
+          snippet: 'Note sur le canevas',
         },
       ],
     },
@@ -160,7 +155,6 @@ for step in range(3):
     bullets: [
       'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert et sans conflits (Yjs). Rien n’est jamais verrouillé.',
       'Tout fonctionne hors ligne, sans compte et sans serveur au milieu.',
-      'La recherche, les plongements sémantiques et l’OCR de l’écriture manuscrite (macOS) tournent sur votre propre machine.',
       'Amenez votre propre IA : les modèles se connectent via un serveur MCP local, jamais un cloud choisi pour vous.',
       'Importez depuis Obsidian ou GoodNotes, exportez en PDF, images ou JSON, et lisez chaque ligne du code source sur GitHub.',
     ],
