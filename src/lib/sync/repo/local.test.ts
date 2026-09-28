@@ -506,7 +506,13 @@ describe('LocalRepository', () => {
     const ipc = vi.fn(
       async (
         _cmd: string,
-        _args: { relativePath: string; offset: number; bytesBase64: string },
+        _args: {
+          relativePath: string;
+          writeId: string;
+          offset: number;
+          bytesBase64: string;
+          finalChunk: boolean;
+        },
       ) => {},
     );
     const frames: FrameRequestCallback[] = [];
@@ -545,6 +551,14 @@ describe('LocalRepository', () => {
       [17, 16 * 1024],
     ]);
     expect(ipc.mock.calls[0][0]).toBe('write_local_file_chunk');
+    expect(new Set(ipc.mock.calls.map(([, args]) => args.writeId)).size).toBe(
+      1,
+    );
+    expect(ipc.mock.calls.map(([, args]) => args.finalChunk)).toEqual([
+      false,
+      false,
+      true,
+    ]);
     expect(ipc.mock.calls[0][1].relativePath).toBe(
       `repositories/base64-chunk-test/files/${fileId}.png`,
     );
@@ -561,7 +575,13 @@ describe('LocalRepository', () => {
     const ipc = vi.fn(
       async (
         _cmd: string,
-        _args: { relativePath: string; offset: number; bytesBase64: string },
+        _args: {
+          relativePath: string;
+          writeId: string;
+          offset: number;
+          bytesBase64: string;
+          finalChunk: boolean;
+        },
       ) => {},
     );
     vi.stubGlobal('isTauri', true);

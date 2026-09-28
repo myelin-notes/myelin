@@ -1,7 +1,7 @@
 use std::{
     ffi::OsStr,
     fs::OpenOptions,
-    io::{Seek, SeekFrom, Write},
+    io::Write,
     path::{Component, Path},
 };
 
@@ -12,8 +12,10 @@ use tauri::{AppHandle, Manager};
 pub async fn write_local_file_chunk(
     app: AppHandle,
     relative_path: String,
+    write_id: String,
     offset: u64,
     bytes_base64: String,
+    final_chunk: bool,
 ) -> Result<(), String> {
     let root = app
         .path()
@@ -23,14 +25,32 @@ pub async fn write_local_file_chunk(
         let bytes = STANDARD
             .decode(bytes_base64)
             .map_err(|error| error.to_string())?;
-        write_chunk(&root, Path::new(&relative_path), offset, &bytes)
+        write_chunk(
+            &root,
+            Path::new(&relative_path),
+            &write_id,
+            offset,
+            &bytes,
+            final_chunk,
+        )
     })
     .await
     .map_err(|error| error.to_string())?
 }
 
-fn write_chunk(root: &Path, relative_path: &Path, offset: u64, bytes: &[u8]) -> Result<(), String> {
+fn write_chunk(
+    root: &Path,
+    relative_path: &Path,
+    write_id: &str,
+    offset: u64,
+    bytes: &[u8],
+    final_chunk: bool,
+) -> Result<(), String> {
     if relative_path.as_os_str().is_empty()
+        || write_id.len() != 36
+        || !write_id
+            .chars()
+            .all(|ch| ch.is_ascii_hexdigit() || ch == '-')
         || relative_path
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
@@ -54,20 +74,27 @@ fn write_chunk(root: &Path, relative_path: &Path, offset: u64, bytes: &[u8]) -> 
     {
         return Err("invalid local file path".into());
     }
+    let staged = path.with_file_name(format!(
+        ".{}.{}.tmp",
+        path.file_name()
+            .ok_or("invalid local file path")?
+            .to_string_lossy(),
+        write_id
+    ));
     let mut file = OpenOptions::new()
-        .write(true)
-        .create(offset == 0)
-        .truncate(offset == 0)
-        .open(path)
+        .append(true)
+        .create_new(offset == 0)
+        .open(&staged)
         .map_err(|error| error.to_string())?;
-    if offset > 0 {
-        if file.metadata().map_err(|error| error.to_string())?.len() != offset {
-            return Err("local file write offset mismatch".into());
-        }
-        file.seek(SeekFrom::Start(offset))
-            .map_err(|error| error.to_string())?;
+    if file.metadata().map_err(|error| error.to_string())?.len() != offset {
+        return Err("local file write offset mismatch".into());
     }
-    file.write_all(bytes).map_err(|error| error.to_string())
+    file.write_all(bytes).map_err(|error| error.to_string())?;
+    if final_chunk {
+        drop(file);
+        std::fs::rename(staged, path).map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -80,13 +107,25 @@ mod tests {
         let root = std::env::temp_dir().join(format!("myelin-file-write-{}", std::process::id()));
         fs::create_dir_all(root.join("files")).unwrap();
         let path = Path::new("files/note.myelin");
-        write_chunk(&root, path, 0, b"hello ").unwrap();
-        write_chunk(&root, path, 6, b"world").unwrap();
+        let write_id = "12345678-1234-1234-1234-123456789abc";
+        fs::write(root.join(path), b"original").unwrap();
+        write_chunk(&root, path, write_id, 0, b"hello ", false).unwrap();
+        assert_eq!(fs::read(root.join(path)).unwrap(), b"original");
+        write_chunk(&root, path, write_id, 6, b"world", true).unwrap();
         assert_eq!(fs::read(root.join(path)).unwrap(), b"hello world");
-        write_chunk(&root, Path::new("manifest.json"), 0, b"{}").unwrap();
+        write_chunk(&root, Path::new("manifest.json"), write_id, 0, b"{}", true).unwrap();
         assert_eq!(fs::read(root.join("manifest.json")).unwrap(), b"{}");
-        assert!(write_chunk(&root, path, 1, b"bad").is_err());
-        assert!(write_chunk(&root, Path::new("../files/escape"), 0, b"bad").is_err());
+        assert!(write_chunk(&root, path, write_id, 1, b"bad", true).is_err());
+        assert!(write_chunk(
+            &root,
+            Path::new("../files/escape"),
+            write_id,
+            0,
+            b"bad",
+            true
+        )
+        .is_err());
+        assert!(write_chunk(&root, path, "../../escape", 0, b"bad", true).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

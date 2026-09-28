@@ -297,6 +297,7 @@ export class LocalRepository extends BaseRepository {
     if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
       await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
     } else if (isTauri()) {
+      const writeId = crypto.randomUUID();
       for (
         let offset = 0;
         offset < bytes.byteLength;
@@ -304,10 +305,12 @@ export class LocalRepository extends BaseRepository {
       ) {
         await invoke('write_local_file_chunk', {
           relativePath: filePath,
+          writeId,
           offset,
           bytesBase64: encodeBase64(
             bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
           ),
+          finalChunk: offset + MAX_IPC_WRITE_BYTES >= bytes.byteLength,
         });
         if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
           await new Promise<void>((resolve) => {
