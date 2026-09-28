@@ -206,7 +206,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
       query: {
         type: 'string',
         description:
-          'Optional keyword filter over note titles. When set, results come back relevance-ranked and folderId/tag are applied on top; when omitted, notes are collected by walking the folder tree.',
+          'Optional keyword filter over note titles, tags, and saved content. When set, results come back relevance-ranked and folderId/tag are applied on top; when omitted, notes are collected by walking the folder tree.',
       },
       folderId: {
         type: 'string',
@@ -220,12 +220,13 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'search_notes',
     description:
-      'Keyword search across canvas note titles, returning matches ranked by relevance with a score and the terms that matched. Prefer this over list_notes whenever you know what you are looking for.',
+      'Keyword search across canvas note titles, tags, and saved content, returning matches ranked by relevance with a score and the terms that matched. Prefer this over list_notes whenever you know what you are looking for.',
     inputSchema: textSchema(
       {
         query: {
           type: 'string',
-          description: 'Search terms matched against note titles.',
+          description:
+            'Search terms matched against note titles, tags, and saved content.',
         },
         tag: TAG_FILTER_PROPERTY,
         limit: LIMIT_PROPERTY,

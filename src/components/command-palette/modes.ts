@@ -4,6 +4,7 @@ import type { Messages } from '@myelin/editor/i18n';
 import { Logger } from '@myelin/shared/logger';
 import { openNote } from '@/lib/note/navigation';
 import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { CommandPaletteItem, CommandPaletteModeState } from './types';
 import { createCommandPaletteSearchIndex } from './utils';
@@ -69,8 +70,10 @@ export function useNotesMode({
 }): CommandPaletteModeState {
   const [noteResults, setNoteResults] = useState<NoteEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const noteIndexStatus = useNoteIndexStatus();
   const loadRequestRef = useRef(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: index revision refreshes active search results
   useEffect(() => {
     const requestId = loadRequestRef.current + 1;
     loadRequestRef.current = requestId;
@@ -136,7 +139,7 @@ export function useNotesMode({
       window.clearTimeout(timer);
       loadRequestRef.current++;
     };
-  }, [active, query, repository]);
+  }, [active, query, repository, noteIndexStatus.revision]);
 
   const items = useMemo<CommandPaletteItem[]>(() => {
     const trimmed = query.trim();

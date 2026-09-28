@@ -94,7 +94,7 @@ for step in range(3):
     audioBody:
       'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera.',
     searchBody:
-      'Busca notas por título y etiquetas en la biblioteca. En un lienzo abierto, encuentra texto y transcripciones de audio.',
+      'Busca en la biblioteca por título, etiquetas, texto guardado y transcripciones de audio. También puedes buscar dentro de un lienzo abierto.',
     audioMock: {
       title: 'Clase 12 · Potenciales de acción',
       duration: '48:12',

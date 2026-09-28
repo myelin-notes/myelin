@@ -22,6 +22,7 @@ import {
   useRepositoryStatus,
   type VFSNode,
 } from '@/lib/sync';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import {
   ExplorerModel,
   type ExplorerSortMode,
@@ -81,6 +82,7 @@ export function ExplorerTree({
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
       new ExplorerModel(repository, (name, parentId) =>
@@ -171,6 +173,7 @@ export function ExplorerTree({
     startNewFile,
   ]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: index revision refreshes active search results
   useEffect(() => {
     if (!isSearching || repositorySetupState !== 'ready') {
       void reload();
@@ -188,7 +191,13 @@ export function ExplorerTree({
       window.clearTimeout(timer);
       explorer.invalidatePendingRequests();
     };
-  }, [explorer, isSearching, reload, repositorySetupState]);
+  }, [
+    explorer,
+    isSearching,
+    reload,
+    repositorySetupState,
+    noteIndexStatus.revision,
+  ]);
 
   useEffect(() => {
     if (repositoryStatus.lastRemoteSyncAt !== null) {

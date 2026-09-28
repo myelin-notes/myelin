@@ -244,6 +244,14 @@ const fr: typeof en = {
       },
     },
     explorerTree: {
+      preparingIndex:
+        'Indexation des notes… D’autres résultats peuvent apparaître.',
+      indexingUnavailable:
+        'Impossible d’indexer les notes. La recherche dans le contenu réessaiera plus tard.',
+      indexingNotes: (indexed: number, total: number) =>
+        `Indexation des notes… ${indexed}/${total}. D’autres résultats peuvent apparaître.`,
+      indexingFailed: (count: number) =>
+        `${count} notes n’ont pas pu être indexées.`,
       repositorySetupRequired:
         'Configuration du dépôt requise. Terminez la configuration dans les Réglages pour voir les fichiers.',
       emptySearch: 'Aucun résultat',

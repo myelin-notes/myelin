@@ -14,6 +14,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
+import { noteContentIndex } from './note-content-index';
 import {
   computeRevision,
   createEmptyManifest,
@@ -125,6 +126,7 @@ export class LocalRepository extends BaseRepository {
     const manifest = structuredClone(snapshot.manifest);
     await this.writeManifestToDisk(manifest);
     this.manifest = manifest;
+    noteContentIndex.reconcile(this);
     logger.debug('Replaced local repository snapshot', {
       storageRoot: this.storageRoot,
       nodeCount: Object.keys(snapshot.manifest.nodes).length,

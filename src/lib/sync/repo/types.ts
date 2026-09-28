@@ -13,12 +13,19 @@ import type { NoteSession } from '../session';
 
 export * from '@myelin/editor/sync/repo/types';
 
+export interface NoteIndexItem {
+  nodeId: VFSNodeId;
+  path: string;
+}
+
 export interface OpenSessionOptions {
   /** Newly created local files have no remote state to pull. */
   skipRemotePull?: boolean;
 }
 
 export interface Repository extends EditorRepository {
+  getNoteIndexSource(): object;
+  listNoteIndexItems(): Promise<NoteIndexItem[]>;
   openSession(
     nodeId: VFSNodeId,
     options?: OpenSessionOptions,

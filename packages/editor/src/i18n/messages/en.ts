@@ -235,6 +235,12 @@ const en = {
       },
     },
     explorerTree: {
+      preparingIndex: 'Indexing notes… More results may appear.',
+      indexingUnavailable:
+        'Could not index notes. Saved content search will retry later.',
+      indexingNotes: (indexed: number, total: number) =>
+        `Indexing notes… ${indexed}/${total}. More results may appear.`,
+      indexingFailed: (count: number) => `${count} notes could not be indexed.`,
       repositorySetupRequired:
         'Repository setup required. Finish setup in Settings to view files.',
       emptySearch: 'No results found',

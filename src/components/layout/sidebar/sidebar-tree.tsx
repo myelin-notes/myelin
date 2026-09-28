@@ -18,6 +18,7 @@ import {
   type VFSFolderNode,
   type VFSNode,
 } from '@/lib/sync';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import {
   compareExplorerNodes,
   ExplorerModel,
@@ -134,6 +135,7 @@ export function SidebarTree({
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
       new ExplorerModel(repository, (name, parentId) =>
@@ -269,6 +271,7 @@ export function SidebarTree({
     loadFlatResults,
     repositoryStatus.lastRemoteSyncAt,
     repositoryStatus.dataVersion,
+    noteIndexStatus.revision,
   ]);
 
   const toggle = useCallback(
