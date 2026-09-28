@@ -236,10 +236,12 @@ export class CanvasRenderer {
 
     const viewRect = viewport.getWorldRect();
     const cullMargin = cullMarginWorld(zoom);
+    const visibleElements: DrawableElement[] = [];
     for (const element of elements) {
       if (!element.intersectsWorldRect(viewRect, cullMargin)) {
         continue;
       }
+      visibleElements.push(element);
       element.draw(this.ctx, deltaTime);
     }
     // Cursor: compute fresh from screen position so it's correct even if
@@ -273,7 +275,7 @@ export class CanvasRenderer {
 
     if (domOverlayHost) {
       for (const element of elements) {
-        element.syncDOM(viewport, domOverlayHost);
+        element.syncDOM(viewport, domOverlayHost, visibleElements);
       }
       // DOM roots share canvas order with page-frame chrome, so keep both z-index and sibling order
       // in sync. `syncDOM` only appends on create, so only out-of-position nodes move.

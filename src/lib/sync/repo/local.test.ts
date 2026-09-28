@@ -23,6 +23,11 @@ import {
   MANIFEST_PATH,
 } from './shared';
 
+vi.mock('@tauri-apps/api/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tauri-apps/api/core')>()),
+  convertFileSrc: (path: string) => path,
+}));
+
 function readFirstPageFrameMarkdown(update: Uint8Array | null): string {
   if (!update || update.byteLength === 0) {
     return '';
@@ -444,6 +449,169 @@ describe('LocalRepository', () => {
     await repository.deleteNode(fileId);
 
     expect(storage.readBinary(storedPath)).toBeNull();
+  });
+
+  it('writes large files in bounded IPC chunks', async () => {
+    const repository = new LocalRepository('repositories/chunked-write-test');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+    const storage = getRepositoryTestStorage();
+    const open = storage.open.bind(storage);
+    const writeSizes: number[] = [];
+    let writes = 0;
+    const openSpy = vi
+      .spyOn(storage, 'open')
+      .mockImplementation(async (path, options) => {
+        const file = await open(path, options);
+        return {
+          ...file,
+          write: async (data) => {
+            writeSizes.push(data.byteLength);
+            return file.write(
+              writes++ === 0 ? data.subarray(0, data.byteLength / 2) : data,
+            );
+          },
+        };
+      });
+    const bytes = new Uint8Array(16 * 1024 + 17).fill(7);
+
+    await repository.writeFileBytes(fileId, bytes);
+
+    expect(writeSizes).toEqual([8 * 1024, 8 * 1024, 4 * 1024 + 17]);
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ truncate: true }),
+    );
+    expect(
+      storage.readBinary(
+        `repositories/chunked-write-test/files/${getStoredFileName({ id: fileId, fileType: 'png' })}`,
+      ),
+    ).toEqual(bytes);
+  });
+
+  it('sends large Tauri saves as paced base64 chunks', async () => {
+    const repository = new LocalRepository('repositories/base64-chunk-test');
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Photo.png',
+      'png',
+      null,
+      new Uint8Array([1]),
+    );
+    const ipc = vi.fn(
+      async (
+        _cmd: string,
+        _args: {
+          relativePath: string;
+          writeId: string;
+          offset: number;
+          bytesBase64: string;
+          finalChunk: boolean;
+        },
+      ) => {},
+    );
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('isTauri', true);
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke: ipc } });
+    vi.stubGlobal('document', { visibilityState: 'visible' });
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    const bytes = Uint8Array.from(
+      { length: 16 * 1024 + 17 },
+      (_, index) => index % 251,
+    );
+
+    try {
+      const save = repository.writeFileBytes(fileId, bytes);
+      await vi.waitFor(() => expect(ipc).toHaveBeenCalledTimes(1));
+      frames.shift()?.(0);
+      await vi.waitFor(() => expect(ipc).toHaveBeenCalledTimes(2));
+      frames.shift()?.(0);
+      await save;
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(ipc).toHaveBeenCalledTimes(3);
+    expect(
+      ipc.mock.calls.map(([, args]) => [
+        atob(args.bytesBase64).length,
+        args.offset,
+      ]),
+    ).toEqual([
+      [8 * 1024, 0],
+      [8 * 1024, 8 * 1024],
+      [17, 16 * 1024],
+    ]);
+    expect(ipc.mock.calls[0][0]).toBe('write_local_file_chunk');
+    expect(new Set(ipc.mock.calls.map(([, args]) => args.writeId)).size).toBe(
+      1,
+    );
+    expect(ipc.mock.calls.map(([, args]) => args.finalChunk)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(ipc.mock.calls[0][1].relativePath).toBe(
+      `repositories/base64-chunk-test/files/${fileId}.png`,
+    );
+    expect(
+      Uint8Array.from(atob(ipc.mock.calls[0][1].bytesBase64), (char) =>
+        char.charCodeAt(0),
+      ),
+    ).toEqual(bytes.subarray(0, 8 * 1024));
+  });
+
+  it('sends large Tauri manifests in bounded chunks', async () => {
+    const repository = new LocalRepository('repositories/manifest-chunk-test');
+    await repository.initialize();
+    const ipc = vi.fn(
+      async (
+        _cmd: string,
+        _args: {
+          relativePath: string;
+          writeId: string;
+          offset: number;
+          bytesBase64: string;
+          finalChunk: boolean;
+        },
+      ) => {},
+    );
+    vi.stubGlobal('isTauri', true);
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke: ipc } });
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+
+    try {
+      await repository.applyManifestMutation('Add tags', (manifest) => {
+        manifest.tagRegistry = ['x'.repeat(17 * 1024)];
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(ipc.mock.calls.length).toBeGreaterThan(1);
+    expect(
+      ipc.mock.calls.map(([, args]) => [
+        args.relativePath,
+        args.offset,
+        atob(args.bytesBase64).length,
+      ]),
+    ).toEqual([
+      ['repositories/manifest-chunk-test/manifest.json', 0, 8 * 1024],
+      ['repositories/manifest-chunk-test/manifest.json', 8 * 1024, 8 * 1024],
+      [
+        'repositories/manifest-chunk-test/manifest.json',
+        16 * 1024,
+        expect.any(Number),
+      ],
+    ]);
   });
 
   it('removes stored note bytes when a file is deleted', async () => {

@@ -288,6 +288,16 @@ export class PdfElement
     );
   }
 
+  public override intersectsWorldRect(rect: DOMRect, margin: number): boolean {
+    const bounds = this.boundingBox;
+    return (
+      bounds.right >= rect.left - margin &&
+      bounds.left <= rect.right + margin &&
+      bounds.bottom >= rect.top - margin &&
+      bounds.top <= rect.bottom + margin
+    );
+  }
+
   protected isOverLocal(
     x: number,
     y: number,
@@ -390,7 +400,11 @@ export class PdfElement
     return { kind: 'pdf', source: this.getPdfExportSource() };
   }
 
-  public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
+  public override syncDOM(
+    viewport: CanvasViewport,
+    host: HTMLElement,
+    visibleElements?: readonly DrawableElement[],
+  ): void {
     if (!this._chrome) {
       this.createDom(host);
     }
@@ -412,6 +426,7 @@ export class PdfElement
       contentWidth,
       zoom,
     });
+    const coveringBounds = this.getCoveringBounds(viewport, visibleElements);
     this._chrome?.sync({
       screenX,
       screenY,
@@ -423,6 +438,7 @@ export class PdfElement
         menuRect.top + menuRect.size / 2,
         menuRect.size,
         viewport,
+        coveringBounds,
       ),
     });
     const rasterZoom = quantizeRasterZoom(zoom);
@@ -448,7 +464,13 @@ export class PdfElement
       pageLayout: this.model.pageLayout,
       layout,
       isCovered: (screenX, screenY, size) =>
-        this.isChromeButtonCovered(screenX, screenY, size, viewport),
+        this.isChromeButtonCovered(
+          screenX,
+          screenY,
+          size,
+          viewport,
+          coveringBounds,
+        ),
     });
   }
 
@@ -457,39 +479,46 @@ export class PdfElement
     this.chromeController.setZIndex(zIndex);
   }
 
+  private getCoveringBounds(
+    viewport: CanvasViewport,
+    visibleElements?: readonly DrawableElement[],
+  ): DOMRect[] {
+    const viewRect = viewport.getWorldRect();
+    if (!this.intersectsWorldRect(viewRect, 0)) {
+      return [];
+    }
+    const elements = visibleElements ?? this._exportElementsProvider?.();
+    const elementIndex = elements?.indexOf(this) ?? -1;
+    if (!elements || elementIndex < 0) {
+      return [];
+    }
+    const bounds: DOMRect[] = [];
+    for (let i = elementIndex + 1; i < elements.length; i++) {
+      const element = elements[i];
+      if (!element.hidden && element.intersectsWorldRect(viewRect, 0)) {
+        bounds.push(element.boundingBox);
+      }
+    }
+    return bounds;
+  }
+
   private isChromeButtonCovered(
     screenX: number,
     screenY: number,
     size: number,
     viewport: CanvasViewport,
+    coveringBounds: readonly DOMRect[],
   ): boolean {
-    const elements = this._exportElementsProvider?.();
-    if (!elements) {
-      return false;
-    }
-    const elementIndex = elements.indexOf(this);
-    if (elementIndex < 0) {
-      return false;
-    }
-    const left = screenX - size / 2;
-    const top = screenY - size / 2;
-    const right = left + size;
-    const bottom = top + size;
-    for (let i = elementIndex + 1; i < elements.length; i++) {
-      const element = elements[i];
-      if (element.hidden) {
-        continue;
-      }
-      const bounds = element.boundingBox;
-      const elementLeft = (bounds.left + viewport.offset.x) * viewport.zoom;
-      const elementTop = (bounds.top + viewport.offset.y) * viewport.zoom;
-      const elementRight = elementLeft + bounds.width * viewport.zoom;
-      const elementBottom = elementTop + bounds.height * viewport.zoom;
+    const left = (screenX - size / 2) / viewport.zoom - viewport.offset.x;
+    const top = (screenY - size / 2) / viewport.zoom - viewport.offset.y;
+    const right = left + size / viewport.zoom;
+    const bottom = top + size / viewport.zoom;
+    for (const bounds of coveringBounds) {
       if (
-        left < elementRight &&
-        right > elementLeft &&
-        top < elementBottom &&
-        bottom > elementTop
+        left < bounds.right &&
+        right > bounds.left &&
+        top < bounds.bottom &&
+        bottom > bounds.top
       ) {
         return true;
       }

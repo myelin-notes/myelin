@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
 import {
   getRepositoryTestStorage,
@@ -12,6 +12,8 @@ beforeEach(() => {
   resetRepositoryTestDoubles();
   vi.mocked(invoke).mockReset();
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 it('stages raw bytes and sends only paths to embedded Git, then removes staging', async () => {
   const bytes = new Uint8Array([1, 2, 3, 4]);
@@ -50,6 +52,11 @@ it('stages raw bytes and sends only paths to embedded Git, then removes staging'
 });
 
 it('stages large bytes in bounded writes and completes partial writes', async () => {
+  vi.stubGlobal('document', { visibilityState: 'visible' });
+  const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+    return setTimeout(() => callback(0), 0);
+  });
+  vi.stubGlobal('requestAnimationFrame', requestFrame);
   const storage = getRepositoryTestStorage();
   const originalOpen = storage.open.bind(storage);
   let largestWrite = 0;
@@ -60,12 +67,12 @@ it('stages large bytes in bounded writes and completes partial writes', async ()
       write: (data: Uint8Array) => {
         largestWrite = Math.max(largestWrite, data.byteLength);
         return file.write(
-          data.subarray(0, Math.min(data.byteLength, 256 * 1024)),
+          data.subarray(0, Math.min(data.byteLength, 4 * 1024)),
         );
       },
     };
   });
-  const bytes = new Uint8Array(2 * 1024 * 1024 + 1);
+  const bytes = new Uint8Array(32 * 1024 + 1);
   bytes[0] = 7;
   bytes[bytes.length - 1] = 9;
   vi.mocked(invoke).mockImplementation(async (_command, args) => {
@@ -87,5 +94,6 @@ it('stages large bytes in bounded writes and completes partial writes', async ()
     'private-token',
   );
 
-  expect(largestWrite).toBeLessThanOrEqual(1024 * 1024);
+  expect(largestWrite).toBeLessThanOrEqual(16 * 1024);
+  expect(requestFrame).toHaveBeenCalled();
 });

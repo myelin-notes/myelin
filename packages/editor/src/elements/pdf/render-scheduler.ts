@@ -16,6 +16,7 @@ export interface PendingPdfPageRender {
   key: PdfPageRenderKey;
   timeout: number;
   zoom: number;
+  dueAt: number;
 }
 
 export interface PdfPageSurface {
@@ -94,12 +95,13 @@ export class PdfPageRenderScheduler {
       isSameRenderKey(params.surface.pendingRender.key, key)
     ) {
       if (
-        !params.fastScroll &&
-        params.surface.pendingRender.zoom === params.zoom
+        params.fastScroll ||
+        params.surface.pendingRender.zoom !== params.zoom
       ) {
-        return;
+        params.surface.pendingRender.zoom = params.zoom;
+        params.surface.pendingRender.dueAt =
+          Date.now() + PDF_RENDER_DEBOUNCE_MS;
       }
-      this.schedule(params);
       return;
     }
     if (
@@ -148,11 +150,32 @@ export class PdfPageRenderScheduler {
       pageIndex: params.pageIndex,
       renderScale: params.renderScale,
     };
-    const timeout = globalThis.setTimeout(() => {
+    const pending: PendingPdfPageRender = {
+      key,
+      timeout: 0,
+      zoom: params.zoom,
+      dueAt: Date.now() + PDF_RENDER_DEBOUNCE_MS,
+    };
+    const fire = () => {
+      if (params.surface.pendingRender !== pending) {
+        return;
+      }
+      const remaining = pending.dueAt - Date.now();
+      if (remaining > 0) {
+        pending.timeout = globalThis.setTimeout(
+          fire,
+          remaining,
+        ) as unknown as number;
+        return;
+      }
       params.surface.pendingRender = null;
       this.start(params);
-    }, PDF_RENDER_DEBOUNCE_MS) as unknown as number;
-    params.surface.pendingRender = { key, timeout, zoom: params.zoom };
+    };
+    pending.timeout = globalThis.setTimeout(
+      fire,
+      PDF_RENDER_DEBOUNCE_MS,
+    ) as unknown as number;
+    params.surface.pendingRender = pending;
   }
 
   private clearPending(surface: PdfPageSurface): void {
@@ -187,19 +210,18 @@ export class PdfPageRenderScheduler {
       renderScale: params.renderScale,
     });
     params.surface.renderHandle = handle;
+    let canvasToRelease = stagingCanvas;
 
     void handle.promise
       .then(() => {
         if (params.surface.renderHandle !== handle) {
           return;
         }
-        const context = params.surface.canvas.getContext('2d');
-        if (!context) {
-          throw new Error('Failed to create PDF page canvas context');
-        }
-        params.surface.canvas.width = stagingCanvas.width;
-        params.surface.canvas.height = stagingCanvas.height;
-        context.drawImage(stagingCanvas, 0, 0);
+        const visibleCanvas = params.surface.canvas;
+        stagingCanvas.style.cssText = visibleCanvas.style.cssText;
+        visibleCanvas.replaceWith(stagingCanvas);
+        params.surface.canvas = stagingCanvas;
+        canvasToRelease = visibleCanvas;
         params.surface.renderHandle = null;
         params.surface.rendered = {
           pageIndex: params.pageIndex,
@@ -221,7 +243,7 @@ export class PdfPageRenderScheduler {
         });
       })
       .finally(() => {
-        this.canvasPool.release(stagingCanvas);
+        this.canvasPool.release(canvasToRelease);
       });
   }
 }

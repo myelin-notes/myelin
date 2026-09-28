@@ -26,6 +26,7 @@ export function createPdfChromeButton({
     transformOrigin: '0 0',
     pointerEvents: 'auto',
     visibility: 'hidden',
+    borderRadius: 'var(--radius-lg)',
   } as Partial<CSSStyleDeclaration>);
 
   const reactRoot = createRoot(root);
@@ -34,11 +35,9 @@ export function createPdfChromeButton({
   return {
     root,
     sync: ({ screenX, screenY, size }) => {
-      root.style.visibility = 'visible';
       root.style.transform = `translate(${screenX - size / 2}px, ${screenY - size / 2}px)`;
       root.style.width = `${size}px`;
       root.style.height = `${size}px`;
-      root.style.borderRadius = 'var(--radius-lg)';
     },
     dispose: () => {
       reactRoot.unmount();
@@ -77,7 +76,6 @@ function PdfChromeButton({
         width: '100%',
         height: '100%',
         borderRadius: 'inherit',
-        visibility: 'visible',
       }}
     >
       <Icon aria-hidden="true" strokeWidth={1.5} />

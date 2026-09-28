@@ -91,8 +91,7 @@ export function extractStoredNoteLinks(doc: Y.Doc): StoredNoteLink[] {
   const ydoc = new YDocManager(doc);
   const links: StoredNoteLink[] = [];
 
-  for (let i = 0; i < ydoc.elements.length; i++) {
-    const yMap = ydoc.elements.get(i);
+  for (const yMap of ydoc.elements) {
     if (yMap.get('type') !== ElementType.PAGE_FRAME) {
       continue;
     }
