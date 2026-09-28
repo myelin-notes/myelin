@@ -13,8 +13,42 @@ import {
   addMarkdownPageFrameToYDoc,
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
 } from './import';
+import { serializeDocToMarkdown } from './serializer';
 
 describe('markdown canvas import', () => {
+  it('keeps underscores literal through import and serialization', async () => {
+    const ydoc = new YDocManager();
+    const uuid = await addMarkdownPageFrameToYDoc(
+      ydoc,
+      [
+        'Answer: ______ and ____',
+        '',
+        '______',
+        '',
+        '_italic_ and __bold__ and *italic*',
+        '',
+        '___',
+      ].join('\n'),
+    );
+    const doc = yXmlFragmentToProseMirrorRootNode(
+      ydoc.getXmlFragment(uuid),
+      schema,
+    );
+
+    expect(doc.child(0).textContent).toBe('Answer: ______ and ____');
+    expect(doc.child(1).type.name).toBe('paragraph');
+    expect(doc.child(1).textContent).toBe('______');
+    expect(doc.child(2).toJSON().content).toEqual([
+      { type: 'text', text: '_italic_ and __bold__ and ' },
+      { type: 'text', text: 'italic', marks: [{ type: 'italic' }] },
+    ]);
+    expect(doc.child(3).type.name).toBe('paragraph');
+    expect(doc.child(3).textContent).toBe('___');
+    expect(serializeDocToMarkdown(doc)).toBe(
+      'Answer: ______ and ____\n\n______\n\n_italic_ and __bold__ and *italic*\n\n___\n',
+    );
+  });
+
   it('creates a page frame populated with parsed markdown', async () => {
     const ydoc = new YDocManager();
     const uuid = await addMarkdownPageFrameToYDoc(
