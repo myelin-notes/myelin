@@ -34,7 +34,8 @@ fn write_chunk(root: &Path, relative_path: &Path, offset: u64, bytes: &[u8]) -> 
         || relative_path
             .components()
             .any(|component| !matches!(component, Component::Normal(_)))
-        || relative_path.parent().and_then(Path::file_name) != Some(OsStr::new("files"))
+        || (relative_path.file_name() != Some(OsStr::new("manifest.json"))
+            && relative_path.parent().and_then(Path::file_name) != Some(OsStr::new("files")))
     {
         return Err("invalid local file path".into());
     }
@@ -82,6 +83,8 @@ mod tests {
         write_chunk(&root, path, 0, b"hello ").unwrap();
         write_chunk(&root, path, 6, b"world").unwrap();
         assert_eq!(fs::read(root.join(path)).unwrap(), b"hello world");
+        write_chunk(&root, Path::new("manifest.json"), 0, b"{}").unwrap();
+        assert_eq!(fs::read(root.join("manifest.json")).unwrap(), b"{}");
         assert!(write_chunk(&root, path, 1, b"bad").is_err());
         assert!(write_chunk(&root, Path::new("../files/escape"), 0, b"bad").is_err());
         fs::remove_dir_all(root).unwrap();

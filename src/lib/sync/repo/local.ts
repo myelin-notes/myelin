@@ -27,7 +27,7 @@ import {
 import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
-const MAX_IPC_WRITE_BYTES = 64 * 1024;
+const MAX_IPC_WRITE_BYTES = 8 * 1024;
 
 function encodeBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -109,7 +109,7 @@ export class LocalRepository extends BaseRepository {
       );
       const bytes = snapshot.notes[node.id] ?? null;
       if (bytes && bytes.byteLength > 0) {
-        await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+        await this.writeBytesToDisk(filePath, bytes);
         continue;
       }
 
@@ -221,54 +221,7 @@ export class LocalRepository extends BaseRepository {
         FILES_DIR,
         getStoredFileName(node),
       );
-      // One large Tauri IPC payload blocked the renderer for ~3s in the canvas trace.
-      if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
-        await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
-      } else if (isTauri()) {
-        // Android has no raw IPC body; base64 is smaller than FileHandle.write's JSON byte array.
-        for (
-          let offset = 0;
-          offset < bytes.byteLength;
-          offset += MAX_IPC_WRITE_BYTES
-        ) {
-          await invoke('write_local_file_chunk', {
-            relativePath: filePath,
-            offset,
-            bytesBase64: encodeBase64(
-              bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
-            ),
-          });
-          if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
-            await new Promise<void>((resolve) => {
-              if (document.visibilityState === 'visible') {
-                requestAnimationFrame(() => setTimeout(resolve, 0));
-              } else {
-                setTimeout(resolve, 0);
-              }
-            });
-          }
-        }
-      } else {
-        const file = await open(filePath, {
-          write: true,
-          create: true,
-          truncate: true,
-          baseDir: BaseDirectory.AppData,
-        });
-        try {
-          for (let offset = 0; offset < bytes.byteLength; ) {
-            const written = await file.write(
-              bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
-            );
-            if (written === 0) {
-              throw new Error('Could not write local file bytes');
-            }
-            offset += written;
-          }
-        } finally {
-          await file.close();
-        }
-      }
+      await this.writeBytesToDisk(filePath, bytes);
       const revision = await computeRevision(bytes);
       logger.debug('Saved local note bytes to disk', {
         nodeId,
@@ -328,13 +281,65 @@ export class LocalRepository extends BaseRepository {
   }
 
   private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {
-    await writeTextFile(
-      this.resolveStoragePath(MANIFEST_PATH),
-      JSON.stringify(manifest, null, 2),
-      {
+    const filePath = this.resolveStoragePath(MANIFEST_PATH);
+    const text = JSON.stringify(manifest, null, 2);
+    if (isTauri() && text.length > MAX_IPC_WRITE_BYTES) {
+      await this.writeBytesToDisk(filePath, new TextEncoder().encode(text));
+    } else {
+      await writeTextFile(filePath, text, { baseDir: BaseDirectory.AppData });
+    }
+  }
+
+  private async writeBytesToDisk(
+    filePath: string,
+    bytes: Uint8Array,
+  ): Promise<void> {
+    if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
+      await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+    } else if (isTauri()) {
+      for (
+        let offset = 0;
+        offset < bytes.byteLength;
+        offset += MAX_IPC_WRITE_BYTES
+      ) {
+        await invoke('write_local_file_chunk', {
+          relativePath: filePath,
+          offset,
+          bytesBase64: encodeBase64(
+            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+          ),
+        });
+        if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
+          await new Promise<void>((resolve) => {
+            if (document.visibilityState === 'visible') {
+              requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+        }
+      }
+    } else {
+      const file = await open(filePath, {
+        write: true,
+        create: true,
+        truncate: true,
         baseDir: BaseDirectory.AppData,
-      },
-    );
+      });
+      try {
+        for (let offset = 0; offset < bytes.byteLength; ) {
+          const written = await file.write(
+            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+          );
+          if (written === 0) {
+            throw new Error('Could not write local file bytes');
+          }
+          offset += written;
+        }
+      } finally {
+        await file.close();
+      }
+    }
   }
 
   /**

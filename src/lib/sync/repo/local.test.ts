@@ -524,11 +524,11 @@ describe('LocalRepository', () => {
           },
         };
       });
-    const bytes = new Uint8Array(128 * 1024 + 17).fill(7);
+    const bytes = new Uint8Array(16 * 1024 + 17).fill(7);
 
     await repository.writeFileBytes(fileId, bytes);
 
-    expect(writeSizes).toEqual([64 * 1024, 64 * 1024, 32 * 1024 + 17]);
+    expect(writeSizes).toEqual([8 * 1024, 8 * 1024, 4 * 1024 + 17]);
     expect(openSpy).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ truncate: true }),
@@ -564,7 +564,7 @@ describe('LocalRepository', () => {
       return frames.length;
     });
     const bytes = Uint8Array.from(
-      { length: 128 * 1024 + 17 },
+      { length: 16 * 1024 + 17 },
       (_, index) => index % 251,
     );
 
@@ -586,9 +586,9 @@ describe('LocalRepository', () => {
         args.offset,
       ]),
     ).toEqual([
-      [64 * 1024, 0],
-      [64 * 1024, 64 * 1024],
-      [17, 128 * 1024],
+      [8 * 1024, 0],
+      [8 * 1024, 8 * 1024],
+      [17, 16 * 1024],
     ]);
     expect(ipc.mock.calls[0][0]).toBe('write_local_file_chunk');
     expect(ipc.mock.calls[0][1].relativePath).toBe(
@@ -598,7 +598,46 @@ describe('LocalRepository', () => {
       Uint8Array.from(atob(ipc.mock.calls[0][1].bytesBase64), (char) =>
         char.charCodeAt(0),
       ),
-    ).toEqual(bytes.subarray(0, 64 * 1024));
+    ).toEqual(bytes.subarray(0, 8 * 1024));
+  });
+
+  it('sends large Tauri manifests in bounded chunks', async () => {
+    const repository = new LocalRepository('repositories/manifest-chunk-test');
+    await repository.initialize();
+    const ipc = vi.fn(
+      async (
+        _cmd: string,
+        _args: { relativePath: string; offset: number; bytesBase64: string },
+      ) => {},
+    );
+    vi.stubGlobal('isTauri', true);
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke: ipc } });
+    vi.stubGlobal('document', { visibilityState: 'hidden' });
+
+    try {
+      await repository.applyManifestMutation('Add tags', (manifest) => {
+        manifest.tagRegistry = ['x'.repeat(17 * 1024)];
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(ipc.mock.calls.length).toBeGreaterThan(1);
+    expect(
+      ipc.mock.calls.map(([, args]) => [
+        args.relativePath,
+        args.offset,
+        atob(args.bytesBase64).length,
+      ]),
+    ).toEqual([
+      ['repositories/manifest-chunk-test/manifest.json', 0, 8 * 1024],
+      ['repositories/manifest-chunk-test/manifest.json', 8 * 1024, 8 * 1024],
+      [
+        'repositories/manifest-chunk-test/manifest.json',
+        16 * 1024,
+        expect.any(Number),
+      ],
+    ]);
   });
 
   it('removes stored note bytes when a file is deleted', async () => {
