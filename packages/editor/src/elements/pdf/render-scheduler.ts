@@ -210,19 +210,18 @@ export class PdfPageRenderScheduler {
       renderScale: params.renderScale,
     });
     params.surface.renderHandle = handle;
+    let canvasToRelease = stagingCanvas;
 
     void handle.promise
       .then(() => {
         if (params.surface.renderHandle !== handle) {
           return;
         }
-        const context = params.surface.canvas.getContext('2d');
-        if (!context) {
-          throw new Error('Failed to create PDF page canvas context');
-        }
-        params.surface.canvas.width = stagingCanvas.width;
-        params.surface.canvas.height = stagingCanvas.height;
-        context.drawImage(stagingCanvas, 0, 0);
+        const visibleCanvas = params.surface.canvas;
+        stagingCanvas.style.cssText = visibleCanvas.style.cssText;
+        visibleCanvas.replaceWith(stagingCanvas);
+        params.surface.canvas = stagingCanvas;
+        canvasToRelease = visibleCanvas;
         params.surface.renderHandle = null;
         params.surface.rendered = {
           pageIndex: params.pageIndex,
@@ -244,7 +243,7 @@ export class PdfPageRenderScheduler {
         });
       })
       .finally(() => {
-        this.canvasPool.release(stagingCanvas);
+        this.canvasPool.release(canvasToRelease);
       });
   }
 }
