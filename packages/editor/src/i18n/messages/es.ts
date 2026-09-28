@@ -26,8 +26,6 @@ const es: typeof en = {
   },
   sidebar: {
     searchPlaceholder: 'Busca en tu biblioteca...',
-    searchModeText: 'Texto',
-    searchModeSemantic: 'Semántica',
     explorer: 'Explorador',
     tags: 'Etiquetas',
     collapse: 'Contraer barra lateral',
@@ -98,7 +96,6 @@ const es: typeof en = {
         '¿Encontraste un error o tienes una idea? Cuéntanos en un formulario breve.',
     },
     searchPlaceholder: 'Buscar en el estudio...',
-    semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {

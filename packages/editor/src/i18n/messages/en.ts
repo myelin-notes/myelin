@@ -24,8 +24,6 @@ const en = {
   },
   sidebar: {
     searchPlaceholder: 'Search your library...',
-    searchModeText: 'Text',
-    searchModeSemantic: 'Semantic',
     explorer: 'Explorer',
     tags: 'Tags',
     collapse: 'Collapse sidebar',
@@ -95,7 +93,6 @@ const en = {
       description: 'Hit a bug or have an idea? Tell us in a short form.',
     },
     searchPlaceholder: 'Search studio...',
-    semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',
     sortLabel: (label: string) => `Sort: ${label}`,
     sortModes: {

@@ -6,9 +6,7 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { artifactCache } from './artifact-cache';
 import { codeRunner } from './code-runner';
-import { TauriHandwritingService } from './handwriting';
 import { IrohTransport } from './iroh';
-import { TauriNoteIndexService } from './note-index';
 import { pdfExport } from './pdf-export';
 import { transcription } from './transcription';
 
@@ -45,9 +43,7 @@ export const tauriPlatform: Platform = {
   },
 
   transcription,
-  handwriting: new TauriHandwritingService(),
   codeRunner,
   pdfExport,
-  noteIndex: new TauriNoteIndexService(),
   createLiveTransport: (noteId) => new IrohTransport(noteId),
 };

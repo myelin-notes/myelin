@@ -4,11 +4,9 @@ mod code_runner;
 mod clipboard;
 mod error_report;
 mod github_push;
-mod handwriting;
 mod iroh_transport;
 mod local_file_write;
 mod mcp_server;
-mod note_index;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
@@ -71,12 +69,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_ocr::init())
         .plugin(tauri_plugin_pencil::init())
         .manage(iroh_transport::IrohState::new())
         .manage(mcp_server::McpServerState::new())
-        .manage(note_index::IndexEngineState::new())
-        .manage(handwriting::HandwritingState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
         .manage(oauth_loopback::OAuthLoopbackState::new())
@@ -92,13 +87,6 @@ pub fn run() {
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
             mcp_server::mcp_respond,
-            note_index::reindex_note,
-            note_index::reindex_batch,
-            note_index::remove_index,
-            note_index::embed_search_query,
-            handwriting::recognize_handwriting,
-            handwriting::recognize_handwriting_batch,
-            handwriting::remove_handwriting,
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,

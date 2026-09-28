@@ -58,7 +58,6 @@ describe('MCP tool service', () => {
       await createRepositoryWithNote();
     const service = new McpToolService({
       repository,
-      indexedTextByNode: new Map([[noteId, 'Indexed body']]),
       allowDirectWrites: () => false,
     });
 
@@ -67,14 +66,11 @@ describe('MCP tool service', () => {
         {
           id: noteId,
           title: 'Tool Note',
-          preview: 'Indexed body',
+          preview: null,
         },
       ],
     });
     const note = await service.callTool('read_note', { noteId });
-    expect(note).toMatchObject({
-      indexedText: 'Indexed body',
-    });
     expect(
       (note as { elements: Array<{ kind: string; id: string }> }).elements,
     ).toEqual(

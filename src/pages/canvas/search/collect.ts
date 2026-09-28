@@ -2,13 +2,8 @@ import type { Node as PMNode } from 'prosemirror-model';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SearchableElement } from '@myelin/editor/elements/canvas-searchable-element';
 import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
-import type { RecognizedPage } from '@myelin/editor/platform';
 
-export type CanvasSearchKind =
-  | 'text'
-  | 'page-frame'
-  | 'transcript'
-  | 'handwriting';
+export type CanvasSearchKind = 'text' | 'page-frame' | 'transcript';
 
 export interface CanvasSearchRect {
   x: number;
@@ -44,11 +39,8 @@ function rectOf(box: DOMRect): CanvasSearchRect {
   return { x: box.x, y: box.y, width: box.width, height: box.height };
 }
 
-// Text, page frames and audio transcripts come live from the in-memory doc (always fresh);
-// handwriting comes from the recognized artifact.
 export function collectCanvasSearchSources(
   dc: DrawableCanvas,
-  recognized: RecognizedPage | null,
 ): CanvasSearchSource[] {
   const sources: CanvasSearchSource[] = [];
 
@@ -74,22 +66,6 @@ export function collectCanvasSearchSources(
       selectUuids: [element.uuid],
       text: content.text,
     });
-  }
-
-  if (recognized) {
-    for (const line of recognized.lines) {
-      const text = line.text.trim();
-      if (!text) {
-        continue;
-      }
-      const [x, y, width, height] = line.bbox;
-      sources.push({
-        kind: 'handwriting',
-        rect: { x, y, width, height },
-        selectUuids: line.strokeIds,
-        text,
-      });
-    }
   }
 
   return sources;

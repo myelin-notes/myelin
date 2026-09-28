@@ -108,12 +108,9 @@ describe('MCP read model', () => {
   it('extracts staged note inventory from a canvas note', async () => {
     const { repository, noteId } = await createRepositoryNote();
 
-    const note = await buildMcpNoteReadModel(repository, noteId, {
-      indexedText: 'Indexed note text',
-    });
+    const note = await buildMcpNoteReadModel(repository, noteId);
 
     expect(note.note.title).toBe('MCP Note');
-    expect(note.indexedText).toBe('Indexed note text');
     expect(note.elements.map((element) => element.kind)).toEqual([
       'page-frame',
       'text',
@@ -177,7 +174,7 @@ describe('MCP read model', () => {
 
     expect(note.elements[5]).toEqual({
       kind: 'stroke-group',
-      reader: 'read_handwriting',
+      reader: 'screenshot_canvas',
       count: 2,
       bounds: { x: 9.8, y: 43.2, width: 112.7, height: 169.3 },
       boxes: [
@@ -221,11 +218,8 @@ describe('MCP read model', () => {
   it('reads the full note model in one pass', async () => {
     const { repository, noteId, pageFrameId } = await createRepositoryNote();
 
-    const full = await readMcpNoteFull(repository, noteId, {
-      indexedText: 'Indexed note text',
-    });
+    const full = await readMcpNoteFull(repository, noteId);
 
-    expect(full.indexedText).toBe('Indexed note text');
     expect(full.pageFrames).toEqual([
       expect.objectContaining({
         pageFrameId,

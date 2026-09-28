@@ -88,11 +88,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: '录下来，找得到。\n连手写也不例外。',
+    heading: '录下来，转成文字。\n在画布上找得到。',
     audioBody:
-      '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，因此每段录音都可搜索，而音频始终不会离开你的设备。',
+      '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。',
     searchBody:
-      '全文搜索与语义搜索都在本地运行，使用内置的 all-MiniLM-L6-v2 模型。在 macOS 上，手写内容通过 Apple 的 Vision 框架识别，音频转写文本同样可以搜索。',
+      '在资料库中按笔记标题和标签搜索；打开画布后，可查找文字和音频转写内容。',
     audioMock: {
       title: '第 12 讲 · 动作电位',
       duration: '48:12',
@@ -102,22 +102,17 @@ for step in range(3):
       match: '髓鞘',
     },
     searchMock: {
-      query: '郎飞结',
+      query: '第 12 讲',
       results: [
         {
           kind: 'page',
           title: '第 12 讲 · 动作电位',
-          snippet: '……信号在郎飞结之间跳跃……',
-        },
-        {
-          kind: 'ink',
-          title: '白板 · 髓鞘化草图',
-          snippet: '手写匹配，本地 OCR',
+          snippet: '画布笔记',
         },
         {
           kind: 'audio',
           title: '录音 · 第 12 讲',
-          snippet: '转写文本匹配，位于 31:42',
+          snippet: '画布笔记',
         },
       ],
     },
@@ -162,7 +157,6 @@ for step in range(3):
     bullets: [
       '你的笔记是硬盘上的普通文件，采用开放、无冲突的格式（Yjs）。任何内容都不会被锁定。',
       '所有功能都能完全离线使用，无需账号，中间也没有服务器。',
-      '搜索、语义向量与手写 OCR（macOS）全部在你自己的设备上运行。',
       '自带 AI：模型通过本地 MCP 服务器接入，而不是我们替你选定的某个云服务。',
       '可从 Obsidian 或 GoodNotes 导入，导出为 PDF、图片或 JSON，并在 GitHub 上阅读每一行源码。',
     ],

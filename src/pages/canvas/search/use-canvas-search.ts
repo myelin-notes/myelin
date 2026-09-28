@@ -13,9 +13,7 @@ import {
   clearSearchHighlight,
   setSearchHighlight,
 } from '@myelin/editor/page-frame/pm/search-highlight';
-import { getPlatform } from '@myelin/editor/platform';
 import { useKeybindings } from '@/hooks/useKeybindings';
-import type { VFSNodeId } from '@/lib/sync';
 import {
   buildCanvasMatches,
   type CanvasMatch,
@@ -58,7 +56,6 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 export function useCanvasSearch(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
-  nodeId: VFSNodeId,
 ): CanvasSearchController {
   const [open, setOpen] = useState(false);
   const [query, setQueryState] = useState('');
@@ -188,21 +185,6 @@ export function useCanvasSearch(
     setQueryState('');
   }, []);
 
-  // Re-collecting also refreshes the live text/frame/transcript sources, which is fine — collection
-  // is cheap. Without the handwriting capability there is no artifact and no handwriting layer.
-  const refreshHandwritingSources = useCallback(() => {
-    const handwriting = getPlatform().handwriting;
-    if (!handwriting) {
-      return;
-    }
-    void handwriting.readPage(nodeId).then((page) => {
-      const current = drawableCanvasRef.current;
-      if (current) {
-        setSources(collectCanvasSearchSources(current, page));
-      }
-    });
-  }, [drawableCanvasRef, nodeId]);
-
   const openSearch = useCallback(() => {
     const dc = drawableCanvasRef.current;
     if (!dc) {
@@ -212,29 +194,8 @@ export function useCanvasSearch(
     setOpen(true);
     setQueryState('');
     setCurrentIndex(0);
-    setSources(collectCanvasSearchSources(dc, null));
-    // Handwriting is read from disk and merged in once it resolves.
-    refreshHandwritingSources();
-  }, [drawableCanvasRef, clearActiveHighlight, refreshHandwritingSources]);
-
-  // Recognition can land after the find bar is open. New handwriting matches append after the
-  // element matches, so the current position stays put.
-  useEffect(() => {
-    if (!open || !getPlatform().handwriting) {
-      return;
-    }
-    const unlisten = getPlatform().subscribeEvent<{ nodeId: VFSNodeId }>(
-      'handwriting-updated',
-      (payload) => {
-        if (payload.nodeId === nodeId) {
-          refreshHandwritingSources();
-        }
-      },
-    );
-    return () => {
-      void unlisten.then((fn) => fn());
-    };
-  }, [open, nodeId, refreshHandwritingSources]);
+    setSources(collectCanvasSearchSources(dc));
+  }, [drawableCanvasRef, clearActiveHighlight]);
 
   const close = useCallback(() => {
     clearActiveHighlight();

@@ -25,8 +25,6 @@ const zhHans: typeof en = {
   },
   sidebar: {
     searchPlaceholder: '搜索你的资料库…',
-    searchModeText: '文本',
-    searchModeSemantic: '语义',
     explorer: '资源管理器',
     tags: '标签',
     collapse: '收起侧边栏',
@@ -95,7 +93,6 @@ const zhHans: typeof en = {
       description: '遇到问题或有想法？填写简短表单告诉我们。',
     },
     searchPlaceholder: '搜索工作室…',
-    semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
     sortLabel: (label: string) => `排序：${label}`,
     sortModes: {

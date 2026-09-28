@@ -27,7 +27,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "macros", "time", "process"] }
 tauri-plugin-mcp-bridge = "0.12"
-tauri-plugin-ocr = { path = "plugins/tauri-plugin-ocr" }
 tauri-plugin-pencil = { path = "plugins/tauri-plugin-pencil" }
 tauri-plugin-scoped-storage = "=1.5.1"
 tauri-plugin-stronghold = "2"
@@ -49,10 +48,6 @@ onenote_parser = { version = "2", features = ["onepkg"] }
 typed-path = "0.12"
 yrs = "0.26.0"
 scribble = "0.5.4"
-candle-core = "0.10"
-candle-nn = "0.10"
-candle-transformers = "0.10"
-tokenizers = { version = "0.23", default-features = false, features = ["fancy-regex"] }
 tauri-plugin-deep-link = "2"
 # Already in the tree via reqwest/iroh, so declaring them adds no build cost.
 hyper = { version = "1", features = ["server", "http1"] }
@@ -89,33 +84,6 @@ scribble = { version = "0.5.4", features = ["metal"] }
 tauri-plugin-apple-compliance = { path = "plugins/tauri-plugin-apple-compliance" }
 
 [profile.dev.package.scrypt]
-opt-level = 3
-
-# Embedding inference (candle BERT) is unusably slow at the dev default of
-# opt-level 0. Optimize the embedding crates and the gemm matmul kernels they
-# call (the hot f32 loop lives in gemm-f32 / gemm-common, not the gemm facade).
-# These are external deps that don't change, so they compile once and cache.
-[profile.dev.package.candle-core]
-opt-level = 3
-[profile.dev.package.candle-nn]
-opt-level = 3
-[profile.dev.package.candle-transformers]
-opt-level = 3
-[profile.dev.package.gemm]
-opt-level = 3
-[profile.dev.package.gemm-common]
-opt-level = 3
-[profile.dev.package.gemm-f32]
-opt-level = 3
-# gemm-f16 additionally *must* stay optimized on aarch64-linux-android: it
-# instantiates gemm-common's `#[inline]` fp16 vector helpers (vmulq_f16 and
-# friends), which upstream left without `#[target_feature(enable = "fp16")]`.
-# At opt-level 0 they get standalone codegen instead of being inlined into
-# their fp16-enabled callers, and the assembler rejects the .8h instructions
-# with "instruction requires: fullfp16". Release builds never hit this.
-[profile.dev.package.gemm-f16]
-opt-level = 3
-[profile.dev.package.half]
 opt-level = 3
 
 # Fork carrying the Windows MSVC compilation fix (whisper logging hooks) plus

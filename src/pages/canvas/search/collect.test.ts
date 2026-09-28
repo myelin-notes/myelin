@@ -17,7 +17,7 @@ describe('collectCanvasSearchSources', () => {
       ],
     } as unknown as DrawableCanvas;
 
-    expect(collectCanvasSearchSources(canvas, null)).toEqual([
+    expect(collectCanvasSearchSources(canvas)).toEqual([
       {
         kind: 'text',
         rect: { x: 10, y: 20, width: 30, height: 40 },

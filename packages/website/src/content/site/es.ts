@@ -90,11 +90,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Grábalo. Encuéntralo.\nHasta tu letra a mano.',
+    heading: 'Grábalo. Transcríbelo.\nEncuéntralo en el lienzo.',
     audioBody:
-      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo, así que cada grabación se puede buscar y ningún audio sale de tu equipo.',
+      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera.',
     searchBody:
-      'La búsqueda por texto y la semántica funcionan en local, con un modelo all-MiniLM-L6-v2 incluido. La escritura a mano se reconoce en macOS mediante el framework Vision de Apple, y las transcripciones de audio también se pueden buscar.',
+      'Busca notas por título y etiquetas en la biblioteca. En un lienzo abierto, encuentra texto y transcripciones de audio.',
     audioMock: {
       title: 'Clase 12 · Potenciales de acción',
       duration: '48:12',
@@ -104,22 +104,17 @@ for step in range(3):
       match: 'vaina de mielina',
     },
     searchMock: {
-      query: 'nódulo de ranvier',
+      query: 'Clase 12',
       results: [
         {
           kind: 'page',
           title: 'Clase 12 · Potenciales de acción',
-          snippet: '…la señal salta entre nódulos de Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Pizarra · esquema de mielinización',
-          snippet: 'Coincidencia manuscrita, OCR en el dispositivo',
+          snippet: 'Nota del lienzo',
         },
         {
           kind: 'audio',
           title: 'Grabación · Clase 12',
-          snippet: 'Coincidencia en la transcripción, minuto 31:42',
+          snippet: 'Nota del lienzo',
         },
       ],
     },
@@ -168,7 +163,6 @@ for step in range(3):
     bullets: [
       'Tus notas son archivos normales en tu disco, en un formato abierto y sin conflictos (Yjs). Nada queda nunca atrapado.',
       'Todo funciona sin conexión, sin cuenta y sin ningún servidor por medio.',
-      'La búsqueda, los vectores semánticos y el OCR de escritura a mano (macOS) se ejecutan en tu propio equipo.',
       'Usa la IA que quieras: los modelos se conectan a través de un servidor MCP local, nunca de una nube que hayamos elegido por ti.',
       'Importa desde Obsidian o GoodNotes, exporta a PDF, imágenes o JSON, y lee cada línea del código en GitHub.',
     ],

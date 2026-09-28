@@ -190,7 +190,6 @@ describe('ExplorerModel', () => {
       const directory = await model.refresh({
         folderId: configuration.folderId,
         searchQuery: '',
-        searchMode: 'lexical',
         filterTags: [],
       });
       expect(directory?.nodes.map((node) => node.name)).toEqual(
@@ -200,7 +199,6 @@ describe('ExplorerModel', () => {
       const tagged = await model.refresh({
         folderId: configuration.folderId,
         searchQuery: '',
-        searchMode: 'lexical',
         filterTags: ['work'],
       });
       expect(tagged?.nodes.map((node) => node.name)).toEqual(
@@ -210,7 +208,6 @@ describe('ExplorerModel', () => {
       const searched = await model.refresh({
         folderId: configuration.folderId,
         searchQuery: 'needle',
-        searchMode: 'semantic',
         filterTags: ['search'],
       });
       expect(searched?.nodes.map((node) => node.name)).toEqual(['needle note']);
@@ -242,13 +239,11 @@ describe('ExplorerModel', () => {
     const firstRefresh = model.refresh({
       folderId: null,
       searchQuery: 'first',
-      searchMode: 'lexical',
       filterTags: [],
     });
     const secondRefresh = model.refresh({
       folderId: null,
       searchQuery: 'second',
-      searchMode: 'lexical',
       filterTags: [],
     });
 
