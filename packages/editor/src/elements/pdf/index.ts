@@ -288,6 +288,16 @@ export class PdfElement
     );
   }
 
+  public override intersectsWorldRect(rect: DOMRect, margin: number): boolean {
+    const bounds = this.boundingBox;
+    return (
+      bounds.right >= rect.left - margin &&
+      bounds.left <= rect.right + margin &&
+      bounds.bottom >= rect.top - margin &&
+      bounds.top <= rect.bottom + margin
+    );
+  }
+
   protected isOverLocal(
     x: number,
     y: number,

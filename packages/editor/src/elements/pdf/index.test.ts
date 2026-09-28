@@ -124,6 +124,15 @@ afterEach(() => {
 });
 
 describe('PdfElement', () => {
+  it('keeps fixed-size chrome visible when the PDF content is scaled down', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    pdf.setScale(0.5, 0.5);
+    const headerView = new DOMRect(0, -50, 20, 10);
+
+    expect(pdf.intersectsWorldRect(headerView, 0)).toBe(true);
+    expect(pdf.boundingBox.top).toBeLessThan(headerView.bottom);
+  });
+
   it('reads later visible element bounds once for all chrome buttons', () => {
     const pdf = new PdfElement('pdf-uuid');
     let reads = 0;
