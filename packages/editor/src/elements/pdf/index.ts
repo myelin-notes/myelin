@@ -390,7 +390,11 @@ export class PdfElement
     return { kind: 'pdf', source: this.getPdfExportSource() };
   }
 
-  public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
+  public override syncDOM(
+    viewport: CanvasViewport,
+    host: HTMLElement,
+    visibleElements?: readonly DrawableElement[],
+  ): void {
     if (!this._chrome) {
       this.createDom(host);
     }
@@ -412,7 +416,7 @@ export class PdfElement
       contentWidth,
       zoom,
     });
-    const coveringBounds = this.getCoveringBounds(viewport);
+    const coveringBounds = this.getCoveringBounds(viewport, visibleElements);
     this._chrome?.sync({
       screenX,
       screenY,
@@ -465,12 +469,15 @@ export class PdfElement
     this.chromeController.setZIndex(zIndex);
   }
 
-  private getCoveringBounds(viewport: CanvasViewport): DOMRect[] {
+  private getCoveringBounds(
+    viewport: CanvasViewport,
+    visibleElements?: readonly DrawableElement[],
+  ): DOMRect[] {
     const viewRect = viewport.getWorldRect();
     if (!this.intersectsWorldRect(viewRect, 0)) {
       return [];
     }
-    const elements = this._exportElementsProvider?.();
+    const elements = visibleElements ?? this._exportElementsProvider?.();
     const elementIndex = elements?.indexOf(this) ?? -1;
     if (!elements || elementIndex < 0) {
       return [];
@@ -492,20 +499,16 @@ export class PdfElement
     viewport: CanvasViewport,
     coveringBounds: readonly DOMRect[],
   ): boolean {
-    const left = screenX - size / 2;
-    const top = screenY - size / 2;
-    const right = left + size;
-    const bottom = top + size;
+    const left = (screenX - size / 2) / viewport.zoom - viewport.offset.x;
+    const top = (screenY - size / 2) / viewport.zoom - viewport.offset.y;
+    const right = left + size / viewport.zoom;
+    const bottom = top + size / viewport.zoom;
     for (const bounds of coveringBounds) {
-      const elementLeft = (bounds.left + viewport.offset.x) * viewport.zoom;
-      const elementTop = (bounds.top + viewport.offset.y) * viewport.zoom;
-      const elementRight = elementLeft + bounds.width * viewport.zoom;
-      const elementBottom = elementTop + bounds.height * viewport.zoom;
       if (
-        left < elementRight &&
-        right > elementLeft &&
-        top < elementBottom &&
-        bottom > elementTop
+        left < bounds.right &&
+        right > bounds.left &&
+        top < bounds.bottom &&
+        bottom > bounds.top
       ) {
         return true;
       }

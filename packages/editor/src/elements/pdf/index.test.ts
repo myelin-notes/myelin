@@ -180,6 +180,59 @@ describe('PdfElement', () => {
     expect(reads).toBe(1);
   });
 
+  it('checks PDF coverage only against visible render candidates', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const offscreen = {
+      hidden: false,
+      intersectsWorldRect: () => {
+        throw new Error('offscreen element should not be scanned again');
+      },
+    } as unknown as DrawableElement;
+    const upper = {
+      hidden: false,
+      intersectsWorldRect: () => true,
+      boundingBox: new DOMRect(10, 10, 20, 20),
+    } as unknown as DrawableElement;
+    pdf.setExportElementsProvider(() => [pdf, offscreen, upper]);
+    const viewport = {
+      getWorldRect: () => new DOMRect(0, 0, 100, 100),
+    } as CanvasViewport;
+
+    const bounds = (
+      pdf as unknown as {
+        getCoveringBounds(
+          viewport: CanvasViewport,
+          visibleElements: readonly DrawableElement[],
+        ): DOMRect[];
+      }
+    ).getCoveringBounds(viewport, [pdf, upper]);
+
+    expect(bounds).toEqual([upper.boundingBox]);
+  });
+
+  it('compares covered buttons in world space after pan and zoom', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const viewport = {
+      offset: { x: 5, y: -5 },
+      zoom: 2,
+    } as CanvasViewport;
+    const isCovered = (
+      pdf as unknown as {
+        isChromeButtonCovered(
+          x: number,
+          y: number,
+          size: number,
+          viewport: CanvasViewport,
+          bounds: readonly DOMRect[],
+        ): boolean;
+      }
+    ).isChromeButtonCovered.bind(pdf);
+    const bounds = [new DOMRect(10, 10, 20, 20)];
+
+    expect(isCovered(50, 30, 10, viewport, bounds)).toBe(true);
+    expect(isCovered(100, 100, 10, viewport, bounds)).toBe(false);
+  });
+
   it('skips cover elements when the PDF chrome is offscreen', () => {
     const pdf = new PdfElement('pdf-uuid');
     const upper = {

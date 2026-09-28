@@ -472,7 +472,11 @@ export abstract class DrawableElement {
   public exitEditMode(): void {}
 
   // Called once per frame from `DrawableCanvas.redraw()` after the 2D pass.
-  public syncDOM(_viewport: CanvasViewport, _host: HTMLElement): void {}
+  public syncDOM(
+    _viewport: CanvasViewport,
+    _host: HTMLElement,
+    _visibleElements?: readonly DrawableElement[],
+  ): void {}
 
   public setDomZIndex(_zIndex: string): void {}
 
