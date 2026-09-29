@@ -409,6 +409,13 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
   let tarball: Uint8Array | null = null;
   let tarballFetchCount = 0;
   const commits = new Map<string, { parent: string }>();
+  const gitBlobs = new Map<string, Uint8Array>();
+  const gitTrees = new Map<
+    string,
+    Array<{ path: string; sha: string | null }>
+  >();
+  const stagedCommits = new Map<string, { parent: string; tree: string }>();
+  let gitObjectCounter = 0;
   let nextBranchFailure: { status: number; body: string } | null = null;
   let nextCompareFailure: number | null = null;
   let nextTarballFailure: {
@@ -450,6 +457,11 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     return sha;
   }
 
+  function nextGitObjectSha(): string {
+    gitObjectCounter += 1;
+    return (1_000_000 + gitObjectCounter).toString(16).padStart(40, '0');
+  }
+
   return {
     applyGitPush(additions, deletions, expectedHeadOid) {
       if (expectedHeadOid && expectedHeadOid !== headOid) {
@@ -483,6 +495,64 @@ function createMemoryGitHubApi(): MemoryGitHubApi {
     },
     async fetch(url, init) {
       const parsed = new URL(url);
+      const gitCommit = parsed.pathname.match(/\/git\/commits\/([^/]+)$/);
+      if (gitCommit && init.method === 'GET') {
+        return createJsonResponse(200, { tree: { sha: '0'.repeat(40) } });
+      }
+      if (parsed.pathname.endsWith('/git/blobs') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as { content: string };
+        const sha = nextGitObjectSha();
+        gitBlobs.set(sha, new Uint8Array(Buffer.from(body.content, 'base64')));
+        return createJsonResponse(201, { sha });
+      }
+      if (parsed.pathname.endsWith('/git/trees') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as {
+          tree: Array<{ path: string; sha: string | null }>;
+        };
+        const sha = nextGitObjectSha();
+        gitTrees.set(sha, body.tree);
+        return createJsonResponse(201, { sha });
+      }
+      if (parsed.pathname.endsWith('/git/commits') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as {
+          tree: string;
+          parents: string[];
+        };
+        const sha = nextGitObjectSha();
+        stagedCommits.set(sha, {
+          parent: body.parents[0] ?? '',
+          tree: body.tree,
+        });
+        return createJsonResponse(201, { sha });
+      }
+      if (
+        parsed.pathname.includes('/git/refs/heads/') &&
+        init.method === 'PATCH'
+      ) {
+        const body = JSON.parse(String(init.body)) as {
+          sha: string;
+          force: boolean;
+        };
+        const commit = stagedCommits.get(body.sha);
+        if (!commit || (commit.parent !== headOid && !body.force)) {
+          return createJsonResponse(422, {
+            message: 'Reference update failed',
+          });
+        }
+        for (const entry of gitTrees.get(commit.tree) ?? []) {
+          if (entry.sha === null) {
+            files.delete(entry.path);
+          } else {
+            const bytes = gitBlobs.get(entry.sha);
+            if (bytes) {
+              files.set(entry.path, { sha: entry.sha, bytes });
+            }
+          }
+        }
+        commits.set(body.sha, { parent: headOid });
+        headOid = body.sha;
+        return createJsonResponse(200, { object: { sha: headOid } });
+      }
       const branch = getBranchName(url);
       if (branch !== null) {
         if (nextBranchFailure !== null) {
