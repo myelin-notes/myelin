@@ -6,15 +6,20 @@ import {
   useState,
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
+import { isTauri } from '@tauri-apps/api/core';
 import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import {
   type CredentialChange,
   subscribeCredentialChanges,
 } from './repo/credential-vault';
 import { createRepository } from './repo/factory';
+import { noteContentIndex } from './repo/note-content-index';
 import { credentialTokenKey } from './repo/oauth/client';
 import { isRepositoryFullyConfigured } from './repo/readiness';
-import { getRepositoryConfigIdentity } from './repo/repository-backends';
+import {
+  getRepositoryConfigIdentity,
+  getRepositoryStorageKey,
+} from './repo/repository-backends';
 import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
@@ -170,6 +175,14 @@ export function RepositoryProvider({
           return;
         }
 
+        if (isTauri()) {
+          noteContentIndex.start(
+            `${resolvedConfig.kind}__${getRepositoryStorageKey(resolvedConfig)}`,
+            repository.getNoteIndexSource(),
+            () => repository.listNoteIndexItems(),
+          );
+        }
+
         setStatus((current) => ({
           ...current,
           initializing: false,
@@ -191,6 +204,7 @@ export function RepositoryProvider({
 
     return () => {
       disposed = true;
+      noteContentIndex.stop();
       if (readinessRetryTimer !== null) {
         window.clearTimeout(readinessRetryTimer);
       }

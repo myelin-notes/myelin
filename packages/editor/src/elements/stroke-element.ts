@@ -357,8 +357,12 @@ export class StrokeElement extends DrawableElement {
       return;
     }
     const pts: number[] = [];
+    const { offset, scale } = this;
     for (const [x, y] of outline) {
-      const p = ctx.worldToPagePt(x, y);
+      const p = ctx.worldToPagePt(
+        x * scale.x + offset.x,
+        y * scale.y + offset.y,
+      );
       pts.push(p.x, p.y);
     }
     const { rgb, opacity } = parseCssColor(this.style.color);

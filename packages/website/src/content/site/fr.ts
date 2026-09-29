@@ -87,7 +87,7 @@ for step in range(3):
     audioBody:
       'Enregistrez cours ou réunions sur le canevas. Un modèle Whisper base intégré les transcrit sur l’appareil : vous pouvez retrouver des mots dans la transcription sans envoyer l’audio ailleurs.',
     searchBody:
-      'Recherchez des notes par titre et par étiquette dans la bibliothèque. Dans un canevas ouvert, retrouvez le texte et les transcriptions audio.',
+      'Recherchez dans la bibliothèque par titre, étiquette, texte enregistré et transcription audio. Vous pouvez aussi rechercher dans un canevas ouvert.',
     audioMock: {
       title: 'Cours 12 · Potentiels d’action',
       duration: '48:12',

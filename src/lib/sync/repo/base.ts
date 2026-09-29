@@ -19,6 +19,7 @@ import type {
 } from './config';
 import { MAX_PEN_PRESETS } from './config';
 import { processDocumentAsync } from './document-worker';
+import { noteContentIndex } from './note-content-index';
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
@@ -62,6 +63,7 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  NoteIndexItem,
   OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
@@ -117,6 +119,7 @@ export abstract class BaseRepository
     dataVersion: number;
     index: SearchIndex<VFSNode>;
   } | null = null;
+  private searchMetadataRevision = 0;
 
   // While positive, manifest mutations accumulate on one held manifest and defer their save to the
   // outermost close.
@@ -170,16 +173,30 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
+    let indexable = false;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
+        indexable = node.fileType === 'mcanvas' && !node.system;
         // Snapshots are system nodes; their links must not enter the graph.
         if (node.fileType === 'mcanvas' && !node.system && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
+    if (indexable) {
+      noteContentIndex.invalidate(this, nodeId);
+      void this.getStoredAbsolutePath(nodeId)
+        .then((path) => {
+          if (path) {
+            noteContentIndex.queueSaved(this, nodeId, path);
+          }
+        })
+        .catch((error) => {
+          logger.error('Could not queue note for indexing', error, { nodeId });
+        });
+    }
   }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
@@ -306,7 +323,9 @@ export abstract class BaseRepository
     action: string,
     mutator: (manifest: VFSManifest) => T,
   ): Promise<T> {
-    return this.mutateManifest(action, mutator);
+    const result = await this.mutateManifest(action, mutator);
+    this.searchMetadataRevision++;
+    return result;
   }
 
   async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
@@ -359,6 +378,21 @@ export abstract class BaseRepository
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifest();
+    if (noteContentIndex.isSource(this)) {
+      try {
+        return await noteContentIndex.search(
+          manifest,
+          this.searchMetadataRevision,
+          query,
+          options.limit,
+        );
+      } catch (error) {
+        logger.error(
+          'Search worker unavailable; using title and tag search',
+          error,
+        );
+      }
+    }
     const index = this.getNodeSearchIndex(manifest);
     return searchNodeResults(manifest, query, index).slice(0, options.limit);
   }
@@ -439,6 +473,7 @@ export abstract class BaseRepository
       manifest.nodes[id] = createFolderNode(id, name, parentId, now);
       addChild(manifest, parentId, id);
     });
+    this.searchMetadataRevision++;
     return id;
   }
 
@@ -464,6 +499,7 @@ export abstract class BaseRepository
       );
       addChild(manifest, parentId, id);
     });
+    this.searchMetadataRevision++;
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
     }
@@ -587,6 +623,7 @@ export abstract class BaseRepository
       node.name = newName;
       node.modifiedAt = Date.now();
     });
+    this.searchMetadataRevision++;
   }
 
   async deleteNode(nodeId: string): Promise<void> {
@@ -598,8 +635,12 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
+        if (file.fileType === 'mcanvas' && !file.system) {
+          noteContentIndex.remove(this, file.id);
+        }
       }),
     );
+    this.searchMetadataRevision++;
 
     emitNodesDeleted(deletedFiles.map((file) => file.id));
   }
@@ -619,6 +660,7 @@ export abstract class BaseRepository
       node.tags = tags;
       node.modifiedAt = Date.now();
     });
+    this.searchMetadataRevision++;
   }
 
   async setFolderColor(nodeId: string, color: string | null): Promise<void> {
@@ -648,6 +690,7 @@ export abstract class BaseRepository
         modifiedAt: Date.now(),
       };
     });
+    this.searchMetadataRevision++;
   }
 
   async removeTag(nodeId: string, tag: string): Promise<void> {
@@ -662,6 +705,7 @@ export abstract class BaseRepository
         modifiedAt: Date.now(),
       };
     });
+    this.searchMetadataRevision++;
   }
 
   async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
@@ -670,6 +714,30 @@ export abstract class BaseRepository
 
   async getStoredAbsolutePath(_nodeId: VFSNodeId): Promise<string | null> {
     return null;
+  }
+
+  getNoteIndexSource(): object {
+    return this;
+  }
+
+  async listNoteIndexItems(): Promise<NoteIndexItem[]> {
+    const { manifest } = await this.loadManifest();
+    const items: NoteIndexItem[] = [];
+    let inspected = 0;
+    for (const id in manifest.nodes) {
+      const node = manifest.nodes[id];
+      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
+        continue;
+      }
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        items.push({ nodeId: node.id, path });
+      }
+      if (++inspected % 100 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+    return items;
   }
 
   async getCustomColors(tool: CustomColorTool): Promise<string[]> {

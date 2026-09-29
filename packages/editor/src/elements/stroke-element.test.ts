@@ -278,6 +278,41 @@ describe('StrokeElement live bounds', () => {
 });
 
 describe('StrokeElement outline scale', () => {
+  it('exports a moved and resized stroke at its displayed position', () => {
+    const points = [10, 20, 0.5, 30, 25, 0.5, 50, 40, 0.5];
+    const original = new StrokeElement('original', points, false, STYLE);
+    const transformed = new StrokeElement('transformed', points, false, STYLE);
+    transformed.setOffset(120, -35);
+    transformed.setScale(2, 0.75);
+
+    const pdfPoints = (stroke: StrokeElement): number[] => {
+      let result: number[] = [];
+      stroke.drawToPdf({
+        worldToPagePt: (x, y) => ({ x, y }),
+        ptPerWorldY: 1,
+        push: (item) => {
+          if (item.t === 'path') {
+            result = item.pts;
+          }
+        },
+        addImageBase64: () => 0,
+        addFontBase64: () => 0,
+      });
+      return result;
+    };
+
+    const originalPoints = pdfPoints(original);
+    const transformedPoints = pdfPoints(transformed);
+    expect(originalPoints.length).toBeGreaterThan(0);
+    expect(transformedPoints).toHaveLength(originalPoints.length);
+    for (let i = 0; i < originalPoints.length; i += 2) {
+      expect(transformedPoints[i]).toBeCloseTo(originalPoints[i] * 2 + 120);
+      expect(transformedPoints[i + 1]).toBeCloseTo(
+        originalPoints[i + 1] * 0.75 - 35,
+      );
+    }
+  });
+
   function outlineAtSize(size: number, hasPressure: boolean): number[] {
     const points = Array.from({ length: 100 }, (_, i) => [
       i * 0.08 * size,

@@ -18,12 +18,14 @@ export async function pushGitHubBatch(
 ): Promise<GitPushResponse> {
   const stagingId = crypto.randomUUID();
   const stagingPath = `git-sync/${stagingId}`;
+  let stage = 'directory';
   try {
     await mkdir(stagingPath, {
       baseDir: BaseDirectory.AppCache,
       recursive: true,
     });
     for (const [index, addition] of input.additions.entries()) {
+      stage = 'file';
       const file = await open(`${stagingPath}/${index}`, {
         baseDir: BaseDirectory.AppCache,
         write: true,
@@ -31,6 +33,7 @@ export async function pushGitHubBatch(
         truncate: true,
       });
       try {
+        stage = 'write';
         for (let offset = 0; offset < addition.contents.byteLength; ) {
           const written = await file.write(
             addition.contents.subarray(offset, offset + STAGING_CHUNK_BYTES),
@@ -53,6 +56,7 @@ export async function pushGitHubBatch(
         await file.close();
       }
     }
+    stage = 'push';
     return await invoke<GitPushResponse>('github_push_batch', {
       request: {
         owner: config.owner,
@@ -71,6 +75,11 @@ export async function pushGitHubBatch(
         deletions: input.deletions.map((deletion) => deletion.path),
       },
     });
+  } catch (error) {
+    if (stage === 'push') {
+      throw error;
+    }
+    throw new Error(`Git staging ${stage} failed`);
   } finally {
     await remove(stagingPath, {
       baseDir: BaseDirectory.AppCache,

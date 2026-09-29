@@ -500,32 +500,35 @@ function alignCodeBlockGutter(block: HTMLElement): void {
   }
 }
 
-// Same as how the PDF element overlays annotations. The frame is unscaled, so one world px maps
-// to one CSS px; each element draws itself in its page's PDF-point space.
+// The clone is at natural size, so map world-space overlays back through the frame scale.
 function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
   const overlays = source.overlays;
   if (!overlays || overlays.length === 0) {
     return;
   }
   const horizontal = source.pageLayout === 'horizontal';
+  const scaleX = Math.max(Math.abs(source.scale?.x ?? 1), 0.001);
+  const scaleY = Math.max(Math.abs(source.scale?.y ?? 1), 0.001);
 
   for (let p = 0; p < h.pages.length; p++) {
     const pageWorldX =
-      source.offset.x + (horizontal ? p * (source.pageWidth + PAGE_GAP) : 0);
+      source.offset.x +
+      (horizontal ? p * (source.pageWidth + PAGE_GAP) : 0) * scaleX;
     const pageWorldY =
-      source.offset.y + (horizontal ? 0 : p * (source.pageHeight + PAGE_GAP));
+      source.offset.y +
+      (horizontal ? 0 : p * (source.pageHeight + PAGE_GAP)) * scaleY;
     const pageBounds = new DOMRect(
       pageWorldX,
       pageWorldY,
-      source.pageWidth,
-      source.pageHeight,
+      source.pageWidth * scaleX,
+      source.pageHeight * scaleY,
     );
 
     const ctx: PdfHarvestContext = {
-      ptPerWorldY: POINTS_PER_PX,
+      ptPerWorldY: POINTS_PER_PX / scaleY,
       worldToPagePt: (wx, wy) => ({
-        x: (wx - pageWorldX) * POINTS_PER_PX,
-        y: (wy - pageWorldY) * POINTS_PER_PX,
+        x: ((wx - pageWorldX) / scaleX) * POINTS_PER_PX,
+        y: ((wy - pageWorldY) / scaleY) * POINTS_PER_PX,
       }),
       push: (item) => h.pages[p].items.push(item),
       addImageBase64: (b64) => h.imagesB64.push(b64) - 1,

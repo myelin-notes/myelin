@@ -97,3 +97,22 @@ it('stages large bytes in bounded writes and completes partial writes', async ()
   expect(largestWrite).toBeLessThanOrEqual(16 * 1024);
   expect(requestFrame).toHaveBeenCalled();
 });
+
+it('reports a staging failure without exposing a filesystem error', async () => {
+  vi.spyOn(getRepositoryTestStorage(), 'mkdir').mockRejectedValueOnce(
+    new Error('private path'),
+  );
+
+  await expect(
+    pushGitHubBatch(
+      { owner: 'myelin', repo: 'notes', branch: 'main' },
+      {
+        additions: [],
+        deletions: [],
+        expectedHeadOid: 'b'.repeat(40),
+        message: { headline: 'Sync change' },
+      },
+      'private-token',
+    ),
+  ).rejects.toThrow('Git staging directory failed');
+});

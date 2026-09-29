@@ -6,6 +6,7 @@ import {
   BatchHeadConflictError,
   BatchUnknownError,
   type GitHubGitFailureDiagnostics,
+  type GitHubRestFailureDiagnostics,
 } from './batch';
 import { getGitHubToken } from './github-credentials';
 import { type GitPushResponse, pushGitHubBatch } from './github-git-push';
@@ -47,12 +48,19 @@ interface GitHubRepositoryConfig {
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
+const BASE64_CHUNK_SIZE = 0x8000;
 const SAFE_GIT_REASONS = new Set([
+  'Git staging directory failed',
+  'Git staging file failed',
   'Git staging write failed',
   'Git push task failed',
+  'Could not resolve Git staging directory',
   'Invalid Git push request',
   'Git push lock unavailable',
+  'Git CA bundle unavailable',
+  'Git TLS certificates unavailable',
   'Git cache unavailable',
+  'Git cache path unavailable',
   'Git clone failed',
   'Git fetch failed',
   'Git head unavailable',
@@ -73,6 +81,14 @@ function base64DecodeToBytes(content: string): Uint8Array {
     bytes[i] = binary.charCodeAt(i);
   }
   return bytes;
+}
+
+function base64EncodeBytes(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE));
+  }
+  return btoa(binary);
 }
 
 function getResponseHeader(
@@ -571,10 +587,11 @@ export class GitHubRepository extends BaseRepository {
         await getGitHubToken(this.config.credentialId),
       );
     } catch (error) {
-      throw failure(
-        'upload',
-        error instanceof Error ? error.message : String(error),
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      if (/^Git (clone|fetch) failed \(Net\/GenericError\)$/.test(reason)) {
+        return this.commitRestBatch(input);
+      }
+      throw failure('upload', reason);
     }
     if (result.status === 'head-conflict') {
       throw new BatchHeadConflictError('GitHub branch head changed');
@@ -638,5 +655,187 @@ export class GitHubRepository extends BaseRepository {
       newHeadOid: commitOid,
       blobShas: new Map(Object.entries(result.blobShas)),
     };
+  }
+
+  private async commitRestBatch(
+    input: BatchedCommitInput,
+  ): Promise<BatchedCommitResult & { blobShas: Map<string, string> }> {
+    const baseUrl = `${GITHUB_API_BASE}/repos/${this.config.owner}/${this.config.repo}`;
+    const startedAt = Date.now();
+    const metrics = {
+      github_rest_file_bytes: input.additions.reduce(
+        (total, addition) => total + addition.contents.byteLength,
+        0,
+      ),
+      github_rest_additions: input.additions.length,
+      github_rest_deletions: input.deletions.length,
+    };
+    const failure = (
+      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
+      response?: Response,
+    ) => {
+      const requestId = response
+        ? getResponseHeader(response, 'x-github-request-id')
+            ?.replace(/[^A-Za-z0-9-]/g, '')
+            .slice(0, 100)
+        : null;
+      return new BatchUnknownError(
+        `GitHub REST ${stage} request failed${response ? ` (${response.status})` : ''}`,
+        null,
+        {
+          ...metrics,
+          github_rest_stage: stage,
+          github_rest_duration_ms: Date.now() - startedAt,
+          ...(response ? { github_rest_status: response.status } : {}),
+          ...(requestId ? { github_request_id: requestId } : {}),
+        },
+      );
+    };
+    const request = async <T>(
+      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
+      path: string,
+      method: 'GET' | 'POST' | 'PATCH',
+      body?: object,
+    ): Promise<T> => {
+      let response: Response;
+      try {
+        response = await this.sendWithRateLimitRetry(
+          `${baseUrl}${path}`,
+          async () => ({
+            method,
+            headers: {
+              ...(await this.authHeaders()),
+              ...(body ? { 'Content-Type': 'application/json' } : {}),
+            },
+            ...(body ? { body: JSON.stringify(body) } : {}),
+          }),
+        );
+      } catch {
+        throw failure(stage);
+      }
+      if (!response.ok) {
+        throw failure(stage, response);
+      }
+      try {
+        return (await response.json()) as T;
+      } catch {
+        throw failure(stage, response);
+      }
+    };
+    const sha = (
+      value: unknown,
+      stage: GitHubRestFailureDiagnostics['github_rest_stage'],
+    ): string => {
+      if (typeof value !== 'string' || !/^[a-f0-9]{40}$/i.test(value)) {
+        throw failure(stage);
+      }
+      return value;
+    };
+
+    const parent = await request<{ tree?: { sha?: string } }>(
+      'parent',
+      `/git/commits/${encodeURIComponent(input.expectedHeadOid)}`,
+      'GET',
+    );
+    const parentTreeSha = sha(parent.tree?.sha, 'parent');
+    const treeEntries: Array<{
+      path: string;
+      mode: '100644';
+      type: 'blob';
+      sha: string | null;
+    }> = [];
+    const blobShas = new Map<string, string>();
+    for (const addition of input.additions) {
+      const blob = await request<{ sha?: string }>(
+        'blob',
+        '/git/blobs',
+        'POST',
+        {
+          content: base64EncodeBytes(addition.contents),
+          encoding: 'base64',
+        },
+      );
+      const blobSha = sha(blob.sha, 'blob');
+      treeEntries.push({
+        path: addition.path,
+        mode: '100644',
+        type: 'blob',
+        sha: blobSha,
+      });
+      blobShas.set(addition.path, blobSha);
+    }
+    for (const deletion of input.deletions) {
+      treeEntries.push({
+        path: deletion.path,
+        mode: '100644',
+        type: 'blob',
+        sha: null,
+      });
+    }
+    const tree = await request<{ sha?: string }>('tree', '/git/trees', 'POST', {
+      base_tree: parentTreeSha,
+      tree: treeEntries,
+    });
+    const treeSha = sha(tree.sha, 'tree');
+    const commit = await request<{ sha?: string }>(
+      'commit',
+      '/git/commits',
+      'POST',
+      {
+        message: input.message.body
+          ? `${input.message.headline}\n\n${input.message.body}`
+          : input.message.headline,
+        tree: treeSha,
+        parents: [input.expectedHeadOid],
+      },
+    );
+    const commitSha = sha(commit.sha, 'commit');
+
+    try {
+      const ref = await request<{ object?: { sha?: string } }>(
+        'ref',
+        `/git/refs/heads/${this.config.branch.split('/').map(encodeURIComponent).join('/')}`,
+        'PATCH',
+        { sha: commitSha, force: false },
+      );
+      if (ref.object?.sha !== commitSha) {
+        throw failure('ref');
+      }
+    } catch (error) {
+      let observedHead: string;
+      try {
+        observedHead = await this.getBranchHeadOid();
+        if (observedHead === commitSha) {
+          return { newHeadOid: commitSha, blobShas };
+        }
+        const comparison = await request<{ status?: string }>(
+          'verify',
+          `/compare/${encodeURIComponent(commitSha)}...${encodeURIComponent(observedHead)}`,
+          'GET',
+        );
+        if (
+          comparison.status === 'ahead' ||
+          comparison.status === 'identical'
+        ) {
+          return { newHeadOid: commitSha, blobShas };
+        }
+      } catch {
+        throw error;
+      }
+      const status =
+        error instanceof BatchUnknownError &&
+        error.diagnostics &&
+        'github_rest_status' in error.diagnostics
+          ? error.diagnostics.github_rest_status
+          : undefined;
+      if (
+        observedHead !== input.expectedHeadOid &&
+        (status === 409 || status === 422)
+      ) {
+        throw new BatchHeadConflictError('GitHub branch head changed');
+      }
+      throw error;
+    }
+    return { newHeadOid: commitSha, blobShas };
   }
 }

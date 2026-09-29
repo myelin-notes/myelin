@@ -287,6 +287,14 @@ export class CachedRepository
     return this.cache.searchNodes(query, options);
   }
 
+  async listNoteIndexItems() {
+    return this.cache.listNoteIndexItems();
+  }
+
+  getNoteIndexSource(): object {
+    return this.cache;
+  }
+
   async getNodesByName(name: string): Promise<VFSNode[]> {
     return this.cache.getNodesByName(name);
   }

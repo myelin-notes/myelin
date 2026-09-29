@@ -226,6 +226,11 @@ const zhHans: typeof en = {
       },
     },
     explorerTree: {
+      preparingIndex: '正在索引笔记… 可能还会出现更多结果。',
+      indexingUnavailable: '无法索引笔记。稍后将重试已保存内容搜索。',
+      indexingNotes: (indexed: number, total: number) =>
+        `正在索引笔记… ${indexed}/${total}。可能还会出现更多结果。`,
+      indexingFailed: (count: number) => `${count} 篇笔记无法索引。`,
       repositorySetupRequired: '请先在设置中完成仓库配置，才能查看文件',
       emptySearch: '未找到结果',
       emptyFilter: '没有符合所选标签的项目',

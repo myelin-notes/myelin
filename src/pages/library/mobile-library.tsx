@@ -34,6 +34,7 @@ import {
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import { useTabController } from '@/lib/tabs/context';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { ImportHost } from '@/pages/library/import/import-host';
@@ -69,6 +70,7 @@ export function MobileLibrary() {
   const scrollRef = useRef<HTMLElement | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const noteIndexStatus = useNoteIndexStatus();
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -296,6 +298,32 @@ export function MobileLibrary() {
                   </button>
                 )}
               </div>
+              {searchQuery.trim() &&
+                noteIndexStatus.active &&
+                (noteIndexStatus.scanning ||
+                  noteIndexStatus.indexed + noteIndexStatus.failed <
+                    noteIndexStatus.total) && (
+                  <div className="pt-2 text-text-muted text-xs">
+                    {noteIndexStatus.scanning
+                      ? strings.library.explorerTree.preparingIndex
+                      : strings.library.explorerTree.indexingNotes(
+                          noteIndexStatus.indexed,
+                          noteIndexStatus.total,
+                        )}
+                  </div>
+                )}
+              {searchQuery.trim() && noteIndexStatus.failed > 0 && (
+                <div className="pt-2 text-text-muted text-xs">
+                  {strings.library.explorerTree.indexingFailed(
+                    noteIndexStatus.failed,
+                  )}
+                </div>
+              )}
+              {searchQuery.trim() && noteIndexStatus.loadError && (
+                <div className="pt-2 text-text-muted text-xs">
+                  {strings.library.explorerTree.indexingUnavailable}
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="flex min-w-0 items-center gap-2">

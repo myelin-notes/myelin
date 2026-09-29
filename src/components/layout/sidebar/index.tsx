@@ -21,6 +21,7 @@ import {
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
@@ -39,6 +40,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const noteIndexStatus = useNoteIndexStatus();
   const { width } = useSidebar();
   const treeRef = useRef<SidebarTreeHandle>(null);
 
@@ -173,6 +175,32 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
             </button>
           )}
         </div>
+        {searchQuery.trim() &&
+          noteIndexStatus.active &&
+          (noteIndexStatus.scanning ||
+            noteIndexStatus.indexed + noteIndexStatus.failed <
+              noteIndexStatus.total) && (
+            <div className="px-2 pt-1 text-[11px] text-text-muted">
+              {noteIndexStatus.scanning
+                ? strings.library.explorerTree.preparingIndex
+                : strings.library.explorerTree.indexingNotes(
+                    noteIndexStatus.indexed,
+                    noteIndexStatus.total,
+                  )}
+            </div>
+          )}
+        {searchQuery.trim() && noteIndexStatus.failed > 0 && (
+          <div className="px-2 pt-1 text-[11px] text-text-muted">
+            {strings.library.explorerTree.indexingFailed(
+              noteIndexStatus.failed,
+            )}
+          </div>
+        )}
+        {searchQuery.trim() && noteIndexStatus.loadError && (
+          <div className="px-2 pt-1 text-[11px] text-text-muted">
+            {strings.library.explorerTree.indexingUnavailable}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-1 px-3 py-1">

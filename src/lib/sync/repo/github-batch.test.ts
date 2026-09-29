@@ -177,6 +177,144 @@ describe('CachedRepository GitHub Git pushes', () => {
         github_git_error_code: 'Auth',
       },
     });
+
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git TLS certificates unavailable',
+    );
+    await expect(
+      remote.commitBatch({
+        additions: [{ path: 'files/note', contents: new Uint8Array([1]) }],
+        deletions: [],
+        message: { headline: 'Sync note' },
+        expectedHeadOid: await remote.getBranchHeadOid(),
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'GitHub Git push failed (upload: Git TLS certificates unavailable)',
+      diagnostics: { github_git_reason: 'Git TLS certificates unavailable' },
+    });
+  });
+
+  it('commits queued files through the GitHub API when native clone fails', async () => {
+    const { repository } = buildRepository('git-clone-rest-fallback');
+    await repository.initialize();
+    const bytes = new Uint8Array(4_190_722);
+    bytes[0] = 127;
+    bytes[bytes.length - 1] = 255;
+    const fileId = await repository.createFile('Fallback', 'mp4', null, bytes);
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git clone failed (Net/GenericError)',
+    );
+
+    await repository.flushPending();
+
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - baseline).toBe(1);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect(
+      getRepositoryTestGitHubApi().readBytes(
+        getStoredFilePath({ id: fileId, fileType: 'mp4' }),
+      ),
+    ).toEqual(bytes);
+  }, 15_000);
+
+  it('replans when the branch changes before the API fallback updates it', async () => {
+    const { repository } = buildRepository('git-clone-rest-conflict');
+    await repository.initialize();
+    await repository.createFile('Fallback', 'mp4', null, new Uint8Array([1]));
+    const api = getRepositoryTestGitHubApi();
+    const send = api.fetch.bind(api);
+    let raced = false;
+    vi.spyOn(api, 'fetch').mockImplementation(async (url, init) => {
+      if (
+        !raced &&
+        url.includes('/git/refs/heads/') &&
+        init.method === 'PATCH'
+      ) {
+        raced = true;
+        api.bumpHeadOidExternally();
+      }
+      return send(url, init);
+    });
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git clone failed (Net/GenericError)',
+    );
+
+    await repository.flushPending();
+
+    expect(raced).toBe(true);
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - baseline).toBe(2);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('accepts an API fallback commit when its ref response is lost', async () => {
+    const { repository } = buildRepository('git-clone-rest-ambiguous');
+    await repository.initialize();
+    await repository.createFile('Fallback', 'mp4', null, new Uint8Array([1]));
+    const api = getRepositoryTestGitHubApi();
+    const send = api.fetch.bind(api);
+    let lost = false;
+    vi.spyOn(api, 'fetch').mockImplementation(async (url, init) => {
+      const response = await send(url, init);
+      if (
+        !lost &&
+        url.includes('/git/refs/heads/') &&
+        init.method === 'PATCH'
+      ) {
+        lost = true;
+        throw new Error('response lost');
+      }
+      return response;
+    });
+    const baseline = vi.mocked(pushGitHubBatch).mock.calls.length;
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git clone failed (Net/GenericError)',
+    );
+
+    await repository.flushPending();
+
+    expect(lost).toBe(true);
+    expect(vi.mocked(pushGitHubBatch).mock.calls.length - baseline).toBe(1);
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('keeps pending changes queued when the API fallback also fails', async () => {
+    const { repository } = buildRepository('git-clone-rest-failed');
+    await repository.initialize();
+    await repository.createFile('Fallback', 'mp4', null, new Uint8Array([1]));
+    const api = getRepositoryTestGitHubApi();
+    const send = api.fetch.bind(api);
+    vi.spyOn(api, 'fetch').mockImplementation(async (url, init) => {
+      if (url.includes('/git/commits/') && init.method === 'GET') {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ message: 'private response' }),
+          arrayBuffer: async () => new ArrayBuffer(0),
+          text: async () => 'private response',
+        };
+      }
+      return send(url, init);
+    });
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git clone failed (Net/GenericError)',
+    );
+
+    await expect(repository.flushPending()).rejects.toMatchObject({
+      message: 'GitHub REST parent request failed (503)',
+      diagnostics: {
+        github_rest_stage: 'parent',
+        github_rest_status: 503,
+      },
+    });
+
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
+      0,
+    );
+    expect(JSON.stringify(vi.mocked(trackEvent).mock.calls)).not.toContain(
+      'private response',
+    );
   });
 
   it('tracks a push rejection and safe REST verification details', async () => {

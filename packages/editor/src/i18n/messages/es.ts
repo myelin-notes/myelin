@@ -240,6 +240,13 @@ const es: typeof en = {
       },
     },
     explorerTree: {
+      preparingIndex: 'Indexando notas… Pueden aparecer más resultados.',
+      indexingUnavailable:
+        'No se pudieron indexar las notas. La búsqueda de contenido se reintentará más tarde.',
+      indexingNotes: (indexed: number, total: number) =>
+        `Indexando notas… ${indexed}/${total}. Pueden aparecer más resultados.`,
+      indexingFailed: (count: number) =>
+        `No se pudieron indexar ${count} notas.`,
       repositorySetupRequired:
         'Configura el repositorio en Ajustes para ver archivos.',
       emptySearch: 'No se encontraron resultados',

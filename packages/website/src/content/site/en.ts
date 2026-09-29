@@ -94,7 +94,7 @@ for step in range(3):
     audioBody:
       'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
-      'Search your library by note title and tags. Within an open canvas, find text and audio transcripts.',
+      'Search your library by note title, tags, and saved text or audio transcripts. Find matches within an open canvas, too.',
     // Content of the mock app cards standing in for real screenshots
     // (see world-layer.tsx).
     audioMock: {

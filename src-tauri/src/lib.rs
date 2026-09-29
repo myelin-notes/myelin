@@ -6,6 +6,7 @@ mod error_report;
 mod github_push;
 mod iroh_transport;
 mod local_file_write;
+mod note_text_index;
 mod mcp_server;
 mod oauth_loopback;
 mod onenote_import;
@@ -81,7 +82,10 @@ pub fn run() {
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             local_file_write::write_local_file_chunk,
+            note_text_index::index_note_text,
+            note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
+            pdf_export::export_pdf_ios,
             workspace_export::export_obsidian_vault,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
