@@ -575,6 +575,7 @@ describe('LocalRepository', () => {
     );
     await repository.initialize();
     const fileId = await repository.createFile('Note', 'mcanvas', null);
+    const emptyFileId = await repository.createFile('Empty', 'png', null);
     const bytes = createNoteState('small').update;
     const ipc = vi.fn(async () => {});
     vi.stubGlobal('isTauri', true);
@@ -582,6 +583,7 @@ describe('LocalRepository', () => {
 
     try {
       await repository.writeFileBytes(fileId, bytes);
+      await repository.writeFileBytes(emptyFileId, new Uint8Array());
     } finally {
       vi.unstubAllGlobals();
     }
@@ -592,6 +594,16 @@ describe('LocalRepository', () => {
         relativePath: `repositories/small-atomic-save-test/files/${fileId}.myelin`,
         offset: 0,
         bytesBase64: expect.any(String),
+        finalChunk: true,
+      }),
+      undefined,
+    );
+    expect(ipc).toHaveBeenCalledWith(
+      'write_local_file_chunk',
+      expect.objectContaining({
+        relativePath: `repositories/small-atomic-save-test/files/${emptyFileId}.png`,
+        offset: 0,
+        bytesBase64: '',
         finalChunk: true,
       }),
       undefined,

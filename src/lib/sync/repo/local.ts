@@ -302,7 +302,7 @@ export class LocalRepository extends BaseRepository {
       const writeId = crypto.randomUUID();
       for (
         let offset = 0;
-        offset < bytes.byteLength;
+        offset < Math.max(bytes.byteLength, 1);
         offset += MAX_IPC_WRITE_BYTES
       ) {
         await invoke('write_local_file_chunk', {
