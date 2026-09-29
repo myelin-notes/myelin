@@ -298,6 +298,15 @@ function makePdfCtx(): { ctx: PdfHarvestContext; items: PageItem[] } {
 }
 
 describe('ShapeElement drawToPdf', () => {
+  it('scales line thickness with a group-scaled shape', () => {
+    const shape = new ShapeElement('scaled', 'line', [0, 0, 100, 50], STYLE);
+    shape.setScale(2, 2);
+    const { ctx, items } = makePdfCtx();
+    shape.drawToPdf(ctx);
+
+    expect(items[0]).toMatchObject({ t: 'line', width: 32 });
+  });
+
   it('emits one width-carrying line for a line shape', () => {
     const shape = new ShapeElement('l', 'line', [0, 0, 100, 50], STYLE);
     shape.setOffset(0, 0);

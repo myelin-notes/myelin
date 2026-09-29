@@ -449,7 +449,7 @@ export class ShapeElement extends DrawableElement {
       return;
     }
     const { rgb } = parseCssColor(this.style.color);
-    const width = ctx.ptPerWorldY * this.style.size;
+    const width = ctx.ptPerWorldY * this.style.size * Math.abs(this.scale.y);
     const closed =
       this.shapeType === 'rect' ||
       this.shapeType === 'triangle' ||
