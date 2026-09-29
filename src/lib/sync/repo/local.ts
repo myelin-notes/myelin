@@ -296,7 +296,7 @@ export class LocalRepository extends BaseRepository {
     filePath: string,
     bytes: Uint8Array,
   ): Promise<void> {
-    if (bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
+    if (!isTauri() && bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
       await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
     } else if (isTauri()) {
       const writeId = crypto.randomUUID();

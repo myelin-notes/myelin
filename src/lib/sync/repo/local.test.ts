@@ -569,6 +569,35 @@ describe('LocalRepository', () => {
     ).toEqual(bytes.subarray(0, 8 * 1024));
   });
 
+  it('stages small Tauri note saves before replacing the file', async () => {
+    const repository = new LocalRepository(
+      'repositories/small-atomic-save-test',
+    );
+    await repository.initialize();
+    const fileId = await repository.createFile('Note', 'mcanvas', null);
+    const bytes = createNoteState('small').update;
+    const ipc = vi.fn(async () => {});
+    vi.stubGlobal('isTauri', true);
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: { invoke: ipc } });
+
+    try {
+      await repository.writeFileBytes(fileId, bytes);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(ipc).toHaveBeenCalledWith(
+      'write_local_file_chunk',
+      expect.objectContaining({
+        relativePath: `repositories/small-atomic-save-test/files/${fileId}.myelin`,
+        offset: 0,
+        bytesBase64: expect.any(String),
+        finalChunk: true,
+      }),
+      undefined,
+    );
+  });
+
   it('sends large Tauri manifests in bounded chunks', async () => {
     const repository = new LocalRepository('repositories/manifest-chunk-test');
     await repository.initialize();
