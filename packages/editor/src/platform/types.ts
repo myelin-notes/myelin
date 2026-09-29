@@ -94,10 +94,7 @@ export interface CodeRunnerCapability {
 export interface PdfExportOptions {
   /** Suggested file name, including the .pdf extension. */
   suggestedName: string;
-  /**
-   * Called only after the user confirms a destination, so cancelling stays cheap. Return null to
-   * abort the export (nothing written, result reports `cancelled`).
-   */
+  /** Return null to abort the export. On iOS this runs before the save dialog. */
   buildRequest(): Promise<PdfExportRequest | null>;
 }
 
