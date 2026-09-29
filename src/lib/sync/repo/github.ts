@@ -48,11 +48,17 @@ const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 const MAX_MANIFEST_RETRIES = 4;
 const SAFE_GIT_REASONS = new Set([
+  'Git staging directory failed',
+  'Git staging file failed',
   'Git staging write failed',
   'Git push task failed',
+  'Could not resolve Git staging directory',
   'Invalid Git push request',
   'Git push lock unavailable',
+  'Git CA bundle unavailable',
+  'Git TLS certificates unavailable',
   'Git cache unavailable',
+  'Git cache path unavailable',
   'Git clone failed',
   'Git fetch failed',
   'Git head unavailable',

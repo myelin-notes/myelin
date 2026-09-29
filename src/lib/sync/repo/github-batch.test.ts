@@ -177,6 +177,22 @@ describe('CachedRepository GitHub Git pushes', () => {
         github_git_error_code: 'Auth',
       },
     });
+
+    vi.mocked(pushGitHubBatch).mockRejectedValueOnce(
+      'Git TLS certificates unavailable',
+    );
+    await expect(
+      remote.commitBatch({
+        additions: [{ path: 'files/note', contents: new Uint8Array([1]) }],
+        deletions: [],
+        message: { headline: 'Sync note' },
+        expectedHeadOid: await remote.getBranchHeadOid(),
+      }),
+    ).rejects.toMatchObject({
+      message:
+        'GitHub Git push failed (upload: Git TLS certificates unavailable)',
+      diagnostics: { github_git_reason: 'Git TLS certificates unavailable' },
+    });
   });
 
   it('tracks a push rejection and safe REST verification details', async () => {
