@@ -6,15 +6,15 @@ import {
   getRepositoryTestGitHubApi,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { BatchUnknownError } from './batch';
-import { CachedRepository } from './cached';
-import { GitHubRepository } from './github';
-import { pushGitHubBatch } from './github-git-push';
-import { LocalRepository } from './local';
-import { getStoredFilePath } from './shared';
+import { BatchUnknownError } from '../batch';
+import { CachedRepository } from '../cached';
+import { LocalRepository } from '../local';
+import { getStoredFilePath } from '../shared';
+import { GitHubRepository } from '.';
+import { pushGitHubBatch } from './git-push';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
-vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
+vi.mock('./git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 function buildRepository(suffix: string) {
   const remote = new GitHubRepository({

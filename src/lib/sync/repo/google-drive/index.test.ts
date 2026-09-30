@@ -6,10 +6,10 @@ import {
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { CachedRepository } from './cached';
-import { GoogleDriveRepository } from './google-drive';
-import { LocalRepository } from './local';
-import type { VFSManifest } from './shared';
+import { CachedRepository } from '../cached';
+import { LocalRepository } from '../local';
+import type { VFSManifest } from '../shared';
+import { GoogleDriveRepository } from '.';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 

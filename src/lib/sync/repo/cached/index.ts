@@ -20,7 +20,7 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from '../config';
-import { GoogleDriveRequestError } from '../google-drive-error';
+import { GoogleDriveRequestError } from '../google-drive/error';
 import type { LocalRepository } from '../local';
 import {
   addChild,

@@ -11,7 +11,7 @@ import {
 import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
-import { pushGitHubBatch } from './github-git-push';
+import { pushGitHubBatch } from './github/git-push';
 import { LocalRepository } from './local';
 import {
   computeRevision,
@@ -21,7 +21,7 @@ import {
 } from './shared';
 import type { RepositoryCapabilities, VFSFileNode, VFSNodeId } from './types';
 
-vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
+vi.mock('./github/git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 class MemoryRemoteRepository extends BaseRepository {
   public readonly kind = 'memory-remote';

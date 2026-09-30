@@ -4,17 +4,6 @@ export * from '@myelin/editor/sync/repo/file-types';
 // extension (adds `openSession`), so importers here keep the full contract.
 export * from '@myelin/editor/sync/repo/types';
 export * from '@myelin/editor/sync/types';
-export {
-  fetchGitHubBranches,
-  fetchGitHubOrgs,
-  fetchGitHubReposForOrg,
-  fetchGitHubReposForUser,
-  fetchGitHubUser,
-  type GitHubBranch,
-  type GitHubOrg,
-  type GitHubRepo,
-  type GitHubUser,
-} from '../utils/github-api';
 export { RepositoryProvider } from './context';
 export { CloudflareLiveDiscoveryClient } from './live/cloudflare-discovery';
 export {
@@ -46,10 +35,21 @@ export {
   type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
+export {
+  fetchGitHubBranches,
+  fetchGitHubOrgs,
+  fetchGitHubReposForOrg,
+  fetchGitHubReposForUser,
+  fetchGitHubUser,
+  type GitHubBranch,
+  type GitHubOrg,
+  type GitHubRepo,
+  type GitHubUser,
+} from './repo/github/api';
 export type {
   GitHubOAuthResult,
   GitHubOAuthStartPayload,
-} from './repo/github-credentials';
+} from './repo/github/credentials';
 export {
   beginGitHubOAuth,
   cancelGitHubOAuth,
@@ -61,7 +61,7 @@ export {
   openGitHubOAuth,
   storeGitHubToken,
   waitForGitHubOAuth,
-} from './repo/github-credentials';
+} from './repo/github/credentials';
 export {
   ensureGoogleDriveFolder,
   renameGoogleDriveFolder,
@@ -69,7 +69,7 @@ export {
 export type {
   GoogleDriveOAuthResult,
   GoogleDriveOAuthStartPayload,
-} from './repo/google-drive-credentials';
+} from './repo/google-drive/credentials';
 export {
   beginGoogleDriveAuth,
   cancelGoogleDriveAuth,
@@ -81,7 +81,7 @@ export {
   isGoogleDriveSecureStorageAvailable,
   openGoogleDriveAuth,
   waitForGoogleDriveAuth,
-} from './repo/google-drive-credentials';
+} from './repo/google-drive/credentials';
 export {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OAuthCallbackParams } from './oauth/redirect';
+import type { OAuthCallbackParams } from '../oauth/redirect';
 
 // The shared setup replaces this module wholesale for consumers that only need
 // a token; here the real implementation is what's under test.
-vi.unmock('@/lib/sync/repo/github-credentials');
+vi.unmock('@/lib/sync/repo/github/credentials');
 
 vi.mock('@/lib/env', () => ({
   IS_DEV: false,
@@ -25,7 +25,7 @@ const REDIRECT_URI = 'http://127.0.0.1:54321/oauth/callback';
 let resolveRedirect: (params: OAuthCallbackParams) => void;
 const cancelListener = vi.fn(async () => {});
 
-vi.mock('./oauth/redirect', () => ({
+vi.mock('../oauth/redirect', () => ({
   startOAuthRedirectListener: async () => ({
     redirectUri: REDIRECT_URI,
     wait: () =>
@@ -90,7 +90,7 @@ const {
   cancelGitHubOAuth,
   getGitHubToken,
   waitForGitHubOAuth,
-} = await import('./github-credentials');
+} = await import('./credentials');
 
 async function sha256Base64Url(value: string): Promise<string> {
   const digest = await crypto.subtle.digest(

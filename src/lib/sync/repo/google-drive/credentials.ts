@@ -7,11 +7,7 @@ import {
   GOOGLE_CLIENT_SECRET,
   MOBILE_PLATFORM,
 } from '@/lib/env';
-import { createCredentialVault } from './credential-vault';
-import {
-  type GoogleDriveFailureDiagnostics,
-  GoogleDriveRequestError,
-} from './google-drive-error';
+import { createCredentialVault } from '../credential-vault';
 import {
   credentialTokenKey,
   normalizeCredentialId,
@@ -19,9 +15,13 @@ import {
   type OAuthExchange,
   type OAuthResult,
   type OAuthStartPayload,
-} from './oauth/client';
-import { encodeFormBody } from './oauth/pkce';
-import { MOBILE_REDIRECT_SCHEME } from './oauth/redirect';
+} from '../oauth/client';
+import { encodeFormBody } from '../oauth/pkce';
+import { MOBILE_REDIRECT_SCHEME } from '../oauth/redirect';
+import {
+  type GoogleDriveFailureDiagnostics,
+  GoogleDriveRequestError,
+} from './error';
 
 const logger = new Logger('GoogleDriveCredentials');
 

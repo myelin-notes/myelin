@@ -20,7 +20,6 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
-import { trackEvent } from '@/lib/analytics';
 import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
@@ -193,17 +192,12 @@ export function MobileLibrary() {
 
   const handleNewFile = useCallback(
     (title: string, type: FileType) => {
-      void explorerRef.current
-        ?.startNewFile(title, type)
-        .then(() => {
-          trackEvent('note_created', { file_type: type });
-        })
-        .catch((error) => {
-          logger.error('Failed to create file', error, { fileType: type });
-          toast.error(strings.commandPalette.errors.createNote, {
-            description: errorDescription(error),
-          });
+      void explorerRef.current?.startNewFile(title, type).catch((error) => {
+        logger.error('Failed to create file', error, { fileType: type });
+        toast.error(strings.commandPalette.errors.createNote, {
+          description: errorDescription(error),
         });
+      });
     },
     [strings.commandPalette.errors.createNote],
   );
@@ -490,12 +484,7 @@ export function MobileLibrary() {
                             style: 'short',
                           })}
                           onClick={() =>
-                            openNote(
-                              tabController,
-                              file,
-                              file.name,
-                              'recent_files',
-                            )
+                            openNote(tabController, file, file.name)
                           }
                           onChanged={refreshLibraryData}
                         />

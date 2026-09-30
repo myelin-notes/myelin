@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRepository } from './factory';
-import { hasGitHubToken } from './github-credentials';
+import { hasGitHubToken } from './github/credentials';
 import {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
