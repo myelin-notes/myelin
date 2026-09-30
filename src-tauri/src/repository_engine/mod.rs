@@ -29,7 +29,7 @@ pub struct RepositoryManager {
 
 struct RepositoryHandle {
     engine: Arc<RepositoryEngine>,
-    notes: HashSet<String>,
+    notes: HashMap<String, HashSet<String>>,
 }
 
 pub(crate) struct RepositoryEngine {
@@ -38,7 +38,7 @@ pub(crate) struct RepositoryEngine {
     source: AsyncMutex<Option<RepositorySource>>,
     credential_id: Mutex<String>,
     network_lock: AsyncMutex<()>,
-    open_notes: Mutex<HashMap<String, usize>>,
+    open_notes: Mutex<HashMap<String, HashSet<String>>>,
     references: AtomicUsize,
     scheduling: AtomicBool,
     checkpoint_scheduling: AtomicBool,
@@ -104,12 +104,15 @@ pub enum RepositoryOperation {
         update_base64: String,
         origin: String,
         generation: Option<String>,
+        source_session: Option<String>,
     },
     Subscribe {
         node_id: String,
+        session_id: String,
     },
     Unsubscribe {
         node_id: String,
+        session_id: String,
     },
     Path {
         node_id: String,
@@ -121,7 +124,8 @@ pub enum RepositoryOperation {
 struct DocumentChange {
     repository_id: String,
     node_id: String,
-    update_base64: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    update_base64: Option<String>,
     origin: String,
     generation: String,
     replacement: bool,
@@ -130,6 +134,7 @@ struct DocumentChange {
 struct DocumentNotification {
     node_id: String,
     bytes: Vec<u8>,
+    source_session: Option<String>,
     origin: String,
     generation: String,
     replacement: bool,
@@ -240,37 +245,57 @@ impl RepositoryEngine {
         let _ = app.emit("repository-status", self.status().await);
         let _ = app.emit("repository-data", json!({"repositoryId": self.id, "changed": changes.changed, "deleted": changes.deleted}));
         for notification in changes.documents {
-            let DocumentNotification {
-                node_id: node,
-                bytes,
-                origin,
-                generation,
-                replacement,
-            } = notification;
-            let subscribed = self.open_notes.lock().unwrap().contains_key(&node);
-            if subscribed {
-                let _ = app.emit(
-                    "repository-document",
-                    DocumentChange {
-                        repository_id: self.id.clone(),
-                        node_id: node.clone(),
-                        update_base64: STANDARD.encode(&bytes),
-                        origin: origin.clone(),
-                        generation,
-                        replacement,
-                    },
-                );
-            }
-            if origin == "local" {
+            self.emit_document_change(&notification, |event, payload| {
+                let _ = app.emit(event, payload);
+            });
+            if notification.origin == "local" {
                 let app = app.clone();
                 let id = self.id.clone();
                 tauri::async_runtime::spawn(async move {
-                    crate::iroh_transport::broadcast_document(&app, &id, &node, bytes).await;
+                    crate::iroh_transport::broadcast_document(
+                        &app,
+                        &id,
+                        &notification.node_id,
+                        notification.bytes,
+                    )
+                    .await;
                 });
             }
         }
         if local_mutation {
             self.wake.notify_one();
+        }
+    }
+
+    fn emit_document_change(
+        &self,
+        notification: &DocumentNotification,
+        mut emit: impl FnMut(&str, &DocumentChange),
+    ) {
+        let sessions = self
+            .open_notes
+            .lock()
+            .unwrap()
+            .get(&notification.node_id)
+            .into_iter()
+            .flatten()
+            .filter(|session| notification.source_session.as_ref() != Some(*session))
+            .cloned()
+            .collect::<Vec<_>>();
+        if sessions.is_empty() {
+            return;
+        }
+        let payload = DocumentChange {
+            repository_id: self.id.clone(),
+            node_id: notification.node_id.clone(),
+            update_base64: (!notification.replacement)
+                .then(|| STANDARD.encode(&notification.bytes)),
+            origin: notification.origin.clone(),
+            generation: notification.generation.clone(),
+            replacement: notification.replacement,
+        };
+        for session in sessions {
+            emit(&format!("repository-document-{session}"), &payload);
         }
     }
 
@@ -518,6 +543,7 @@ impl RepositoryOperation {
                     changes.documents.push(DocumentNotification {
                         node_id: id.clone(),
                         bytes: bytes.clone(),
+                        source_session: None,
                         origin: "local".into(),
                         generation,
                         replacement: replace && known,
@@ -604,6 +630,7 @@ impl RepositoryOperation {
                 update_base64,
                 origin,
                 generation: expected,
+                source_session,
             } => {
                 if !matches!(origin.as_str(), "local" | "peer") {
                     return Err("Invalid document update origin".into());
@@ -635,6 +662,7 @@ impl RepositoryOperation {
                     changes.documents.push(DocumentNotification {
                         node_id: node_id.clone(),
                         bytes: update,
+                        source_session,
                         origin,
                         generation: generation.clone(),
                         replacement: false,
@@ -717,7 +745,7 @@ pub async fn repository_open(
         handle_id.clone(),
         RepositoryHandle {
             engine: engine.clone(),
-            notes: HashSet::new(),
+            notes: HashMap::new(),
         },
     );
     if request.source.is_some() {
@@ -750,32 +778,42 @@ pub async fn repository_operation(
 ) -> Result<Value, String> {
     let engine = manager.engine(&handle).await?;
     match &operation {
-        RepositoryOperation::Subscribe { node_id } => {
+        RepositoryOperation::Subscribe { node_id, session_id } => {
             let mut handles = manager.handles.lock().await;
             let handle = handles
                 .get_mut(&handle)
                 .ok_or("Repository handle is closed")?;
-            if handle.notes.insert(node_id.clone()) {
-                *engine
+            if handle
+                .notes
+                .entry(node_id.clone())
+                .or_default()
+                .insert(session_id.clone())
+            {
+                engine
                     .open_notes
                     .lock()
                     .unwrap()
                     .entry(node_id.clone())
-                    .or_default() += 1;
+                    .or_default()
+                    .insert(session_id.clone());
             }
             return Ok(Value::Null);
         }
-        RepositoryOperation::Unsubscribe { node_id } => {
+        RepositoryOperation::Unsubscribe { node_id, session_id } => {
             let mut handles = manager.handles.lock().await;
-            if handles
-                .get_mut(&handle)
-                .is_some_and(|handle| handle.notes.remove(node_id))
-            {
-                let mut notes = engine.open_notes.lock().unwrap();
-                if let Some(count) = notes.get_mut(node_id) {
-                    *count -= 1;
-                    if *count == 0 {
-                        notes.remove(node_id);
+            if let Some(handle) = handles.get_mut(&handle) {
+                if let Some(sessions) = handle.notes.get_mut(node_id) {
+                    if sessions.remove(session_id) {
+                        let mut notes = engine.open_notes.lock().unwrap();
+                        if let Some(sessions) = notes.get_mut(node_id) {
+                            sessions.remove(session_id);
+                            if sessions.is_empty() {
+                                notes.remove(node_id);
+                            }
+                        }
+                    }
+                    if sessions.is_empty() {
+                        handle.notes.remove(node_id);
                     }
                 }
             }
@@ -807,10 +845,10 @@ pub async fn repository_release(
     if let Some(handle) = removed {
         {
             let mut notes = handle.engine.open_notes.lock().unwrap();
-            for id in handle.notes {
-                if let Some(count) = notes.get_mut(&id) {
-                    *count -= 1;
-                    if *count == 0 {
+            for (id, removed) in handle.notes {
+                if let Some(sessions) = notes.get_mut(&id) {
+                    sessions.retain(|session| !removed.contains(session));
+                    if sessions.is_empty() {
                         notes.remove(&id);
                     }
                 }
@@ -862,6 +900,7 @@ pub(crate) async fn peer_update(
             update_base64: STANDARD.encode(update),
             origin: "peer".into(),
             generation: None,
+            source_session: None,
         })
         .await?;
     engine.emit_changes(app, changes).await;

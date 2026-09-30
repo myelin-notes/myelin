@@ -17,7 +17,7 @@ import {
   YDocManager,
 } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import { getOrCreatePeerId } from './identity';
+import { createEphemeralPeerId, getOrCreatePeerId } from './identity';
 import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {
   decodeMessage,
@@ -63,6 +63,7 @@ export class NoteSession {
   private status: NoteSessionStatus;
   private nativeQueue: Uint8Array[] = [];
   private nativeGeneration: string | undefined;
+  private readonly nativeSessionId = createEphemeralPeerId();
   private replaced = false;
   private readonly replacementListeners = new Set<() => void>();
   private nativeSaving: Promise<void> | null = null;
@@ -158,11 +159,14 @@ export class NoteSession {
               session.invalidateNativeDocument();
               return;
             }
-            session.applyUpdate(
-              change.update,
-              change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
-            );
+            if (change.update) {
+              session.applyUpdate(
+                change.update,
+                change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
+              );
+            }
           },
+          session.nativeSessionId,
         );
         await session.pull();
       } catch (error) {
@@ -591,6 +595,7 @@ export class NoteSession {
             ? this.nativeQueue[0]
             : mergeUpdates(this.nativeQueue.slice(0, count)),
           this.nativeGeneration,
+          this.nativeSessionId,
         );
         this.nativeQueue.splice(0, count);
         this.remoteStateVector = result.stateVector;

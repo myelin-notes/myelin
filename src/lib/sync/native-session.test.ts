@@ -33,6 +33,7 @@ function nativeTarget() {
       _id: string,
       update: Uint8Array,
       expected?: string,
+      _sourceSession?: string,
     ): Promise<YjsSyncPushResult> => {
       if (expected && expected !== generation) {
         throw new Error('Native document replaced');
@@ -53,12 +54,12 @@ function nativeTarget() {
     pushUpdates: (id, update) => persist(id, update),
     persistDocumentUpdate: persist,
     flushDocument: vi.fn(async () => {}),
-    subscribeDocument: async (_id, callback) => {
+    subscribeDocument: vi.fn(async (_id, callback, _sessionId) => {
       listener = callback;
       return async () => {
         listener = undefined;
       };
-    },
+    }),
   };
   return {
     doc,
@@ -100,6 +101,12 @@ describe('native editor sessions', () => {
       expect(native.doc.getText('content').toString()).toBe('abc'),
     );
     expect(native.persist).toHaveBeenCalledTimes(2);
+    const sessionId = vi.mocked(native.target.subscribeDocument).mock
+      .calls[0][2];
+    expect(sessionId).toBeTruthy();
+    expect(
+      native.persist.mock.calls.every((call) => call[3] === sessionId),
+    ).toBe(true);
     expect(
       native.persist.mock.calls.every((call) => call[2] === 'original'),
     ).toBe(true);
@@ -182,7 +189,7 @@ describe('native editor sessions', () => {
     session.subscribeReplacement(replaced);
     native.replace();
     native.emit({
-      update: new Uint8Array([0, 0]),
+      update: null,
       origin: 'local',
       generation: 'replacement',
       replacement: true,

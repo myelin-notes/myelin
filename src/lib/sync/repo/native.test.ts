@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { invoke } from '@tauri-apps/api/core';
+import type { NativeDocumentChange } from '../native-document-target';
 import { NativeRepository } from './native';
 import { createRepositoryFromConfig } from './repository-backends';
 import {
@@ -241,4 +242,94 @@ it('does not publish a new file while its native byte write is still in flight',
   expect(native.manifest().nodes[id]?.name).toBe('Large import');
   expect(native.files.get(id)).toEqual(new Uint8Array([4, 5, 6]));
   await repository.dispose();
+});
+
+it('keeps session subscriptions distinct and delivers metadata-only replacement events', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'repository_operation') {
+      const op = (args as { operation: Record<string, unknown> }).operation;
+      if (op.kind === 'subscribe' || op.kind === 'unsubscribe') {
+        native.operations.push(op);
+        return;
+      }
+      if (op.kind === 'update-document') {
+        native.operations.push(op);
+        return {
+          accepted: true,
+          changed: true,
+          stateVectorBase64: 'AA==',
+          revision: 'native',
+        };
+      }
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  const editor = vi.fn((_change: NativeDocumentChange) => {});
+  const mcp = vi.fn((_change: NativeDocumentChange) => {});
+  const closeEditor = await repository.subscribeDocument(
+    'note',
+    editor,
+    'editor',
+  );
+  const closeMcp = await repository.subscribeDocument('note', mcp, 'mcp');
+  expect(native.operations.filter((op) => op.kind === 'subscribe')).toEqual([
+    { kind: 'subscribe', nodeId: 'note', sessionId: 'editor' },
+    { kind: 'subscribe', nodeId: 'note', sessionId: 'mcp' },
+  ]);
+  await repository.persistDocumentUpdate(
+    'note',
+    new Uint8Array([1, 2]),
+    'original',
+    'editor',
+  );
+  expect(native.operations.at(-1)).toMatchObject({
+    kind: 'update-document',
+    sourceSession: 'editor',
+    generation: 'original',
+  });
+  listeners.get('repository-document-mcp')?.({
+    payload: {
+      repositoryId: 'local',
+      nodeId: 'note',
+      updateBase64: 'AQI=',
+      origin: 'local',
+      generation: 'original',
+      replacement: false,
+    },
+  });
+  expect(editor).not.toHaveBeenCalled();
+  expect(mcp).toHaveBeenCalledWith({
+    update: new Uint8Array([1, 2]),
+    origin: 'local',
+    generation: 'original',
+    replacement: false,
+  });
+  await closeEditor();
+  expect(listeners.has('repository-document-editor')).toBe(false);
+  expect(listeners.has('repository-document-mcp')).toBe(true);
+  listeners.get('repository-document-mcp')?.({
+    payload: {
+      repositoryId: 'local',
+      nodeId: 'note',
+      origin: 'local',
+      generation: 'replacement',
+      replacement: true,
+    },
+  });
+  expect(mcp).toHaveBeenLastCalledWith({
+    update: null,
+    origin: 'local',
+    generation: 'replacement',
+    replacement: true,
+  });
+  await closeMcp();
+  expect(native.operations.filter((op) => op.kind === 'unsubscribe')).toEqual([
+    { kind: 'unsubscribe', nodeId: 'note', sessionId: 'editor' },
+    { kind: 'unsubscribe', nodeId: 'note', sessionId: 'mcp' },
+  ]);
+  await repository.dispose();
+  expect(listeners.size).toBe(0);
 });

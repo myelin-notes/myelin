@@ -472,6 +472,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 changes.documents.push(super::DocumentNotification {
                     node_id: id.clone(),
                     bytes: bytes.clone(),
+                    source_session: None,
                     origin: "repository".into(),
                     generation,
                     replacement: false,
@@ -595,30 +596,19 @@ impl RepositoryEngine {
                 let _ = app.emit("repository-status", self.status().await);
                 let _ = app.emit("repository-data", json!({"repositoryId": self.id, "changed": changes.changed, "deleted": changes.deleted}));
                 for notification in changes.documents {
-                    let super::DocumentNotification {
-                        node_id: node,
-                        bytes,
-                        origin,
-                        generation,
-                        replacement,
-                    } = notification;
-                    if self.open_notes.lock().unwrap().contains_key(&node) {
-                        let _ = app.emit(
-                            "repository-document",
-                            super::DocumentChange {
-                                repository_id: self.id.clone(),
-                                node_id: node.clone(),
-                                update_base64: STANDARD.encode(&bytes),
-                                origin,
-                                generation,
-                                replacement,
-                            },
-                        );
-                    }
+                    self.emit_document_change(&notification, |event, payload| {
+                        let _ = app.emit(event, payload);
+                    });
                     let app = app.clone();
                     let id = self.id.clone();
                     tauri::async_runtime::spawn(async move {
-                        crate::iroh_transport::broadcast_document(&app, &id, &node, bytes).await;
+                        crate::iroh_transport::broadcast_document(
+                            &app,
+                            &id,
+                            &notification.node_id,
+                            notification.bytes,
+                        )
+                        .await;
                     });
                 }
                 Ok(())

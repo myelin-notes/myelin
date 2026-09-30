@@ -9,7 +9,7 @@ export interface NativeDocumentSnapshot extends YjsSyncSnapshot {
 }
 
 export interface NativeDocumentChange {
-  update: Uint8Array;
+  update: Uint8Array | null;
   origin: 'local' | 'peer' | 'repository';
   generation: string;
   replacement: boolean;
@@ -26,11 +26,13 @@ export interface NativeDocumentTarget extends YjsSyncTarget {
     nodeId: string,
     update: Uint8Array,
     generation?: string,
+    sourceSession?: string,
   ): Promise<YjsSyncPushResult>;
   flushDocument(nodeId: string): Promise<void>;
   subscribeDocument(
     nodeId: string,
     listener: (change: NativeDocumentChange) => void,
+    sessionId: string,
   ): Promise<() => Promise<void>>;
 }
 

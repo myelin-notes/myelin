@@ -40,7 +40,7 @@ interface NativeDocument {
 interface DocumentEvent {
   repositoryId: string;
   nodeId: string;
-  updateBase64: string;
+  updateBase64?: string;
   origin: 'local' | 'peer' | 'repository';
   generation: string;
   replacement: boolean;
@@ -80,10 +80,6 @@ export class NativeRepository
   private initializing: Promise<void> | null = null;
   private disposed = false;
   private readonly unlisteners: UnlistenFn[] = [];
-  private readonly documents = new Map<
-    string,
-    Set<(change: NativeDocumentChange) => void>
-  >();
   private readonly restoring = new Set<string>();
   private nativeVersion = -1;
 
@@ -118,22 +114,6 @@ export class NativeRepository
         await listen<NativeStatus>('repository-status', ({ payload }) => {
           if (payload.repositoryId === this.repositoryId && !this.disposed) {
             this.applyStatus(payload);
-          }
-        }),
-      );
-      this.unlisteners.push(
-        await listen<DocumentEvent>('repository-document', ({ payload }) => {
-          if (payload.repositoryId !== this.repositoryId || this.disposed) {
-            return;
-          }
-          const update = decode(payload.updateBase64);
-          for (const listener of this.documents.get(payload.nodeId) ?? []) {
-            listener({
-              update,
-              origin: payload.origin,
-              generation: payload.generation,
-              replacement: payload.replacement,
-            });
           }
         }),
       );
@@ -423,6 +403,7 @@ export class NativeRepository
     nodeId: string,
     update: Uint8Array,
     generation?: string,
+    sourceSession?: string,
   ): Promise<YjsSyncPushResult> {
     const result = await this.operation<NativeDocument>({
       kind: 'update-document',
@@ -430,6 +411,7 @@ export class NativeRepository
       updateBase64: encode(update),
       origin: 'local',
       generation: generation ?? null,
+      sourceSession: sourceSession ?? null,
     });
     return {
       accepted: result.accepted ?? true,
@@ -446,31 +428,46 @@ export class NativeRepository
   async subscribeDocument(
     nodeId: string,
     listener: (change: NativeDocumentChange) => void,
+    sessionId: string,
   ): Promise<() => Promise<void>> {
-    let listeners = this.documents.get(nodeId);
-    if (!listeners) {
-      listeners = new Set();
-      this.documents.set(nodeId, listeners);
-    }
-    listeners.add(listener);
-    if (listeners.size === 1) {
-      try {
-        await this.operation({ kind: 'subscribe', nodeId });
-      } catch (error) {
-        listeners.delete(listener);
-        if (!listeners.size) {
-          this.documents.delete(nodeId);
+    await this.initialize();
+    const unlisten = await listen<DocumentEvent>(
+      `repository-document-${sessionId}`,
+      ({ payload }) => {
+        if (
+          payload.repositoryId !== this.repositoryId ||
+          payload.nodeId !== nodeId ||
+          this.disposed
+        ) {
+          return;
         }
-        throw error;
+        listener({
+          update: payload.updateBase64 ? decode(payload.updateBase64) : null,
+          origin: payload.origin,
+          generation: payload.generation,
+          replacement: payload.replacement,
+        });
+      },
+    );
+    this.unlisteners.push(unlisten);
+    try {
+      await this.operation({ kind: 'subscribe', nodeId, sessionId });
+    } catch (error) {
+      unlisten();
+      const index = this.unlisteners.indexOf(unlisten);
+      if (index !== -1) {
+        this.unlisteners.splice(index, 1);
       }
+      throw error;
     }
     return async () => {
-      listeners.delete(listener);
-      if (!listeners.size) {
-        this.documents.delete(nodeId);
-        if (!this.disposed) {
-          await this.operation({ kind: 'unsubscribe', nodeId });
-        }
+      const index = this.unlisteners.indexOf(unlisten);
+      if (index !== -1) {
+        unlisten();
+        this.unlisteners.splice(index, 1);
+      }
+      if (!this.disposed) {
+        await this.operation({ kind: 'unsubscribe', nodeId, sessionId });
       }
     };
   }

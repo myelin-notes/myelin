@@ -85,6 +85,7 @@ async fn update(engine: &RepositoryEngine, key: &str, origin: &str) -> (Value, C
             update_base64: fixture()[key].as_str().unwrap().into(),
             origin: origin.into(),
             generation: None,
+            source_session: None,
         })
         .await
         .unwrap()
@@ -179,6 +180,80 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
 }
 
 #[tokio::test]
+async fn document_events_skip_the_source_session_and_replacements_omit_bytes() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "canvas", "mcanvas", fixture_bytes("baseUpdate")).await;
+    engine
+        .open_notes
+        .lock()
+        .unwrap()
+        .insert("canvas".into(), HashSet::from(["editor".into()]));
+    let (_, changes) = engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "canvas".into(),
+            update_base64: fixture()["localUpdate"].as_str().unwrap().into(),
+            origin: "local".into(),
+            generation: None,
+            source_session: Some("editor".into()),
+        })
+        .await
+        .unwrap();
+    let notification = &changes.documents[0];
+    let mut events = Vec::new();
+    engine.emit_document_change(notification, |event, payload| {
+        events.push((event.to_owned(), serde_json::to_value(payload).unwrap()));
+    });
+    assert!(events.is_empty());
+    engine
+        .open_notes
+        .lock()
+        .unwrap()
+        .get_mut("canvas")
+        .unwrap()
+        .insert("mcp".into());
+    engine.emit_document_change(notification, |event, payload| {
+        events.push((event.to_owned(), serde_json::to_value(payload).unwrap()));
+    });
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].0, "repository-document-mcp");
+    assert_eq!(events[0].1["updateBase64"], fixture()["localUpdate"]);
+    assert_eq!(events[0].1["origin"], "local");
+    let (_, peer) = update(&engine, "remoteUpdate", "peer").await;
+    events.clear();
+    engine.emit_document_change(&peer.documents[0], |event, payload| {
+        events.push((event.to_owned(), serde_json::to_value(payload).unwrap()));
+    });
+    assert_eq!(events.len(), 2);
+    assert!(events
+        .iter()
+        .any(|(event, _)| event == "repository-document-editor"));
+    assert!(events
+        .iter()
+        .all(|(_, payload)| payload["origin"] == "peer"));
+    let (_, replacement) = engine
+        .operate(RepositoryOperation::WriteFile {
+            node: node("canvas", "mcanvas"),
+            bytes_base64: fixture()["baseUpdate"].as_str().unwrap().into(),
+            replace: true,
+            overwrite_remote: true,
+        })
+        .await
+        .unwrap();
+    events.clear();
+    engine.emit_document_change(&replacement.documents[0], |event, payload| {
+        events.push((event.to_owned(), serde_json::to_value(payload).unwrap()));
+    });
+    assert_eq!(events.len(), 2);
+    for (_, payload) in events {
+        assert_eq!(payload["replacement"], true);
+        assert_eq!(payload["generation"], replacement.documents[0].generation);
+        assert!(payload.get("updateBase64").is_none());
+    }
+    assert!(replacement.documents[0].bytes.len() > 65536);
+}
+
+#[tokio::test]
 async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stale_generation() {
     let directory = TestDirectory::new();
     let engine = directory.engine(false);
@@ -245,6 +320,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
             update_base64: fixture()["localUpdate"].as_str().unwrap().into(),
             origin: "local".into(),
             generation: Some(opened["generation"].as_str().unwrap().into()),
+            source_session: None,
         })
         .await;
     assert_eq!(stale.err().unwrap(), "Native document replaced");
@@ -271,6 +347,7 @@ async fn failed_durability_blocks_more_writes_then_replays_the_delta_on_reopen()
             update_base64: fixture()["localUpdate"].as_str().unwrap().into(),
             origin: "local".into(),
             generation: None,
+            source_session: None,
         })
         .await;
     assert!(failed.is_err());
