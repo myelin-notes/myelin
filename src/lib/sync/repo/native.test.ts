@@ -3,11 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { NativeDocumentChange } from '../native-document-target';
 import { NativeRepository } from './native';
 import { createRepositoryFromConfig } from './repository-backends';
-import {
-  createEmptyManifest,
-  createFileNode,
-  type VFSManifest,
-} from './shared';
+import { createEmptyManifest, type VFSManifest } from './shared';
 
 const { listeners } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
@@ -162,8 +158,31 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(listeners.size).toBe(0);
 });
 
-it('marks ordinary raw writes for conflict checking and only restores as cloud replacements', async () => {
+it('keeps snapshot and restore content in Rust while ordinary writes check conflicts', async () => {
   const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  const version = {
+    id: 'version',
+    sourceFileId: 'image',
+    sourceName: 'Image',
+    fileType: 'png',
+    sourceRevision: 'old',
+    capturedAt: 1,
+    byteLength: 2,
+  };
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'repository_operation') {
+      const op = (args as { operation: Record<string, unknown> }).operation;
+      if (
+        op.kind === 'create-file-version' ||
+        op.kind === 'restore-file-version'
+      ) {
+        native.operations.push(op);
+        return op.kind === 'create-file-version' ? version : null;
+      }
+    }
+    return implementation(command, args);
+  });
   const repository = new NativeRepository({ kind: 'local' });
   await repository.initialize();
   const id = await repository.createFile(
@@ -173,34 +192,19 @@ it('marks ordinary raw writes for conflict checking and only restores as cloud r
     new Uint8Array([1, 2]),
   );
   await repository.writeFileBytes(id, new Uint8Array([2, 3]));
-  const ordinary = native.operations
-    .filter((op) => op.kind === 'write-file')
-    .at(-1);
-  expect(ordinary?.overwriteRemote).toBe(false);
-  native.manifest().nodes.version = {
-    ...createFileNode('version', 'Saved image', 'png', null, 1),
-    system: {
-      kind: 'file-version',
-      sourceFileId: id,
-      sourceFileType: 'png',
-      sourceName: 'Image',
-      sourceRevision: 'old',
-      capturedAt: 1,
-      byteLength: 2,
-    },
-  };
-  native.files.set('version', new Uint8Array([4, 5]));
+  expect(native.operations.at(-1)).toMatchObject({
+    kind: 'write-file',
+    overwriteRemote: false,
+  });
+  const before = native.operations.length;
+  expect(await repository.createFileVersionIfDue(id)).toEqual(version);
+  await repository.createFileVersionIfDue(id, { force: true });
   await repository.restoreFileVersion(id, 'version');
-  const restores = native.operations.filter(
-    (op) => op.kind === 'write-file' && (op.node as { id: string }).id === id,
-  );
-  expect(restores.at(-1)?.overwriteRemote).toBe(true);
-  expect(await repository.readFileBytes(id)).toEqual(new Uint8Array([4, 5]));
-  expect(
-    Object.values(native.manifest().nodes).some(
-      (node) => node.system?.kind === 'file-version' && node.id !== 'version',
-    ),
-  ).toBe(true);
+  expect(native.operations.slice(before)).toEqual([
+    { kind: 'create-file-version', nodeId: id, force: false },
+    { kind: 'create-file-version', nodeId: id, force: true },
+    { kind: 'restore-file-version', nodeId: id, versionId: 'version' },
+  ]);
   await repository.dispose();
 });
 

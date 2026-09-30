@@ -136,6 +136,304 @@ fn assert_document(bytes: &[u8]) {
     assert_eq!(json!(document::links(&doc)), expected["links"]);
 }
 
+async fn capture_version(engine: &RepositoryEngine, id: &str, force: bool) -> Value {
+    engine
+        .operate(RepositoryOperation::CreateFileVersion {
+            node_id: id.into(),
+            force,
+        })
+        .await
+        .unwrap()
+        .0
+}
+
+#[tokio::test]
+async fn native_versions_check_cadence_before_reading_and_deduplicate_existing_content() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "picture", "png", b"original".to_vec()).await;
+    let version = capture_version(&engine, "picture", false).await;
+    assert_eq!(version["byteLength"], 8);
+    assert_eq!(
+        read(&engine, version["id"].as_str().unwrap()).await,
+        b"original"
+    );
+    assert!(version.get("bytesBase64").is_none());
+    let source = directory.0.join("data/files/picture.png");
+    fs::remove_file(&source).unwrap();
+    fs::create_dir(&source).unwrap();
+    assert!(capture_version(&engine, "picture", false).await.is_null());
+    assert!(engine
+        .operate(RepositoryOperation::CreateFileVersion {
+            node_id: "picture".into(),
+            force: true,
+        })
+        .await
+        .is_err());
+    fs::remove_dir(&source).unwrap();
+    fs::write(&source, b"changed").unwrap();
+    {
+        let mut store = engine.store.lock().unwrap();
+        store.manifest["nodes"][version["id"].as_str().unwrap()]["system"]["capturedAt"] = json!(1);
+    }
+    let changed = capture_version(&engine, "picture", false).await;
+    assert_eq!(
+        read(&engine, changed["id"].as_str().unwrap()).await,
+        b"changed"
+    );
+    assert!(capture_version(&engine, "picture", true).await.is_null());
+    assert!(
+        capture_version(&engine, version["id"].as_str().unwrap(), true)
+            .await
+            .is_null()
+    );
+    assert!(capture_version(&engine, "missing", true).await.is_null());
+}
+
+#[tokio::test]
+async fn native_restore_preserves_metadata_saves_current_bytes_and_rejects_missing_versions() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    seed(&engine, "picture", "png", b"original".to_vec()).await;
+    let version = capture_version(&engine, "picture", false).await;
+    let version_id = version["id"].as_str().unwrap();
+    engine
+        .operate(RepositoryOperation::WriteFile {
+            node: node("picture", "png"),
+            bytes_base64: STANDARD.encode(b"current"),
+            replace: true,
+            overwrite_remote: false,
+        })
+        .await
+        .unwrap();
+    let before = {
+        let mut store = engine.store.lock().unwrap();
+        store.manifest["nodes"]["picture"]["name"] = json!("Renamed.png");
+        store.manifest["nodes"]["picture"]["tags"] = json!(["keep"]);
+        store.manifest["nodes"]["picture"].clone()
+    };
+    assert!(engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "other".into(),
+            version_id: version_id.into(),
+        })
+        .await
+        .is_err());
+    let before_version = engine.store.lock().unwrap().data_version;
+    engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "picture".into(),
+            version_id: version_id.into(),
+        })
+        .await
+        .unwrap();
+    let backup_id = {
+        let store = engine.store.lock().unwrap();
+        assert_eq!(store.data_version, before_version + 1);
+        for key in ["name", "parentId", "tags", "createdAt"] {
+            assert_eq!(store.manifest["nodes"]["picture"][key], before[key]);
+        }
+        assert!(store
+            .outbox
+            .iter()
+            .any(|op| op["nodeId"] == "picture" && op["replaceFile"] == true));
+        store.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .find(|node| node["system"]["kind"] == "file-version" && node["id"] != version_id)
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(read(&engine, "picture").await, b"original");
+    assert_eq!(read(&engine, &backup_id).await, b"current");
+    let before_noop = engine.store.lock().unwrap().data_version;
+    let (_, changes) = engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "picture".into(),
+            version_id: version_id.into(),
+        })
+        .await
+        .unwrap();
+    assert!(changes.changed.is_empty());
+    assert_eq!(engine.store.lock().unwrap().data_version, before_noop);
+    drop(engine);
+    let engine = directory.engine(true);
+    engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "picture".into(),
+            version_id: backup_id.clone(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(read(&engine, "picture").await, b"current");
+    assert_eq!(
+        engine.store.lock().unwrap().manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter(|node| node["system"]["kind"] == "file-version")
+            .count(),
+        2
+    );
+    fs::remove_file(directory.0.join(format!("data/files/{version_id}.png"))).unwrap();
+    assert_eq!(
+        engine
+            .operate(RepositoryOperation::RestoreFileVersion {
+                node_id: "picture".into(),
+                version_id: version_id.into(),
+            })
+            .await
+            .err()
+            .unwrap(),
+        "Version data is missing."
+    );
+    assert_eq!(read(&engine, "picture").await, b"current");
+}
+
+#[tokio::test]
+async fn native_restore_can_prune_the_selected_version_without_losing_its_bytes() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    seed(&engine, "picture", "png", vec![0]).await;
+    let mut oldest_id = String::new();
+    for index in 0..32 {
+        engine
+            .operate(RepositoryOperation::WriteFile {
+                node: node("picture", "png"),
+                bytes_base64: STANDARD.encode([index]),
+                replace: true,
+                overwrite_remote: false,
+            })
+            .await
+            .unwrap();
+        let version = capture_version(&engine, "picture", true).await;
+        let id = version["id"].as_str().unwrap();
+        if index == 0 {
+            oldest_id = id.into();
+        }
+        engine.store.lock().unwrap().manifest["nodes"][id]["system"]["capturedAt"] =
+            json!(index + 1);
+    }
+    engine
+        .operate(RepositoryOperation::WriteFile {
+            node: node("picture", "png"),
+            bytes_base64: STANDARD.encode([99]),
+            replace: true,
+            overwrite_remote: false,
+        })
+        .await
+        .unwrap();
+    let (_, changes) = engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "picture".into(),
+            version_id: oldest_id.clone(),
+        })
+        .await
+        .unwrap();
+    assert_eq!(read(&engine, "picture").await, vec![0]);
+    assert_eq!(changes.deleted, vec![oldest_id.clone()]);
+    assert!(!directory
+        .0
+        .join(format!("data/files/{oldest_id}.png"))
+        .exists());
+    let backup_id = {
+        let store = engine.store.lock().unwrap();
+        let versions = store.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter(|node| node["system"]["kind"] == "file-version")
+            .collect::<Vec<_>>();
+        assert_eq!(versions.len(), 32);
+        assert!(store
+            .outbox
+            .iter()
+            .any(|op| op["kind"] == "delete-manifest-node" && op["nodeId"] == oldest_id));
+        versions
+            .into_iter()
+            .max_by_key(|node| node["system"]["capturedAt"].as_u64().unwrap())
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(read(&engine, &backup_id).await, vec![99]);
+}
+
+#[tokio::test]
+async fn native_canvas_restore_captures_uncheckpointed_edits_and_replaces_the_generation() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    seed(&engine, "canvas", "mcanvas", fixture_bytes("baseUpdate")).await;
+    let version = capture_version(&engine, "canvas", false).await;
+    let version_id = version["id"].as_str().unwrap();
+    let (opened, _) = engine
+        .operate(RepositoryOperation::Document {
+            node_id: "canvas".into(),
+            state_vector_base64: None,
+        })
+        .await
+        .unwrap();
+    update(&engine, "localUpdate", "local").await;
+    update(&engine, "remoteUpdate", "peer").await;
+    update(&engine, "deletionUpdate", "local").await;
+    let (_, changes) = engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "canvas".into(),
+            version_id: version_id.into(),
+        })
+        .await
+        .unwrap();
+    assert!(changes.documents[0].replacement);
+    assert_ne!(
+        changes.documents[0].generation,
+        opened["generation"].as_str().unwrap()
+    );
+    let backup_id = {
+        let store = engine.store.lock().unwrap();
+        let backup = store.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .find(|node| node["system"]["kind"] == "file-version" && node["id"] != version_id)
+            .unwrap();
+        assert!(store.manifest["linksBySource"][backup["id"].as_str().unwrap()].is_null());
+        assert!(store
+            .outbox
+            .iter()
+            .any(|op| op["nodeId"] == "canvas" && op["replaceFile"] == true));
+        assert_eq!(
+            store.manifest["linksBySource"]["canvas"],
+            json!(document::links(
+                &document::decode(&fixture_bytes("baseUpdate")).unwrap()
+            ))
+        );
+        backup["id"].as_str().unwrap().to_owned()
+    };
+    assert_document(&read(&engine, &backup_id).await);
+    assert!(!directory.0.join("data/.native-updates/canvas").exists());
+    assert!(engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "canvas".into(),
+            update_base64: fixture()["localUpdate"].as_str().unwrap().into(),
+            origin: "local".into(),
+            generation: Some(opened["generation"].as_str().unwrap().into()),
+            source_session: None,
+        })
+        .await
+        .is_err());
+    drop(engine);
+    let reopened = directory.engine(true);
+    assert_document(&read(&reopened, &backup_id).await);
+    let restored = read(&reopened, "canvas").await;
+    let saved = read(&reopened, version_id).await;
+    assert!(!document::apply(&document::decode(&restored).unwrap(), &saved).unwrap());
+    assert!(!document::apply(&document::decode(&saved).unwrap(), &restored).unwrap());
+}
+
 #[tokio::test]
 async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_rewrites() {
     let directory = TestDirectory::new();

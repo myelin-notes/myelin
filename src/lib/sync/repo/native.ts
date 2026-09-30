@@ -21,6 +21,7 @@ import type { VFSManifest } from './shared';
 import type {
   CreateFileOptions,
   FileType,
+  FileVersion,
   RepositoryCapabilities,
   VFSNodeId,
 } from './types';
@@ -80,7 +81,6 @@ export class NativeRepository
   private initializing: Promise<void> | null = null;
   private disposed = false;
   private readonly unlisteners: UnlistenFn[] = [];
-  private readonly restoring = new Set<string>();
   private nativeVersion = -1;
 
   constructor(
@@ -304,7 +304,7 @@ export class NativeRepository
       node,
       bytesBase64: encode(bytes),
       replace: true,
-      overwriteRemote: this.restoring.has(nodeId),
+      overwriteRemote: false,
     });
     return result.revision;
   }
@@ -337,16 +337,21 @@ export class NativeRepository
       super.createFile(name, fileType, parentId, bytes, options),
     );
   }
+  override createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    return this.operation({
+      kind: 'create-file-version',
+      nodeId,
+      force: options.force ?? false,
+    });
+  }
   override async restoreFileVersion(
     nodeId: VFSNodeId,
     versionId: VFSNodeId,
   ): Promise<void> {
-    this.restoring.add(nodeId);
-    try {
-      await super.restoreFileVersion(nodeId, versionId);
-    } finally {
-      this.restoring.delete(nodeId);
-    }
+    await this.operation({ kind: 'restore-file-version', nodeId, versionId });
   }
   override getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
     return this.operation({ kind: 'path', nodeId });

@@ -109,6 +109,10 @@ export class TestRepository extends BaseRepository {
     }
   }
 
+  override async restoreFileVersion(): Promise<void> {
+    throw new Error('Version restores require the native repository.');
+  }
+
   override async getStoredAbsolutePath(
     nodeId: VFSNodeId,
   ): Promise<string | null> {

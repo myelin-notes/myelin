@@ -3,6 +3,7 @@ mod remote;
 mod store;
 #[cfg(test)]
 mod tests;
+mod version_history;
 
 use crate::repository_bootstrap::{download::RepositorySource, recover_cache, CachePaths};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -87,6 +88,14 @@ pub enum RepositoryOperation {
         bytes_base64: String,
         replace: bool,
         overwrite_remote: bool,
+    },
+    CreateFileVersion {
+        node_id: String,
+        force: bool,
+    },
+    RestoreFileVersion {
+        node_id: String,
+        version_id: String,
     },
     DeleteFile {
         node_id: String,
@@ -494,84 +503,19 @@ impl RepositoryOperation {
                 replace,
                 overwrite_remote,
             } => {
-                let id = node["id"]
-                    .as_str()
-                    .ok_or("Invalid repository node ID")?
-                    .to_owned();
                 let bytes = STANDARD
                     .decode(bytes_base64)
                     .map_err(|_| "Invalid repository file bytes")?;
-                let name = file_name(&node)?;
-                state.transaction_active = true;
-                let known = state.manifest["nodes"][&id]["type"] == "file";
-                changes.wake_remote = known && state.remote;
-                if node["fileType"] == "mcanvas" {
-                    let doc = if replace {
-                        document::decode(&bytes)?
-                    } else {
-                        let old = if known {
-                            document::bytes(state.doc(&id)?)
-                        } else {
-                            state.read_file(&node)?
-                        };
-                        document::decode(&document::merge(&old, &bytes)?)?
-                    };
-                    let bytes = document::bytes(&doc);
-                    state.documents.insert(id.clone(), doc);
-                    let generation =
-                        if replace || !state.sync.document_generations.contains_key(&id) {
-                            let generation = uuid::Uuid::new_v4().to_string();
-                            state
-                                .sync
-                                .document_generations
-                                .insert(id.clone(), generation.clone());
-                            generation
-                        } else {
-                            state.sync.document_generations[&id].clone()
-                        };
-                    if known {
-                        state.touch_document(&id, true)?;
-                        if overwrite_remote {
-                            state.queue("push-note", Some(&id), json!({"replaceFile": true}));
-                        }
-                    }
-                    state.commit(vec![FileWrite {
-                        name,
-                        bytes: Some(STANDARD.encode(&bytes)),
-                    }])?;
-                    changes.changed.push(id.clone());
-                    changes.documents.push(DocumentNotification {
-                        node_id: id.clone(),
-                        bytes: bytes.clone(),
-                        source_session: None,
-                        origin: "local".into(),
-                        generation,
-                        replacement: replace && known,
-                    });
-                    json!({"revision": revision(&bytes)})
-                } else {
-                    if known {
-                        let old = state.read_file(&node)?;
-                        let base = if old.is_empty() {
-                            None
-                        } else {
-                            Some(revision(&old))
-                        };
-                        state.manifest["nodes"][&id]["modifiedAt"] = json!(store::now());
-                        state.queue(
-                            "push-note",
-                            Some(&id),
-                            json!({"baseFileRevision": base, "replaceFile": overwrite_remote}),
-                        );
-                        state.queue("upsert-manifest-node", Some(&id), json!({}));
-                        changes.changed.push(id.clone());
-                    }
-                    state.commit(vec![FileWrite {
-                        name,
-                        bytes: Some(STANDARD.encode(&bytes)),
-                    }])?;
-                    json!({"revision": revision(&bytes)})
-                }
+                return write_file(state, node, bytes, replace, overwrite_remote, Vec::new());
+            }
+            Self::CreateFileVersion { node_id, force } => {
+                return version_history::create(state, &node_id, force);
+            }
+            Self::RestoreFileVersion {
+                node_id,
+                version_id,
+            } => {
+                return version_history::restore(state, &node_id, &version_id);
             }
             Self::DeleteFile { node_id, file_type } => {
                 let node = state.manifest["nodes"][&node_id].clone();
@@ -678,6 +622,94 @@ impl RepositoryOperation {
         };
         Ok((result, changes))
     }
+}
+
+fn write_file(
+    state: &mut Store,
+    node: Value,
+    bytes: Vec<u8>,
+    replace: bool,
+    overwrite_remote: bool,
+    mut files: Vec<FileWrite>,
+) -> Result<(Value, Changes), String> {
+    let mut changes = Changes::default();
+    let id = node["id"]
+        .as_str()
+        .ok_or("Invalid repository node ID")?
+        .to_owned();
+    let name = file_name(&node)?;
+    state.transaction_active = true;
+    let known = state.manifest["nodes"][&id]["type"] == "file";
+    changes.wake_remote = known && state.remote;
+    let result = if node["fileType"] == "mcanvas" {
+        let doc = if replace {
+            document::decode(&bytes)?
+        } else {
+            let old = if known {
+                document::bytes(state.doc(&id)?)
+            } else {
+                state.read_file(&node)?
+            };
+            document::decode(&document::merge(&old, &bytes)?)?
+        };
+        let bytes = document::bytes(&doc);
+        state.documents.insert(id.clone(), doc);
+        let generation = if replace || !state.sync.document_generations.contains_key(&id) {
+            let generation = uuid::Uuid::new_v4().to_string();
+            state
+                .sync
+                .document_generations
+                .insert(id.clone(), generation.clone());
+            generation
+        } else {
+            state.sync.document_generations[&id].clone()
+        };
+        if known {
+            state.touch_document(&id, true)?;
+            if overwrite_remote {
+                state.queue("push-note", Some(&id), json!({"replaceFile": true}));
+            }
+        }
+        files.push(FileWrite {
+            name,
+            bytes: Some(STANDARD.encode(&bytes)),
+        });
+        state.commit(files)?;
+        changes.changed.push(id.clone());
+        changes.documents.push(DocumentNotification {
+            node_id: id.clone(),
+            bytes: bytes.clone(),
+            source_session: None,
+            origin: "local".into(),
+            generation,
+            replacement: replace && known,
+        });
+        json!({"revision": revision(&bytes)})
+    } else {
+        if known {
+            let old = state.read_file(&node)?;
+            let base = if old.is_empty() {
+                None
+            } else {
+                Some(revision(&old))
+            };
+            state.manifest["nodes"][&id]["modifiedAt"] = json!(store::now());
+            state.queue(
+                "push-note",
+                Some(&id),
+                json!({"baseFileRevision": base, "replaceFile": overwrite_remote}),
+            );
+            state.queue("upsert-manifest-node", Some(&id), json!({}));
+            changes.changed.push(id.clone());
+        }
+        files.push(FileWrite {
+            name,
+            bytes: Some(STANDARD.encode(&bytes)),
+        });
+        state.commit(files)?;
+        json!({"revision": revision(&bytes)})
+    };
+    Ok((result, changes))
 }
 
 #[tauri::command]

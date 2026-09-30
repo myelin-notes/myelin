@@ -541,33 +541,10 @@ export abstract class BaseRepository
       : null;
   }
 
-  async restoreFileVersion(
+  abstract restoreFileVersion(
     nodeId: VFSNodeId,
     versionId: VFSNodeId,
-  ): Promise<void> {
-    const versionNode = await this.getNode(versionId);
-    if (
-      !isConcreteFileVersionNode(versionNode) ||
-      versionNode.system.sourceFileId !== nodeId
-    ) {
-      throw new Error('Version does not belong to this file.');
-    }
-
-    const bytes = await this.readFileBytes(versionId);
-    if (!bytes) {
-      throw new Error('Version data is missing.');
-    }
-    const currentBytes = await this.readFileBytes(nodeId);
-    const versionRevision = await computeRevision(bytes);
-    if (
-      currentBytes &&
-      (await computeRevision(currentBytes)) === versionRevision
-    ) {
-      return;
-    }
-    await this.createFileVersionIfDue(nodeId, { force: true });
-    await this.writeFileBytes(nodeId, bytes);
-  }
+  ): Promise<void>;
 
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
     const { bytes } = await this.loadFileBytes(nodeId);
