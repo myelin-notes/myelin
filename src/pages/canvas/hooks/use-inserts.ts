@@ -21,7 +21,6 @@ import { useMessages } from '@myelin/editor/i18n';
 import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { CollisionHelper } from '@myelin/editor/utils/collision-helper';
-import { trackEvent } from '@/lib/analytics';
 import { MOBILE_PLATFORM } from '@/lib/env';
 import { prepareCapturedPhoto } from '../photo-capture';
 
@@ -97,10 +96,6 @@ export function useCanvasInserts({
       });
       el.updateBounds();
       el.select();
-      trackEvent('element_inserted', {
-        element_type: 'audio',
-        insertion_method: 'menu',
-      });
     },
     [drawableCanvasRef],
   );
@@ -118,10 +113,6 @@ export function useCanvasInserts({
       });
       latex.updateBounds();
       latex.select();
-      trackEvent('element_inserted', {
-        element_type: 'latex',
-        insertion_method: 'menu',
-      });
       // Placement runs inside a canvas pointerdown; entering edit now would
       // register a click-outside listener that the same event, still bubbling
       // to document, immediately trips. Defer past this event.
