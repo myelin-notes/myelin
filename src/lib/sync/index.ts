@@ -62,10 +62,6 @@ export {
   storeGitHubToken,
   waitForGitHubOAuth,
 } from './repo/github/credentials';
-export {
-  ensureGoogleDriveFolder,
-  renameGoogleDriveFolder,
-} from './repo/google-drive';
 export type {
   GoogleDriveOAuthResult,
   GoogleDriveOAuthStartPayload,
@@ -82,6 +78,10 @@ export {
   openGoogleDriveAuth,
   waitForGoogleDriveAuth,
 } from './repo/google-drive/credentials';
+export {
+  ensureGoogleDriveFolder,
+  renameGoogleDriveFolder,
+} from './repo/google-drive/folders';
 export {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,

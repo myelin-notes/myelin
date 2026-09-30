@@ -112,7 +112,4 @@ vi.mock('@tauri-apps/plugin-fs', async () => {
   return createPluginFsModule();
 });
 
-vi.mock('@tauri-apps/plugin-http', async () => {
-  const { createPluginHttpModule } = await import('./repository-test-utils');
-  return createPluginHttpModule();
-});
+vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }));

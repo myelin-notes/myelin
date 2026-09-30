@@ -13,7 +13,6 @@ const { listeners } = vi.hoisted(() => ({
 }));
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
-  isTauri: () => true,
   convertFileSrc: (path: string) => path,
 }));
 vi.mock('@tauri-apps/api/event', () => ({

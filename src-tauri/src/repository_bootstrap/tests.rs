@@ -1,4 +1,6 @@
+use super::download::{download_repository, RepositorySource};
 use super::*;
+use std::sync::Mutex;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc,
@@ -6,7 +8,6 @@ use std::sync::{
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const STAGE_ID: &str = "12345678-1234-1234-1234-123456789abc";
-const NEXT_STAGE_ID: &str = "12345678-1234-1234-1234-123456789def";
 const ROOT: &str = "repositories/github/test";
 
 struct TestDirectory(PathBuf);
@@ -183,8 +184,10 @@ async fn github_server(archive: Vec<u8>) -> TestServer {
 }
 
 #[tokio::test]
-async fn github_prepare_installs_one_revision_and_preserves_cache_auxiliary_files() {
+async fn github_downloads_one_revision_without_changing_existing_cache() {
     let directory = TestDirectory::new();
+    let stage = directory.0.join("download");
+    fs::create_dir_all(stage.join("files")).unwrap();
     directory.seed_cache();
     let manifest = manifest();
     let note = vec![7; 150_000];
@@ -195,118 +198,51 @@ async fn github_prepare_installs_one_revision_and_preserves_cache_auxiliary_file
         ("unrelated.txt", b"ignore".to_vec()),
     ]))
     .await;
-    let prepared = prepare_cache(
-        &directory.0,
-        ROOT,
-        STAGE_ID,
-        github_source(),
-        &server.endpoints(),
-    )
-    .await
-    .unwrap();
-    assert_eq!((prepared.file_count, prepared.byte_length), (2, 150_003));
+    let prepared = download_repository(&stage, github_source(), &server.endpoints())
+        .await
+        .unwrap();
+    assert_eq!(prepared, (2, 150_003));
     let paths = directory.cache();
     assert_eq!(
         fs::read(paths.cache.join("files/old.myelin")).unwrap(),
         b"offline content"
     );
-    assert!(install_cache(&paths, STAGE_ID).unwrap());
-    assert_eq!(
-        fs::read(paths.cache.join("files/canvas.myelin")).unwrap(),
-        note
-    );
-    assert_eq!(
-        fs::read(paths.cache.join("files/version.pdf")).unwrap(),
-        b"pdf"
-    );
+    assert_eq!(fs::read(stage.join("files/canvas.myelin")).unwrap(), note);
+    assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
     assert_eq!(
         serde_json::from_slice::<serde_json::Value>(
-            &fs::read(paths.cache.join("manifest.json")).unwrap()
+            &fs::read(stage.join("manifest.json")).unwrap()
         )
         .unwrap(),
         manifest
     );
-    assert_eq!(fs::read(paths.cache.join("outbox.json")).unwrap(), b"[]");
-    assert_eq!(
-        fs::read(paths.cache.join("outbox.json.sync-status.json")).unwrap(),
-        b"123"
-    );
-    assert_eq!(
-        fs::read(paths.cache.join("outbox.corrupt.json")).unwrap(),
-        b"recovery content"
-    );
-    assert!(!paths.cache.join("files/old.myelin").exists());
-    assert!(!paths.cache.join(".prepared.json").exists());
-    assert!(!paths.cache.join("unrelated.txt").exists());
-    assert!(!paths.journal.exists() && !paths.backup.exists());
+
+    assert!(!stage.join("files/old.myelin").exists());
+    assert!(!stage.join(".prepared.json").exists());
+    assert!(!stage.join("unrelated.txt").exists());
+
     assert_eq!(server.requests.lock().unwrap().len(), 2);
 }
 
 #[tokio::test]
-async fn missing_download_and_pending_or_changed_local_state_never_replace_cache() {
+async fn github_rejects_an_archive_missing_repository_files() {
     let directory = TestDirectory::new();
     directory.seed_cache();
+    let stage = directory.0.join("download");
+    fs::create_dir_all(stage.join("files")).unwrap();
     let server = github_server(archive(vec![(
         "manifest.json",
         serde_json::to_vec(&manifest()).unwrap(),
     )]))
     .await;
-    assert!(prepare_cache(
-        &directory.0,
-        ROOT,
-        STAGE_ID,
-        github_source(),
-        &server.endpoints()
-    )
-    .await
-    .unwrap_err()
-    .contains("missing a repository file"));
-    let paths = directory.cache();
-    assert!(!paths.stage(STAGE_ID).unwrap().exists());
+    let error = download_repository(&stage, github_source(), &server.endpoints())
+        .await
+        .unwrap_err();
+    assert!(error.contains("missing a repository file"));
     assert_eq!(
-        fs::read(paths.cache.join("files/old.myelin")).unwrap(),
+        fs::read(directory.cache().cache.join("files/old.myelin")).unwrap(),
         b"offline content"
     );
-
-    let server = github_server(archive(vec![(
-        "manifest.json",
-        br#"{"version":3,"nodes":{}}"#.to_vec(),
-    )]))
-    .await;
-    prepare_cache(
-        &directory.0,
-        ROOT,
-        STAGE_ID,
-        github_source(),
-        &server.endpoints(),
-    )
-    .await
-    .unwrap();
-    prepare_cache(
-        &directory.0,
-        ROOT,
-        NEXT_STAGE_ID,
-        github_source(),
-        &server.endpoints(),
-    )
-    .await
-    .unwrap();
-    fs::write(
-        paths.cache.join("outbox.json"),
-        br#"[{"kind":"push-note","nodeId":"old"}]"#,
-    )
-    .unwrap();
-    assert!(!install_cache(&paths, STAGE_ID).unwrap());
-    fs::write(paths.cache.join("outbox.json"), b"[]").unwrap();
-    fs::write(paths.cache.join("files/old.myelin"), b"new offline content").unwrap();
-    assert!(!install_cache(&paths, STAGE_ID).unwrap());
-    assert_eq!(
-        fs::read(paths.cache.join("files/old.myelin")).unwrap(),
-        b"new offline content"
-    );
-    fs::write(paths.cache.join("files/old.myelin"), b"offline content").unwrap();
-    assert!(install_cache(&paths, STAGE_ID).unwrap());
-    assert!(!install_cache(&paths, NEXT_STAGE_ID).unwrap());
 }
 
 #[test]
@@ -378,6 +314,8 @@ fn rejects_traversal_and_symlinks() {
 async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
     for changed in [false, true] {
         let directory = TestDirectory::new();
+        let stage = directory.0.join("download");
+        fs::create_dir_all(stage.join("files")).unwrap();
         let body = serde_json::to_vec(&manifest()).unwrap();
         let lookups = AtomicU64::new(0);
         let server = TestServer::new(move |path| {
@@ -401,11 +339,8 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
                 _ => (404, vec![]),
             }
         }).await;
-        let root = "repositories/google-drive/test";
-        let result = prepare_cache(
-            &directory.0,
-            root,
-            STAGE_ID,
+        let result = download_repository(
+            &stage,
             RepositorySource::GoogleDrive {
                 folder_id: "folder".into(),
                 token: "secret".into(),
@@ -413,21 +348,17 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
             &server.endpoints(),
         )
         .await;
-        let paths = CachePaths::new(&directory.0, root).unwrap();
+
         if changed {
             assert!(result.unwrap_err().contains("manifest changed"));
-            assert!(!paths.stage(STAGE_ID).unwrap().exists() && !paths.cache.exists());
+            assert!(!directory.cache().cache.exists());
         } else {
             result.unwrap();
-            assert!(install_cache(&paths, STAGE_ID).unwrap());
             assert_eq!(
-                fs::read(paths.cache.join("files/canvas.myelin")).unwrap(),
+                fs::read(stage.join("files/canvas.myelin")).unwrap(),
                 b"canvas"
             );
-            assert_eq!(
-                fs::read(paths.cache.join("files/version.pdf")).unwrap(),
-                b"pdf"
-            );
+            assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
         }
     }
 }
@@ -436,6 +367,8 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
 async fn initializes_missing_and_zero_length_github_manifests_without_sending_files_through_js() {
     for existing_empty in [false, true] {
         let directory = TestDirectory::new();
+        let stage = directory.0.join("download");
+        fs::create_dir_all(stage.join("files")).unwrap();
         let tarball = if existing_empty {
             archive(vec![("manifest.json", vec![])])
         } else {
@@ -453,16 +386,10 @@ async fn initializes_missing_and_zero_length_github_manifests_without_sending_fi
             _ => (404, vec![]),
         })
         .await;
-        let prepared = prepare_cache(
-            &directory.0,
-            ROOT,
-            STAGE_ID,
-            github_source(),
-            &server.endpoints(),
-        )
-        .await
-        .unwrap();
-        assert_eq!((prepared.file_count, prepared.byte_length), (0, 0));
+        let prepared = download_repository(&stage, github_source(), &server.endpoints())
+            .await
+            .unwrap();
+        assert_eq!((prepared.0, prepared.1), (0, 0));
         let messages = server.messages.lock().unwrap();
         let write = messages
             .iter()
@@ -482,11 +409,7 @@ async fn initializes_missing_and_zero_length_github_manifests_without_sending_fi
         let manifest: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(manifest["version"], 3);
         assert_eq!(manifest["nodes"], serde_json::json!({}));
-        assert!(install_cache(&directory.cache(), STAGE_ID).unwrap());
-        assert_eq!(
-            fs::read(directory.cache().cache.join("manifest.json")).unwrap(),
-            bytes
-        );
+        assert_eq!(fs::read(stage.join("manifest.json")).unwrap(), bytes);
     }
 }
 
@@ -494,6 +417,8 @@ async fn initializes_missing_and_zero_length_github_manifests_without_sending_fi
 async fn initializes_new_and_zero_length_drive_manifests_with_the_existing_format() {
     for existing_empty in [false, true] {
         let directory = TestDirectory::new();
+        let stage = directory.0.join("download");
+        fs::create_dir_all(stage.join("files")).unwrap();
         let server = TestServer::new(move |path| {
             if path.starts_with("/drive/files?") {
                 let files = if existing_empty {
@@ -508,11 +433,8 @@ async fn initializes_new_and_zero_length_drive_manifests_with_the_existing_forma
                 _ => (404, vec![]),
             }
         }).await;
-        let root = "repositories/google-drive/test";
-        let prepared = prepare_cache(
-            &directory.0,
-            root,
-            STAGE_ID,
+        let prepared = download_repository(
+            &stage,
             RepositorySource::GoogleDrive {
                 folder_id: "folder".into(),
                 token: "secret".into(),
@@ -521,11 +443,10 @@ async fn initializes_new_and_zero_length_drive_manifests_with_the_existing_forma
         )
         .await
         .unwrap();
-        assert_eq!(prepared.file_count, 0);
-        let paths = CachePaths::new(&directory.0, root).unwrap();
-        assert!(install_cache(&paths, STAGE_ID).unwrap());
+        assert_eq!(prepared.0, 0);
+
         let manifest: serde_json::Value =
-            serde_json::from_slice(&fs::read(paths.cache.join("manifest.json")).unwrap()).unwrap();
+            serde_json::from_slice(&fs::read(stage.join("manifest.json")).unwrap()).unwrap();
         assert_eq!(manifest["version"], 3);
         assert_eq!(manifest["nodes"], serde_json::json!({}));
         assert_eq!(

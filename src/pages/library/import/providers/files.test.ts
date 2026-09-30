@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '@myelin/editor/i18n/messages/en';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { filesProvider } from './files';
 
 vi.mock('@myelin/editor/pdf-renderer', () => ({
@@ -20,7 +20,7 @@ function markdownFile(name: string, body: string): File {
   return new File([body], name, { type: 'text/markdown' });
 }
 
-function createJob(files: File[], repository: LocalRepository) {
+function createJob(files: File[], repository: TestRepository) {
   return filesProvider.createJob({
     selection: { kind: 'files', files },
     repository,
@@ -36,7 +36,7 @@ describe('files import provider', () => {
 
   it('previews supported files and flags the unsupported ones', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-preview');
+    const repository = new TestRepository('files-provider-preview');
 
     const job = createJob(
       [
@@ -58,7 +58,7 @@ describe('files import provider', () => {
 
   it('imports supported files and reports counts', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-import');
+    const repository = new TestRepository('files-provider-import');
 
     const job = createJob(
       [
@@ -85,7 +85,7 @@ describe('files import provider', () => {
 
   it('reports an empty preview when nothing is importable', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-empty');
+    const repository = new TestRepository('files-provider-empty');
 
     const job = createJob(
       [new File([new Uint8Array([1])], 'archive.xyz', { type: '' })],
@@ -97,7 +97,7 @@ describe('files import provider', () => {
 
   it('refuses to run before scanning', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-unscanned');
+    const repository = new TestRepository('files-provider-unscanned');
 
     await expect(
       createJob([markdownFile('A.md', '# A')], repository).run({

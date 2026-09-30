@@ -47,7 +47,6 @@ import {
   listTags,
   moveNodeInManifest,
   normalizeCustomColor,
-  type RepositorySnapshot,
   searchNodeResults,
   setStoredNoteLinks,
   toFileVersion,
@@ -211,31 +210,6 @@ export abstract class BaseRepository
     return () => {
       this.statusListeners.delete(listener);
     };
-  }
-
-  async exportSnapshot(): Promise<RepositorySnapshot> {
-    const { manifest } = await this.loadManifest();
-    const snapshotManifest = structuredClone(manifest);
-    const fileNodes = Object.values(snapshotManifest.nodes).filter(
-      (node): node is VFSFileNode => node.type === 'file',
-    );
-
-    const noteEntries = await Promise.all(
-      fileNodes.map(async (node) => {
-        const { bytes } = await this.loadFileBytes(node.id);
-        return [node.id, bytes ? new Uint8Array(bytes) : null] as const;
-      }),
-    );
-
-    return {
-      manifest: snapshotManifest,
-      notes: Object.fromEntries(noteEntries),
-    };
-  }
-
-  async exportManifest(): Promise<VFSManifest> {
-    const { manifest } = await this.loadManifest();
-    return structuredClone(manifest);
   }
 
   // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch

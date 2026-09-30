@@ -5,7 +5,6 @@ mod code_runner;
 mod error_report;
 mod github_push;
 mod iroh_transport;
-mod local_file_write;
 mod mcp_server;
 mod note_text_index;
 mod oauth_loopback;
@@ -84,11 +83,6 @@ pub fn run() {
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
-            local_file_write::write_local_file_chunk,
-            repository_bootstrap::recover_repository_cache,
-            repository_bootstrap::prepare_repository_cache,
-            repository_bootstrap::install_repository_cache,
-            repository_bootstrap::discard_repository_cache,
             repository_engine::repository_open,
             repository_engine::repository_operation,
             repository_engine::repository_sync,
@@ -116,7 +110,6 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
-            github_push::github_push_batch,
         ]);
 
     #[cfg(not(target_os = "ios"))]

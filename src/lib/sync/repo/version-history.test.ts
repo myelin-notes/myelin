@@ -4,7 +4,7 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { LocalRepository } from './local';
+import { TestRepository } from '@/test/test-repository';
 import { getStoredFileName, type VFSManifest } from './shared';
 
 describe('repository file version history', () => {
@@ -17,7 +17,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-hidden-test');
+    const repository = new TestRepository('repositories/version-hidden-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
@@ -66,7 +66,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-cadence-test');
+    const repository = new TestRepository('repositories/version-cadence-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
@@ -102,7 +102,7 @@ describe('repository file version history', () => {
   it('keeps 32 versions and restores content without metadata changes', async () => {
     vi.useFakeTimers();
 
-    const repository = new LocalRepository('repositories/version-restore-test');
+    const repository = new TestRepository('repositories/version-restore-test');
     await repository.initialize();
 
     const folderId = await repository.createFolder('Docs', null);
@@ -152,7 +152,7 @@ describe('repository file version history', () => {
   it('does not duplicate existing history when restoring back and forth', async () => {
     vi.useFakeTimers();
 
-    const repository = new LocalRepository('repositories/version-toggle-test');
+    const repository = new TestRepository('repositories/version-toggle-test');
     await repository.initialize();
 
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
@@ -193,7 +193,7 @@ describe('repository file version history', () => {
   it('does not mutate the file when restoring the current content', async () => {
     vi.useFakeTimers();
 
-    const repository = new LocalRepository(
+    const repository = new TestRepository(
       'repositories/version-current-restore-test',
     );
     await repository.initialize();
@@ -224,7 +224,7 @@ describe('repository file version history', () => {
   });
 
   it('does not restore missing version data as an empty file', async () => {
-    const repository = new LocalRepository('repositories/version-missing-test');
+    const repository = new TestRepository('repositories/version-missing-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
@@ -254,7 +254,7 @@ describe('repository file version history', () => {
   });
 
   it('does not store note links for version-history snapshots', async () => {
-    const repository = new LocalRepository('repositories/version-links-test');
+    const repository = new TestRepository('repositories/version-links-test');
     await repository.initialize();
 
     const sourceId = await repository.createFile('Source', 'mcanvas', null);
@@ -284,7 +284,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-delete-test');
+    const repository = new TestRepository('repositories/version-delete-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(

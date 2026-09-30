@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { resetRepositoryTestDoubles } from '@/test/repository-test-utils';
-import { LocalRepository } from './local';
+import { TestRepository } from '@/test/test-repository';
 
 /**
  * searchNodes caches the built MiniSearch index across queries; these tests pin
@@ -11,11 +11,11 @@ describe('searchNodes index cache', () => {
     resetRepositoryTestDoubles();
   });
 
-  const ids = async (repository: LocalRepository, query: string) =>
+  const ids = async (repository: TestRepository, query: string) =>
     (await repository.searchNodes(query)).map((result) => result.node.id);
 
   it('reflects a rename after the index was already built for a prior query', async () => {
-    const repository = new LocalRepository('repositories/search-cache-rename');
+    const repository = new TestRepository('repositories/search-cache-rename');
     await repository.initialize();
     const fileId = await repository.createFile('Alpha', 'mcanvas', null);
 
@@ -28,7 +28,7 @@ describe('searchNodes index cache', () => {
   });
 
   it('reflects newly created and deleted nodes across cached queries', async () => {
-    const repository = new LocalRepository('repositories/search-cache-crud');
+    const repository = new TestRepository('repositories/search-cache-crud');
     await repository.initialize();
     const alpha = await repository.createFile('Alpha', 'mcanvas', null);
 

@@ -6,7 +6,6 @@ use git2::{
     Repository, Signature,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,20 +35,6 @@ pub struct GitPushResponse {
     pub(crate) commit_oid: Option<String>,
     pub(crate) blob_shas: HashMap<String, String>,
     pub(crate) failure_reason: Option<String>,
-}
-
-#[tauri::command]
-pub async fn github_push_batch(
-    app: AppHandle,
-    request: GitPushRequest,
-) -> Result<GitPushResponse, String> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
-        .map_err(|_| "Could not resolve Git staging directory")?;
-    tokio::task::spawn_blocking(move || push_batch(&cache_dir, request))
-        .await
-        .map_err(|_| "Git push task failed")?
 }
 
 pub(crate) fn push_batch(

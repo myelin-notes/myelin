@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { LocalRepository } from '@/lib/sync/repo/local';
+import { TestRepository } from '@/test/test-repository';
 import { McpToolService } from './tools';
 
 let repositoryCounter = 0;
 
 async function createEmptyRepository() {
   repositoryCounter += 1;
-  const repository = new LocalRepository(
+  const repository = new TestRepository(
     `repositories/mcp-tools-${repositoryCounter}`,
   );
   await repository.initialize();
