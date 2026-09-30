@@ -13,7 +13,7 @@ import {
   type RemoteAuthState,
   type RemoteOAuthProvider,
   useRemoteAuth,
-} from './use-remote-auth';
+} from '../use-remote-auth';
 
 const PROVIDER: RemoteOAuthProvider<GitHubOAuthStartPayload> = {
   name: 'GitHub',

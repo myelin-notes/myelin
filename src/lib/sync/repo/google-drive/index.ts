@@ -8,9 +8,7 @@
  * realistic multi-device window but not the sub-round-trip one, which stays last-writer-wins.
  */
 import { fetch } from '@tauri-apps/plugin-http';
-import { BaseRepository } from './base';
-import { getGoogleDriveToken } from './google-drive-credentials';
-import { GoogleDriveRequestError } from './google-drive-error';
+import { BaseRepository } from '../base';
 import {
   createEmptyManifest,
   FILES_DIR,
@@ -20,13 +18,15 @@ import {
   migrate,
   type RepositorySnapshot,
   type VFSManifest,
-} from './shared';
+} from '../shared';
 import type {
   FileType,
   RepositoryCapabilities,
   VFSFileNode,
   VFSNodeId,
-} from './types';
+} from '../types';
+import { getGoogleDriveToken } from './credentials';
+import { GoogleDriveRequestError } from './error';
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';

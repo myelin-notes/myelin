@@ -26,14 +26,14 @@ import {
 import { AuthStatusBadge } from './auth-status-badge';
 import { BranchField } from './branch-field';
 import { FolderField } from './folder-field';
+import { useGitHubAuth } from './github/use-auth';
+import { useGitHubSelectors } from './github/use-selectors';
+import { useGoogleDriveAuth } from './google-drive/use-auth';
+import { useGoogleDriveFolder } from './google-drive/use-folder';
 import { KindCard } from './kind-card';
 import { OwnerField } from './owner-field';
 import { RepoField } from './repo-field';
 import { SyncStatusBadge, type SyncStatusTone } from './sync-status-badge';
-import { useGitHubAuth } from './use-github-auth';
-import { useGitHubSelectors } from './use-github-selectors';
-import { useGoogleDriveAuth } from './use-google-drive-auth';
-import { useGoogleDriveFolder } from './use-google-drive-folder';
 
 type RepoKind = RepositoryConfig['kind'];
 

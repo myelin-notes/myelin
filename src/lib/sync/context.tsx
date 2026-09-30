@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
 import { isTauri } from '@tauri-apps/api/core';
+import { createSyncCompletionTracker } from './analytics';
 import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import {
   type CredentialChange,
@@ -130,12 +131,19 @@ export function RepositoryProvider({
   );
 
   useEffect(() => {
-    setStatus(
-      mergeRuntimeStatus(
-        createRepositoryStatus(resolvedConfig),
-        repository.getRuntimeStatus(),
-      ),
+    let currentStatus = mergeRuntimeStatus(
+      createRepositoryStatus(resolvedConfig),
+      repository.getRuntimeStatus(),
     );
+    const trackSyncCompletion = createSyncCompletionTracker();
+    trackSyncCompletion(currentStatus);
+    setStatus(currentStatus);
+
+    const updateStatus = (patch: Partial<RepositoryStatus>) => {
+      currentStatus = { ...currentStatus, ...patch };
+      trackSyncCompletion(currentStatus);
+      setStatus(currentStatus);
+    };
 
     let disposed = false;
     let readinessRetryTimer: number | null = null;
@@ -144,7 +152,7 @@ export function RepositoryProvider({
         return;
       }
 
-      setStatus((current) => mergeRuntimeStatus(current, runtimeStatus));
+      updateStatus(runtimeStatus);
     });
 
     const initialize = async (): Promise<void> => {
@@ -155,12 +163,11 @@ export function RepositoryProvider({
         }
 
         if (!ready) {
-          setStatus((current) => ({
-            ...current,
+          updateStatus({
             initializing: false,
             online: false,
             lastError: null,
-          }));
+          });
           if (typeof window !== 'undefined') {
             readinessRetryTimer = window.setTimeout(() => {
               void initialize();
@@ -169,7 +176,7 @@ export function RepositoryProvider({
           return;
         }
 
-        setStatus((current) => ({ ...current, initializing: true }));
+        updateStatus({ initializing: true });
         await repository.initialize();
         if (disposed) {
           return;
@@ -183,20 +190,16 @@ export function RepositoryProvider({
           );
         }
 
-        setStatus((current) => ({
-          ...current,
-          initializing: false,
-        }));
+        updateStatus({ initializing: false });
       } catch (error) {
         if (disposed) {
           return;
         }
 
-        setStatus((current) => ({
-          ...current,
+        updateStatus({
           initializing: false,
           lastError: error instanceof Error ? error : new Error(String(error)),
-        }));
+        });
       }
     };
 

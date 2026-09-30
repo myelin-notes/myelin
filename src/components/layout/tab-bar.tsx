@@ -25,7 +25,6 @@ import {
   ContextMenuTrigger,
 } from '@myelin/ui/context-menu';
 import { useSidebar } from '@/components/layout/sidebar/context';
-import { trackEvent } from '@/lib/analytics';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -537,7 +536,6 @@ const TabItem = memo(function TabItem({
           const adopted = await dropTabOntoWindow(tab, screenX, screenY);
           if (!adopted) {
             await spawnWindow(tab);
-            trackEvent('window_spawned', { target_type: tab.target.type });
           }
           controller.closeTab(tab.id, paneId);
         } catch {

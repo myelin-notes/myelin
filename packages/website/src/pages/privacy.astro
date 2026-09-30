@@ -134,11 +134,10 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
       <ul class={list}>
         <li>
           <span class={term}>Product events.</span> A fixed list of named actions:
-          opening the app, creating or opening a note, running a command, finishing
-          an import or export, changing a setting, a sync failing. Each carries only
-          categorical detail, such as the kind of note, the export format, or how many
-          files were involved. Note titles and note content are not attached. The one
-          exception is a failed sync, which also carries the first 200 characters of
+          running a command, finishing an import or export, changing a setting,
+          a sync failing. Each carries only categorical detail, such as the export
+          format or how many files were involved. Note titles and note content are
+          not attached. A failed sync also carries the first 200 characters of
           the error message so the failure can be diagnosed, and that text can mention
           a file path.
         </li>
@@ -151,6 +150,7 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           may reveal a folder or file name even though the note itself is never included.
         </li>
       </ul>
+      <p class={p}>Every app analytics event and error report includes the app version.</p>
       <p class={p}>
         This switch starts on. Turning it off stops product events and error
         reports at once, and nothing is sent while it is off.

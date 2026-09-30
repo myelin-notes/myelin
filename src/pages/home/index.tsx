@@ -6,7 +6,6 @@ import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { errorDescription } from '@/components/command-palette/utils';
-import { trackEvent } from '@/lib/analytics';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import { openNote } from '@/lib/note/navigation';
 import {
@@ -55,7 +54,6 @@ export function HomePage() {
       );
       const id = await createBlankCanvasFile(repository, name, null);
       tabController.openTab({ type: 'canvas', id }, name);
-      trackEvent('note_created', { file_type: 'mcanvas' });
     } catch (error) {
       logger.error('Failed to create canvas', error);
       toast.error(strings.commandPalette.errors.createNote, {
@@ -154,9 +152,7 @@ export function HomePage() {
                       time={formatRelativeTime(file.modifiedAt, locale, {
                         style: 'short',
                       })}
-                      onClick={() =>
-                        openNote(tabController, file, file.name, 'recent_files')
-                      }
+                      onClick={() => openNote(tabController, file, file.name)}
                       onChanged={loadRecentFiles}
                     />
                   </div>

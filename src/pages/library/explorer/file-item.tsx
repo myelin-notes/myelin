@@ -72,7 +72,7 @@ export function FileItem({
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  openNote(tabController, file, file.name, 'explorer');
+                  openNote(tabController, file, file.name);
                 }
               }}
               onDragStart={handleDragStart}

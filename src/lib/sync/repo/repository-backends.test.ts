@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RepositoryConfig } from './config';
-import { hasGitHubToken } from './github-credentials';
-import { hasGoogleDriveToken } from './google-drive-credentials';
+import { hasGitHubToken } from './github/credentials';
+import { hasGoogleDriveToken } from './google-drive/credentials';
 import {
   createRepositoryBackendRegistry,
   getRepositoryBackends,

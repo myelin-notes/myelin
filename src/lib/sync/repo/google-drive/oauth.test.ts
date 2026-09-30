@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetch } from '@tauri-apps/plugin-http';
-import { GoogleDriveRequestError } from './google-drive-error';
-import type { OAuthCallbackParams } from './oauth/redirect';
+import type { OAuthCallbackParams } from '../oauth/redirect';
+import { GoogleDriveRequestError } from './error';
 
 // The shared setup replaces this module wholesale for consumers that only need
 // a token; here the real implementation is what's under test.
-vi.unmock('@/lib/sync/repo/google-drive-credentials');
+vi.unmock('@/lib/sync/repo/google-drive/credentials');
 
 vi.mock('@/lib/env', () => ({
   IS_DEV: false,
@@ -32,7 +32,7 @@ const REDIRECT_URI = 'http://127.0.0.1:54321/oauth/callback';
 let resolveRedirect: (params: OAuthCallbackParams) => void;
 const cancelListener = vi.fn(async () => {});
 
-vi.mock('./oauth/redirect', () => ({
+vi.mock('../oauth/redirect', () => ({
   MOBILE_REDIRECT_SCHEME: 'com.github.wintersteve25.myelin',
   startOAuthRedirectListener: async () => ({
     redirectUri: REDIRECT_URI,
@@ -47,7 +47,7 @@ vi.mock('./oauth/redirect', () => ({
 const storedSecrets = new Map<string, string>();
 const credentialWriteOptions: Array<{ notify?: boolean } | undefined> = [];
 
-vi.mock('./credential-vault', () => ({
+vi.mock('../credential-vault', () => ({
   createCredentialVault: () => ({
     isAvailable: async () => true,
     read: async (key: string) => storedSecrets.get(key) ?? null,
@@ -92,7 +92,7 @@ const {
   getGoogleDriveToken,
   hasGoogleDriveToken,
   waitForGoogleDriveAuth,
-} = await import('./google-drive-credentials');
+} = await import('./credentials');
 
 async function base64UrlSha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest(

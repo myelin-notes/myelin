@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { BaseDirectory, mkdir, open, remove } from '@tauri-apps/plugin-fs';
-import type { BatchedCommitInput } from './batch';
+import type { BatchedCommitInput } from '../batch';
 
 const STAGING_CHUNK_BYTES = 16 * 1024;
 

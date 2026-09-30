@@ -1,20 +1,9 @@
-import { useEffect, useState } from 'react';
 import { useMessages } from '@myelin/editor/i18n';
-import { Logger } from '@myelin/shared/logger';
-import { getVersion } from '@tauri-apps/api/app';
-
-const logger = new Logger('AboutSection');
+import { version } from '../../../../package.json';
 
 export function AboutSection() {
   const strings = useMessages();
-  const [version, setVersion] = useState('');
   const aboutStrings = strings.settings.about;
-
-  useEffect(() => {
-    getVersion()
-      .then(setVersion)
-      .catch((error) => logger.error('Failed to read app version', error));
-  }, []);
 
   return (
     <section id="about" className="scroll-mt-12">

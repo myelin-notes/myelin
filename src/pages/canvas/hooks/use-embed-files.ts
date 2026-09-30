@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useMessages } from '@myelin/editor/i18n';
 import { getMediaImportHandler } from '@myelin/editor/media';
-import { trackEvent } from '@/lib/analytics';
 import { useRepository } from '@/lib/sync';
 
 export type EmbedFilesFn = (
@@ -11,22 +10,6 @@ export type EmbedFilesFn = (
   screenX?: number,
   screenY?: number,
 ) => void;
-
-function embedElementType(mimeType: string): string {
-  if (mimeType === 'application/pdf') {
-    return 'pdf';
-  }
-  if (mimeType === 'text/markdown' || mimeType === 'text/x-markdown') {
-    return 'markdown';
-  }
-  if (mimeType.startsWith('image/')) {
-    return 'image';
-  }
-  if (mimeType.startsWith('audio/')) {
-    return 'audio';
-  }
-  return 'other';
-}
 
 export function useEmbedFiles(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
@@ -51,19 +34,12 @@ export function useEmbedFiles(
         } else {
           void Promise.resolve(
             handler(file, dc, { repository, screenX, screenY }),
-          )
-            .then(() => {
-              trackEvent('element_inserted', {
-                element_type: embedElementType(file.type),
-                insertion_method: 'embed',
-              });
-            })
-            .catch((error) => {
-              toast.error(messages.canvas.embedComposer.errors.embedFailed, {
-                description:
-                  error instanceof Error ? error.message : String(error),
-              });
+          ).catch((error) => {
+            toast.error(messages.canvas.embedComposer.errors.embedFailed, {
+              description:
+                error instanceof Error ? error.message : String(error),
             });
+          });
         }
       }
     },
