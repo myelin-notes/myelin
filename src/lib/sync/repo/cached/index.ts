@@ -6,6 +6,12 @@ import type {
   YjsSyncTarget,
 } from '@myelin/editor/sync/types';
 import { Logger } from '@myelin/shared/logger';
+import {
+  BaseDirectory,
+  exists,
+  readTextFile,
+  writeTextFile,
+} from '@tauri-apps/plugin-fs';
 import { trackEvent } from '@/lib/analytics';
 import { NoteSession } from '../../session';
 import type { BaseRepository } from '../base';
@@ -181,6 +187,7 @@ export class CachedRepository
       async () => {
         await this.cache.initialize();
         await this.outbox.load();
+        await this.loadLastRemoteSync();
         return !this.outbox.recoveryError && this.outbox.length === 0;
       },
     );
@@ -221,15 +228,9 @@ export class CachedRepository
   }
 
   async refresh(): Promise<void> {
-    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), () =>
-      this.syncCacheFromRemote(),
-    );
-  }
-
-  async flushPending(): Promise<void> {
     await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
       try {
-        await this.flushPendingImpl();
+        await this.syncCacheFromRemote();
       } catch (error) {
         this.updateRuntimeStatus({
           online: false,
@@ -237,9 +238,22 @@ export class CachedRepository
         });
         throw error;
       }
+    });
+  }
 
-      if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
-        await this.syncCacheFromRemote();
+  async flushPending(): Promise<void> {
+    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
+      try {
+        await this.flushPendingImpl();
+        if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
+          await this.syncCacheFromRemote();
+        }
+      } catch (error) {
+        this.updateRuntimeStatus({
+          online: false,
+          lastError: error instanceof Error ? error : new Error(String(error)),
+        });
+        throw error;
       }
     });
   }
@@ -870,20 +884,14 @@ export class CachedRepository
               pendingOps: this.outbox.length,
             },
           );
-          this.updateRuntimeStatus({
-            online: true,
+          await this.recordRemoteSync({
             pendingRemoteWrites: this.outbox.length,
-            lastRemoteSyncAt: Date.now(),
-            lastError: null,
           });
           return false;
         }
 
-        this.updateRuntimeStatus({
-          online: true,
+        await this.recordRemoteSync({
           pendingRemoteWrites: this.outbox.length,
-          lastRemoteSyncAt: Date.now(),
-          lastError: null,
         });
         return true;
       });
@@ -1080,11 +1088,8 @@ export class CachedRepository
         );
       }
 
-      this.updateRuntimeStatus({
-        online: true,
+      await this.recordRemoteSync({
         pendingRemoteWrites: this.outbox.length,
-        lastRemoteSyncAt: Date.now(),
-        lastError: null,
       });
       return removedAll;
     });
@@ -1423,11 +1428,7 @@ export class CachedRepository
     const remoteUpdate = remoteSnapshot.update;
 
     if (!remoteUpdate || remoteUpdate.byteLength === 0) {
-      this.updateRuntimeStatus({
-        online: true,
-        lastRemoteSyncAt: Date.now(),
-        lastError: null,
-      });
+      await this.recordRemoteSync();
       return;
     }
 
@@ -1464,11 +1465,7 @@ export class CachedRepository
       return true;
     });
 
-    this.updateRuntimeStatus({
-      online: true,
-      lastRemoteSyncAt: Date.now(),
-      lastError: null,
-    });
+    await this.recordRemoteSync();
     if (appliedRemoteUpdate) {
       logger.debug('Pulled remote note into cache', {
         repositoryKind: this.kind,
@@ -1642,11 +1639,7 @@ export class CachedRepository
             pendingOps: this.outbox.length,
           },
         );
-        this.updateRuntimeStatus({
-          online: true,
-          lastRemoteSyncAt: Date.now(),
-          lastError: null,
-        });
+        await this.recordRemoteSync();
         return;
       }
 
@@ -1659,15 +1652,59 @@ export class CachedRepository
   ): Promise<void> {
     await this.cache.replaceSnapshot(remoteSnapshot);
     this.needsRemoteBootstrap = false;
-    this.updateRuntimeStatus({
-      online: true,
-      lastRemoteSyncAt: Date.now(),
-      lastError: null,
-    });
+    await this.recordRemoteSync();
     logger.debug('Replaced cache from remote snapshot', {
       repositoryKind: this.kind,
       remoteNodeCount: Object.keys(remoteSnapshot.manifest.nodes).length,
       remoteNoteCount: Object.keys(remoteSnapshot.notes).length,
+    });
+  }
+
+  private syncStatusPath(): string {
+    return `${this.outboxPath()}.sync-status.json`;
+  }
+
+  private async loadLastRemoteSync(): Promise<void> {
+    try {
+      const path = this.syncStatusPath();
+      if (!(await exists(path, { baseDir: BaseDirectory.AppData }))) {
+        return;
+      }
+      const timestamp: unknown = JSON.parse(
+        await readTextFile(path, { baseDir: BaseDirectory.AppData }),
+      );
+      if (
+        typeof timestamp === 'number' &&
+        Number.isFinite(timestamp) &&
+        timestamp > 0
+      ) {
+        this.updateRuntimeStatus({ lastRemoteSyncAt: timestamp });
+      }
+    } catch (error) {
+      logger.error('Failed to load last remote sync timestamp', error);
+    }
+  }
+
+  private async recordRemoteSync(
+    patch: Partial<RepositoryRuntimeStatus> = {},
+  ): Promise<void> {
+    const lastRemoteSyncAt = Date.now();
+    try {
+      await writeTextFile(
+        this.syncStatusPath(),
+        JSON.stringify(lastRemoteSyncAt),
+        {
+          baseDir: BaseDirectory.AppData,
+        },
+      );
+    } catch (error) {
+      logger.error('Failed to save last remote sync timestamp', error);
+    }
+    this.updateRuntimeStatus({
+      ...patch,
+      online: true,
+      lastRemoteSyncAt,
+      lastError: null,
     });
   }
 

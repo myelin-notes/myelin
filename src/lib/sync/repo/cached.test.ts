@@ -186,6 +186,110 @@ describe('CachedRepository', () => {
     vi.useRealTimers();
   });
 
+  it('restores the last remote sync with pending edits and keeps it scoped to the repository', async () => {
+    const remote = new MemoryRemoteRepository();
+    const root = 'repositories/sync-status-test';
+    const first = new CachedRepository(
+      remote,
+      new LocalRepository(root),
+      `${root}/outbox.json`,
+    );
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+    try {
+      await first.initialize();
+      expect(first.getRuntimeStatus().lastRemoteSyncAt).toBe(1_000);
+      await first.createFolder('Pending folder', null);
+
+      clock.mockReturnValue(2_000);
+      const reopened = new CachedRepository(
+        remote,
+        new LocalRepository(root),
+        `${root}/outbox.json`,
+      );
+      const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+      await reopened.initialize();
+      expect(exportSnapshot).not.toHaveBeenCalled();
+      expect(reopened.getRuntimeStatus()).toMatchObject({
+        pendingRemoteWrites: 1,
+        lastRemoteSyncAt: 1_000,
+      });
+
+      await reopened.flushPending();
+      expect(reopened.getRuntimeStatus().lastRemoteSyncAt).toBe(2_000);
+      clock.mockReturnValue(3_000);
+      await reopened.flushPending();
+      expect(reopened.getRuntimeStatus().lastRemoteSyncAt).toBe(2_000);
+
+      const offline = new CachedRepository(
+        new FlakyBootstrapRepository(),
+        new LocalRepository(root),
+        `${root}/outbox.json`,
+      );
+      await offline.initialize();
+      expect(offline.getRuntimeStatus()).toMatchObject({
+        online: false,
+        lastRemoteSyncAt: 2_000,
+      });
+
+      const other = new CachedRepository(
+        new FlakyBootstrapRepository(),
+        new LocalRepository('repositories/other-sync-status-test'),
+        'repositories/other-sync-status-test/outbox.json',
+      );
+      await other.initialize();
+      expect(other.getRuntimeStatus().lastRemoteSyncAt).toBeNull();
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('reports failed refreshes without advancing last sync and clears the error after recovery', async () => {
+    const remote = new MemoryRemoteRepository();
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/refresh-status-test'),
+      'repositories/refresh-status-test/outbox.json',
+    );
+    await repository.initialize();
+    const lastRemoteSyncAt = repository.getRuntimeStatus().lastRemoteSyncAt;
+    const error = new Error('remote unavailable');
+    vi.spyOn(remote, 'exportSnapshot').mockRejectedValueOnce(error);
+
+    await expect(repository.refresh()).rejects.toThrow('remote unavailable');
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: false,
+      lastError: error,
+      lastRemoteSyncAt,
+    });
+
+    await repository.refresh();
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: true,
+      lastError: null,
+    });
+  });
+
+  it('reports a failed bootstrap retry from flushPending', async () => {
+    const remote = new FlakyBootstrapRepository();
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/retry-status-test'),
+      'repositories/retry-status-test/outbox.json',
+    );
+    await repository.initialize();
+    const error = new Error('retry unavailable');
+    vi.spyOn(remote, 'exportSnapshot').mockRejectedValueOnce(error);
+
+    await expect(repository.flushPending()).rejects.toThrow(
+      'retry unavailable',
+    );
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: false,
+      lastError: error,
+      lastRemoteSyncAt: null,
+    });
+  });
+
   it('serves cache writes immediately and flushes them to remote', async () => {
     const remote = new MemoryRemoteRepository();
     const cache = new LocalRepository('repositories/cached-test');
