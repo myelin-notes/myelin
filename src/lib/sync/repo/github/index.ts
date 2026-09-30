@@ -1,5 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { BaseRepository } from './base';
+import { BaseRepository } from '../base';
 import {
   type BatchedCommitInput,
   type BatchedCommitResult,
@@ -7,9 +7,7 @@ import {
   BatchUnknownError,
   type GitHubGitFailureDiagnostics,
   type GitHubRestFailureDiagnostics,
-} from './batch';
-import { getGitHubToken } from './github-credentials';
-import { type GitPushResponse, pushGitHubBatch } from './github-git-push';
+} from '../batch';
 import {
   createEmptyManifest,
   getStoredFilePath,
@@ -17,14 +15,16 @@ import {
   migrate,
   type RepositorySnapshot,
   type VFSManifest,
-} from './shared';
-import { readGzippedTarballEntries } from './tar';
+} from '../shared';
+import { readGzippedTarballEntries } from '../tar';
 import type {
   FileType,
   RepositoryCapabilities,
   VFSFileNode,
   VFSNodeId,
-} from './types';
+} from '../types';
+import { getGitHubToken } from './credentials';
+import { type GitPushResponse, pushGitHubBatch } from './git-push';
 
 const RATE_LIMIT_MAX_RETRY_DELAY_MS = 60_000;
 

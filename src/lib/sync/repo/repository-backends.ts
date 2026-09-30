@@ -5,9 +5,9 @@ import {
 import { CachedRepository } from './cached';
 import type { ActiveRepository } from './config';
 import { GitHubRepository } from './github';
-import { hasGitHubToken } from './github-credentials';
+import { hasGitHubToken } from './github/credentials';
 import { GoogleDriveRepository } from './google-drive';
-import { hasGoogleDriveToken } from './google-drive-credentials';
+import { hasGoogleDriveToken } from './google-drive/credentials';
 import { LocalRepository } from './local';
 
 interface RepositoryConfigBase {

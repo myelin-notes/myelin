@@ -4,7 +4,7 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { pushGitHubBatch } from './github-git-push';
+import { pushGitHubBatch } from './git-push';
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 

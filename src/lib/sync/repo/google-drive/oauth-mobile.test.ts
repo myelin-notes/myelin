@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { OAuthCallbackParams } from './oauth/redirect';
+import type { OAuthCallbackParams } from '../oauth/redirect';
 
-// Kept apart from google-drive-oauth.test.ts because the platform is baked in
+// Kept apart from oauth.test.ts because the platform is baked in
 // at module load: `@/lib/env` reports one platform per build.
-vi.unmock('@/lib/sync/repo/google-drive-credentials');
+vi.unmock('@/lib/sync/repo/google-drive/credentials');
 
 vi.mock('@/lib/env', () => ({
   IS_DEV: false,
@@ -30,7 +30,7 @@ const MOBILE_REDIRECT_URI = 'com.github.wintersteve25.myelin:/oauth2redirect';
 let resolveRedirect: (params: OAuthCallbackParams) => void;
 let requestedRedirectUri: string | undefined;
 
-vi.mock('./oauth/redirect', () => ({
+vi.mock('../oauth/redirect', () => ({
   MOBILE_REDIRECT_SCHEME: 'com.github.wintersteve25.myelin',
   startOAuthRedirectListener: async (options: {
     mobileRedirectUri?: string;
@@ -49,7 +49,7 @@ vi.mock('./oauth/redirect', () => ({
 
 const storedSecrets = new Map<string, string>();
 
-vi.mock('./credential-vault', () => ({
+vi.mock('../credential-vault', () => ({
   createCredentialVault: () => ({
     isAvailable: async () => true,
     read: async (key: string) => storedSecrets.get(key) ?? null,
@@ -90,7 +90,7 @@ const {
   beginGoogleDriveAuth,
   isGoogleDriveAuthAvailable,
   waitForGoogleDriveAuth,
-} = await import('./google-drive-credentials');
+} = await import('./credentials');
 
 describe('Google Drive OAuth on Android', () => {
   it('uses the Android client and the custom scheme, with no secret', async () => {

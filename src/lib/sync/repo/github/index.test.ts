@@ -6,16 +6,16 @@ import {
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { GitHubRepository } from './github';
-import { pushGitHubBatch } from './github-git-push';
 import {
   createEmptyManifest,
   getNotePath,
   getStoredFilePath,
   MANIFEST_PATH,
-} from './shared';
+} from '../shared';
+import { GitHubRepository } from '.';
+import { pushGitHubBatch } from './git-push';
 
-vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
+vi.mock('./git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 function createRepository() {
   return new GitHubRepository({

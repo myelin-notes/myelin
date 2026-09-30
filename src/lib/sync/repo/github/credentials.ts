@@ -1,14 +1,14 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@/lib/env';
-import { createCredentialVault } from './credential-vault';
+import { createCredentialVault } from '../credential-vault';
 import {
   credentialTokenKey,
   OAuthClient,
   type OAuthExchange,
   type OAuthResult,
   type OAuthStartPayload,
-} from './oauth/client';
-import { encodeFormBody } from './oauth/pkce';
+} from '../oauth/client';
+import { encodeFormBody } from '../oauth/pkce';
 
 export const GITHUB_PROVIDER_NAME = 'GitHub';
 

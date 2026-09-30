@@ -9,12 +9,12 @@ import {
 } from '@/test/repository-test-utils';
 import type { BaseRepository } from './base';
 import { GitHubRepository } from './github';
-import { pushGitHubBatch } from './github-git-push';
+import { pushGitHubBatch } from './github/git-push';
 import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
 import type { VFSFolderNode } from './types';
 
-vi.mock('./github-git-push', () => ({ pushGitHubBatch: vi.fn() }));
+vi.mock('./github/git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 const repositoryCases: {
   name: string;
