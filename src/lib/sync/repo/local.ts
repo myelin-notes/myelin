@@ -67,6 +67,7 @@ export class LocalRepository extends BaseRepository {
   async refresh(): Promise<void> {
     this.manifest = null;
     await this.loadManifestImpl();
+    noteContentIndex.reconcile(this);
   }
 
   async getRevealPath(nodeId: VFSNodeId): Promise<string | null> {

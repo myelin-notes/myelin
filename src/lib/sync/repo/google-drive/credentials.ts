@@ -311,6 +311,7 @@ async function refreshAccessToken(
 
 export async function getGoogleDriveToken(
   credentialId: string,
+  options: { forceRefresh?: boolean } = {},
 ): Promise<string> {
   const normalized = normalizeCredentialId(credentialId);
   const stored = await readStoredToken(normalized);
@@ -319,6 +320,7 @@ export async function getGoogleDriveToken(
   }
 
   if (
+    !options.forceRefresh &&
     stored.accessToken &&
     stored.expiresAtMs - TOKEN_EXPIRY_SKEW_MS > Date.now()
   ) {

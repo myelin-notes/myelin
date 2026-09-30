@@ -9,6 +9,7 @@ import { hasGitHubToken } from './github/credentials';
 import { GoogleDriveRepository } from './google-drive';
 import { hasGoogleDriveToken } from './google-drive/credentials';
 import { LocalRepository } from './local';
+import { createNativeRepositoryBootstrap } from './native-bootstrap';
 
 interface RepositoryConfigBase {
   kind: string;
@@ -108,6 +109,7 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
         }),
         new LocalRepository(cacheRoot),
         `${cacheRoot}/outbox.json`,
+        createNativeRepositoryBootstrap(config, cacheRoot),
       );
     },
     normalizeConfig: (config) => ({
@@ -157,6 +159,7 @@ const googleDriveRepositoryBackend: RepositoryBackendDescriptor<GoogleDriveRepos
         }),
         new LocalRepository(cacheRoot),
         `${cacheRoot}/outbox.json`,
+        createNativeRepositoryBootstrap(config, cacheRoot),
       );
     },
     normalizeConfig: (config) => ({

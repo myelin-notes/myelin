@@ -4360,6 +4360,7 @@ version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "flate2",
  "form_urlencoded",
  "git2",
  "http-body-util",
@@ -4379,6 +4380,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-apple-compliance",

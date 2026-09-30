@@ -28,6 +28,7 @@ import type {
 } from '../config';
 import { GoogleDriveRequestError } from '../google-drive/error';
 import type { LocalRepository } from '../local';
+import type { NativeRepositoryBootstrap } from '../native-bootstrap';
 import {
   addChild,
   computeRevision,
@@ -144,6 +145,7 @@ export class CachedRepository
     private readonly remote: BaseRepository,
     private readonly cache: LocalRepository,
     outboxPath: string,
+    private readonly nativeBootstrap?: NativeRepositoryBootstrap,
   ) {
     this.kind = remote.kind;
     this.capabilities = remote.capabilities;
@@ -186,6 +188,7 @@ export class CachedRepository
   private async initializeImpl(): Promise<void> {
     const shouldBootstrapFromRemote = await this.withLocalStateLock(
       async () => {
+        await this.nativeBootstrap?.recover();
         await this.cache.initialize();
         await this.outbox.load();
         await this.loadLastRemoteSync();
@@ -200,16 +203,7 @@ export class CachedRepository
 
     if (shouldBootstrapFromRemote) {
       try {
-        const remoteSnapshot = await this.remote.exportSnapshot();
-
-        await this.withLocalStateLock(async () => {
-          await this.outbox.load();
-          if (this.outbox.recoveryError || this.outbox.length !== 0) {
-            return;
-          }
-
-          await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
-        });
+        await this.bootstrapFromRemote();
       } catch (error) {
         this.updateRuntimeStatus({
           online: false,
@@ -1612,6 +1606,10 @@ export class CachedRepository
   }
 
   private async syncCacheFromRemote(): Promise<void> {
+    if (this.nativeBootstrap && this.needsRemoteBootstrap) {
+      await this.bootstrapFromRemote();
+      return;
+    }
     const remoteSnapshot = await this.remote.exportSnapshot();
 
     await this.withLocalStateLock(async () => {
@@ -1652,6 +1650,41 @@ export class CachedRepository
 
       await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
     });
+  }
+
+  private async bootstrapFromRemote(): Promise<void> {
+    if (!this.nativeBootstrap) {
+      const snapshot = await this.remote.exportSnapshot();
+      await this.withLocalStateLock(async () => {
+        await this.outbox.load();
+        if (!this.outbox.recoveryError && this.outbox.length === 0) {
+          await this.replaceCacheFromRemoteSnapshot(snapshot);
+        }
+      });
+      return;
+    }
+
+    const prepared = await this.nativeBootstrap.prepare();
+    try {
+      await this.withLocalStateLock(async () => {
+        await this.outbox.load();
+        if (this.outbox.recoveryError || this.outbox.length !== 0) {
+          return;
+        }
+        if (await this.nativeBootstrap!.install(prepared.stageId)) {
+          await this.cache.refresh();
+          this.needsRemoteBootstrap = false;
+          await this.recordRemoteSync();
+        }
+      });
+    } finally {
+      await this.nativeBootstrap.discard(prepared.stageId).catch((error) => {
+        logger.error(
+          'Failed to discard native repository bootstrap stage',
+          error,
+        );
+      });
+    }
   }
 
   private async replaceCacheFromRemoteSnapshot(

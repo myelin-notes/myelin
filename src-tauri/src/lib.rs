@@ -11,6 +11,7 @@ mod mcp_server;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
+mod repository_bootstrap;
 mod transcription;
 mod workspace_export;
 
@@ -82,6 +83,10 @@ pub fn run() {
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
             local_file_write::write_local_file_chunk,
+            repository_bootstrap::recover_repository_cache,
+            repository_bootstrap::prepare_repository_cache,
+            repository_bootstrap::install_repository_cache,
+            repository_bootstrap::discard_repository_cache,
             note_text_index::index_note_text,
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
