@@ -125,6 +125,7 @@ export class CachedRepository
   private readonly emptyDocUpdate = Y.encodeStateAsUpdate(new Y.Doc());
   private readonly outbox: CachedRepositoryOutbox;
   private flushTimer: number | null = null;
+  private pendingFlushes = 0;
   private bulkWriting = false;
   private bulkDataChanged = false;
   private needsRemoteBootstrap = true;
@@ -242,20 +243,26 @@ export class CachedRepository
   }
 
   async flushPending(): Promise<void> {
-    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
-      try {
-        await this.flushPendingImpl();
-        if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
-          await this.syncCacheFromRemote();
+    this.pendingFlushes += 1;
+    try {
+      await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
+        try {
+          await this.flushPendingImpl();
+          if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
+            await this.syncCacheFromRemote();
+          }
+        } catch (error) {
+          this.updateRuntimeStatus({
+            online: false,
+            lastError:
+              error instanceof Error ? error : new Error(String(error)),
+          });
+          throw error;
         }
-      } catch (error) {
-        this.updateRuntimeStatus({
-          online: false,
-          lastError: error instanceof Error ? error : new Error(String(error)),
-        });
-        throw error;
-      }
-    });
+      });
+    } finally {
+      this.pendingFlushes -= 1;
+    }
   }
 
   async dispose(): Promise<void> {
@@ -814,7 +821,7 @@ export class CachedRepository
     }
 
     this.flushTimer = window.setInterval(() => {
-      if (this.bulkWriting) {
+      if (this.bulkWriting || this.pendingFlushes > 0) {
         return;
       }
       void this.flushPending().catch((error) => {

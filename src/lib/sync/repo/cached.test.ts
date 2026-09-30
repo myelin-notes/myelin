@@ -1440,6 +1440,45 @@ describe('CachedRepository', () => {
     await session.close();
   });
 
+  it('skips background ticks during a slow flush and resumes after failure', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', {
+      setInterval: globalThis.setInterval,
+      clearInterval: globalThis.clearInterval,
+    });
+    const remote = new MemoryRemoteRepository();
+    const root = 'repositories/slow-background-flush-test';
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository(root),
+      `${root}/outbox.json`,
+    );
+    await repository.initialize();
+    const fileId = await repository.createFile('Queued', 'mcanvas', null);
+    const release = createDeferred();
+    const saveManifest = vi.spyOn(remote, 'applyManifestMutation');
+    saveManifest.mockImplementationOnce(async () => {
+      await release.promise;
+      throw new Error('Upload failed');
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(saveManifest).toHaveBeenCalledTimes(1);
+
+    release.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(saveManifest).toHaveBeenCalledTimes(1);
+    expect(await remote.getNode(fileId)).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await remote.getNode(fileId)).not.toBeNull();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    await repository.dispose();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
   it('does not auto-drain a non-batched remote after a bulk import', async () => {
     vi.useFakeTimers();
     const remote = new MemoryRemoteRepository();
