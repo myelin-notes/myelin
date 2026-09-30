@@ -45,8 +45,6 @@ try {
   });
   initRustErrorReporting();
   disableNativePinchZoom();
-  trackEvent('app_opened');
-
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <I18nProvider>

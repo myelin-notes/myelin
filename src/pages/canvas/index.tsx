@@ -366,12 +366,7 @@ function CanvasViewInner({
   );
   const openBacklinkSource = useEffectEvent(async (sourceId: VFSNodeId) => {
     await engine.saveBeforeExit();
-    openNote(
-      tabController,
-      { fileType: 'mcanvas', id: sourceId },
-      undefined,
-      'backlink',
-    );
+    openNote(tabController, { fileType: 'mcanvas', id: sourceId }, undefined);
   });
   const handleOpenBacklinkSource = useCallback((sourceId: VFSNodeId) => {
     void openBacklinkSource(sourceId).catch((error) => {

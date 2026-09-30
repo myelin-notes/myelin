@@ -19,7 +19,6 @@ describe('note navigation', () => {
       controller,
       { fileType: descriptor.extension, id: `note-${descriptor.extension}` },
       undefined,
-      'explorer',
     );
 
     const state = controller.getSnapshot();
@@ -34,12 +33,7 @@ describe('note navigation', () => {
 
   it('opens a canvas note as a tab', () => {
     const controller = new TabStateController();
-    openNote(
-      controller,
-      { fileType: 'mcanvas', id: 'note-123' },
-      undefined,
-      'explorer',
-    );
+    openNote(controller, { fileType: 'mcanvas', id: 'note-123' }, undefined);
 
     const state = controller.getSnapshot();
     const pane = state.layout.type === 'pane' ? state.layout : null;

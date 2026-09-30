@@ -14,7 +14,6 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { TAB_BAR_HEIGHT_CLASS } from '@myelin/shared/os';
 import { errorDescription } from '@/components/command-palette/utils';
-import { trackEvent } from '@/lib/analytics';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -102,7 +101,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
       void treeRef.current
         ?.startNewFile(title, type)
         .then(() => {
-          trackEvent('note_created', { file_type: type });
           refreshMeta();
         })
         .catch((error) => {

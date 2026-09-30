@@ -157,7 +157,7 @@ export function useNotesMode({
       icon: FileText,
       onSelect: () => {
         closePalette();
-        openNote(tabController, note, note.name, 'search');
+        openNote(tabController, note, note.name);
       },
     }));
   }, [

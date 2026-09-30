@@ -80,10 +80,6 @@ export function useCanvasInserts({
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
       frame.select();
-      trackEvent('page_frame_created', {
-        insertion_method: 'menu',
-        layout: UserPrefs.get('defaultPageLayout'),
-      });
     },
     [drawableCanvasRef],
   );

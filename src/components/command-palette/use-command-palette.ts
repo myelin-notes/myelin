@@ -120,7 +120,6 @@ export function useCommandPalette(): {
     setMode(nextMode);
     setQuery('');
     setOpen(true);
-    trackEvent('command_palette_opened', { mode: nextMode });
   }, []);
 
   const handleQueryChange = useCallback((nextQuery: string) => {

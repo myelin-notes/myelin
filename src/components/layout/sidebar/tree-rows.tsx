@@ -187,7 +187,7 @@ export function SidebarFileRow({
               draggable={!renaming}
               onClick={(e) => {
                 if (!renaming && !onSelect(e)) {
-                  openNote(tabController, node, node.name, 'explorer');
+                  openNote(tabController, node, node.name);
                 }
               }}
               onDragStart={handleDragStart}

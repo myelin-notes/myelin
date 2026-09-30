@@ -194,12 +194,7 @@ export function GraphPage() {
       if (!node) {
         return;
       }
-      openNote(
-        tabController,
-        { fileType: 'mcanvas', id: node.id },
-        node.name,
-        'graph',
-      );
+      openNote(tabController, { fileType: 'mcanvas', id: node.id }, node.name);
     },
     [tabController],
   );
