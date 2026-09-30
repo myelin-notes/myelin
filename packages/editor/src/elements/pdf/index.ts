@@ -320,9 +320,10 @@ export class PdfElement
     scale: number,
     region: DOMRect,
   ): Promise<void> {
+    const generation = this._loadGeneration;
     this._thumbnailPages = [];
     await this._pdfLoadPromise;
-    if (!this._pdfDocument) {
+    if (generation !== this._loadGeneration || !this._pdfDocument) {
       return;
     }
     const scaleX = getPositiveScale(this._scale.x);
@@ -358,6 +359,9 @@ export class PdfElement
           renderScale,
         }).promise;
       } catch (error) {
+        if (generation !== this._loadGeneration) {
+          return;
+        }
         if (!isPdfRenderCancelled(error)) {
           logger.error('Failed to render PDF thumbnail page', error, {
             uuid: this.uuid,
@@ -366,6 +370,9 @@ export class PdfElement
           });
         }
         continue;
+      }
+      if (generation !== this._loadGeneration) {
+        return;
       }
       this._thumbnailPages.push({ canvas, page });
     }
@@ -649,6 +656,7 @@ export class PdfElement
     forceMetadata: boolean,
   ): Promise<void> {
     const generation = ++this._loadGeneration;
+    this._thumbnailPages = [];
     this.pageView.invalidate();
     void this._pdfDocument?.loadingTask.destroy();
     this._pdfDocument = null;

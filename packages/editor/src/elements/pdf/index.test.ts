@@ -8,6 +8,7 @@ import {
   type Mock,
   vi,
 } from 'vitest';
+import { Logger } from '@myelin/shared/logger';
 import type { CanvasViewport } from '../../canvas-viewport';
 import {
   getPdfDocumentPageSizes,
@@ -562,6 +563,74 @@ describe('PdfElement thumbnail rendering', () => {
         .mocked(renderPdfPageToCanvas)
         .mock.calls.map(([params]) => params.pageIndex),
     ).toEqual([0, 1]);
+  });
+
+  it.each([
+    'dispose',
+    'replace',
+  ] as const)('stops thumbnail rendering when the PDF is invalidated by %s', async (action) => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+    let finishRender!: () => void;
+    vi.mocked(renderPdfPageToCanvas).mockReturnValueOnce({
+      promise: new Promise<void>((resolve) => {
+        finishRender = resolve;
+      }),
+      cancel: vi.fn(),
+    });
+
+    const prepared = element.prepareThumbnail(
+      0.5,
+      new DOMRect(0, 0, 612, 1500),
+    );
+    await flushPromises();
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+
+    if (action === 'dispose') {
+      element.disposeDOM();
+    } else {
+      mockLoadedPdf([{ w: 400, h: 200 }]);
+      element.setInitialPdfData(new Uint8Array([4, 5, 6]), 'new.pdf');
+      await flushPromises();
+    }
+    finishRender();
+    await prepared;
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).not.toHaveBeenCalled();
+  });
+
+  it('ignores a render rejection after the PDF is disposed', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    let rejectRender!: (error: Error) => void;
+    vi.mocked(renderPdfPageToCanvas).mockReturnValueOnce({
+      promise: new Promise<void>((_resolve, reject) => {
+        rejectRender = reject;
+      }),
+      cancel: vi.fn(),
+    });
+    const logError = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    try {
+      const prepared = element.prepareThumbnail(
+        0.5,
+        new DOMRect(0, 0, 612, 1500),
+      );
+      await flushPromises();
+      element.disposeDOM();
+      rejectRender(new Error('PDF transport destroyed'));
+      await prepared;
+
+      expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+      expect(logError).not.toHaveBeenCalled();
+    } finally {
+      logError.mockRestore();
+    }
   });
 
   it('is a no-op before a PDF document is loaded', async () => {
