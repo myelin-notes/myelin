@@ -90,6 +90,7 @@ interface ActiveCanvasSession {
   unsubscribeStatus: () => void;
   unsubscribePeers: () => void;
   unsubscribeViewport: () => void;
+  unsubscribeReplacement: () => void;
 }
 
 export class CanvasSessionController {
@@ -288,10 +289,14 @@ export class CanvasSessionController {
       activeSession.unsubscribeStatus();
       activeSession.unsubscribePeers();
       activeSession.unsubscribeViewport();
+      activeSession.unsubscribeReplacement();
       await flushViewportStates();
       activeSession.drawableCanvas.destroy();
 
-      if (hasAudioRecordingsForOwner(this.recordingOwnerId)) {
+      if (
+        !activeSession.noteSession.documentReplaced &&
+        hasAudioRecordingsForOwner(this.recordingOwnerId)
+      ) {
         preserveCanvasSession(this.recordingOwnerId, activeSession.noteSession);
         return;
       }
@@ -367,6 +372,11 @@ export class CanvasSessionController {
       unsubscribeStatus: () => unsubscribeStatus(),
       unsubscribePeers,
       unsubscribeViewport,
+      unsubscribeReplacement: noteSession.subscribeReplacement(() => {
+        if (this.activeSession?.noteSession === noteSession) {
+          void this.open(noteSession.id);
+        }
+      }),
     };
     this.drawableCanvasRef.current = drawableCanvas;
 
@@ -388,6 +398,9 @@ export class CanvasSessionController {
       error: null,
       ready: true,
     });
+    if (noteSession.documentReplaced) {
+      void this.open(noteSession.id);
+    }
   }
 
   private async cleanupAbandonedSession(

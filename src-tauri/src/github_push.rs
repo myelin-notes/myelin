@@ -11,31 +11,31 @@ use tauri::{AppHandle, Manager};
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushFile {
-    path: String,
-    index: usize,
+    pub(crate) path: String,
+    pub(crate) index: usize,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushRequest {
-    owner: String,
-    repo: String,
-    branch: String,
-    token: String,
-    expected_head_oid: String,
-    message: String,
-    staging_id: String,
-    additions: Vec<GitPushFile>,
-    deletions: Vec<String>,
+    pub(crate) owner: String,
+    pub(crate) repo: String,
+    pub(crate) branch: String,
+    pub(crate) token: String,
+    pub(crate) expected_head_oid: String,
+    pub(crate) message: String,
+    pub(crate) staging_id: String,
+    pub(crate) additions: Vec<GitPushFile>,
+    pub(crate) deletions: Vec<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushResponse {
-    status: &'static str,
-    commit_oid: Option<String>,
-    blob_shas: HashMap<String, String>,
-    failure_reason: Option<String>,
+    pub(crate) status: &'static str,
+    pub(crate) commit_oid: Option<String>,
+    pub(crate) blob_shas: HashMap<String, String>,
+    pub(crate) failure_reason: Option<String>,
 }
 
 #[tauri::command]
@@ -52,7 +52,10 @@ pub async fn github_push_batch(
         .map_err(|_| "Git push task failed")?
 }
 
-fn push_batch(cache_dir: &Path, request: GitPushRequest) -> Result<GitPushResponse, String> {
+pub(crate) fn push_batch(
+    cache_dir: &Path,
+    request: GitPushRequest,
+) -> Result<GitPushResponse, String> {
     if request.staging_id.len() != 36
         || !request
             .staging_id

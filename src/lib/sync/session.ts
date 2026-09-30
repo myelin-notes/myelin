@@ -1,3 +1,4 @@
+import { mergeUpdates } from 'yjs';
 import { summarizeYDocManager } from '@myelin/editor/note/state-summary';
 import {
   noopTransport,
@@ -25,6 +26,11 @@ import {
   type PeerMode,
   type SyncMessage,
 } from './live/protocol';
+import {
+  isNativeDocumentTarget,
+  type NativeDocumentSnapshot,
+  type NativeDocumentTarget,
+} from './native-document-target';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
@@ -55,6 +61,12 @@ export class NoteSession {
   private heartbeatTimer: HeartbeatTimer | null = null;
   private operationQueue: Promise<void> = Promise.resolve();
   private status: NoteSessionStatus;
+  private nativeQueue: Uint8Array[] = [];
+  private nativeGeneration: string | undefined;
+  private replaced = false;
+  private readonly replacementListeners = new Set<() => void>();
+  private nativeSaving: Promise<void> | null = null;
+  private unsubscribeNative: (() => Promise<void>) | null = null;
 
   constructor(
     public readonly id: VFSNodeId,
@@ -77,11 +89,29 @@ export class NoteSession {
     this.remoteStateVector = initialStateVector;
 
     this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (this.closed) {
+      if (this.closed || this.replaced) {
         return;
       }
 
-      if (!isRemoteSyncOrigin(origin) && this.transport.connected) {
+      if (
+        isNativeDocumentTarget(this.syncTarget) &&
+        origin !== PEER_ORIGIN &&
+        origin !== REPOSITORY_SYNC_ORIGIN
+      ) {
+        this.nativeQueue.push(new Uint8Array(update));
+        void this.drainNative().catch((error) =>
+          this.setStatus({
+            lastError:
+              error instanceof Error ? error : new Error(String(error)),
+          }),
+        );
+      }
+
+      if (
+        !isNativeDocumentTarget(this.syncTarget) &&
+        !isRemoteSyncOrigin(origin) &&
+        this.transport.connected
+      ) {
         this.sendMessage({
           type: 'yjs-update',
           data: new Uint8Array(update),
@@ -112,6 +142,35 @@ export class NoteSession {
       initial.revision,
       initial.stateVector,
     );
+    if (isNativeDocumentTarget(syncTarget)) {
+      session.nativeGeneration = (initial as NativeDocumentSnapshot).generation;
+      try {
+        session.unsubscribeNative = await syncTarget.subscribeDocument(
+          nodeId,
+          (change) => {
+            if (session.closed || session.replaced) {
+              return;
+            }
+            if (
+              change.replacement ||
+              change.generation !== session.nativeGeneration
+            ) {
+              session.invalidateNativeDocument();
+              return;
+            }
+            session.applyUpdate(
+              change.update,
+              change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
+            );
+          },
+        );
+        await session.pull();
+      } catch (error) {
+        await session.unsubscribeNative?.();
+        session.ydoc.doc.destroy();
+        throw error;
+      }
+    }
     logger.info('Opened note session', {
       nodeId,
       revision: initial.revision,
@@ -120,6 +179,26 @@ export class NoteSession {
       ...summarizeYDocManager(session.ydoc),
     });
     return session;
+  }
+
+  get documentReplaced(): boolean {
+    return this.replaced;
+  }
+
+  private invalidateNativeDocument(): void {
+    this.replaced = true;
+    this.nativeQueue = [];
+    this.flushedEpoch = this.changeEpoch;
+    for (const listener of this.replacementListeners) {
+      listener();
+    }
+  }
+
+  subscribeReplacement(listener: () => void): () => void {
+    this.replacementListeners.add(listener);
+    return () => {
+      this.replacementListeners.delete(listener);
+    };
   }
 
   get transportConnected(): boolean {
@@ -183,6 +262,13 @@ export class NoteSession {
     this.updatePeerSnapshot(this.peerState.resetRemotePeers());
 
     this.transport = transport;
+    if (
+      isNativeDocumentTarget(this.syncTarget) &&
+      'bindRepository' in transport &&
+      typeof transport.bindRepository === 'function'
+    ) {
+      transport.bindRepository(this.syncTarget.nativeRepositoryHandle);
+    }
 
     transport.on('message', this.onTransportMessage);
     transport.on('disconnected', this.onTransportDisconnected);
@@ -248,6 +334,14 @@ export class NoteSession {
         this.ydoc.encodeStateVector(),
       );
 
+      if (
+        isNativeDocumentTarget(this.syncTarget) &&
+        (result as NativeDocumentSnapshot).generation !== this.nativeGeneration
+      ) {
+        this.invalidateNativeDocument();
+        return;
+      }
+
       if (result.update && result.update.byteLength > 0) {
         this.ydoc.applyUpdate(result.update, REPOSITORY_SYNC_ORIGIN);
         pulledUpdate = result.update;
@@ -268,11 +362,19 @@ export class NoteSession {
   }
 
   private async saveInternal(): Promise<boolean> {
-    if (this.closed) {
+    if (this.closed || this.replaced) {
       return false;
     }
 
     const targetChangeEpoch = this.changeEpoch;
+    if (isNativeDocumentTarget(this.syncTarget)) {
+      this.ydoc.sweepOrphanPageFrameFragments();
+      await this.runWithPhase('pushing', () => this.drainNative());
+      await this.syncTarget.flushDocument(this.id);
+      const changed = targetChangeEpoch !== this.flushedEpoch;
+      this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
+      return changed;
+    }
     if (targetChangeEpoch === this.flushedEpoch) {
       logger.debug('Skipped note session push; already synced', {
         nodeId: this.id,
@@ -397,6 +499,9 @@ export class NoteSession {
   };
 
   private sendInitialState(): void {
+    if (isNativeDocumentTarget(this.syncTarget)) {
+      return;
+    }
     this.sendMessage({
       type: 'yjs-update',
       data: this.ydoc.encodeDiff(),
@@ -415,7 +520,10 @@ export class NoteSession {
     });
 
     try {
-      if (this.hasUnsyncedChanges()) {
+      if (
+        this.hasUnsyncedChanges() ||
+        isNativeDocumentTarget(this.syncTarget)
+      ) {
         await this.saveInternal();
       }
     } catch (error) {
@@ -423,6 +531,8 @@ export class NoteSession {
     }
 
     this.clearTransport();
+    await this.unsubscribeNative?.();
+    this.unsubscribeNative = null;
     this.stopHeartbeat();
     this.closed = true;
     this.setStatus({ phase: 'closed' });
@@ -465,6 +575,44 @@ export class NoteSession {
       });
       throw statusError;
     }
+  }
+
+  private drainNative(): Promise<void> {
+    if (this.nativeSaving) {
+      return this.nativeSaving;
+    }
+    const target = this.syncTarget as NativeDocumentTarget;
+    this.nativeSaving = (async () => {
+      while (this.nativeQueue.length && !this.replaced) {
+        const count = this.nativeQueue.length;
+        const result = await target.persistDocumentUpdate(
+          this.id,
+          count === 1
+            ? this.nativeQueue[0]
+            : mergeUpdates(this.nativeQueue.slice(0, count)),
+          this.nativeGeneration,
+        );
+        this.nativeQueue.splice(0, count);
+        this.remoteStateVector = result.stateVector;
+        this.setStatus({
+          remoteRevision: result.revision,
+          lastError: null,
+          lastSyncedAt: Date.now(),
+        });
+      }
+    })().then(
+      () => {
+        this.nativeSaving = null;
+        if (this.nativeQueue.length) {
+          return this.drainNative();
+        }
+      },
+      (error) => {
+        this.nativeSaving = null;
+        throw error;
+      },
+    );
+    return this.nativeSaving;
   }
 
   private enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {

@@ -58,6 +58,8 @@ png = "0.18.1"
 git2 = { version = "0.21", features = ["https", "vendored-libgit2", "vendored-openssl"] }
 flate2 = "1"
 tar = "0.4"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default

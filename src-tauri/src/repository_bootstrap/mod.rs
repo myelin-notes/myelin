@@ -1,4 +1,4 @@
-mod download;
+pub(crate) mod download;
 #[cfg(test)]
 mod tests;
 
@@ -37,14 +37,14 @@ struct InstallJournal {
     had_cache: bool,
 }
 
-struct CachePaths {
-    cache: PathBuf,
+pub(crate) struct CachePaths {
+    pub(crate) cache: PathBuf,
     backup: PathBuf,
     journal: PathBuf,
 }
 
 impl CachePaths {
-    fn new(app_data: &Path, storage_root: &str) -> Result<Self, String> {
+    pub(crate) fn new(app_data: &Path, storage_root: &str) -> Result<Self, String> {
         let parts: Vec<_> = storage_root.split('/').collect();
         if parts.len() != 3
             || parts[0] != "repositories"
@@ -99,7 +99,7 @@ impl CachePaths {
     }
 }
 
-fn valid_component(value: &str) -> bool {
+pub(crate) fn valid_component(value: &str) -> bool {
     !value.is_empty()
         && value != "."
         && value != ".."
@@ -112,7 +112,7 @@ fn io_error(error: std::io::Error) -> String {
     format!("Repository cache I/O failed: {error}")
 }
 
-fn reject_symlink(path: &Path) -> Result<(), String> {
+pub(crate) fn reject_symlink(path: &Path) -> Result<(), String> {
     match path.symlink_metadata() {
         Ok(metadata) if metadata.file_type().is_symlink() => {
             Err("Invalid repository cache path".into())
@@ -129,7 +129,7 @@ fn write_durable(path: &Path, bytes: &[u8]) -> Result<(), String> {
     file.sync_all().map_err(io_error)
 }
 
-fn sync_directory(path: &Path) -> Result<(), String> {
+pub(crate) fn sync_directory(path: &Path) -> Result<(), String> {
     #[cfg(unix)]
     File::open(path)
         .and_then(|file| file.sync_all())
@@ -218,7 +218,7 @@ fn remove_directory(path: &Path) -> Result<(), String> {
     }
 }
 
-fn recover_cache(paths: &CachePaths) -> Result<(), String> {
+pub(crate) fn recover_cache(paths: &CachePaths) -> Result<(), String> {
     if !paths.journal.exists() {
         return Ok(());
     }
@@ -280,6 +280,9 @@ fn install_cache(paths: &CachePaths, stage_id: &str) -> Result<bool, String> {
             if child
                 .file_name()
                 .is_some_and(|name| name == "manifest.json" || name == "files")
+                || stage
+                    .join(child.file_name().ok_or("Invalid repository cache path")?)
+                    .exists()
             {
                 continue;
             }

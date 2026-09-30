@@ -4,11 +4,11 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
 import { getGoogleDriveToken } from './google-drive/credentials';
 import { LocalRepository } from './local';
 import { createNativeRepositoryBootstrap } from './native-bootstrap';
-import { createRepositoryFromConfig } from './repository-backends';
 import { createEmptyManifest, createFileNode } from './shared';
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -25,6 +25,20 @@ const config = {
   credentialId: 'default',
 };
 const root = 'repositories/github/owner__repo__main';
+
+function createBootstrapRepository() {
+  return new CachedRepository(
+    new GitHubRepository({
+      owner: config.owner,
+      repo: config.repo,
+      branch: config.branch,
+      credentialId: config.credentialId,
+    }),
+    new LocalRepository(root),
+    `${root}/outbox.json`,
+    createNativeRepositoryBootstrap(config, root) ?? undefined,
+  );
+}
 
 describe('native repository bootstrap', () => {
   beforeEach(() => {
@@ -77,7 +91,7 @@ describe('native repository bootstrap', () => {
       'replaceSnapshot',
     );
     try {
-      const repository = createRepositoryFromConfig(config);
+      const repository = createBootstrapRepository();
       await repository.initialize();
       expect((await repository.getNode('note'))?.name).toBe('Remote image');
       expect(await repository.readFileBytes('note')).toEqual(
@@ -118,7 +132,7 @@ describe('native repository bootstrap', () => {
       }
       return undefined;
     });
-    const repository = createRepositoryFromConfig(config);
+    const repository = createBootstrapRepository();
     const initializing = repository.initialize();
     await started;
     const folderId = await repository.createFolder('Offline edit', null);
@@ -131,7 +145,7 @@ describe('native repository bootstrap', () => {
       'prepare_repository_cache',
       'discard_repository_cache',
     ]);
-    const reopened = createRepositoryFromConfig(config);
+    const reopened = createBootstrapRepository();
     await reopened.initialize();
     expect((await reopened.getNode(folderId))?.name).toBe('Offline edit');
     expect(
@@ -147,7 +161,7 @@ describe('native repository bootstrap', () => {
     vi.mocked(invoke)
       .mockImplementationOnce(async () => undefined)
       .mockRejectedValueOnce('temporary download failure');
-    const repository = createRepositoryFromConfig(config);
+    const repository = createBootstrapRepository();
     await repository.initialize();
     expect(repository.getRuntimeStatus().online).toBe(false);
     vi.mocked(invoke).mockImplementation(async (command) => {

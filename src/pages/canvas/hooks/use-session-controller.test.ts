@@ -50,6 +50,7 @@ interface MockNoteSession {
     listener: (status: NoteSessionStatus) => void,
   ) => () => void;
   subscribePeerSnapshot: (listener: (snapshot: unknown) => void) => () => void;
+  subscribeReplacement: (listener: () => void) => () => void;
   close: () => Promise<void>;
   save: () => Promise<void>;
 }
@@ -77,6 +78,7 @@ function createSession(id: VFSNodeId): MockNoteSession {
       return vi.fn();
     }),
     subscribePeerSnapshot: vi.fn(() => vi.fn()),
+    subscribeReplacement: vi.fn(() => vi.fn()),
     close: vi.fn().mockResolvedValue(undefined),
     save: vi.fn().mockResolvedValue(undefined),
   };
@@ -88,6 +90,41 @@ afterEach(() => {
 });
 
 describe('CanvasSessionController', () => {
+  it('reopens an active editor when its native document is replaced', async () => {
+    const first = createSession('note');
+    const second = createSession('note');
+    let replace!: () => void;
+    first.subscribeReplacement = vi.fn((listener) => {
+      replace = listener;
+      return vi.fn();
+    });
+    const repository = {
+      kind: 'local',
+      openSession: vi
+        .fn()
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(second),
+      getNode: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+    await controller.open('note');
+    replace();
+    await vi.waitFor(() =>
+      expect(controller.getSnapshot().noteSession).toBe(second),
+    );
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot().ready).toBe(true);
+    await controller.dispose();
+  });
+
   it('restores the selected tool when switching notes in a pane', async () => {
     const repository = {
       kind: 'local',

@@ -1,17 +1,18 @@
 use tauri::Manager;
 
-mod code_runner;
 mod clipboard;
+mod code_runner;
 mod error_report;
 mod github_push;
 mod iroh_transport;
 mod local_file_write;
-mod note_text_index;
 mod mcp_server;
+mod note_text_index;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
 mod repository_bootstrap;
+mod repository_engine;
 mod transcription;
 mod workspace_export;
 
@@ -73,6 +74,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_pencil::init())
         .manage(iroh_transport::IrohState::new())
+        .manage(repository_engine::RepositoryManager::default())
         .manage(mcp_server::McpServerState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
@@ -87,6 +89,11 @@ pub fn run() {
             repository_bootstrap::prepare_repository_cache,
             repository_bootstrap::install_repository_cache,
             repository_bootstrap::discard_repository_cache,
+            repository_engine::repository_open,
+            repository_engine::repository_operation,
+            repository_engine::repository_sync,
+            repository_engine::repository_release,
+            repository_engine::repository_auth_response,
             note_text_index::index_note_text,
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,

@@ -2,6 +2,7 @@ import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   type RepositoryConfig,
 } from '@myelin/editor/sync/repo/config';
+import { isTauri } from '@tauri-apps/api/core';
 import { CachedRepository } from './cached';
 import type { ActiveRepository } from './config';
 import { GitHubRepository } from './github';
@@ -9,6 +10,7 @@ import { hasGitHubToken } from './github/credentials';
 import { GoogleDriveRepository } from './google-drive';
 import { hasGoogleDriveToken } from './google-drive/credentials';
 import { LocalRepository } from './local';
+import { NativeRepository } from './native';
 import { createNativeRepositoryBootstrap } from './native-bootstrap';
 
 interface RepositoryConfigBase {
@@ -86,7 +88,10 @@ function normalizeStorageKeyPart(value: string): string {
 const localRepositoryBackend: RepositoryBackendDescriptor<LocalRepositoryConfig> =
   {
     kind: 'local',
-    create: () => new LocalRepository(),
+    create: () =>
+      isTauri()
+        ? new NativeRepository({ kind: 'local' })
+        : new LocalRepository(),
     normalizeConfig: () => ({ kind: 'local' }),
     storageKey: () => 'local',
     configIdentity: () => 'local',
@@ -100,6 +105,9 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
     kind: 'github',
     create: (config) => {
       const cacheRoot = `repositories/github/${getRepositoryStorageKey(config)}`;
+      if (isTauri()) {
+        return new NativeRepository(config, cacheRoot);
+      }
       return new CachedRepository(
         new GitHubRepository({
           owner: config.owner,
@@ -152,6 +160,9 @@ const googleDriveRepositoryBackend: RepositoryBackendDescriptor<GoogleDriveRepos
     kind: 'google-drive',
     create: (config) => {
       const cacheRoot = `repositories/google-drive/${getRepositoryStorageKey(config)}`;
+      if (isTauri()) {
+        return new NativeRepository(config, cacheRoot);
+      }
       return new CachedRepository(
         new GoogleDriveRepository({
           folderId: config.folderId,

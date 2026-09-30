@@ -13,7 +13,7 @@ use tokio::io::AsyncWriteExt;
 
 use super::{io_error, valid_component, write_durable};
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RepositorySource {
     Github {
@@ -30,7 +30,8 @@ pub enum RepositorySource {
     },
 }
 
-pub(super) struct RemoteEndpoints {
+#[derive(Clone)]
+pub(crate) struct RemoteEndpoints {
     pub github: String,
     pub drive: String,
     pub drive_upload: String,
@@ -46,14 +47,14 @@ impl Default for RemoteEndpoints {
     }
 }
 
-struct RemoteClient {
-    client: Client,
-    token: String,
-    github: bool,
+pub(crate) struct RemoteClient {
+    pub(crate) client: Client,
+    pub(crate) token: String,
+    pub(crate) github: bool,
 }
 
 impl RemoteClient {
-    fn new(token: String, github: bool) -> Result<Self, String> {
+    pub(crate) fn new(token: String, github: bool) -> Result<Self, String> {
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(120))
@@ -66,7 +67,7 @@ impl RemoteClient {
         })
     }
 
-    async fn request(
+    pub(crate) async fn request(
         &self,
         label: &str,
         method: Method,
@@ -115,7 +116,7 @@ impl RemoteClient {
         Err(format!("{label}: exhausted retries"))
     }
 
-    async fn json(
+    pub(crate) async fn json(
         &self,
         label: &str,
         method: Method,
@@ -156,7 +157,7 @@ fn retry_delay(response: &Response, attempt: usize, github: bool) -> Option<Dura
     ))
 }
 
-fn require_success(response: Response, label: &str) -> Result<Response, String> {
+pub(crate) fn require_success(response: Response, label: &str) -> Result<Response, String> {
     if response.status().is_success() {
         Ok(response)
     } else {
@@ -164,7 +165,7 @@ fn require_success(response: Response, label: &str) -> Result<Response, String> 
     }
 }
 
-fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
+pub(crate) fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
     let mut url = Url::parse(base).map_err(|_| "Invalid repository endpoint")?;
     url.path_segments_mut()
         .map_err(|_| "Invalid repository endpoint")?
@@ -172,11 +173,11 @@ fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
     Ok(url)
 }
 
-fn empty_manifest() -> Value {
+pub(crate) fn empty_manifest() -> Value {
     json!({ "version": 3, "nodes": {}, "linksBySource": {}, "colors": { "pen": [], "highlighter": [], "text": [], "folder": [] }, "tagRegistry": [], "penPresets": [] })
 }
 
-fn parse_manifest(bytes: &[u8]) -> Result<Value, String> {
+pub(crate) fn parse_manifest(bytes: &[u8]) -> Result<Value, String> {
     let manifest: Value =
         serde_json::from_slice(bytes).map_err(|_| "Unreadable repository manifest")?;
     if !manifest.get("version").is_some_and(Value::is_number)
@@ -187,7 +188,7 @@ fn parse_manifest(bytes: &[u8]) -> Result<Value, String> {
     Ok(manifest)
 }
 
-fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
+pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
     for (key, node) in manifest["nodes"]
         .as_object()
@@ -219,7 +220,7 @@ fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
-pub(super) async fn download_repository(
+pub(crate) async fn download_repository(
     stage: &Path,
     source: RepositorySource,
     endpoints: &RemoteEndpoints,
@@ -341,6 +342,9 @@ async fn download_github(
             .map_err(|_| "GitHub archive extraction task failed")??;
         std::fs::remove_file(archive).map_err(io_error)?;
         if let Some(result) = extracted {
+            tokio::fs::write(stage.join(".remote-revision"), revision)
+                .await
+                .map_err(io_error)?;
             return Ok(result);
         }
         let existing_empty = stage.join("manifest.json").exists();
@@ -365,6 +369,17 @@ async fn download_github(
             .await;
         match response {
             Ok(response) if response.status().is_success() => {
+                let response = response
+                    .bytes()
+                    .await
+                    .map_err(|_| "GitHub manifest initialization response failed")?;
+                let payload: Value = serde_json::from_slice(&response).unwrap_or(Value::Null);
+                tokio::fs::write(
+                    stage.join(".remote-revision"),
+                    payload["commit"]["sha"].as_str().unwrap_or(revision),
+                )
+                .await
+                .map_err(io_error)?;
                 save_manifest(stage, &manifest).await?;
                 return Ok((0, 0));
             }
@@ -445,11 +460,11 @@ fn extract_archive(stage: &Path) -> Result<Option<(usize, u64)>, String> {
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct DriveEntry {
-    id: String,
+pub(crate) struct DriveEntry {
+    pub(crate) id: String,
     #[serde(default)]
-    name: String,
-    head_revision_id: Option<String>,
+    pub(crate) name: String,
+    pub(crate) head_revision_id: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -464,7 +479,7 @@ fn escape_query(value: &str) -> String {
     value.replace('\\', "\\\\").replace('\'', "\\'")
 }
 
-async fn list_drive(
+pub(crate) async fn list_drive(
     client: &RemoteClient,
     endpoints: &RemoteEndpoints,
     query: &str,
@@ -494,7 +509,7 @@ async fn list_drive(
     }
 }
 
-async fn find_drive(
+pub(crate) async fn find_drive(
     client: &RemoteClient,
     endpoints: &RemoteEndpoints,
     parent: &str,
@@ -669,5 +684,15 @@ async fn download_drive(
             return Err("Google Drive repository file changed during download".into());
         }
     }
+    let mut revisions = entries;
+    if let Some(entry) = manifest_entry {
+        revisions.insert("manifest.json".into(), entry);
+    }
+    tokio::fs::write(
+        stage.join(".remote-drive.json"),
+        serde_json::to_vec(&revisions).map_err(|error| error.to_string())?,
+    )
+    .await
+    .map_err(io_error)?;
     Ok((files.len(), size))
 }
