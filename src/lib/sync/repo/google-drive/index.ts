@@ -7,10 +7,15 @@
  * re-reads `headRevisionId` immediately before uploading and refuses if it moved. That closes the
  * realistic multi-device window but not the sub-round-trip one, which stays last-writer-wins.
  */
+import * as Y from 'yjs';
 import { fetch } from '@tauri-apps/plugin-http';
 import { BaseRepository } from '../base';
+import type { RecoverableNote } from '../manifest-recovery';
 import {
+  computeRevision,
+  createDocFromBytes,
   createEmptyManifest,
+  FILE_EXT,
   FILES_DIR,
   getStoredFileName,
   getStoredFilePath,
@@ -33,7 +38,8 @@ const DRIVE_UPLOAD_BASE = 'https://www.googleapis.com/upload/drive/v3';
 const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 /** Parent id of My Drive's root. */
 const DRIVE_ROOT_ID = 'root';
-const ENTRY_FIELDS = 'files(id,name,headRevisionId)';
+const ENTRY_FIELDS =
+  'files(id,name,headRevisionId,createdTime,modifiedTime,appProperties)';
 const MAX_MANIFEST_RETRIES = 4;
 const MAX_REQUEST_ATTEMPTS = 4;
 const MAX_RETRY_DELAY_MS = 60_000;
@@ -54,12 +60,18 @@ interface DriveEntry {
   id: string;
   name: string;
   headRevisionId: string | null;
+  createdTime?: string;
+  modifiedTime?: string;
+  appProperties?: Record<string, string>;
 }
 
 interface DriveFileResource {
   id: string;
   name?: string;
   headRevisionId?: string | null;
+  createdTime?: string;
+  modifiedTime?: string;
+  appProperties?: Record<string, string>;
 }
 
 interface DriveListResponse {
@@ -86,7 +98,15 @@ function toDriveEntry(resource: DriveFileResource): DriveEntry {
     name: resource.name ?? '',
     // Absent on a metadata-only file that has no content yet.
     headRevisionId: resource.headRevisionId ?? null,
+    createdTime: resource.createdTime,
+    modifiedTime: resource.modifiedTime,
+    appProperties: resource.appProperties,
   };
+}
+
+function parseDriveTime(value: string | undefined): number | null {
+  const time = value ? Date.parse(value) : NaN;
+  return Number.isFinite(time) ? time : null;
 }
 
 function escapeDriveQueryValue(value: string): string {
@@ -320,6 +340,7 @@ async function createDriveFile(
   parentId: string,
   name: string,
   mimeType?: string,
+  appProperties?: Record<string, string>,
 ): Promise<string> {
   const response = await driveRequest(
     ctx,
@@ -332,6 +353,7 @@ async function createDriveFile(
         name,
         parents: [parentId],
         ...(mimeType ? { mimeType } : {}),
+        ...(appProperties ? { appProperties } : {}),
       }),
     },
   );
@@ -536,7 +558,20 @@ export class GoogleDriveRepository extends BaseRepository {
       return null;
     }
 
-    const entry = await this.ensureEntry(getStoredFilePath(node));
+    const appProperties: Record<string, string> | undefined =
+      node.fileType === 'mcanvas'
+        ? node.system?.kind === 'file-version'
+          ? {
+              myelinKind: 'file-version',
+              myelinSourceFileId: node.system.sourceFileId,
+              myelinCapturedAt: new Date(node.system.capturedAt).toISOString(),
+            }
+          : { myelinKind: 'note' }
+        : undefined;
+    const entry = await this.ensureEntry(
+      getStoredFilePath(node),
+      appProperties,
+    );
     return uploadDriveFile(this.drive, entry.id, bytes);
   }
 
@@ -603,6 +638,65 @@ export class GoogleDriveRepository extends BaseRepository {
     return downloadDriveFile(this.drive, fileId);
   }
 
+  /** Reads stored canvas notes without relying on the manifest. */
+  async readRecoverableNotes(): Promise<RecoverableNote[]> {
+    const folderId = await this.findFolderId(FILES_DIR);
+    if (!folderId) {
+      return [];
+    }
+
+    const entries = (await listDriveFolder(this.drive, folderId)).filter(
+      (entry) =>
+        entry.name.endsWith(FILE_EXT) &&
+        /^[\w-]+$/.test(entry.name.slice(0, -FILE_EXT.length)),
+    );
+    const notes: RecoverableNote[] = [];
+    for (
+      let start = 0;
+      start < entries.length;
+      start += SNAPSHOT_DOWNLOAD_CONCURRENCY
+    ) {
+      const batch = entries.slice(start, start + SNAPSHOT_DOWNLOAD_CONCURRENCY);
+      const downloaded = await Promise.all(
+        batch.map(async (entry): Promise<RecoverableNote> => {
+          const bytes = await this.download(entry.id);
+          if (!bytes) {
+            throw new Error(`Could not read ${entry.name} during recovery.`);
+          }
+          let stateVector: Map<number, number>;
+          try {
+            const doc = createDocFromBytes(bytes);
+            try {
+              stateVector = Y.decodeStateVector(Y.encodeStateVector(doc));
+            } finally {
+              doc.destroy();
+            }
+          } catch (cause) {
+            throw new Error(`Invalid note file: ${entry.name}`, { cause });
+          }
+          const properties = entry.appProperties;
+          const kind = properties?.myelinKind;
+          return {
+            id: entry.name.slice(0, -FILE_EXT.length),
+            bytes,
+            stateVector,
+            revision: await computeRevision(bytes),
+            createdAt: parseDriveTime(entry.createdTime),
+            modifiedAt: parseDriveTime(entry.modifiedTime),
+            kind: kind === 'note' || kind === 'file-version' ? kind : null,
+            sourceFileId:
+              kind === 'file-version'
+                ? (properties?.myelinSourceFileId ?? null)
+                : null,
+            capturedAt: parseDriveTime(properties?.myelinCapturedAt),
+          };
+        }),
+      );
+      notes.push(...downloaded);
+    }
+    return notes;
+  }
+
   // Settings resolves the folder id before the repository is usable, so an empty one means setup
   // is unfinished. Failing here surfaces that as the repository's error rather than a confusing
   // Drive rejection, and the cached wrapper keeps serving local data meanwhile.
@@ -616,7 +710,7 @@ export class GoogleDriveRepository extends BaseRepository {
   private async getFileNode(
     nodeId: VFSNodeId,
     fileType?: FileType,
-  ): Promise<Pick<VFSFileNode, 'id' | 'fileType'> | null> {
+  ): Promise<Pick<VFSFileNode, 'id' | 'fileType' | 'system'> | null> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
     if (node?.type === 'file') {
@@ -634,7 +728,10 @@ export class GoogleDriveRepository extends BaseRepository {
   }
 
   /** The entry for `path`, creating the file and its directories if missing. */
-  private async ensureEntry(path: string): Promise<DriveEntry> {
+  private async ensureEntry(
+    path: string,
+    appProperties?: Record<string, string>,
+  ): Promise<DriveEntry> {
     const name = baseNameOf(path);
     const parentId = await this.ensureFolderId(dirNameOf(path));
     const existing = await findDriveEntry(this.drive, parentId, name);
@@ -642,7 +739,13 @@ export class GoogleDriveRepository extends BaseRepository {
       return existing;
     }
 
-    const id = await createDriveFile(this.drive, parentId, name);
+    const id = await createDriveFile(
+      this.drive,
+      parentId,
+      name,
+      undefined,
+      appProperties,
+    );
     return { id, name, headRevisionId: null };
   }
 

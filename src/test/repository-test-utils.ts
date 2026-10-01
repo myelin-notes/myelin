@@ -691,6 +691,9 @@ interface MemoryDriveNode {
   mimeType: string | null;
   bytes: Uint8Array | null;
   headRevisionId: string | null;
+  createdTime: string;
+  modifiedTime: string;
+  appProperties?: Record<string, string>;
 }
 
 export interface MemoryGoogleDriveApi {
@@ -720,7 +723,11 @@ export interface MemoryGoogleDriveApi {
   /** Paths are relative to the repository's root folder, e.g. `manifest.json`. */
   readBytes(path: string): Uint8Array | null;
   readJson<T>(path: string): T | null;
-  writeBytes(path: string, bytes: Uint8Array): void;
+  writeBytes(
+    path: string,
+    bytes: Uint8Array,
+    metadata?: { createdTime?: string; appProperties?: Record<string, string> },
+  ): void;
   readonly rootFolderId: string;
   readonly uploadCallCount: number;
   readonly deleteCallCount: number;
@@ -764,6 +771,8 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
       mimeType,
       bytes: null,
       headRevisionId: null,
+      createdTime: new Date().toISOString(),
+      modifiedTime: new Date().toISOString(),
     };
     nodes.set(node.id, node);
     return node;
@@ -812,6 +821,9 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
     return {
       id: node.id,
       name: node.name,
+      createdTime: node.createdTime,
+      modifiedTime: node.modifiedTime,
+      appProperties: node.appProperties,
       ...(node.headRevisionId ? { headRevisionId: node.headRevisionId } : {}),
     };
   }
@@ -819,6 +831,7 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
   function writeNode(node: MemoryDriveNode, bytes: Uint8Array): void {
     node.bytes = new Uint8Array(bytes);
     node.headRevisionId = `rev-${++revisionCounter}`;
+    node.modifiedTime = new Date().toISOString();
   }
 
   return {
@@ -904,12 +917,14 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
             name?: string;
             parents?: string[];
             mimeType?: string;
+            appProperties?: Record<string, string>;
           };
           const node = createNode(
             payload.name ?? '',
             payload.parents?.[0] ?? 'root',
             payload.mimeType ?? null,
           );
+          node.appProperties = payload.appProperties;
           return createJsonResponse(200, { id: node.id });
         }
       }
@@ -938,10 +953,16 @@ function createMemoryGoogleDriveApi(): MemoryGoogleDriveApi {
       }
       return JSON.parse(new TextDecoder().decode(bytes)) as T;
     },
-    writeBytes(path, bytes) {
+    writeBytes(path, bytes, metadata) {
       const node = resolveNode(path, true);
       if (node) {
         writeNode(node, bytes);
+        if (metadata?.createdTime) {
+          node.createdTime = metadata.createdTime;
+        }
+        if (metadata?.appProperties) {
+          node.appProperties = metadata.appProperties;
+        }
       }
     },
     get rootFolderId() {

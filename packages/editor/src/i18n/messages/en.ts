@@ -445,6 +445,17 @@ const en = {
         connected: 'Connected',
         disconnected: 'Not connected',
       },
+      recovery: {
+        title: 'Recover library',
+        description:
+          'Find missing notes in Google Drive’s .myelin files. Existing notes are kept. Recovered notes use file IDs as names; original folders and tags cannot be restored.',
+        button: 'Recover notes',
+        recovering: 'Recovering notes…',
+        succeeded: (notes: number, versions: number) =>
+          `Recovered ${notes} note${notes === 1 ? '' : 's'} and ${versions} history version${versions === 1 ? '' : 's'}. Changes will sync automatically.`,
+        empty: 'No missing notes found.',
+        failed: 'Could not recover notes',
+      },
       sync: {
         title: 'Repository Sync',
         queuedChanges: 'Queued changes',

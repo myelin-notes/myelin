@@ -1,4 +1,5 @@
 import { useMessages } from '@myelin/editor/i18n';
+import { RepositoryRecovery } from './recovery';
 import { RepositorySetup } from './setup';
 
 export function RepositorySection() {
@@ -16,6 +17,7 @@ export function RepositorySection() {
       </div>
 
       <RepositorySetup />
+      <RepositoryRecovery />
     </div>
   );
 }

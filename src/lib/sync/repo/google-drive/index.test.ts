@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as Y from 'yjs';
 import { trackEvent } from '@/lib/analytics';
 import {
   createNoteState,
   getRepositoryTestGoogleDriveApi,
+  getRepositoryTestStorage,
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { CachedRepository } from '../cached';
 import { LocalRepository } from '../local';
-import type { VFSManifest } from '../shared';
+import { createEmptyManifest, type VFSManifest } from '../shared';
 import { GoogleDriveRepository } from '.';
 
 vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
@@ -158,6 +160,251 @@ describe('GoogleDriveRepository', () => {
     const snapshot = await repository.exportSnapshot();
     expect(Object.keys(snapshot.manifest.nodes)).toContain(noteId);
     expect(readNoteText(snapshot.notes[noteId] ?? null)).toBe('snapshot me');
+  });
+
+  it('recovers notes and marked history locally, then syncs only the manifest', async () => {
+    const drive = getRepositoryTestGoogleDriveApi();
+    const remote = createRepository();
+    await remote.initialize();
+    const note = createNoteState('surviving content');
+    const noteId = await remote.createFile(
+      'Lost name',
+      'mcanvas',
+      null,
+      note.update,
+    );
+    const version = await remote.createFileVersionIfDue(noteId, {
+      force: true,
+    });
+    expect(version).not.toBeNull();
+    drive.writeBytes(
+      'manifest.json',
+      new TextEncoder().encode(JSON.stringify(createEmptyManifest())),
+    );
+
+    const root = 'repositories/drive-recovery';
+    const cache = new LocalRepository(root);
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      `${root}/outbox.json`,
+    );
+    await repository.initialize();
+    expect((await repository.listDirectory(null))[1]).toHaveLength(0);
+    const uploadsBefore = drive.uploadCallCount;
+    const dataVersion = repository.getRuntimeStatus().dataVersion;
+
+    expect(await repository.recoverManifest()).toEqual({
+      notesRecovered: 1,
+      versionsRecovered: 1,
+    });
+    expect(
+      (await repository.listDirectory(null))[1].map((node) => node.id),
+    ).toEqual([noteId]);
+    expect((await repository.listFileVersions(noteId))[0]).toMatchObject({
+      id: version!.id,
+      sourceFileId: noteId,
+      sourceRevision: version!.sourceRevision,
+    });
+    expect(readNoteText(await repository.readFileBytes(noteId))).toBe(
+      'surviving content',
+    );
+    expect(readNoteText(await repository.readFileBytes(version!.id))).toBe(
+      'surviving content',
+    );
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      pendingRemoteWrites: 3,
+      dataVersion: dataVersion + 1,
+    });
+    expect(drive.readJson<VFSManifest>('manifest.json')?.nodes).toEqual({});
+    expect(drive.uploadCallCount).toBe(uploadsBefore);
+    expect(
+      JSON.parse(
+        getRepositoryTestStorage().readText(`${root}/outbox.json`) ?? '[]',
+      ),
+    ).toHaveLength(3);
+
+    const reopened = new CachedRepository(
+      createRepository(),
+      new LocalRepository(root),
+      `${root}/outbox.json`,
+    );
+    await reopened.initialize();
+    expect((await reopened.listDirectory(null))[1]).toHaveLength(1);
+    await reopened.flushPending();
+    expect(
+      drive.readJson<VFSManifest>('manifest.json')?.nodes[version!.id]?.system,
+    ).toMatchObject({ kind: 'file-version', sourceFileId: noteId });
+    expect(drive.uploadCallCount - uploadsBefore).toBe(3);
+    expect(readNoteText(drive.readBytes(`files/${noteId}.myelin`))).toBe(
+      'surviving content',
+    );
+    expect(await reopened.recoverManifest()).toEqual({
+      notesRecovered: 0,
+      versionsRecovered: 0,
+    });
+    expect(reopened.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+  });
+
+  it('infers legacy snapshots by Yjs lineage and keeps independent and ambiguous files visible', async () => {
+    const drive = getRepositoryTestGoogleDriveApi();
+    const doc = new Y.Doc();
+    doc.getText('content').insert(0, 'old');
+    const old = Y.encodeStateAsUpdate(doc);
+    doc.getText('content').insert(3, ' current');
+    const current = Y.encodeStateAsUpdate(doc);
+    doc.destroy();
+    drive.writeBytes('files/current.myelin', current, {
+      createdTime: '2026-09-01T00:00:00Z',
+    });
+    drive.writeBytes('files/history.myelin', old, {
+      createdTime: '2026-09-02T00:00:00Z',
+    });
+    drive.writeBytes('files/history-2.myelin', old, {
+      createdTime: '2026-09-03T00:00:00Z',
+    });
+    drive.writeBytes(
+      'files/independent.myelin',
+      createNoteState('old').update,
+      { createdTime: '2026-09-04T00:00:00Z' },
+    );
+    drive.writeBytes('files/copy.myelin', current, {
+      createdTime: '2026-09-05T00:00:00Z',
+      appProperties: { myelinKind: 'note' },
+    });
+    drive.writeBytes('files/no-date.myelin', old, { createdTime: 'invalid' });
+    drive.writeBytes('files/orphan-history.myelin', old, {
+      appProperties: {
+        myelinKind: 'file-version',
+        myelinSourceFileId: 'missing',
+      },
+    });
+    drive.writeBytes('files/image.png', new Uint8Array([1, 2, 3]));
+    const repository = new CachedRepository(
+      createRepository(),
+      new LocalRepository('repositories/legacy-recovery'),
+      'repositories/legacy-recovery/outbox.json',
+    );
+    await repository.initialize();
+
+    expect(await repository.recoverManifest()).toEqual({
+      notesRecovered: 5,
+      versionsRecovered: 2,
+    });
+    expect(
+      (await repository.listDirectory(null))[1].map((node) => node.id).sort(),
+    ).toEqual(['copy', 'current', 'independent', 'no-date', 'orphan-history']);
+    expect(
+      (await repository.listFileVersions('current')).map((node) => node.id),
+    ).toEqual(['history-2', 'history']);
+    expect(await repository.getNode('image')).toBeNull();
+    expect(readNoteText(await repository.readFileBytes('history'))).toBe('old');
+  });
+
+  it('preserves existing metadata and pending edits and deletes during recovery', async () => {
+    const remote = createRepository();
+    await remote.initialize();
+    const folderId = await remote.createFolder('Folder', null);
+    const noteId = await remote.createFile(
+      'Existing',
+      'mcanvas',
+      folderId,
+      createNoteState('existing').update,
+    );
+    const deletedId = await remote.createFile(
+      'Deleted',
+      'mcanvas',
+      null,
+      createNoteState('delete me').update,
+    );
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/recovery-pending'),
+      'repositories/recovery-pending/outbox.json',
+    );
+    await repository.initialize();
+    await repository.renameNode(noteId, 'Renamed locally');
+    await repository.setTags(noteId, ['keep']);
+    await repository.writeFileBytes(
+      noteId,
+      createNoteState('local edit').update,
+    );
+    await repository.deleteNode(deletedId);
+    getRepositoryTestGoogleDriveApi().writeBytes(
+      'files/recovered.myelin',
+      createNoteState('recovered').update,
+    );
+
+    expect(await repository.recoverManifest()).toEqual({
+      notesRecovered: 1,
+      versionsRecovered: 0,
+    });
+    expect(await repository.getNode(noteId)).toMatchObject({
+      name: 'Renamed locally',
+      parentId: folderId,
+      tags: ['keep'],
+    });
+    expect(readNoteText(await repository.readFileBytes(noteId))).toBe(
+      'local edit',
+    );
+    expect(await repository.getNode(deletedId)).toBeNull();
+    await repository.flushPending();
+    expect(
+      getRepositoryTestGoogleDriveApi().readJson<VFSManifest>('manifest.json')
+        ?.nodes[noteId],
+    ).toMatchObject({ name: 'Renamed locally', tags: ['keep'] });
+    expect(
+      getRepositoryTestGoogleDriveApi().readBytes(`files/${deletedId}.myelin`),
+    ).toBeNull();
+  });
+
+  it('leaves manifests untouched if a stored note cannot be decoded', async () => {
+    const drive = getRepositoryTestGoogleDriveApi();
+    drive.writeBytes('files/valid.myelin', createNoteState('valid').update);
+    drive.writeBytes('files/invalid.myelin', new Uint8Array([255]));
+    const cache = new LocalRepository('repositories/recovery-invalid');
+    const repository = new CachedRepository(
+      createRepository(),
+      cache,
+      'repositories/recovery-invalid/outbox.json',
+    );
+    await repository.initialize();
+    const uploadsBefore = drive.uploadCallCount;
+
+    await expect(repository.recoverManifest()).rejects.toThrow(
+      'Invalid note file: invalid.myelin',
+    );
+    expect((await cache.exportManifest()).nodes).toEqual({});
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+    expect(drive.uploadCallCount).toBe(uploadsBefore);
+  });
+
+  it('uploads recovered entries on the normal background sync timer', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('window', { setInterval, clearInterval });
+    const drive = getRepositoryTestGoogleDriveApi();
+    drive.writeBytes(
+      'files/recovered.myelin',
+      createNoteState('background').update,
+    );
+    const repository = new CachedRepository(
+      createRepository(),
+      new LocalRepository('repositories/recovery-background'),
+      'repositories/recovery-background/outbox.json',
+    );
+    try {
+      await repository.initialize();
+      await repository.recoverManifest();
+      expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
+      expect(
+        drive.readJson<VFSManifest>('manifest.json')?.nodes.recovered,
+      ).toMatchObject({ type: 'file', fileType: 'mcanvas' });
+    } finally {
+      await repository.dispose();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('retries a manifest write that lost a race, keeping both changes', async () => {

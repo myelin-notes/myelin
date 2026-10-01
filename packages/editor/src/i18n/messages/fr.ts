@@ -457,6 +457,17 @@ const fr: typeof en = {
         connected: 'Connecté',
         disconnected: 'Non connecté',
       },
+      recovery: {
+        title: 'Récupérer la bibliothèque',
+        description:
+          'Recherche les notes manquantes dans les fichiers .myelin de Google Drive. Les notes existantes sont conservées. Les notes récupérées portent leur identifiant comme nom ; les dossiers et étiquettes d’origine ne peuvent pas être restaurés.',
+        button: 'Récupérer les notes',
+        recovering: 'Récupération des notes…',
+        succeeded: (notes: number, versions: number) =>
+          `${notes} notes et ${versions} versions de l’historique récupérées. Les modifications seront synchronisées automatiquement.`,
+        empty: 'Aucune note manquante trouvée.',
+        failed: 'Impossible de récupérer les notes',
+      },
       sync: {
         title: 'Synchronisation du dépôt',
         queuedChanges: 'Modifications en attente',

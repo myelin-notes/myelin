@@ -451,6 +451,17 @@ const es: typeof en = {
         connected: 'Conectado',
         disconnected: 'Desconectado',
       },
+      recovery: {
+        title: 'Recuperar biblioteca',
+        description:
+          'Busca notas perdidas en los archivos .myelin de Google Drive. Se conservan las notas existentes. Las notas recuperadas usan sus ID como nombres; las carpetas y etiquetas originales no se pueden restaurar.',
+        button: 'Recuperar notas',
+        recovering: 'Recuperando notas…',
+        succeeded: (notes: number, versions: number) =>
+          `Se recuperaron ${notes} notas y ${versions} versiones del historial. Los cambios se sincronizarán automáticamente.`,
+        empty: 'No se encontraron notas perdidas.',
+        failed: 'No se pudieron recuperar las notas',
+      },
       sync: {
         title: 'Sincronización del repositorio',
         queuedChanges: 'Cambios en cola',

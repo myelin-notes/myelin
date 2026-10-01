@@ -430,6 +430,17 @@ const zhHans: typeof en = {
         connected: '已连接',
         disconnected: '未连接',
       },
+      recovery: {
+        title: '恢复笔记库',
+        description:
+          '从 Google Drive 的 .myelin 文件中查找丢失的笔记。现有笔记会保留。恢复的笔记以文件 ID 命名；无法还原原有文件夹和标签。',
+        button: '恢复笔记',
+        recovering: '正在恢复笔记…',
+        succeeded: (notes: number, versions: number) =>
+          `已恢复 ${notes} 篇笔记和 ${versions} 个历史版本。更改将自动同步。`,
+        empty: '未发现丢失的笔记。',
+        failed: '无法恢复笔记',
+      },
       sync: {
         title: '仓库同步',
         queuedChanges: '排队中的更改',

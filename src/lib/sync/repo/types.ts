@@ -23,7 +23,14 @@ export interface OpenSessionOptions {
   skipRemotePull?: boolean;
 }
 
+export interface ManifestRecoveryResult {
+  notesRecovered: number;
+  versionsRecovered: number;
+}
+
 export interface Repository extends EditorRepository {
+  /** Adds missing stored notes locally and queues their manifest entries for sync. */
+  recoverManifest?(): Promise<ManifestRecoveryResult>;
   getNoteIndexSource(): object;
   listNoteIndexItems(): Promise<NoteIndexItem[]>;
   openSession(

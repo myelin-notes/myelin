@@ -20,8 +20,10 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from '../config';
+import { GoogleDriveRepository } from '../google-drive';
 import { GoogleDriveRequestError } from '../google-drive/error';
 import type { LocalRepository } from '../local';
+import { recoverManifestNodes } from '../manifest-recovery';
 import {
   addChild,
   computeRevision,
@@ -41,6 +43,7 @@ import type {
   CustomColorTool,
   FileType,
   FileVersion,
+  ManifestRecoveryResult,
   NodeSearchResult,
   NoteBacklink,
   OpenSessionOptions,
@@ -395,6 +398,56 @@ export class CachedRepository
         enqueueUpsertManifestNode(ops, nodeId);
       },
     );
+  }
+
+  async recoverManifest(): Promise<ManifestRecoveryResult> {
+    const remote = this.remote;
+    if (!(remote instanceof GoogleDriveRepository)) {
+      throw new Error('Manifest recovery is only available for Google Drive.');
+    }
+
+    return this.batchManifestWrites(async () => {
+      const notes = await remote.readRecoverableNotes();
+      if (notes.length === 0) {
+        return { notesRecovered: 0, versionsRecovered: 0 };
+      }
+
+      const recovered = await this.writeLocalAndQueue(
+        async () => {
+          await this.outbox.load();
+          if (this.outbox.recoveryError) {
+            throw this.outbox.recoveryError;
+          }
+          const deletedIds = new Set(
+            this.outbox
+              .snapshotOps()
+              .flatMap((op) =>
+                op.kind === 'delete-manifest-node' ? op.deletedFileIds : [],
+              ),
+          );
+          const added = await this.cache.applyManifestMutation(
+            'Recover stored notes',
+            (manifest) => recoverManifestNodes(manifest, notes, deletedIds),
+          );
+          const addedIds = new Set(added.nodeIds);
+          for (const note of notes) {
+            if (addedIds.has(note.id)) {
+              await this.cache.writeFileBytes(note.id, note.bytes);
+            }
+          }
+          return added;
+        },
+        (ops, result) => {
+          for (const id of result.nodeIds) {
+            enqueueUpsertManifestNode(ops, id);
+          }
+        },
+      );
+      return {
+        notesRecovered: recovered.notesRecovered,
+        versionsRecovered: recovered.versionsRecovered,
+      };
+    });
   }
 
   async createFile(
