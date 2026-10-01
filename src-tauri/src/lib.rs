@@ -110,7 +110,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
-            onenote_import::parse_onenote,
+            onenote_import::scan_onenote,
             import_files::import_file_name,
         ]);
 

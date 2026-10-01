@@ -1,4 +1,5 @@
 mod document;
+mod onenote;
 mod references;
 mod remote;
 mod store;
@@ -92,6 +93,21 @@ pub enum RepositoryOperation {
         bytes_base64: String,
         replace: bool,
         overwrite_remote: bool,
+    },
+    ImportOneNote {
+        path: tauri_plugin_fs::FilePath,
+        parent_id: Option<String>,
+        root_name: String,
+        fallback_title: String,
+        progress: tauri::ipc::JavaScriptChannelId,
+    },
+    #[serde(skip)]
+    ImportedOneNote {
+        notebook: crate::onenote_import::ImportedNotebook,
+        parent_id: Option<String>,
+        root_name: String,
+        fallback_title: String,
+        progress: tauri::ipc::Channel<Value>,
     },
     ImportFile {
         node: Value,
@@ -542,7 +558,25 @@ impl RepositoryOperation {
             Self::ImportedFile { node, bytes } => {
                 return write_file(state, node, bytes, true, false, Vec::new());
             }
-            Self::ImportFile { .. } => return Err("Import requires an application handle".into()),
+            Self::ImportedOneNote {
+                notebook,
+                parent_id,
+                root_name,
+                fallback_title,
+                progress,
+            } => {
+                return onenote::import(
+                    state,
+                    notebook,
+                    parent_id,
+                    root_name,
+                    &fallback_title,
+                    &progress,
+                );
+            }
+            Self::ImportFile { .. } | Self::ImportOneNote { .. } => {
+                return Err("Import requires an application handle".into())
+            }
             Self::RenameReferences {
                 source_ids,
                 target_id,
@@ -851,6 +885,7 @@ pub async fn repository_open(
 #[tauri::command]
 pub async fn repository_operation(
     app: AppHandle,
+    webview: tauri::Webview,
     manager: tauri::State<'_, RepositoryManager>,
     handle: String,
     operation: RepositoryOperation,
@@ -911,6 +946,27 @@ pub async fn repository_operation(
         return Ok(Value::Null);
     };
     let operation = match operation {
+        RepositoryOperation::ImportOneNote {
+            path,
+            parent_id,
+            root_name,
+            fallback_title,
+            progress,
+        } => {
+            let app = app.clone();
+            let notebook = tokio::task::spawn_blocking(move || {
+                crate::onenote_import::read_notebook(&app, path)
+            })
+            .await
+            .map_err(|error| error.to_string())??;
+            RepositoryOperation::ImportedOneNote {
+                notebook,
+                parent_id,
+                root_name,
+                fallback_title,
+                progress: progress.channel_on(webview),
+            }
+        }
         RepositoryOperation::ImportFile { node, source } => {
             let app = app.clone();
             let bytes = tokio::task::spawn_blocking(move || source.read(&app))

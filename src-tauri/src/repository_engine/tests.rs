@@ -1630,3 +1630,230 @@ async fn native_chunk_transfers_reject_bad_chunks_and_commit_only_complete_file_
         .is_err());
     assert_eq!(read(&engine, "image").await, bytes);
 }
+
+#[tokio::test]
+async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
+    use crate::onenote_import::{
+        ImportedElement, ImportedNotebook, ImportedPage, ImportedSection, ImportedStroke,
+    };
+    use yrs::types::ToJson;
+
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let mut png = Vec::new();
+    {
+        let mut encoder = png::Encoder::new(&mut png, 2, 1);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder
+            .write_header()
+            .unwrap()
+            .write_image_data(&[255, 0, 0, 255, 0, 255, 0, 255])
+            .unwrap();
+    }
+    let notebook = ImportedNotebook {
+        sections: vec![ImportedSection {
+            folder_path: String::new(),
+            name: "Section".into(),
+            pages: vec![
+                ImportedPage {
+                    title: Some(" Page ".into()),
+                    elements: vec![
+                        ImportedElement::Text {
+                            x: 10.0,
+                            y: 20.0,
+                            width: None,
+                            text: "Hello".into(),
+                            font_size: 16.0,
+                            font_family: None,
+                            color: "#123456".into(),
+                        },
+                        ImportedElement::Ink {
+                            strokes: vec![ImportedStroke {
+                                points: vec![1.0, 2.0, 3.0, 4.0],
+                                color: "#654321".into(),
+                                size: 2.0,
+                            }],
+                        },
+                        ImportedElement::Image {
+                            x: 5.0,
+                            y: 6.0,
+                            width: Some(10.0),
+                            height: None,
+                            data: png.clone(),
+                        },
+                        ImportedElement::Image {
+                            x: 0.0,
+                            y: 0.0,
+                            width: None,
+                            height: None,
+                            data: vec![1, 2, 3],
+                        },
+                    ],
+                },
+                ImportedPage {
+                    title: Some("Page".into()),
+                    elements: vec![],
+                },
+                ImportedPage {
+                    title: None,
+                    elements: vec![],
+                },
+            ],
+        }],
+    };
+    let progress = Arc::new(Mutex::new(Vec::new()));
+    let captured = progress.clone();
+    let (result, changes) = engine
+        .operate(RepositoryOperation::ImportedOneNote {
+            notebook,
+            parent_id: None,
+            root_name: "Notebook".into(),
+            fallback_title: "Untitled".into(),
+            progress: tauri::ipc::Channel::new(move |body| {
+                let tauri::ipc::InvokeResponseBody::Json(body) = body else {
+                    panic!("expected JSON progress")
+                };
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str::<Value>(&body).unwrap());
+                Ok(())
+            }),
+        })
+        .await
+        .unwrap();
+    assert_eq!(result["pagesImported"], 3);
+    assert_eq!(result["skippedPages"], 0);
+    assert_eq!(changes.changed.len(), 4);
+    assert!(changes.wake_remote);
+    assert_eq!(
+        *progress.lock().unwrap(),
+        vec![
+            json!({"current": 1, "total": 3, "fileName": "Page"}),
+            json!({"current": 2, "total": 3, "fileName": "Page"}),
+            json!({"current": 3, "total": 3, "fileName": "Untitled 3"}),
+        ]
+    );
+
+    let mut reopened = Store::open(directory.0.join("data"), true).unwrap();
+    let nodes = reopened.manifest["nodes"].as_object().unwrap();
+    let mut names = nodes
+        .values()
+        .filter(|node| node["type"] == "file")
+        .map(|node| node["name"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["Page", "Page 1", "Untitled 3"]);
+    assert!(nodes
+        .values()
+        .filter(|node| node["type"] == "file")
+        .all(|node| node["parentId"] == result["rootFolderId"]));
+    let id = nodes.values().find(|node| node["name"] == "Page").unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let doc = reopened.doc(&id).unwrap();
+    let txn = doc.transact();
+    let elements = txn.get_array("elements").unwrap();
+    assert_eq!(elements.len(&txn), 3);
+    let maps = elements
+        .iter(&txn)
+        .map(|value| match value {
+            Out::YMap(map) => map,
+            _ => panic!("element must be a Y.Map"),
+        })
+        .collect::<Vec<_>>();
+    let text = maps[0].to_json(&txn);
+    assert_eq!(text, Any::from_json(&json!({
+        "type": 1, "uuid": maps[0].get(&txn, "uuid").unwrap().to_json(&txn),
+        "offsetX": 170, "offsetY": 100, "scaleX": 1, "scaleY": 1,
+        "text": "Hello", "color": "#123456", "fontSize": 16, "fontFamily": "sans-serif", "boxWidth": 400, "boxHeight": 0
+    }).to_string()).unwrap());
+    assert_eq!(
+        maps[1].get(&txn, "points"),
+        Some(Out::Any(Any::from(vec![
+            161.0, 82.0, 0.0, 163.0, 84.0, 0.0
+        ])))
+    );
+    assert_eq!(
+        maps[1].get(&txn, "hasPressure"),
+        Some(Out::Any(Any::Bool(false)))
+    );
+    assert_eq!(
+        maps[2].get(&txn, "imageData"),
+        Some(Out::Any(Any::Buffer(png.into())))
+    );
+    for (key, expected) in [
+        ("naturalWidth", 2.0),
+        ("naturalHeight", 1.0),
+        ("scaleX", 5.0),
+        ("scaleY", 1.0),
+        ("offsetX", 165.0),
+        ("offsetY", 86.0),
+        ("cropW", 2.0),
+        ("cropH", 1.0),
+    ] {
+        assert_eq!(
+            maps[2].get(&txn, key),
+            Some(Out::Any(Any::Number(expected)))
+        );
+    }
+    drop(txn);
+    assert_eq!(
+        reopened
+            .outbox
+            .iter()
+            .filter(|op| op["kind"] == "push-note")
+            .count(),
+        3
+    );
+}
+
+#[tokio::test]
+async fn onenote_import_preserves_shared_section_groups_and_rejects_missing_destinations() {
+    use crate::onenote_import::{ImportedNotebook, ImportedPage, ImportedSection};
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    let notebook = || ImportedNotebook {
+        sections: ["A", "B"]
+            .into_iter()
+            .map(|name| ImportedSection {
+                folder_path: "Group/Nested".into(),
+                name: name.into(),
+                pages: vec![ImportedPage {
+                    title: Some("Page".into()),
+                    elements: vec![],
+                }],
+            })
+            .collect(),
+    };
+    let operation = |parent_id| RepositoryOperation::ImportedOneNote {
+        notebook: notebook(),
+        parent_id,
+        root_name: "Notebook".into(),
+        fallback_title: "Untitled".into(),
+        progress: tauri::ipc::Channel::new(|_| Ok(())),
+    };
+    assert!(engine
+        .operate(operation(Some("missing".into())))
+        .await
+        .is_err());
+    let (result, _) = engine.operate(operation(None)).await.unwrap();
+    let reopened = Store::open(directory.0.join("data"), false).unwrap();
+    let nodes = reopened.manifest["nodes"].as_object().unwrap();
+    assert_eq!(nodes.len(), 7);
+    let named = |name: &str| nodes.values().find(|node| node["name"] == name).unwrap();
+    assert_eq!(named("Group")["parentId"], result["rootFolderId"]);
+    assert_eq!(named("Nested")["parentId"], named("Group")["id"]);
+    for name in ["A", "B"] {
+        assert_eq!(named(name)["parentId"], named("Nested")["id"]);
+        assert_eq!(
+            nodes
+                .values()
+                .filter(|node| node["parentId"] == named(name)["id"] && node["type"] == "file")
+                .count(),
+            1
+        );
+    }
+}

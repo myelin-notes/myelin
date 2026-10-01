@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { createCanvasFile } from '@/pages/library/import/canvas-file';
 import { importObsidianVault } from '@/pages/library/import/obsidian-vault';
 import { filesProvider } from '@/pages/library/import/providers/files';
+import { onenoteProvider } from '@/pages/library/import/providers/onenote';
 import { importWorkspaceJson } from '@/pages/library/import/workspace-json';
 import type { NativeDocumentChange } from '../native-document-target';
 import { NativeRepository } from './native';
@@ -19,6 +20,9 @@ const { listeners } = vi.hoisted(() => ({
 }));
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+  Channel: class {
+    onmessage = (_value: unknown) => {};
+  },
   convertFileSrc: (path: string) => path,
 }));
 vi.mock('tauri-plugin-scoped-storage-api', () => ({
@@ -680,5 +684,65 @@ it('saves a JS-generated canvas import through bounded native document transfers
   expect(native.operations.some((op) => op.kind === 'update-document')).toBe(
     false,
   );
+  await repository.dispose();
+});
+
+it('imports OneNote entirely through Rust while keeping preview and progress in JS', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  const result = {
+    rootFolderId: 'imported-root',
+    pagesImported: 2,
+    skippedPages: 0,
+  };
+  let imported: Record<string, unknown> | undefined;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'scan_onenote') {
+      expect(args).toEqual({ path: '/picked/Notebook.onepkg' });
+      return { pages: 2, sections: 1 };
+    }
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (command === 'repository_operation' && op?.kind === 'import-one-note') {
+      expect(args).toMatchObject({ handle: 'native-handle' });
+      imported = op;
+      (op.progress as { onmessage(value: unknown): void }).onmessage({
+        current: 1,
+        total: 2,
+        fileName: 'Page',
+      });
+      return result;
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  const job = onenoteProvider.createJob({
+    selection: { kind: 'file', path: '/picked/Notebook.onepkg' },
+    repository,
+    parentId: null,
+    strings: en,
+  });
+  const preview = await job.scan();
+  expect(preview.name).toBe('Notebook');
+  expect(preview.lines.map((line) => line.text)).toEqual([
+    en.library.importSources.onenote.pages(2),
+    en.library.importSources.onenote.sections(1),
+  ]);
+  const onProgress = vi.fn();
+  const summary = await job.run({ conflictResolution: 'rename', onProgress });
+  expect(imported).toMatchObject({
+    kind: 'import-one-note',
+    path: '/picked/Notebook.onepkg',
+    parentId: null,
+    rootName: 'Notebook',
+    fallbackTitle: en.library.createNew.untitledCanvas,
+  });
+  expect(onProgress).toHaveBeenCalledWith({
+    current: 1,
+    total: 2,
+    fileName: 'Page',
+  });
+  expect(summary.focusNodeId).toBe(result.rootFolderId);
+  expect(summary.stats).toEqual({ count: 2, skipped: 0 });
+  expect(native.operations.map((op) => op.kind)).toEqual(['manifest']);
   await repository.dispose();
 });
