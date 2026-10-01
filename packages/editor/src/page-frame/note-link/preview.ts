@@ -1,5 +1,5 @@
 import type { Repository, VFSNodeId } from '../../sync/repo/types';
-import type { YjsSyncTarget } from '../../sync/types';
+import type { DocumentSource } from '../../sync/types';
 import { extractCanvasPreviewText } from '../preview-text';
 import { isCanvasNote, resolveNoteLinkIdByTitle } from './resolution';
 
@@ -18,7 +18,7 @@ export type NoteLinkPreviewSource = Pick<
   Repository,
   'getNode' | 'getNodesByName' | 'getFolderChain'
 > &
-  Pick<YjsSyncTarget, 'loadDocument'>;
+  DocumentSource;
 
 function isAborted(signal?: AbortSignal): boolean {
   return signal?.aborted === true;

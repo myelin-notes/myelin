@@ -5,7 +5,7 @@ import {
   PAGE_WIDTH,
 } from '@myelin/editor/elements/page-frame-constants';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { NoteSession, Repository } from '@/lib/sync';
+import type { NativeRepository, NoteSession } from '@/lib/sync';
 import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from './pdf';
 
 vi.mock('@myelin/editor/pdf-renderer', () => ({
@@ -23,7 +23,7 @@ function createRepository(session: Partial<NoteSession>) {
     createFile: vi.fn(async () => 'canvas-1'),
     openSession: vi.fn(async () => session as NoteSession),
     deleteNode: vi.fn(async () => {}),
-  } as unknown as Repository;
+  } as unknown as NativeRepository;
 }
 
 describe('PDF library import', () => {
@@ -72,9 +72,7 @@ describe('PDF library import', () => {
       'mcanvas',
       'folder-1',
     );
-    expect(repository.openSession).toHaveBeenCalledWith('canvas-1', {
-      skipRemotePull: true,
-    });
+    expect(repository.openSession).toHaveBeenCalledWith('canvas-1');
     expect(session.save).toHaveBeenCalledTimes(1);
     expect(session.close).toHaveBeenCalledTimes(1);
 

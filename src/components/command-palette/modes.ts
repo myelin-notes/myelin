@@ -3,7 +3,7 @@ import { FileText } from 'lucide-react';
 import type { Messages } from '@myelin/editor/i18n';
 import { Logger } from '@myelin/shared/logger';
 import { openNote } from '@/lib/note/navigation';
-import type { Repository, VFSFileNode, VFSNode } from '@/lib/sync';
+import type { NativeRepository, VFSFileNode, VFSNode } from '@/lib/sync';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import type { TabStateController } from '@/lib/tabs/controller';
 import type { CommandPaletteItem, CommandPaletteModeState } from './types';
@@ -65,7 +65,7 @@ export function useNotesMode({
   closePalette: () => void;
   tabController: TabStateController;
   query: string;
-  repository: Repository;
+  repository: NativeRepository;
   strings: Messages;
 }): CommandPaletteModeState {
   const [noteResults, setNoteResults] = useState<NoteEntry[]>([]);

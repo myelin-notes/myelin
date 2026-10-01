@@ -1,4 +1,5 @@
-import type { ActiveRepository, RepositoryConfig } from './config';
+import type { RepositoryConfig } from './config';
+import type { NativeRepository } from './native';
 import {
   isRepositoryFullyConfigured,
   RepositorySetupIncompleteError,
@@ -7,9 +8,9 @@ import { createRepositoryFromConfig } from './repository-backends';
 import type { CreateFileOptions, FileType } from './types';
 
 function guardNoteCreation(
-  repository: ActiveRepository,
+  repository: NativeRepository,
   config: RepositoryConfig,
-): ActiveRepository {
+): NativeRepository {
   return new Proxy(repository, {
     get(target, property, receiver) {
       if (property === 'createFile') {
@@ -34,9 +35,9 @@ function guardNoteCreation(
       const value = Reflect.get(target, property, receiver);
       return typeof value === 'function' ? value.bind(target) : value;
     },
-  }) as ActiveRepository;
+  }) as NativeRepository;
 }
 
-export function createRepository(config: RepositoryConfig): ActiveRepository {
+export function createRepository(config: RepositoryConfig): NativeRepository {
   return guardNoteCreation(createRepositoryFromConfig(config), config);
 }

@@ -5,15 +5,15 @@ import {
   PAGE_WIDTH,
 } from '@myelin/editor/elements/page-frame-constants';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createBlankCanvasFile } from './create';
 
 describe('createBlankCanvasFile', () => {
   it('creates a canvas containing its initial page frame', async () => {
-    const createFile = vi.fn<Repository['createFile']>(
+    const createFile = vi.fn<NativeRepository['createFile']>(
       async () => 'note-1' as VFSNodeId,
     );
-    const repository = { createFile } as unknown as Repository;
+    const repository = { createFile } as unknown as NativeRepository;
 
     const id = await createBlankCanvasFile(
       repository,
@@ -50,10 +50,10 @@ describe('createBlankCanvasFile', () => {
   });
 
   it('uses an initial page-frame name when one is provided', async () => {
-    const createFile = vi.fn<Repository['createFile']>(
+    const createFile = vi.fn<NativeRepository['createFile']>(
       async () => 'note-1' as VFSNodeId,
     );
-    const repository = { createFile } as unknown as Repository;
+    const repository = { createFile } as unknown as NativeRepository;
 
     await createBlankCanvasFile(repository, 'Alpha Note', null, 'Details');
 

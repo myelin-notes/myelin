@@ -1,4 +1,4 @@
-import type { YjsSyncTarget } from '../types';
+import type { DocumentSource } from '../types';
 import type { Repository } from './types';
 
 export type RepositoryConfig =
@@ -47,11 +47,9 @@ export interface RepositoryStatusSource {
 }
 
 /** A repository that can be read and have its note documents loaded. */
-export type ReadableRepository = Repository &
-  Pick<YjsSyncTarget, 'loadDocument'>;
+export type ReadableRepository = Repository & DocumentSource;
 
-export type ActiveRepository = Repository &
-  YjsSyncTarget &
+export type ActiveRepository = ReadableRepository &
   RepositoryLifecycle &
   RepositoryStatusSource;
 

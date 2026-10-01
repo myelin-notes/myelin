@@ -35,11 +35,6 @@ export interface VFSManifest {
   penPresets: PenPreset[];
 }
 
-export interface RepositorySnapshot {
-  manifest: VFSManifest;
-  notes: Record<VFSNodeId, Uint8Array | null>;
-}
-
 export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
   'pen',
   'highlighter',
@@ -50,8 +45,6 @@ export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
 // 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
 // and the adjacency index is derived at runtime by `./child-index`.
 export const CURRENT_MANIFEST_VERSION = 3;
-export const MANIFEST_PATH = 'manifest.json';
-export const FILES_DIR = 'files';
 export const FILE_EXT = '.myelin';
 export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;
 export const VERSION_HISTORY_MAX_PER_FILE = 32;
@@ -695,16 +688,6 @@ export function getStoredFileName(
   return `${node.id}.${node.fileType}`;
 }
 
-export function getStoredFilePath(
-  node: Pick<VFSFileNode, 'id' | 'fileType'>,
-): string {
-  return `${FILES_DIR}/${getStoredFileName(node)}`;
-}
-
 export function getNoteFileName(nodeId: VFSNodeId): string {
   return `${nodeId}${FILE_EXT}`;
-}
-
-export function getNotePath(nodeId: VFSNodeId): string {
-  return `${FILES_DIR}/${getNoteFileName(nodeId)}`;
 }

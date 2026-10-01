@@ -1,16 +1,18 @@
 use tauri::Manager;
 
-mod code_runner;
 mod clipboard;
+mod code_runner;
 mod error_report;
 mod github_push;
+mod import_files;
 mod iroh_transport;
-mod local_file_write;
-mod note_text_index;
 mod mcp_server;
+mod note_text_index;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
+mod repository_bootstrap;
+mod repository_engine;
 mod transcription;
 mod workspace_export;
 
@@ -72,6 +74,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_pencil::init())
         .manage(iroh_transport::IrohState::new())
+        .manage(repository_engine::RepositoryManager::default())
         .manage(mcp_server::McpServerState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
@@ -81,7 +84,11 @@ pub fn run() {
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
-            local_file_write::write_local_file_chunk,
+            repository_engine::repository_open,
+            repository_engine::repository_operation,
+            repository_engine::repository_sync,
+            repository_engine::repository_release,
+            repository_engine::repository_auth_response,
             note_text_index::index_note_text,
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
@@ -103,8 +110,8 @@ pub fn run() {
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
-            onenote_import::parse_onenote,
-            github_push::github_push_batch,
+            onenote_import::scan_onenote,
+            import_files::import_file_name,
         ]);
 
     #[cfg(not(target_os = "ios"))]

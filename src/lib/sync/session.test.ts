@@ -1,216 +1,73 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
-import type {
-  VFSNodeId,
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-} from '@myelin/editor/sync/types';
 import {
   REPOSITORY_SYNC_ORIGIN,
   YDocManager,
 } from '@myelin/editor/ydoc-manager';
+import type {
+  NativeDocumentSnapshot,
+  NativeDocumentTarget,
+  NativeDocumentWriteResult,
+} from './native-document-target';
 import { NoteSession } from './session';
 
-function createEmptySnapshot(doc: Y.Doc = new Y.Doc()): YjsSyncSnapshot {
-  return {
-    update: null,
+function createSyncTarget(doc = new Y.Doc()) {
+  const snapshot = (): NativeDocumentSnapshot => ({
+    update: Y.encodeStateAsUpdate(doc),
     stateVector: Y.encodeStateVector(doc),
-    revision: null,
-  };
+    revision: 'test',
+    generation: 'original',
+  });
+  const persistDocumentUpdate = vi.fn(
+    async (
+      _id: string,
+      update: Uint8Array,
+    ): Promise<NativeDocumentWriteResult> => {
+      Y.applyUpdate(doc, update);
+      return {
+        ...snapshot(),
+        accepted: true,
+        changed: true,
+      };
+    },
+  );
+  const target = {
+    nativeRepositoryHandle: 'test',
+    loadDocument: async () => snapshot(),
+    pullUpdates: async () => snapshot(),
+    persistDocumentUpdate,
+    flushDocument: vi.fn(async () => {}),
+    subscribeDocument: async () => async () => {},
+  } satisfies NativeDocumentTarget;
+  return { doc, target };
 }
 
-function createSyncTarget() {
-  return {
-    loadDocument: async (): Promise<YjsSyncSnapshot> => createEmptySnapshot(),
-    pullUpdates: async (): Promise<YjsSyncSnapshot> => createEmptySnapshot(),
-    pushUpdates: async (
-      _nodeId: VFSNodeId,
-      _update: Uint8Array,
-      _options: YjsSyncPushOptions,
-    ): Promise<YjsSyncPushResult> => ({
-      accepted: true,
-      changed: true,
-      remoteUpdate: null,
-      ...createEmptySnapshot(),
-    }),
-  };
-}
-
-describe('NoteSession local change listeners', () => {
-  it('fires for local edits and ignores repository-applied updates', () => {
-    const ydoc = new YDocManager();
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      createSyncTarget(),
-      null,
-      ydoc.encodeStateVector(),
-    );
+describe('NoteSession', () => {
+  it('fires local change listeners for edits and ignores repository updates', async () => {
+    const native = createSyncTarget();
+    const session = await NoteSession.open('note', native.target);
     const listener = vi.fn();
     const unsubscribe = session.subscribeLocalChanges(listener);
-
-    ydoc.transact(() => {
-      ydoc.doc.getMap('test').set('value', 1);
-    });
-
+    session.ydoc.doc.getMap('test').set('value', 1);
     const remoteDoc = new Y.Doc();
-    remoteDoc.getMap('test').set('value', 2);
+    remoteDoc.getMap('remote').set('value', 2);
     session.applyUpdate(
       Y.encodeStateAsUpdate(remoteDoc),
       REPOSITORY_SYNC_ORIGIN,
     );
-
-    expect(listener).toHaveBeenCalledTimes(1);
-
+    expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
+    session.ydoc.doc.getMap('test').set('value', 3);
+    expect(listener).toHaveBeenCalledOnce();
+    await session.close();
+    remoteDoc.destroy();
+    native.doc.destroy();
   });
 
-  it('treats raw Y.Doc edits as unsynced changes and saves them', async () => {
+  it('persists delete-only canvas edits and marks them saved after checkpointing', async () => {
     const ydoc = new YDocManager();
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >(async (_nodeId, _update, _options) => ({
-      accepted: true,
-      changed: true,
-      remoteUpdate: null,
-      update: ydoc.encodeState(),
-      stateVector: ydoc.encodeStateVector(),
-      revision: 'rev-1',
-    }));
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-
-    session.ydoc.doc.getText('content').insert(0, 'hello');
-
-    expect(session.hasUnsyncedChanges()).toBe(true);
-
-    await session.save();
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
-    expect(session.hasUnsyncedChanges()).toBe(false);
-  });
-
-  it('returns false when the repository accepts a no-op push', async () => {
-    const ydoc = new YDocManager();
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >(async (_nodeId, _update, _options) => ({
-      accepted: true,
-      remoteUpdate: null,
-      update: ydoc.encodeState(),
-      stateVector: ydoc.encodeStateVector(),
-      revision: 'rev-1',
-      changed: false,
-    }));
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-
-    session.ydoc.doc.getText('content').insert(0, 'hello');
-
-    await expect(session.save()).resolves.toBe(false);
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
-    expect(session.hasUnsyncedChanges()).toBe(false);
-  });
-
-  it('does not enter pushing phase when saving with no unsynced changes', async () => {
-    const ydoc = new YDocManager();
-    const pushUpdates =
-      vi.fn<
-        (
-          nodeId: VFSNodeId,
-          update: Uint8Array,
-          options: YjsSyncPushOptions,
-        ) => Promise<YjsSyncPushResult>
-      >();
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-    const phases: string[] = [];
-    const unsubscribe = session.subscribeStatus((status) => {
-      phases.push(status.phase);
-    });
-
-    await session.save();
-
-    expect(pushUpdates).not.toHaveBeenCalled();
-    expect(phases).toEqual(['idle']);
-
-    unsubscribe();
-  });
-
-  it('does not mark pulled repository updates as local changes', async () => {
-    const ydoc = new YDocManager();
-    const remoteDoc = new Y.Doc();
-    remoteDoc.getText('content').insert(0, 'from remote');
-    const pullUpdates = vi.fn(
-      async (): Promise<YjsSyncSnapshot> => ({
-        update: Y.encodeStateAsUpdate(remoteDoc),
-        stateVector: Y.encodeStateVector(remoteDoc),
-        revision: 'rev-2',
-      }),
-    );
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pullUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-    const listener = vi.fn();
-    const unsubscribe = session.subscribeLocalChanges(listener);
-
-    await session.pull();
-
-    expect(listener).not.toHaveBeenCalled();
-    expect(session.hasUnsyncedChanges()).toBe(false);
-
-    unsubscribe();
-  });
-
-  it('treats delete-only canvas changes as unsynced and pushes them', async () => {
-    const ydoc = new YDocManager();
-    const yMap = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-uuid', {
+    ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame', {
       offsetX: 0,
       offsetY: 0,
       scaleX: 1,
@@ -218,163 +75,58 @@ describe('NoteSession local change listeners', () => {
       pageWidth: 100,
       pageHeight: 100,
     });
-
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >(async (_nodeId, _update, _options) => ({
-      accepted: true,
-      changed: true,
-      remoteUpdate: null,
-      update: ydoc.encodeState(),
-      stateVector: ydoc.encodeStateVector(),
-      revision: 'rev-1',
-    }));
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-
-    ydoc.removeElementMap(yMap);
-
+    const native = createSyncTarget();
+    Y.applyUpdate(native.doc, ydoc.encodeState());
+    const session = await NoteSession.open('note', native.target);
+    session.ydoc.removeElementMap(session.ydoc.elements.get(0));
     expect(session.hasUnsyncedChanges()).toBe(true);
-
-    await session.save();
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
+    expect(await session.save()).toBe(true);
+    const stored = YDocManager.fromUpdate(Y.encodeStateAsUpdate(native.doc));
+    expect(stored.elements.length).toBe(0);
     expect(session.hasUnsyncedChanges()).toBe(false);
+    expect(native.target.flushDocument).toHaveBeenCalledWith('note');
+    expect(await session.save()).toBe(false);
+    await session.close();
+    stored.doc.destroy();
+    ydoc.doc.destroy();
+    native.doc.destroy();
   });
 
-  it('serializes save and close without pushing twice', async () => {
-    const ydoc = new YDocManager();
-    let resolvePush: (() => void) | undefined;
-    let lastStatusPhase: string | null = null;
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >(
-      () =>
-        new Promise<YjsSyncPushResult>((resolve) => {
-          resolvePush = () =>
-            resolve({
-              accepted: true,
-              changed: true,
-              remoteUpdate: null,
-              update: ydoc.encodeState(),
-              stateVector: ydoc.encodeStateVector(),
-              revision: 'rev-1',
-            });
-        }),
-    );
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
-      },
-      null,
-      ydoc.encodeStateVector(),
-    );
-    const unsubscribeStatus = session.subscribeStatus((status) => {
-      lastStatusPhase = status.phase;
+  it('waits for persistence before save and close checkpoint without sending edits twice', async () => {
+    const native = createSyncTarget();
+    const persist =
+      native.target.persistDocumentUpdate.getMockImplementation()!;
+    let resolve!: () => void;
+    const gate = new Promise<void>((done) => {
+      resolve = done;
     });
-
-    session.ydoc.doc.getText('content').insert(0, 'queued');
-
-    const savePromise = session.save();
-    const closePromise = session.close();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
-
-    resolvePush?.();
-    await Promise.all([savePromise, closePromise]);
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
-    expect(lastStatusPhase).toBe('closed');
-
-    unsubscribeStatus();
-  });
-
-  it('runs a queued save before close when close is scheduled first', async () => {
-    const ydoc = new YDocManager();
-    const events: string[] = [];
-    let resolvePush: (() => void) | undefined;
-    const pushUpdates = vi.fn<
-      (
-        nodeId: VFSNodeId,
-        update: Uint8Array,
-        options: YjsSyncPushOptions,
-      ) => Promise<YjsSyncPushResult>
-    >(
-      () =>
-        new Promise<YjsSyncPushResult>((resolve) => {
-          events.push('push-start');
-          resolvePush = () => {
-            events.push('push-resolve');
-            resolve({
-              accepted: true,
-              changed: true,
-              remoteUpdate: null,
-              update: ydoc.encodeState(),
-              stateVector: ydoc.encodeStateVector(),
-              revision: 'rev-1',
-            });
-          };
-        }),
-    );
-
-    const session = new NoteSession(
-      'note-1',
-      ydoc,
-      {
-        ...createSyncTarget(),
-        pushUpdates,
+    native.target.persistDocumentUpdate.mockImplementationOnce(
+      async (...args) => {
+        await gate;
+        return persist(...args);
       },
-      null,
-      ydoc.encodeStateVector(),
     );
+    const session = await NoteSession.open('note', native.target);
+    let saving!: () => void;
+    const started = new Promise<void>((done) => {
+      saving = done;
+    });
     session.subscribeStatus((status) => {
-      if (status.phase === 'closed') {
-        events.push('closed');
+      if (status.phase === 'pushing') {
+        saving();
       }
     });
-
     session.ydoc.doc.getText('content').insert(0, 'queued');
-
-    const closePromise = Promise.resolve().then(async () => {
-      events.push('close-called');
-      await session.close();
-    });
-    const savePromise = session.save();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(events).toEqual(['close-called', 'push-start']);
-
-    resolvePush?.();
-    await Promise.all([savePromise, closePromise]);
-
-    expect(pushUpdates).toHaveBeenCalledTimes(1);
-    expect(events).toEqual([
-      'close-called',
-      'push-start',
-      'push-resolve',
-      'closed',
-    ]);
+    const save = session.save();
+    const close = session.close();
+    await started;
+    expect(native.target.flushDocument).not.toHaveBeenCalled();
+    resolve();
+    await Promise.all([save, close]);
+    expect(native.doc.getText('content').toString()).toBe('queued');
+    expect(native.target.persistDocumentUpdate).toHaveBeenCalledOnce();
+    expect(session.hasUnsyncedChanges()).toBe(false);
+    expect(native.target.flushDocument).toHaveBeenCalledTimes(2);
+    native.doc.destroy();
   });
 });

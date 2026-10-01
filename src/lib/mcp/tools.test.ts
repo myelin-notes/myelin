@@ -1,15 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { LocalRepository } from '@/lib/sync/repo/local';
+import { TestRepository } from '@/test/test-repository';
 import { McpToolService } from './tools';
 
 let repositoryCounter = 0;
 
 async function createEmptyRepository() {
   repositoryCounter += 1;
-  const repository = new LocalRepository(
+  const repository = new TestRepository(
     `repositories/mcp-tools-${repositoryCounter}`,
   );
   await repository.initialize();
@@ -190,7 +190,7 @@ describe('MCP tool service', () => {
     });
   });
 
-  it('reads links, backlinks, and renames note references', async () => {
+  it('reads links and backlinks and requests native reference updates on rename', async () => {
     const { repository, sourceId, targetId } = await createLinkedNotes();
     const service = new McpToolService({
       repository,
@@ -227,6 +227,9 @@ describe('MCP tool service', () => {
       ],
     });
 
+    const renameReferences = vi
+      .spyOn(repository, 'renameReferences')
+      .mockResolvedValue({ sourceCount: 1, linkCount: 1 });
     await expect(
       service.callTool('rename_node', {
         nodeId: targetId,
@@ -242,16 +245,11 @@ describe('MCP tool service', () => {
         linkCount: 1,
       },
     });
-    await expect(
-      service.callTool('read_links', { noteId: sourceId }),
-    ).resolves.toMatchObject({
-      links: [
-        {
-          targetId,
-          targetTitle: 'Renamed MCP Target',
-          targetName: 'Renamed MCP Target',
-        },
-      ],
+    expect(renameReferences).toHaveBeenCalledWith({
+      sourceIds: [sourceId],
+      targetId,
+      newName: 'Renamed MCP Target',
+      referenceKind: 'note',
     });
   });
 

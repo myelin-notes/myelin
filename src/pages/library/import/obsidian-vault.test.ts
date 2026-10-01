@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import type { FileType, VFSNodeId } from '@/lib/sync/repo/types';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { importObsidianVault } from './obsidian-vault';
 
 function collectNoteLinks(json: unknown): Array<{
@@ -86,7 +86,7 @@ describe('Obsidian vault import', () => {
     await storage.writeTextFile('/vault/.DS_Store', 'skip');
     storage.writeSymlink('/vault/Projects/link.md');
 
-    const repository = new LocalRepository('obsidian-import');
+    const repository = new TestRepository('obsidian-import');
     const result = await importObsidianVault({
       repository,
       parentId: null,
@@ -182,7 +182,7 @@ describe('Obsidian vault import', () => {
       ['---', 'tags:', '  - parent/child', '---', '', 'Body'].join('\n'),
     );
 
-    const repository = new LocalRepository('obsidian-hier-import');
+    const repository = new TestRepository('obsidian-hier-import');
     const result = await importObsidianVault({
       repository,
       parentId: null,
@@ -209,7 +209,7 @@ describe('Obsidian vault import', () => {
     await storage.writeTextFile('/vault/Broken.md', 'Broken');
 
     const error = new Error('create failed');
-    class FailingRepository extends LocalRepository {
+    class FailingRepository extends TestRepository {
       override async createFile(
         name: string,
         fileType: FileType,

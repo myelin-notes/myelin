@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import type { Messages } from '@myelin/editor/i18n';
 import type { DialogFilter } from '@tauri-apps/plugin-dialog';
 import type { PickedFolder } from '@/lib/folder-picker';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type { ImportJob } from '../dialog';
 
 /**
@@ -23,16 +23,18 @@ export type ImportProviderId =
 export type ImportPicker =
   | { kind: 'files'; accept: string; multiple: boolean }
   | { kind: 'file'; filters: DialogFilter[] }
+  | { kind: 'native-files'; filters: DialogFilter[]; multiple: boolean }
   | { kind: 'directory' };
 
 export type ImportSelection =
   | { kind: 'files'; files: File[] }
   | { kind: 'file'; path: string }
+  | { kind: 'native-files'; paths: string[] }
   | { kind: 'directory'; folder: PickedFolder };
 
 export interface ImportJobContext {
   selection: ImportSelection;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   strings: Messages;
 }

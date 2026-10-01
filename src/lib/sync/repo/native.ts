@@ -2,35 +2,36 @@ import {
   NODES_DELETED_EVENT,
   type NodesDeletedDetail,
 } from '@myelin/editor/events';
-import type {
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-  YjsSyncTarget,
-} from '@myelin/editor/sync/types';
 import { removeThumbnail } from '@myelin/editor/thumbnails';
 import { Logger } from '@myelin/shared/logger';
+import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { SearchIndex } from '@/lib/search';
-import { NoteSession } from '../session';
 import type {
-  RepositoryLifecycle,
-  RepositoryRuntimeStatus,
-  RepositoryStatusSource,
-} from './config';
-import { MAX_PEN_PRESETS } from './config';
-import { processDocumentAsync } from './document-worker';
+  NativeDocumentChange,
+  NativeDocumentSnapshot,
+  NativeDocumentWriteResult,
+} from '../native-document-target';
+import { NoteSession } from '../session';
+import { MAX_PEN_PRESETS, type RepositoryRuntimeStatus } from './config';
+import type {
+  NativeDocumentWrite,
+  NativeOperationRequests,
+  NativeOperationResults,
+  NativeRevision,
+  OneNoteImportRequest,
+  OneNoteImportResult,
+  UpdateDocumentOperation,
+  WriteFileOperation,
+} from './native-operations';
 import { noteContentIndex } from './note-content-index';
-import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
-  computeRevision,
-  createDocFromBytes,
   createFileNode,
   createFolderNode,
   createNodeId,
   createNodeSearchIndex,
   deleteNodeFromManifest,
-  ensureVersionHistoryRoot,
   getBacklinks,
   getChildrenIds,
   getFileVersionNodes,
@@ -41,46 +42,103 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
-  isFileVersionNode as isConcreteFileVersionNode,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
   moveNodeInManifest,
   normalizeCustomColor,
-  type RepositorySnapshot,
   searchNodeResults,
-  setStoredNoteLinks,
   toFileVersion,
-  VERSION_HISTORY_INTERVAL_MS,
-  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from './shared';
 import { expandTagWithAncestors, normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
   CustomColorTool,
+  FileImportSource,
   FileType,
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
   NoteIndexItem,
-  OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
+  RenameReferencesRequest,
+  RenameReferencesResult,
   Repository,
   RepositoryCapabilities,
   RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
   SearchNodesOptions,
-  StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
   VFSNode,
   VFSNodeId,
 } from './types';
 
-const logger = new Logger('BaseRepository');
+interface NativeStatus extends Omit<RepositoryRuntimeStatus, 'lastError'> {
+  repositoryId: string;
+  lastError: string | null;
+}
+
+interface DocumentEvent {
+  repositoryId: string;
+  nodeId: string;
+  updateBase64?: string;
+  origin: 'local' | 'peer' | 'repository';
+  generation: string;
+  replacement: boolean;
+}
+
+interface DataEvent {
+  repositoryId: string;
+  changed: string[];
+  deleted: string[];
+}
+
+interface AuthEvent {
+  repositoryId: string;
+  credentialId: string;
+  requestId: string;
+  forceRefresh: boolean;
+}
+
+export type NativeRepositorySource =
+  | { kind: 'github'; owner: string; repo: string; branch: string }
+  | { kind: 'google-drive'; folderId: string };
+
+export type NativeRepositoryOptions = {
+  capabilities: RepositoryCapabilities;
+  storageRoot: string;
+} & (
+  | {
+      kind: 'local-storage';
+      source: null;
+      credentialId?: never;
+      getToken?: never;
+    }
+  | {
+      kind: 'github' | 'google-drive';
+      source: NativeRepositorySource;
+      credentialId: string;
+      getToken: (forceRefresh: boolean) => Promise<string>;
+    }
+);
+
+const logger = new Logger('NativeRepository');
+
+function encode(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
+function decode(base64: string): Uint8Array {
+  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+}
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
 // for non-DOM contexts (tests, background workers) where `window` is absent.
@@ -92,15 +150,464 @@ function emitNodesDeleted(ids: VFSNodeId[]): void {
   window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
 }
 
-export abstract class BaseRepository
-  implements
-    Repository,
-    YjsSyncTarget,
-    RepositoryLifecycle,
-    RepositoryStatusSource
-{
-  public abstract readonly kind: string;
-  public abstract readonly capabilities: RepositoryCapabilities;
+export class NativeRepository implements Repository {
+  readonly capabilities: RepositoryCapabilities;
+  readonly kind: string;
+  private handle = '';
+  private initializing: Promise<void> | null = null;
+  private disposed = false;
+  private readonly unlisteners: UnlistenFn[] = [];
+  private nativeVersion = -1;
+
+  constructor(private readonly backend: NativeRepositoryOptions) {
+    this.kind = backend.kind;
+    this.capabilities = backend.capabilities;
+  }
+
+  get nativeRepositoryHandle(): string {
+    return this.handle;
+  }
+  private get repositoryId(): string {
+    return this.backend.storageRoot || 'local';
+  }
+
+  initialize(): Promise<void> {
+    this.initializing ??= this.open();
+    return this.initializing;
+  }
+
+  private async open(): Promise<void> {
+    try {
+      this.unlisteners.push(
+        await listen<NativeStatus>('repository-status', ({ payload }) => {
+          if (payload.repositoryId === this.repositoryId && !this.disposed) {
+            this.applyStatus(payload);
+          }
+        }),
+      );
+      this.unlisteners.push(
+        await listen<DataEvent>('repository-data', ({ payload }) => {
+          if (payload.repositoryId === this.repositoryId && !this.disposed) {
+            void this.onData(payload).catch((error) =>
+              logger.error('Could not refresh native repository index', error),
+            );
+          }
+        }),
+      );
+      this.unlisteners.push(
+        await listen<AuthEvent>('repository-auth-request', ({ payload }) => {
+          if (
+            payload.repositoryId !== this.repositoryId ||
+            !this.backend.source ||
+            payload.credentialId !== this.backend.credentialId ||
+            this.disposed
+          ) {
+            return;
+          }
+          void this.backend.getToken(payload.forceRefresh).then(
+            (token) =>
+              invoke('repository_auth_response', {
+                requestId: payload.requestId,
+                token,
+              }),
+            (error) =>
+              invoke('repository_auth_response', {
+                requestId: payload.requestId,
+                error: String(error),
+              }),
+          );
+        }),
+      );
+      const token =
+        (await this.backend.getToken?.(false).catch(() => '')) ?? '';
+      const source = this.backend.source
+        ? { ...this.backend.source, token }
+        : null;
+      const opened = await invoke<{ handle: string; status: NativeStatus }>(
+        'repository_open',
+        {
+          request: {
+            storageRoot: this.backend.storageRoot,
+            credentialId: this.backend.credentialId ?? '',
+            source,
+          },
+        },
+      );
+      this.handle = opened.handle;
+      if (this.disposed) {
+        await invoke('repository_release', { handle: this.handle });
+        return;
+      }
+      this.applyStatus(opened.status);
+      noteContentIndex.reconcile(this);
+    } catch (error) {
+      for (const unlisten of this.unlisteners.splice(0)) {
+        unlisten();
+      }
+      throw error;
+    }
+  }
+
+  private applyStatus(status: NativeStatus): void {
+    const dataVersion =
+      this.getRuntimeStatus().dataVersion +
+      (status.dataVersion !== this.nativeVersion ? 1 : 0);
+    this.nativeVersion = status.dataVersion;
+    this.updateRuntimeStatus({
+      online: status.online,
+      pendingRemoteWrites: status.pendingRemoteWrites,
+      lastRemoteSyncAt: status.lastRemoteSyncAt,
+      dataVersion,
+      lastError: status.lastError ? new Error(status.lastError) : null,
+    });
+  }
+
+  private async onData(data: DataEvent): Promise<void> {
+    for (const id of data.deleted) {
+      noteContentIndex.remove(this, id);
+      await removeThumbnail(id);
+    }
+    if (data.deleted.length && typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(NODES_DELETED_EVENT, { detail: { ids: data.deleted } }),
+      );
+    }
+    if (!data.changed.length) {
+      return;
+    }
+    const { manifest } = await this.loadManifestImpl();
+    for (const id of data.changed) {
+      const node = manifest.nodes[id];
+      if (node?.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
+        noteContentIndex.remove(this, id);
+        continue;
+      }
+      noteContentIndex.invalidate(this, id);
+      const path = await this.getStoredAbsolutePath(id);
+      if (path) {
+        noteContentIndex.queueSaved(this, id, path);
+      }
+    }
+  }
+
+  private async operation<K extends keyof NativeOperationRequests>(
+    operation: NativeOperationRequests[K] & { kind: K },
+  ): Promise<NativeOperationResults[K]> {
+    await this.initialize();
+    if (this.disposed || !this.handle) {
+      throw new Error('Repository is closed');
+    }
+    return invoke<NativeOperationResults[K]>('repository_operation', {
+      handle: this.handle,
+      operation,
+    });
+  }
+
+  protected loadManifestImpl(): Promise<{
+    manifest: VFSManifest;
+    revision: string;
+  }> {
+    return this.operation({ kind: 'manifest' });
+  }
+  protected async saveManifestImpl(
+    manifest: VFSManifest,
+    revision: string | null,
+  ): Promise<string> {
+    const result = await this.operation({
+      kind: 'save-manifest',
+      manifest,
+      revision: revision ?? '',
+    });
+    return result.revision;
+  }
+  protected isConflictError(error: unknown): boolean {
+    return String(error).includes('Native manifest conflict');
+  }
+  protected manifestMaxRetries(): number {
+    return 4;
+  }
+  protected async loadFileBytes(
+    nodeId: VFSNodeId,
+  ): Promise<{ bytes: Uint8Array | null; revision: string | null }> {
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file') {
+      return { bytes: null, revision: null };
+    }
+    const result = await this.operation({ kind: 'read-file', nodeId });
+    const bytes = decode(result.bytesBase64);
+    return { bytes: bytes.length ? bytes : null, revision: result.revision };
+  }
+  private writeBytes(
+    operation: WriteFileOperation,
+    bytes: Uint8Array,
+  ): Promise<NativeRevision>;
+  private writeBytes(
+    operation: UpdateDocumentOperation,
+    bytes: Uint8Array,
+  ): Promise<NativeDocumentWrite>;
+  private async writeBytes(
+    operation: WriteFileOperation | UpdateDocumentOperation,
+    bytes: Uint8Array,
+  ): Promise<NativeRevision | NativeDocumentWrite> {
+    const withBytes = (
+      bytesBase64: string,
+    ): WriteFileOperation | UpdateDocumentOperation =>
+      operation.kind === 'write-file'
+        ? { ...operation, bytesBase64 }
+        : { ...operation, updateBase64: bytesBase64 };
+    if (bytes.length <= 8192) {
+      return this.operation(withBytes(encode(bytes)));
+    }
+    const transferId = crypto.randomUUID();
+    try {
+      for (let offset = 0; offset < bytes.length; offset += 8192) {
+        await this.operation({
+          kind: 'stage-bytes',
+          transferId,
+          offset,
+          bytesBase64: encode(bytes.subarray(offset, offset + 8192)),
+        });
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      return await this.operation({
+        kind: 'finish-transfer',
+        transferId,
+        operation: withBytes(''),
+      });
+    } catch (error) {
+      await this.operation({ kind: 'cancel-transfer', transferId }).catch(
+        () => {},
+      );
+      throw error;
+    }
+  }
+
+  protected async saveFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+  ): Promise<string | null> {
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file') {
+      throw new Error('Repository file is missing');
+    }
+    const result = await this.writeBytes(
+      {
+        kind: 'write-file',
+        bytesBase64: '',
+        node,
+        replace: true,
+        overwriteRemote: false,
+      },
+      bytes,
+    );
+    return result.revision;
+  }
+  protected async deleteFileBytes(
+    nodeId: VFSNodeId,
+    fileType?: FileType,
+  ): Promise<void> {
+    await this.operation({
+      kind: 'delete-file',
+      nodeId,
+      fileType: fileType ?? null,
+    });
+  }
+  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
+    await this.saveFileBytes(nodeId, bytes);
+  }
+  /** Publishes a new file only after its bytes are durable. */
+  createFile(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    bytes?: Uint8Array,
+    options?: CreateFileOptions,
+  ): Promise<VFSNodeId> {
+    return this.batchManifestWrites(async () => {
+      // Minted outside the mutator so a batched flush that replays this mutation
+      // after a conflict reuses the id the caller already received.
+      const id = createNodeId();
+      const now = Date.now();
+      await this.mutateManifest('Create file', (manifest) => {
+        manifest.nodes[id] = createFileNode(
+          id,
+          name,
+          fileType,
+          parentId,
+          now,
+          options?.system,
+        );
+        addChild(manifest, parentId, id);
+      });
+      this.searchMetadataRevision++;
+      if (bytes !== undefined) {
+        await this.writeFileBytes(id, bytes);
+      }
+      return id;
+    });
+  }
+  async importFile(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    source: FileImportSource,
+  ): Promise<VFSNodeId> {
+    return this.batchManifestWrites(async () => {
+      const id = await this.createFile(name, fileType, parentId);
+      const node = await this.getNode(id);
+      if (!node || node.type !== 'file') {
+        throw new Error('Repository file is missing');
+      }
+      await this.operation({ kind: 'import-file', node, source });
+      return id;
+    });
+  }
+  importOneNote(request: OneNoteImportRequest): Promise<OneNoteImportResult> {
+    return this.operation({ kind: 'import-one-note', ...request });
+  }
+
+  renameReferences(
+    request: RenameReferencesRequest,
+  ): Promise<RenameReferencesResult> {
+    return this.operation({ kind: 'rename-references', ...request });
+  }
+  createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    return this.operation({
+      kind: 'create-file-version',
+      nodeId,
+      force: options.force ?? false,
+    });
+  }
+  async restoreFileVersion(
+    nodeId: VFSNodeId,
+    versionId: VFSNodeId,
+  ): Promise<void> {
+    await this.operation({ kind: 'restore-file-version', nodeId, versionId });
+  }
+  getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.operation({ kind: 'path', nodeId });
+  }
+  getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
+    return this.getStoredAbsolutePath(nodeId);
+  }
+  async refresh(): Promise<void> {
+    await this.initialize();
+    await invoke('repository_sync', { handle: this.handle });
+  }
+  flushPending(): Promise<void> {
+    return this.refresh();
+  }
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    await this.initializing?.catch(() => undefined);
+    for (const unlisten of this.unlisteners.splice(0)) {
+      unlisten();
+    }
+    if (this.handle) {
+      await invoke('repository_release', { handle: this.handle });
+      this.handle = '';
+    }
+  }
+
+  openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+    return NoteSession.open(nodeId, this);
+  }
+
+  loadDocument(nodeId: VFSNodeId): Promise<NativeDocumentSnapshot> {
+    return this.pullUpdates(nodeId);
+  }
+  async pullUpdates(
+    nodeId: VFSNodeId,
+    stateVector?: Uint8Array | null,
+  ): Promise<NativeDocumentSnapshot> {
+    const result = await this.operation({
+      kind: 'document',
+      nodeId,
+      stateVectorBase64: stateVector ? encode(stateVector) : null,
+    });
+    return {
+      generation: result.generation,
+      update: decode(result.updateBase64),
+      stateVector: decode(result.stateVectorBase64),
+      revision: result.revision,
+    };
+  }
+  async persistDocumentUpdate(
+    nodeId: string,
+    update: Uint8Array,
+    generation?: string,
+    sourceSession?: string,
+  ): Promise<NativeDocumentWriteResult> {
+    const result = await this.writeBytes(
+      {
+        kind: 'update-document',
+        updateBase64: '',
+        nodeId,
+        origin: 'local',
+        generation: generation ?? null,
+        sourceSession: sourceSession ?? null,
+      },
+      update,
+    );
+    return {
+      accepted: result.accepted,
+      changed: result.changed,
+      stateVector: decode(result.stateVectorBase64),
+      revision: result.revision,
+    };
+  }
+  async flushDocument(nodeId: string): Promise<void> {
+    await this.operation({ kind: 'checkpoint-document', nodeId });
+  }
+  async subscribeDocument(
+    nodeId: string,
+    listener: (change: NativeDocumentChange) => void,
+    sessionId: string,
+  ): Promise<() => Promise<void>> {
+    await this.initialize();
+    const unlisten = await listen<DocumentEvent>(
+      `repository-document-${sessionId}`,
+      ({ payload }) => {
+        if (
+          payload.repositoryId !== this.repositoryId ||
+          payload.nodeId !== nodeId ||
+          this.disposed
+        ) {
+          return;
+        }
+        listener({
+          update: payload.updateBase64 ? decode(payload.updateBase64) : null,
+          origin: payload.origin,
+          generation: payload.generation,
+          replacement: payload.replacement,
+        });
+      },
+    );
+    this.unlisteners.push(unlisten);
+    try {
+      await this.operation({ kind: 'subscribe', nodeId, sessionId });
+    } catch (error) {
+      unlisten();
+      const index = this.unlisteners.indexOf(unlisten);
+      if (index !== -1) {
+        this.unlisteners.splice(index, 1);
+      }
+      throw error;
+    }
+    return async () => {
+      const index = this.unlisteners.indexOf(unlisten);
+      if (index !== -1) {
+        unlisten();
+        this.unlisteners.splice(index, 1);
+      }
+      if (!this.disposed) {
+        await this.operation({ kind: 'unsubscribe', nodeId, sessionId });
+      }
+    };
+  }
 
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,
@@ -109,6 +616,7 @@ export abstract class BaseRepository
     lastError: null,
     dataVersion: 0,
   };
+
   private readonly statusListeners = new Set<
     (status: RepositoryRuntimeStatus) => void
   >();
@@ -119,85 +627,22 @@ export abstract class BaseRepository
     dataVersion: number;
     index: SearchIndex<VFSNode>;
   } | null = null;
+
   private searchMetadataRevision = 0;
 
   // While positive, manifest mutations accumulate on one held manifest and defer their save to the
   // outermost close.
   private manifestBatchDepth = 0;
+
   // Loaded once. Reads inside the batch see pending writes because they share this object.
   private manifestBatchLoad: Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> | null = null;
+
   // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
   // be replay-safe: ids and any values the caller kept are minted outside the mutator.
   private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
-
-  protected abstract loadManifestImpl(): Promise<{
-    manifest: VFSManifest;
-    revision: string | null;
-  }>;
-
-  protected abstract saveManifestImpl(
-    manifest: VFSManifest,
-    revision: string | null,
-    action: string,
-  ): Promise<string | null>;
-
-  protected abstract loadFileBytes(nodeId: VFSNodeId): Promise<{
-    bytes: Uint8Array | null;
-    revision: string | null;
-  }>;
-
-  protected abstract saveFileBytes(
-    nodeId: VFSNodeId,
-    bytes: Uint8Array,
-    revision: string | null,
-    message: string,
-  ): Promise<string | null>;
-
-  protected abstract deleteFileBytes(
-    nodeId: VFSNodeId,
-    fileType?: FileType,
-  ): Promise<void>;
-
-  protected isConflictError(_error: unknown): boolean {
-    return false;
-  }
-
-  protected manifestMaxRetries(): number {
-    return 1;
-  }
-
-  protected async onFileSaved(
-    nodeId: VFSNodeId,
-    links?: readonly StoredNoteLink[],
-  ): Promise<void> {
-    let indexable = false;
-    await this.mutateManifest('Touch file', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (node && node.type === 'file') {
-        node.modifiedAt = Date.now();
-        indexable = node.fileType === 'mcanvas' && !node.system;
-        // Snapshots are system nodes; their links must not enter the graph.
-        if (node.fileType === 'mcanvas' && !node.system && links) {
-          setStoredNoteLinks(manifest, nodeId, links);
-        }
-      }
-    });
-    if (indexable) {
-      noteContentIndex.invalidate(this, nodeId);
-      void this.getStoredAbsolutePath(nodeId)
-        .then((path) => {
-          if (path) {
-            noteContentIndex.queueSaved(this, nodeId, path);
-          }
-        })
-        .catch((error) => {
-          logger.error('Could not queue note for indexing', error, { nodeId });
-        });
-    }
-  }
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
     return { ...this.runtimeStatus };
@@ -211,31 +656,6 @@ export abstract class BaseRepository
     return () => {
       this.statusListeners.delete(listener);
     };
-  }
-
-  async exportSnapshot(): Promise<RepositorySnapshot> {
-    const { manifest } = await this.loadManifest();
-    const snapshotManifest = structuredClone(manifest);
-    const fileNodes = Object.values(snapshotManifest.nodes).filter(
-      (node): node is VFSFileNode => node.type === 'file',
-    );
-
-    const noteEntries = await Promise.all(
-      fileNodes.map(async (node) => {
-        const { bytes } = await this.loadFileBytes(node.id);
-        return [node.id, bytes ? new Uint8Array(bytes) : null] as const;
-      }),
-    );
-
-    return {
-      manifest: snapshotManifest,
-      notes: Object.fromEntries(noteEntries),
-    };
-  }
-
-  async exportManifest(): Promise<VFSManifest> {
-    const { manifest } = await this.loadManifest();
-    return structuredClone(manifest);
   }
 
   // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
@@ -277,7 +697,7 @@ export abstract class BaseRepository
     const maxRetries = this.manifestMaxRetries();
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        await this.saveManifestImpl(pendingManifest, pendingRevision, 'Import');
+        await this.saveManifestImpl(pendingManifest, pendingRevision);
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
@@ -331,16 +751,6 @@ export abstract class BaseRepository
   async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
     await this.deleteFileBytes(nodeId, fileType);
   }
-
-  async initialize(): Promise<void> {
-    await this.loadManifestImpl();
-  }
-
-  async refresh(): Promise<void> {}
-
-  async flushPending(): Promise<void> {}
-
-  async dispose(): Promise<void> {}
 
   protected updateRuntimeStatus(patch: Partial<RepositoryRuntimeStatus>): void {
     this.runtimeStatus = { ...this.runtimeStatus, ...patch };
@@ -477,141 +887,14 @@ export abstract class BaseRepository
     return id;
   }
 
-  async createFile(
-    name: string,
-    fileType: FileType,
-    parentId: string | null,
-    bytes?: Uint8Array,
-    options?: CreateFileOptions,
-  ): Promise<VFSNodeId> {
-    // Minted outside the mutator so a batched flush that replays this mutation
-    // after a conflict reuses the id the caller already received.
-    const id = createNodeId();
-    const now = Date.now();
-    await this.mutateManifest('Create file', (manifest) => {
-      manifest.nodes[id] = createFileNode(
-        id,
-        name,
-        fileType,
-        parentId,
-        now,
-        options?.system,
-      );
-      addChild(manifest, parentId, id);
-    });
-    this.searchMetadataRevision++;
-    if (bytes !== undefined) {
-      await this.writeFileBytes(id, bytes);
-    }
-    return id;
-  }
-
   async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
     const { manifest } = await this.loadManifest();
     return getFileVersionNodes(manifest, nodeId).map(toFileVersion);
   }
 
-  async createFileVersionIfDue(
-    nodeId: VFSNodeId,
-    options: { force?: boolean } = {},
-  ): Promise<FileVersion | null> {
-    const node = await this.getNode(nodeId);
-    if (!node || node.type !== 'file' || node.system) {
-      return null;
-    }
-
-    const bytes = await this.readFileBytes(nodeId);
-    if (!bytes) {
-      return null;
-    }
-
-    const now = Date.now();
-    const sourceRevision = await computeRevision(bytes);
-    const versions = await this.listFileVersions(nodeId);
-    const latest = versions[0];
-    if (versions.some((version) => version.sourceRevision === sourceRevision)) {
-      return null;
-    }
-    if (
-      !options.force &&
-      latest &&
-      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
-    ) {
-      return null;
-    }
-
-    const parentId = await this.getOrCreateVersionHistoryRoot();
-    const versionId = await this.createFile(
-      `${node.name} ${new Date(now).toISOString()}`,
-      node.fileType,
-      parentId,
-      bytes,
-      {
-        system: {
-          kind: 'file-version',
-          sourceFileId: node.id,
-          sourceFileType: node.fileType,
-          sourceName: node.name,
-          sourceRevision,
-          capturedAt: now,
-          byteLength: bytes.byteLength,
-        },
-      },
-    );
-
-    await this.enforceFileVersionLimit(nodeId);
-
-    const versionNode = await this.getNode(versionId);
-    return isConcreteFileVersionNode(versionNode)
-      ? toFileVersion(versionNode)
-      : null;
-  }
-
-  async restoreFileVersion(
-    nodeId: VFSNodeId,
-    versionId: VFSNodeId,
-  ): Promise<void> {
-    const versionNode = await this.getNode(versionId);
-    if (
-      !isConcreteFileVersionNode(versionNode) ||
-      versionNode.system.sourceFileId !== nodeId
-    ) {
-      throw new Error('Version does not belong to this file.');
-    }
-
-    const bytes = await this.readFileBytes(versionId);
-    if (!bytes) {
-      throw new Error('Version data is missing.');
-    }
-    const currentBytes = await this.readFileBytes(nodeId);
-    const versionRevision = await computeRevision(bytes);
-    if (
-      currentBytes &&
-      (await computeRevision(currentBytes)) === versionRevision
-    ) {
-      return;
-    }
-    await this.createFileVersionIfDue(nodeId, { force: true });
-    await this.writeFileBytes(nodeId, bytes);
-  }
-
   async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
     const { bytes } = await this.loadFileBytes(nodeId);
     return bytes ? new Uint8Array(bytes) : null;
-  }
-
-  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
-    const { revision } = await this.loadFileBytes(nodeId);
-    const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
-    const nextRevision = await this.saveFileBytes(
-      nodeId,
-      bytes,
-      revision,
-      `Update file ${nodeId}`,
-    );
-    if (nextRevision !== null) {
-      await this.onFileSaved(nodeId, links);
-    }
   }
 
   async renameNode(nodeId: string, newName: string): Promise<void> {
@@ -706,14 +989,6 @@ export abstract class BaseRepository
       };
     });
     this.searchMetadataRevision++;
-  }
-
-  async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
-    return null;
-  }
-
-  async getStoredAbsolutePath(_nodeId: VFSNodeId): Promise<string | null> {
-    return null;
   }
 
   getNoteIndexSource(): object {
@@ -892,83 +1167,6 @@ export abstract class BaseRepository
     });
   }
 
-  async openSession(
-    nodeId: VFSNodeId,
-    _options: OpenSessionOptions = {},
-  ): Promise<NoteSession> {
-    logger.debug('Opening repository-backed note session', {
-      repositoryKind: this.kind,
-      nodeId,
-    });
-    return NoteSession.open(nodeId, this);
-  }
-
-  async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
-    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
-    const result = await processDocumentAsync({ bytes });
-    return { update: result.update, stateVector: result.stateVector, revision };
-  }
-
-  async pullUpdates(
-    nodeId: VFSNodeId,
-    stateVector?: Uint8Array | null,
-  ): Promise<YjsSyncSnapshot> {
-    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
-    const result = await processDocumentAsync({ bytes, stateVector });
-    return { update: result.update, stateVector: result.stateVector, revision };
-  }
-
-  async pushUpdates(
-    nodeId: VFSNodeId,
-    update: Uint8Array,
-    options: YjsSyncPushOptions,
-  ): Promise<YjsSyncPushResult> {
-    const remote = await this.readYjsSyncBytes(nodeId);
-    if (options.baseRevision !== remote.revision) {
-      const result = await processDocumentAsync({
-        bytes: remote.bytes,
-        stateVector: options.localStateVector,
-      });
-      return {
-        accepted: false,
-        changed: false,
-        remoteUpdate: result.update,
-        stateVector: result.stateVector,
-        revision: remote.revision,
-        update: remote.bytes,
-      };
-    }
-
-    const result = await processDocumentAsync({ bytes: remote.bytes, update });
-    let revision = remote.revision;
-    if (result.changed) {
-      revision = await this.saveFileBytes(
-        nodeId,
-        result.update!,
-        remote.revision,
-        `Update note ${nodeId}`,
-      );
-      if (revision !== null) {
-        await this.onFileSaved(nodeId, result.links);
-      }
-    }
-    logger.debug('Accepted repository document push', {
-      repositoryKind: this.kind,
-      nodeId,
-      revision,
-      changed: result.changed,
-      updateByteLength: result.update?.byteLength ?? 0,
-    });
-    return {
-      accepted: true,
-      changed: result.changed,
-      remoteUpdate: null,
-      stateVector: result.stateVector,
-      revision,
-      update: result.update,
-    };
-  }
-
   protected async mutateManifest<T>(
     action: string,
     mutator: (manifest: VFSManifest) => T,
@@ -988,7 +1186,7 @@ export abstract class BaseRepository
       const result = mutator(manifest);
 
       try {
-        await this.saveManifestImpl(manifest, revision, action);
+        await this.saveManifestImpl(manifest, revision);
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
@@ -1004,43 +1202,5 @@ export abstract class BaseRepository
     throw new Error(
       `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
     );
-  }
-
-  private async readYjsSyncBytes(nodeId: VFSNodeId): Promise<{
-    bytes: Uint8Array | null;
-    revision: string | null;
-  }> {
-    const node = await this.getNode(nodeId);
-    if (node?.type === 'file' && node.fileType !== 'mcanvas') {
-      throw new Error(`Cannot open ${node.fileType} files as canvas sessions.`);
-    }
-
-    return this.loadFileBytes(nodeId);
-  }
-
-  private async extractStoredNoteLinksForBytes(
-    nodeId: VFSNodeId,
-    bytes: Uint8Array,
-  ): Promise<StoredNoteLink[] | undefined> {
-    const node = await this.getNode(nodeId);
-    if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
-      return undefined;
-    }
-
-    return extractStoredNoteLinks(createDocFromBytes(bytes));
-  }
-
-  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
-    return this.mutateManifest('Create version history root', (manifest) =>
-      ensureVersionHistoryRoot(manifest, Date.now()),
-    );
-  }
-
-  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
-    const versions = await this.listFileVersions(nodeId);
-    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
-    for (const version of expired) {
-      await this.deleteNode(version.id);
-    }
   }
 }

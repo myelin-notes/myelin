@@ -1,13 +1,10 @@
+import { mergeUpdates } from 'yjs';
 import { summarizeYDocManager } from '@myelin/editor/note/state-summary';
 import {
   noopTransport,
   type Transport,
 } from '@myelin/editor/sync/live/transport';
-import type {
-  NoteSessionStatus,
-  VFSNodeId,
-  YjsSyncTarget,
-} from '@myelin/editor/sync/types';
+import type { NoteSessionStatus, VFSNodeId } from '@myelin/editor/sync/types';
 import {
   FRAGMENT_SWEEP_ORIGIN,
   PEER_ORIGIN,
@@ -16,7 +13,7 @@ import {
   YDocManager,
 } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import { getOrCreatePeerId } from './identity';
+import { createEphemeralPeerId, getOrCreatePeerId } from './identity';
 import { type PeerSnapshot, PeerState } from './live/peer-state';
 import {
   decodeMessage,
@@ -25,6 +22,10 @@ import {
   type PeerMode,
   type SyncMessage,
 } from './live/protocol';
+import type {
+  NativeDocumentSnapshot,
+  NativeDocumentTarget,
+} from './native-document-target';
 
 const HEARTBEAT_INTERVAL_MS = 5_000;
 const PEER_TIMEOUT_MS = 15_000;
@@ -55,13 +56,19 @@ export class NoteSession {
   private heartbeatTimer: HeartbeatTimer | null = null;
   private operationQueue: Promise<void> = Promise.resolve();
   private status: NoteSessionStatus;
+  private nativeQueue: Uint8Array[] = [];
+  private readonly nativeGeneration: string;
+  private readonly nativeSessionId = createEphemeralPeerId();
+  private replaced = false;
+  private readonly replacementListeners = new Set<() => void>();
+  private nativeSaving: Promise<void> | null = null;
+  private unsubscribeNative: (() => Promise<void>) | null = null;
 
-  constructor(
+  private constructor(
     public readonly id: VFSNodeId,
     public readonly ydoc: YDocManager,
-    private readonly syncTarget: YjsSyncTarget,
-    initialRevision: string | null,
-    initialStateVector: Uint8Array,
+    private readonly syncTarget: NativeDocumentTarget,
+    initial: NativeDocumentSnapshot,
   ) {
     this.localPeer = {
       peerId: getOrCreatePeerId(),
@@ -72,20 +79,24 @@ export class NoteSession {
       phase: 'idle',
       lastError: null,
       lastSyncedAt: Date.now(),
-      remoteRevision: initialRevision,
+      remoteRevision: initial.revision,
     };
-    this.remoteStateVector = initialStateVector;
+    this.remoteStateVector = initial.stateVector;
+    this.nativeGeneration = initial.generation;
 
     this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (this.closed) {
+      if (this.closed || this.replaced) {
         return;
       }
 
-      if (!isRemoteSyncOrigin(origin) && this.transport.connected) {
-        this.sendMessage({
-          type: 'yjs-update',
-          data: new Uint8Array(update),
-        });
+      if (origin !== PEER_ORIGIN && origin !== REPOSITORY_SYNC_ORIGIN) {
+        this.nativeQueue.push(new Uint8Array(update));
+        void this.drainNative().catch((error) =>
+          this.setStatus({
+            lastError:
+              error instanceof Error ? error : new Error(String(error)),
+          }),
+        );
       }
 
       if (!isRemoteSyncOrigin(origin)) {
@@ -99,19 +110,42 @@ export class NoteSession {
 
   static async open(
     nodeId: VFSNodeId,
-    syncTarget: YjsSyncTarget,
+    syncTarget: NativeDocumentTarget,
   ): Promise<NoteSession> {
     const initial = await syncTarget.loadDocument(nodeId);
     const ydoc = initial.update
       ? YDocManager.fromUpdate(initial.update)
       : new YDocManager();
-    const session = new NoteSession(
-      nodeId,
-      ydoc,
-      syncTarget,
-      initial.revision,
-      initial.stateVector,
-    );
+    const session = new NoteSession(nodeId, ydoc, syncTarget, initial);
+    try {
+      session.unsubscribeNative = await syncTarget.subscribeDocument(
+        nodeId,
+        (change) => {
+          if (session.closed || session.replaced) {
+            return;
+          }
+          if (
+            change.replacement ||
+            change.generation !== session.nativeGeneration
+          ) {
+            session.invalidateNativeDocument();
+            return;
+          }
+          if (change.update) {
+            session.applyUpdate(
+              change.update,
+              change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
+            );
+          }
+        },
+        session.nativeSessionId,
+      );
+      await session.pull();
+    } catch (error) {
+      await session.unsubscribeNative?.();
+      session.ydoc.doc.destroy();
+      throw error;
+    }
     logger.info('Opened note session', {
       nodeId,
       revision: initial.revision,
@@ -120,6 +154,26 @@ export class NoteSession {
       ...summarizeYDocManager(session.ydoc),
     });
     return session;
+  }
+
+  get documentReplaced(): boolean {
+    return this.replaced;
+  }
+
+  private invalidateNativeDocument(): void {
+    this.replaced = true;
+    this.nativeQueue = [];
+    this.flushedEpoch = this.changeEpoch;
+    for (const listener of this.replacementListeners) {
+      listener();
+    }
+  }
+
+  subscribeReplacement(listener: () => void): () => void {
+    this.replacementListeners.add(listener);
+    return () => {
+      this.replacementListeners.delete(listener);
+    };
   }
 
   get transportConnected(): boolean {
@@ -183,6 +237,12 @@ export class NoteSession {
     this.updatePeerSnapshot(this.peerState.resetRemotePeers());
 
     this.transport = transport;
+    if (
+      'bindRepository' in transport &&
+      typeof transport.bindRepository === 'function'
+    ) {
+      transport.bindRepository(this.syncTarget.nativeRepositoryHandle);
+    }
 
     transport.on('message', this.onTransportMessage);
     transport.on('disconnected', this.onTransportDisconnected);
@@ -248,6 +308,11 @@ export class NoteSession {
         this.ydoc.encodeStateVector(),
       );
 
+      if (result.generation !== this.nativeGeneration) {
+        this.invalidateNativeDocument();
+        return;
+      }
+
       if (result.update && result.update.byteLength > 0) {
         this.ydoc.applyUpdate(result.update, REPOSITORY_SYNC_ORIGIN);
         pulledUpdate = result.update;
@@ -268,108 +333,17 @@ export class NoteSession {
   }
 
   private async saveInternal(): Promise<boolean> {
-    if (this.closed) {
+    if (this.closed || this.replaced) {
       return false;
     }
 
     const targetChangeEpoch = this.changeEpoch;
-    if (targetChangeEpoch === this.flushedEpoch) {
-      logger.debug('Skipped note session push; already synced', {
-        nodeId: this.id,
-        changeEpoch: this.changeEpoch,
-        flushedEpoch: this.flushedEpoch,
-        remoteRevision: this.status.remoteRevision,
-        targetChangeEpoch,
-        ...summarizeYDocManager(this.ydoc),
-      });
-      return false;
-    }
-
-    logger.debug('Pushing note session updates', {
-      nodeId: this.id,
-      changeEpoch: this.changeEpoch,
-      flushedEpoch: this.flushedEpoch,
-      remoteRevision: this.status.remoteRevision,
-      remoteStateVectorByteLength: this.remoteStateVector.byteLength,
-      ...summarizeYDocManager(this.ydoc),
-    });
-    let savedChanges = false;
-    await this.runWithPhase('pushing', async () => {
-      this.ydoc.sweepOrphanPageFrameFragments();
-      for (let attempt = 0; attempt < 4; attempt++) {
-        if (targetChangeEpoch === this.flushedEpoch) {
-          logger.debug('Skipped note session push; already synced', {
-            nodeId: this.id,
-            attempt: attempt + 1,
-            changeEpoch: this.changeEpoch,
-            flushedEpoch: this.flushedEpoch,
-            remoteRevision: this.status.remoteRevision,
-            targetChangeEpoch,
-            ...summarizeYDocManager(this.ydoc),
-          });
-          return;
-        }
-
-        const localStateVector = this.ydoc.encodeStateVector();
-        const pendingUpdate = this.ydoc.encodeDiff(this.remoteStateVector);
-        logger.debug('Attempting note session push', {
-          nodeId: this.id,
-          attempt: attempt + 1,
-          baseRevision: this.status.remoteRevision,
-          localStateVectorByteLength: localStateVector.byteLength,
-          changeEpoch: this.changeEpoch,
-          flushedEpoch: this.flushedEpoch,
-          pendingUpdateByteLength: pendingUpdate.byteLength,
-          targetChangeEpoch,
-          ...summarizeYDocManager(this.ydoc),
-        });
-        const result = await this.syncTarget.pushUpdates(
-          this.id,
-          pendingUpdate,
-          {
-            baseRevision: this.status.remoteRevision,
-            localStateVector,
-          },
-        );
-
-        this.remoteStateVector = result.stateVector;
-        this.setStatus({ remoteRevision: result.revision });
-
-        if (result.accepted) {
-          this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
-          savedChanges = result.changed;
-          logger.info('Accepted note session push', {
-            nodeId: this.id,
-            attempt: attempt + 1,
-            changed: result.changed,
-            changeEpoch: this.changeEpoch,
-            flushedEpoch: this.flushedEpoch,
-            remoteRevision: this.status.remoteRevision,
-            remoteStateVectorByteLength: this.remoteStateVector.byteLength,
-            targetChangeEpoch,
-            ...summarizeYDocManager(this.ydoc),
-          });
-          return;
-        }
-
-        logger.debug('Rejected note session push; merging remote state', {
-          nodeId: this.id,
-          attempt: attempt + 1,
-          remoteRevision: this.status.remoteRevision,
-          remoteUpdateByteLength: result.remoteUpdate?.byteLength ?? 0,
-          remoteStateVectorByteLength: this.remoteStateVector.byteLength,
-        });
-        if (result.remoteUpdate && result.remoteUpdate.byteLength > 0) {
-          this.ydoc.applyUpdate(result.remoteUpdate, REPOSITORY_SYNC_ORIGIN);
-        }
-      }
-
-      throw new Error(
-        'Failed to push Yjs updates after reconciling remote changes.',
-      );
-    });
-
-    return savedChanges;
+    this.ydoc.sweepOrphanPageFrameFragments();
+    await this.runWithPhase('pushing', () => this.drainNative());
+    await this.syncTarget.flushDocument(this.id);
+    const changed = targetChangeEpoch !== this.flushedEpoch;
+    this.flushedEpoch = Math.max(this.flushedEpoch, targetChangeEpoch);
+    return changed;
   }
 
   private onTransportMessage = (data: Uint8Array) => {
@@ -387,7 +361,6 @@ export class NoteSession {
   };
 
   private onTransportConnected = () => {
-    this.sendInitialState();
     this.sendPeerPresence('hello');
     this.startHeartbeat();
   };
@@ -395,13 +368,6 @@ export class NoteSession {
   private onTransportDisconnected = () => {
     this.clearTransport();
   };
-
-  private sendInitialState(): void {
-    this.sendMessage({
-      type: 'yjs-update',
-      data: this.ydoc.encodeDiff(),
-    });
-  }
 
   private async closeInternal(): Promise<void> {
     let closeError: unknown = null;
@@ -415,14 +381,14 @@ export class NoteSession {
     });
 
     try {
-      if (this.hasUnsyncedChanges()) {
-        await this.saveInternal();
-      }
+      await this.saveInternal();
     } catch (error) {
       closeError = error;
     }
 
     this.clearTransport();
+    await this.unsubscribeNative?.();
+    this.unsubscribeNative = null;
     this.stopHeartbeat();
     this.closed = true;
     this.setStatus({ phase: 'closed' });
@@ -465,6 +431,45 @@ export class NoteSession {
       });
       throw statusError;
     }
+  }
+
+  private drainNative(): Promise<void> {
+    if (this.nativeSaving) {
+      return this.nativeSaving;
+    }
+    const target = this.syncTarget;
+    this.nativeSaving = (async () => {
+      while (this.nativeQueue.length && !this.replaced) {
+        const count = this.nativeQueue.length;
+        const result = await target.persistDocumentUpdate(
+          this.id,
+          count === 1
+            ? this.nativeQueue[0]
+            : mergeUpdates(this.nativeQueue.slice(0, count)),
+          this.nativeGeneration,
+          this.nativeSessionId,
+        );
+        this.nativeQueue.splice(0, count);
+        this.remoteStateVector = result.stateVector;
+        this.setStatus({
+          remoteRevision: result.revision,
+          lastError: null,
+          lastSyncedAt: Date.now(),
+        });
+      }
+    })().then(
+      () => {
+        this.nativeSaving = null;
+        if (this.nativeQueue.length) {
+          return this.drainNative();
+        }
+      },
+      (error) => {
+        this.nativeSaving = null;
+        throw error;
+      },
+    );
+    return this.nativeSaving;
   }
 
   private enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {

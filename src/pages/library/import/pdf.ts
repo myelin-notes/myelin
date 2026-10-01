@@ -9,10 +9,9 @@ import {
   type PdfPageSize,
 } from '@myelin/editor/pdf-renderer';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createCanvasFile } from './canvas-file';
 
-export const PDF_FILE_ACCEPT = 'application/pdf,.pdf';
 export const PDF_EXTENSION_RE = /\.pdf$/i;
 const GOODNOTES_EXTENSION_RE = /\.goodnotes$/i;
 const PDF_MIME_TYPES = new Set(['application/pdf']);
@@ -21,11 +20,13 @@ const DEFAULT_PDF_IMPORT_OFFSET = {
   y: 80,
 } as const;
 
-export function isPdfFile(file: File): boolean {
+export function isPdfFile(file: Pick<File, 'name' | 'type'>): boolean {
   return PDF_EXTENSION_RE.test(file.name) || PDF_MIME_TYPES.has(file.type);
 }
 
-export function isNativeGoodnotesFile(file: File): boolean {
+export function isNativeGoodnotesFile(
+  file: Pick<File, 'name' | 'type'>,
+): boolean {
   return GOODNOTES_EXTENSION_RE.test(file.name);
 }
 
@@ -63,7 +64,7 @@ export async function importPdfFile({
   fallbackTitle,
 }: {
   file: File;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
@@ -86,7 +87,7 @@ export async function importPdfBytes({
 }: {
   bytes: Uint8Array;
   fileName: string;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {

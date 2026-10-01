@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import en from '@myelin/editor/i18n/messages/en';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { filesProvider } from './files';
 
 vi.mock('@myelin/editor/pdf-renderer', () => ({
@@ -16,13 +16,9 @@ vi.mock('@myelin/editor/pdf-renderer', () => ({
   getPdfPageSizes: vi.fn(async () => [{ w: 680, h: 880 }]),
 }));
 
-function markdownFile(name: string, body: string): File {
-  return new File([body], name, { type: 'text/markdown' });
-}
-
-function createJob(files: File[], repository: LocalRepository) {
+function createJob(paths: string[], repository: TestRepository) {
   return filesProvider.createJob({
-    selection: { kind: 'files', files },
+    selection: { kind: 'native-files', paths },
     repository,
     parentId: null,
     strings: en,
@@ -36,14 +32,10 @@ describe('files import provider', () => {
 
   it('previews supported files and flags the unsupported ones', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-preview');
+    const repository = new TestRepository('files-provider-preview');
 
     const job = createJob(
-      [
-        markdownFile('Notes.md', '# Notes'),
-        new File([new Uint8Array([1, 2])], 'photo.png', { type: 'image/png' }),
-        new File([new Uint8Array([3])], 'archive.xyz', { type: '' }),
-      ],
+      ['/picked/Notes.md', '/picked/photo.png', '/picked/archive.xyz'],
       repository,
     );
 
@@ -57,15 +49,19 @@ describe('files import provider', () => {
   });
 
   it('imports supported files and reports counts', async () => {
-    getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-import');
+    const storage = getRepositoryTestStorage();
+    await storage.writeFile(
+      '/picked/First.md',
+      new TextEncoder().encode('# First'),
+    );
+    await storage.writeFile(
+      '/picked/Second.md',
+      new TextEncoder().encode('# Second'),
+    );
+    const repository = new TestRepository('files-provider-import');
 
     const job = createJob(
-      [
-        markdownFile('First.md', '# First'),
-        markdownFile('Second.md', '# Second'),
-        new File([new Uint8Array([3])], 'archive.xyz', { type: '' }),
-      ],
+      ['/picked/First.md', '/picked/Second.md', '/picked/archive.xyz'],
       repository,
     );
 
@@ -85,22 +81,19 @@ describe('files import provider', () => {
 
   it('reports an empty preview when nothing is importable', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-empty');
+    const repository = new TestRepository('files-provider-empty');
 
-    const job = createJob(
-      [new File([new Uint8Array([1])], 'archive.xyz', { type: '' })],
-      repository,
-    );
+    const job = createJob(['/picked/archive.xyz'], repository);
 
     expect((await job.scan()).isEmpty).toBe(true);
   });
 
   it('refuses to run before scanning', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('files-provider-unscanned');
+    const repository = new TestRepository('files-provider-unscanned');
 
     await expect(
-      createJob([markdownFile('A.md', '# A')], repository).run({
+      createJob(['/picked/A.md'], repository).run({
         conflictResolution: 'rename',
         onProgress: () => {},
       }),

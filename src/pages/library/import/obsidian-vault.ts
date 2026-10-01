@@ -6,10 +6,11 @@ import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
-  type Repository,
+  type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
+import { importStoragePath } from './files';
 import {
   addFolderAncestors,
   createImportedFolders,
@@ -67,7 +68,7 @@ export interface ObsidianVaultImportResult {
 }
 
 export interface ImportObsidianVaultOptions {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   vaultPath: string | PickedFolder;
   vaultName?: string;
@@ -390,7 +391,7 @@ async function writeMarkdownFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'markdown' }>;
-  repository: Repository;
+  repository: NativeRepository;
   resolveNoteLinkId: (target: string) => Promise<VFSNodeId | null>;
 }): Promise<void> {
   if (!file.nodeId) {
@@ -422,7 +423,7 @@ async function importPdfVaultFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'pdf' }>;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
 }): Promise<void> {
   const bytes = await reader.readFile(file.sourcePath);
@@ -449,15 +450,17 @@ async function importStorageVaultFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'storage' }>;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
 }): Promise<void> {
-  await repository.createFile(
-    file.name,
-    file.fileType,
+  await importStoragePath({
+    path: file.sourcePath,
+    name: file.name,
+    fileType: file.fileType,
     parentId,
-    await reader.readFile(file.sourcePath),
-  );
+    repository,
+    reader,
+  });
 }
 
 export async function importObsidianVault({

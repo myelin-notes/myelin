@@ -4,8 +4,8 @@ import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
-import { LocalRepository } from './local';
-import { getStoredFileName, type VFSManifest } from './shared';
+import { TestRepository } from '@/test/test-repository';
+import type { VFSManifest } from './shared';
 
 describe('repository file version history', () => {
   beforeEach(() => {
@@ -17,7 +17,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-hidden-test');
+    const repository = new TestRepository('repositories/version-hidden-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
@@ -66,7 +66,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-cadence-test');
+    const repository = new TestRepository('repositories/version-cadence-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
@@ -99,20 +99,20 @@ describe('repository file version history', () => {
     ]);
   });
 
-  it('keeps 32 versions and restores content without metadata changes', async () => {
+  it('keeps the latest 32 versions', async () => {
     vi.useFakeTimers();
 
-    const repository = new LocalRepository('repositories/version-restore-test');
+    const repository = new TestRepository(
+      'repositories/version-retention-test',
+    );
     await repository.initialize();
 
-    const folderId = await repository.createFolder('Docs', null);
     const fileId = await repository.createFile(
       'Photo.png',
       'png',
-      folderId,
+      null,
       new Uint8Array([0]),
     );
-    await repository.setTags(fileId, ['keep']);
 
     for (let index = 0; index < 33; index += 1) {
       vi.setSystemTime(new Date(Date.UTC(2026, 0, 1, 0, index * 11)));
@@ -120,141 +120,15 @@ describe('repository file version history', () => {
       await repository.createFileVersionIfDue(fileId);
     }
 
-    let versions = await repository.listFileVersions(fileId);
+    const versions = await repository.listFileVersions(fileId);
     expect(versions).toHaveLength(32);
     expect(
       Array.from((await repository.readFileBytes(versions[31].id)) ?? []),
     ).toEqual([1]);
-
-    vi.setSystemTime(new Date('2026-01-02T00:00:00Z'));
-    await repository.renameNode(fileId, 'Current name.png');
-    await repository.writeFileBytes(fileId, new Uint8Array([99]));
-    await repository.restoreFileVersion(fileId, versions[31].id);
-
-    const restoredNode = await repository.getNode(fileId);
-    expect(restoredNode).toMatchObject({
-      id: fileId,
-      name: 'Current name.png',
-      parentId: folderId,
-      tags: ['keep'],
-    });
-    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual([
-      1,
-    ]);
-
-    versions = await repository.listFileVersions(fileId);
-    expect(versions).toHaveLength(32);
-    expect(
-      Array.from((await repository.readFileBytes(versions[0].id)) ?? []),
-    ).toEqual([99]);
-  });
-
-  it('does not duplicate existing history when restoring back and forth', async () => {
-    vi.useFakeTimers();
-
-    const repository = new LocalRepository('repositories/version-toggle-test');
-    await repository.initialize();
-
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-    const fileId = await repository.createFile(
-      'Photo.png',
-      'png',
-      null,
-      new Uint8Array([1]),
-    );
-    const firstVersion = await repository.createFileVersionIfDue(fileId);
-    expect(firstVersion).not.toBeNull();
-
-    vi.setSystemTime(new Date('2026-01-01T00:01:00Z'));
-    await repository.writeFileBytes(fileId, new Uint8Array([2]));
-
-    vi.setSystemTime(new Date('2026-01-01T00:02:00Z'));
-    await repository.restoreFileVersion(fileId, firstVersion?.id ?? '');
-
-    let versions = await repository.listFileVersions(fileId);
-    expect(versions).toHaveLength(2);
-    const secondVersion = versions[0];
-    expect(
-      Array.from(
-        (await repository.readFileBytes(secondVersion?.id ?? '')) ?? [],
-      ),
-    ).toEqual([2]);
-
-    vi.setSystemTime(new Date('2026-01-01T00:03:00Z'));
-    await repository.restoreFileVersion(fileId, secondVersion?.id ?? '');
-
-    versions = await repository.listFileVersions(fileId);
-    expect(versions).toHaveLength(2);
-    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual([
-      2,
-    ]);
-  });
-
-  it('does not mutate the file when restoring the current content', async () => {
-    vi.useFakeTimers();
-
-    const repository = new LocalRepository(
-      'repositories/version-current-restore-test',
-    );
-    await repository.initialize();
-
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-    const fileId = await repository.createFile(
-      'Photo.png',
-      'png',
-      null,
-      new Uint8Array([1]),
-    );
-    const version = await repository.createFileVersionIfDue(fileId);
-    expect(version).not.toBeNull();
-
-    const beforeRestore = await repository.getNode(fileId);
-    const beforeModifiedAt =
-      beforeRestore && beforeRestore.type === 'file'
-        ? beforeRestore.modifiedAt
-        : null;
-
-    vi.setSystemTime(new Date('2026-01-01T00:10:00Z'));
-    await repository.restoreFileVersion(fileId, version?.id ?? '');
-
-    expect(await repository.getNode(fileId)).toMatchObject({
-      modifiedAt: beforeModifiedAt,
-    });
-    expect(await repository.listFileVersions(fileId)).toHaveLength(1);
-  });
-
-  it('does not restore missing version data as an empty file', async () => {
-    const repository = new LocalRepository('repositories/version-missing-test');
-    await repository.initialize();
-
-    const fileId = await repository.createFile(
-      'Photo.png',
-      'png',
-      null,
-      new Uint8Array([1]),
-    );
-    const version = await repository.createFileVersionIfDue(fileId);
-    expect(version).not.toBeNull();
-
-    await repository.writeFileBytes(fileId, new Uint8Array([2]));
-    await getRepositoryTestStorage().remove(
-      `repositories/version-missing-test/files/${getStoredFileName({
-        id: version?.id ?? '',
-        fileType: 'png',
-      })}`,
-    );
-
-    await expect(
-      repository.restoreFileVersion(fileId, version?.id ?? ''),
-    ).rejects.toThrow('Version data is missing.');
-    expect(Array.from((await repository.readFileBytes(fileId)) ?? [])).toEqual([
-      2,
-    ]);
-    expect(await repository.listFileVersions(fileId)).toHaveLength(1);
   });
 
   it('does not store note links for version-history snapshots', async () => {
-    const repository = new LocalRepository('repositories/version-links-test');
+    const repository = new TestRepository('repositories/version-links-test');
     await repository.initialize();
 
     const sourceId = await repository.createFile('Source', 'mcanvas', null);
@@ -263,10 +137,7 @@ describe('repository file version history', () => {
       'See [[Target]] for context.',
       async (title) => (title === 'Target' ? targetId : null),
     );
-    await repository.pushUpdates(sourceId, note.update, {
-      baseRevision: null,
-      localStateVector: note.stateVector,
-    });
+    await repository.persistDocumentUpdate(sourceId, note.update);
 
     const version = await repository.createFileVersionIfDue(sourceId);
     expect(version).not.toBeNull();
@@ -284,7 +155,7 @@ describe('repository file version history', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
 
-    const repository = new LocalRepository('repositories/version-delete-test');
+    const repository = new TestRepository('repositories/version-delete-test');
     await repository.initialize();
 
     const fileId = await repository.createFile(
