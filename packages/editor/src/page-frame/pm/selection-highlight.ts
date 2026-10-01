@@ -69,9 +69,26 @@ export function selectionHighlightPlugin(): Plugin {
           return DecorationSet.empty;
         }
 
-        return DecorationSet.create(state.doc, [
+        const decorations = [
           Decoration.inline(from, to, { class: 'pm-selection' }),
-        ]);
+        ];
+        state.doc.nodesBetween(from, to, (node, pos) => {
+          if (
+            (node.type.name === 'bulletListItem' ||
+              node.type.name === 'orderedListItem' ||
+              node.type.name === 'checkListItem') &&
+            from <= pos &&
+            to >= pos + node.nodeSize
+          ) {
+            decorations.push(
+              Decoration.node(pos, pos + node.nodeSize, {
+                class: 'pm-list-marker-selected',
+              }),
+            );
+          }
+        });
+
+        return DecorationSet.create(state.doc, decorations);
       },
     },
     view(editorView) {

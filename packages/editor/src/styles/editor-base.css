@@ -51,6 +51,18 @@
   left: 0.1em;
 }
 
+.pm-editor .ProseMirror .bullet-list-item.pm-list-marker-selected::before,
+.pm-editor .ProseMirror .ordered-list-item.pm-list-marker-selected::before {
+  background: Highlight;
+  color: HighlightText;
+  padding-block: 2px;
+  margin-block: -2px;
+}
+
+.pm-editor .ProseMirror .check-list-item.pm-list-marker-selected > input[type="checkbox"] {
+  outline: 2px solid Highlight;
+}
+
 .pm-editor .ProseMirror .check-list-item > input[type="checkbox"] {
   accent-color: var(--accent-dark);
   height: 1em;
