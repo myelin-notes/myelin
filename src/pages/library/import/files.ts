@@ -1,5 +1,5 @@
 import type { FolderReader } from '@/lib/folder-reader';
-import type { FileType, Repository, VFSNodeId } from '@/lib/sync';
+import type { FileType, NativeRepository, VFSNodeId } from '@/lib/sync';
 import { getFileTypeForName, isImportableFileType } from '@/lib/sync';
 
 export function isStorageFile(file: Pick<File, 'name' | 'type'>): boolean {
@@ -18,7 +18,7 @@ export async function importStoragePath({
   path: string;
   name: string;
   fileType: FileType;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   reader?: FolderReader;
 }): Promise<VFSNodeId> {

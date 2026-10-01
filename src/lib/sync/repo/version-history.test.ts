@@ -137,10 +137,7 @@ describe('repository file version history', () => {
       'See [[Target]] for context.',
       async (title) => (title === 'Target' ? targetId : null),
     );
-    await repository.pushUpdates(sourceId, note.update, {
-      baseRevision: null,
-      localStateVector: note.stateVector,
-    });
+    await repository.persistDocumentUpdate(sourceId, note.update);
 
     const version = await repository.createFileVersionIfDue(sourceId);
     expect(version).not.toBeNull();

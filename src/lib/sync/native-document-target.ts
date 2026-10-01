@@ -1,8 +1,5 @@
-import type {
-  YjsSyncPushResult,
-  YjsSyncSnapshot,
-  YjsSyncTarget,
-} from '@myelin/editor/sync/types';
+import type { YjsSyncSnapshot } from '@myelin/editor/sync/types';
+import type { NativeRepository } from './repo/native';
 
 export interface NativeDocumentSnapshot extends YjsSyncSnapshot {
   generation: string;
@@ -15,29 +12,19 @@ export interface NativeDocumentChange {
   replacement: boolean;
 }
 
-export interface NativeDocumentTarget extends YjsSyncTarget {
-  readonly nativeRepositoryHandle: string;
-  loadDocument(nodeId: string): Promise<NativeDocumentSnapshot>;
-  pullUpdates(
-    nodeId: string,
-    stateVector?: Uint8Array | null,
-  ): Promise<NativeDocumentSnapshot>;
-  persistDocumentUpdate(
-    nodeId: string,
-    update: Uint8Array,
-    generation?: string,
-    sourceSession?: string,
-  ): Promise<YjsSyncPushResult>;
-  flushDocument(nodeId: string): Promise<void>;
-  subscribeDocument(
-    nodeId: string,
-    listener: (change: NativeDocumentChange) => void,
-    sessionId: string,
-  ): Promise<() => Promise<void>>;
+export interface NativeDocumentWriteResult {
+  stateVector: Uint8Array;
+  revision: string | null;
+  accepted: boolean;
+  changed: boolean;
 }
 
-export function isNativeDocumentTarget(
-  target: YjsSyncTarget,
-): target is NativeDocumentTarget {
-  return 'persistDocumentUpdate' in target && 'subscribeDocument' in target;
-}
+export type NativeDocumentTarget = Pick<
+  NativeRepository,
+  | 'nativeRepositoryHandle'
+  | 'loadDocument'
+  | 'pullUpdates'
+  | 'persistDocumentUpdate'
+  | 'flushDocument'
+  | 'subscribeDocument'
+>;

@@ -1,4 +1,5 @@
-import type { NoteBacklink, Repository, VFSNodeId } from './types';
+import type { NativeRepository } from './native';
+import type { NoteBacklink, VFSNodeId } from './types';
 
 export interface RenamePageFrameReferencesResult {
   sourceCount: number;
@@ -12,7 +13,7 @@ export interface RenamePageFrameReferencesResult {
  * place to avoid clobbering live Y.js state.
  */
 export async function renamePageFrameReferences(
-  repository: Pick<Repository, 'getBacklinks' | 'renameReferences'>,
+  repository: Pick<NativeRepository, 'getBacklinks' | 'renameReferences'>,
   ownerNoteId: VFSNodeId,
   pageFrameId: string,
   newName: string,

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import type {
-  ActiveRepository,
+  NativeRepository,
   NoteSessionStatus,
   VFSNodeId,
 } from '@/lib/sync';
@@ -40,7 +40,7 @@ vi.mock('@myelin/editor/page-frame/note-link/resolution', () => ({
   resolveNoteLinkRefByTitle: resolveNoteLinkRefByTitleMock,
 }));
 
-type ControllerRepository = ActiveRepository;
+type ControllerRepository = NativeRepository;
 type ControllerDrawableCanvasRef = RefObject<DrawableCanvas | null>;
 
 interface MockNoteSession {

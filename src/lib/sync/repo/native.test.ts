@@ -9,6 +9,7 @@ import { filesProvider } from '@/pages/library/import/providers/files';
 import { onenoteProvider } from '@/pages/library/import/providers/onenote';
 import { importWorkspaceJson } from '@/pages/library/import/workspace-json';
 import type { NativeDocumentChange } from '../native-document-target';
+import { getGoogleDriveToken } from './google-drive/credentials';
 import { NativeRepository } from './native';
 import { renameNoteReferences } from './rename-note-references';
 import { renamePageFrameReferences } from './rename-page-frame-references';
@@ -234,6 +235,61 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(listeners.size).toBe(0);
 });
 
+it('refreshes Drive authentication only for its repository and credential', async () => {
+  nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'repository_auth_response') {
+      return;
+    }
+    return implementation(command, args);
+  });
+  const token = vi.mocked(getGoogleDriveToken);
+  token.mockClear();
+  token
+    .mockResolvedValueOnce('initial-token')
+    .mockResolvedValueOnce('refreshed-token');
+  const repository = createRepositoryFromConfig({
+    kind: 'google-drive',
+    folderName: 'Notes',
+    folderId: 'drive-folder',
+    credentialId: 'drive-account',
+  });
+  await repository.initialize();
+  expect(invoke).toHaveBeenCalledWith('repository_open', {
+    request: {
+      storageRoot: 'repositories/google-drive/drive-folder',
+      credentialId: 'drive-account',
+      source: {
+        kind: 'google-drive',
+        folderId: 'drive-folder',
+        token: 'initial-token',
+      },
+    },
+  });
+  const authenticate = listeners.get('repository-auth-request')!;
+  const request = {
+    repositoryId: 'repositories/google-drive/drive-folder',
+    credentialId: 'drive-account',
+    requestId: 'auth',
+    forceRefresh: true,
+  };
+  authenticate({ payload: { ...request, repositoryId: 'another-repository' } });
+  authenticate({ payload: { ...request, credentialId: 'another-account' } });
+  expect(token).toHaveBeenCalledTimes(1);
+  authenticate({ payload: request });
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith('repository_auth_response', {
+      requestId: 'auth',
+      token: 'refreshed-token',
+    }),
+  );
+  expect(token).toHaveBeenLastCalledWith('drive-account', {
+    forceRefresh: true,
+  });
+  await repository.dispose();
+});
+
 it('keeps snapshot and restore content in Rust while ordinary writes check conflicts', async () => {
   const native = nativeBoundary();
   const implementation = vi.mocked(invoke).getMockImplementation()!;
@@ -259,7 +315,7 @@ it('keeps snapshot and restore content in Rust while ordinary writes check confl
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   await repository.initialize();
   const id = await repository.createFile(
     'Image',
@@ -305,7 +361,7 @@ it('does not publish a new file while its native byte write is still in flight',
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const creating = repository.createFile(
     'Large import',
     'png',
@@ -346,7 +402,7 @@ it('keeps session subscriptions distinct and delivers metadata-only replacement 
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const editor = vi.fn((_change: NativeDocumentChange) => {});
   const mcp = vi.fn((_change: NativeDocumentChange) => {});
   const closeEditor = await repository.subscribeDocument(
@@ -439,7 +495,7 @@ it.each([
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const job = filesProvider.createJob({
     selection: { kind: 'native-files', paths: [path] },
     repository,
@@ -499,7 +555,7 @@ it.each([
           },
         ];
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const folder = {
     kind: 'scoped' as const,
     handle: { id: 'picked-folder', name: 'Imported' },
@@ -547,7 +603,7 @@ it('leaves a revoked scoped-folder import unpublished', async () => {
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   await expect(
     repository.importFile('photo.png', 'png', null, {
       kind: 'scoped',
@@ -574,7 +630,7 @@ it('routes note and frame renames to Rust without fetching or replacing file con
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const backlinks = ['owner', 'source', 'source'].map((sourceId) => ({
     sourceId,
     sourceName: sourceId,
@@ -615,7 +671,7 @@ it('routes note and frame renames to Rust without fetching or replacing file con
 it('paces large JS file writes in bounded chunks and never publishes partial bytes', async () => {
   const native = nativeBoundary();
   const bytes = Uint8Array.from({ length: 8192 * 2 + 1 }, (_, i) => i % 251);
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const id = await repository.createFile('Large', 'png', null, bytes);
   expect(native.files.get(id)).toEqual(bytes);
   const chunks = native.operations.filter((op) => op.kind === 'stage-bytes');
@@ -642,7 +698,7 @@ it('cancels a failed JS transfer without publishing a new file', async () => {
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   await expect(
     repository.createFile('Failed', 'png', null, new Uint8Array(8193)),
   ).rejects.toThrow('Transfer interrupted');
@@ -654,7 +710,7 @@ it('cancels a failed JS transfer without publishing a new file', async () => {
 
 it('saves a JS-generated canvas import through bounded native document transfers', async () => {
   const native = nativeBoundary();
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const bytes = Uint8Array.from({ length: 20000 }, (_, i) => i % 251);
   const id = await createCanvasFile({
     repository,
@@ -714,7 +770,7 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     }
     return implementation(command, args);
   });
-  const repository = new NativeRepository({ kind: 'local' });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
   const job = onenoteProvider.createJob({
     selection: { kind: 'file', path: '/picked/Notebook.onepkg' },
     repository,

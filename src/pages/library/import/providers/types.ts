@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import type { Messages } from '@myelin/editor/i18n';
 import type { DialogFilter } from '@tauri-apps/plugin-dialog';
 import type { PickedFolder } from '@/lib/folder-picker';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type { ImportJob } from '../dialog';
 
 /**
@@ -34,7 +34,7 @@ export type ImportSelection =
 
 export interface ImportJobContext {
   selection: ImportSelection;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   strings: Messages;
 }

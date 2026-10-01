@@ -9,7 +9,7 @@ import {
   type PdfPageSize,
 } from '@myelin/editor/pdf-renderer';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createCanvasFile } from './canvas-file';
 
 export const PDF_EXTENSION_RE = /\.pdf$/i;
@@ -64,7 +64,7 @@ export async function importPdfFile({
   fallbackTitle,
 }: {
   file: File;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
@@ -87,7 +87,7 @@ export async function importPdfBytes({
 }: {
   bytes: Uint8Array;
   fileName: string;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {

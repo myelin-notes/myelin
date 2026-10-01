@@ -1,4 +1,5 @@
-import type { NoteBacklink, Repository, VFSNodeId } from './types';
+import type { NativeRepository } from './native';
+import type { NoteBacklink, VFSNodeId } from './types';
 
 export interface RenameNoteReferencesResult {
   sourceCount: number;
@@ -6,7 +7,7 @@ export interface RenameNoteReferencesResult {
 }
 
 export async function renameNoteReferences(
-  repository: Pick<Repository, 'getBacklinks' | 'renameReferences'>,
+  repository: Pick<NativeRepository, 'getBacklinks' | 'renameReferences'>,
   noteId: VFSNodeId,
   newName: string,
   backlinks?: readonly NoteBacklink[],

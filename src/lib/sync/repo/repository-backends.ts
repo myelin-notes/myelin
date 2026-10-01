@@ -2,9 +2,11 @@ import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   type RepositoryConfig,
 } from '@myelin/editor/sync/repo/config';
-import type { ActiveRepository } from './config';
-import { hasGitHubToken } from './github/credentials';
-import { hasGoogleDriveToken } from './google-drive/credentials';
+import { getGitHubToken, hasGitHubToken } from './github/credentials';
+import {
+  getGoogleDriveToken,
+  hasGoogleDriveToken,
+} from './google-drive/credentials';
 import { NativeRepository } from './native';
 
 interface RepositoryConfigBase {
@@ -15,7 +17,7 @@ export interface RepositoryBackendDescriptor<
   Config extends RepositoryConfigBase,
 > {
   readonly kind: Config['kind'];
-  create(config: Config): ActiveRepository;
+  create(config: Config): NativeRepository;
   normalizeConfig(config: Config): Config;
   storageKey(config: Config): string;
   configIdentity(config: Config): string;
@@ -82,7 +84,13 @@ function normalizeStorageKeyPart(value: string): string {
 const localRepositoryBackend: RepositoryBackendDescriptor<LocalRepositoryConfig> =
   {
     kind: 'local',
-    create: () => new NativeRepository({ kind: 'local' }),
+    create: () =>
+      new NativeRepository({
+        kind: 'local-storage',
+        storageRoot: '',
+        source: null,
+        capabilities: { polling: false, liveSync: false, batchedCommit: false },
+      }),
     normalizeConfig: () => ({ kind: 'local' }),
     storageKey: () => 'local',
     configIdentity: () => 'local',
@@ -96,7 +104,19 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
     kind: 'github',
     create: (config) => {
       const cacheRoot = `repositories/github/${getRepositoryStorageKey(config)}`;
-      return new NativeRepository(config, cacheRoot);
+      return new NativeRepository({
+        kind: 'github',
+        storageRoot: cacheRoot,
+        credentialId: config.credentialId,
+        capabilities: { polling: false, liveSync: true, batchedCommit: true },
+        source: {
+          kind: 'github',
+          owner: config.owner,
+          repo: config.repo,
+          branch: config.branch ?? 'main',
+        },
+        getToken: () => getGitHubToken(config.credentialId),
+      });
     },
     normalizeConfig: (config) => ({
       kind: 'github',
@@ -138,7 +158,15 @@ const googleDriveRepositoryBackend: RepositoryBackendDescriptor<GoogleDriveRepos
     kind: 'google-drive',
     create: (config) => {
       const cacheRoot = `repositories/google-drive/${getRepositoryStorageKey(config)}`;
-      return new NativeRepository(config, cacheRoot);
+      return new NativeRepository({
+        kind: 'google-drive',
+        storageRoot: cacheRoot,
+        credentialId: config.credentialId,
+        capabilities: { polling: false, liveSync: true, batchedCommit: false },
+        source: { kind: 'google-drive', folderId: config.folderId },
+        getToken: (forceRefresh) =>
+          getGoogleDriveToken(config.credentialId, { forceRefresh }),
+      });
     },
     normalizeConfig: (config) => ({
       kind: 'google-drive',
@@ -175,7 +203,7 @@ export function getRepositoryBackend(
 
 export function createRepositoryFromConfig(
   config: RepositoryConfig,
-): ActiveRepository {
+): NativeRepository {
   return getRepositoryBackend(config).create(config);
 }
 

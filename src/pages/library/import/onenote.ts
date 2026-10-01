@@ -1,6 +1,7 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
-import type { Repository, VFSNodeId } from '@/lib/sync';
-import { NativeRepository } from '@/lib/sync/repo/native';
+import type { VFSNodeId } from '@/lib/sync';
+import type { NativeRepository } from '@/lib/sync/repo/native';
+import type { OneNoteImportResult } from '@/lib/sync/repo/native-operations';
 import type { ImportProgress } from './dialog';
 
 export const ONENOTE_DIALOG_FILTERS = [
@@ -32,11 +33,7 @@ export interface OneNotePreview {
   sections: number;
 }
 
-export interface OneNoteImportResult {
-  rootFolderId: VFSNodeId;
-  pagesImported: number;
-  skippedPages: number;
-}
+export type { OneNoteImportResult } from '@/lib/sync/repo/native-operations';
 
 export function scanOneNoteFile(path: string): Promise<OneNotePreview> {
   return invoke<OneNotePreview>('scan_onenote', { path });
@@ -51,27 +48,19 @@ export async function importOneNote({
   onProgress,
 }: {
   path: string;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   rootName: string;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;
 }): Promise<OneNoteImportResult> {
-  if (!(repository instanceof NativeRepository)) {
-    throw new Error('OneNote import requires a native repository');
-  }
-  await repository.initialize();
   const progress = new Channel<ImportProgress>();
   progress.onmessage = (value) => onProgress?.(value);
-  return invoke<OneNoteImportResult>('repository_operation', {
-    handle: repository.nativeRepositoryHandle,
-    operation: {
-      kind: 'import-one-note',
-      path,
-      parentId,
-      rootName,
-      fallbackTitle,
-      progress,
-    },
+  return repository.importOneNote({
+    path,
+    parentId,
+    rootName,
+    fallbackTitle,
+    progress,
   });
 }

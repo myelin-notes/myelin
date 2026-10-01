@@ -1,31 +1,79 @@
-import { NODES_DELETED_EVENT } from '@myelin/editor/events';
-import type {
-  YjsSyncPushOptions,
-  YjsSyncPushResult,
-} from '@myelin/editor/sync/types';
+import {
+  NODES_DELETED_EVENT,
+  type NodesDeletedDetail,
+} from '@myelin/editor/events';
 import { removeThumbnail } from '@myelin/editor/thumbnails';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import type { SearchIndex } from '@/lib/search';
 import type {
   NativeDocumentChange,
   NativeDocumentSnapshot,
-  NativeDocumentTarget,
+  NativeDocumentWriteResult,
 } from '../native-document-target';
-import { BaseRepository } from './base';
-import type { RepositoryConfig, RepositoryRuntimeStatus } from './config';
-import { getGitHubToken } from './github/credentials';
-import { getGoogleDriveToken } from './google-drive/credentials';
+import { NoteSession } from '../session';
+import { MAX_PEN_PRESETS, type RepositoryRuntimeStatus } from './config';
+import type {
+  NativeDocumentWrite,
+  NativeOperationRequests,
+  NativeOperationResults,
+  NativeRevision,
+  OneNoteImportRequest,
+  OneNoteImportResult,
+  UpdateDocumentOperation,
+  WriteFileOperation,
+} from './native-operations';
 import { noteContentIndex } from './note-content-index';
-import type { VFSManifest } from './shared';
+import {
+  addChild,
+  createFileNode,
+  createFolderNode,
+  createNodeId,
+  createNodeSearchIndex,
+  deleteNodeFromManifest,
+  getBacklinks,
+  getChildrenIds,
+  getFileVersionNodes,
+  getFolderChain,
+  getNodesByAnyTag,
+  getNodesByExactName,
+  getNoteGraph,
+  getRecentFiles,
+  getStats,
+  getUniqueFileName,
+  listDirectoryNodes,
+  listHierarchicalTags,
+  listTags,
+  moveNodeInManifest,
+  normalizeCustomColor,
+  searchNodeResults,
+  toFileVersion,
+  type VFSManifest,
+} from './shared';
+import { expandTagWithAncestors, normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
+  CustomColorTool,
   FileImportSource,
   FileType,
   FileVersion,
+  NodeSearchResult,
+  NoteBacklink,
+  NoteIndexItem,
+  PenPreset,
+  PenPresetChanges,
   RenameReferencesRequest,
   RenameReferencesResult,
+  Repository,
   RepositoryCapabilities,
+  RepositoryNoteGraph,
+  RepositoryStats,
+  RepositoryTag,
+  SearchNodesOptions,
+  VFSFileNode,
+  VFSFolderNode,
+  VFSNode,
   VFSNodeId,
 } from './types';
 
@@ -33,14 +81,7 @@ interface NativeStatus extends Omit<RepositoryRuntimeStatus, 'lastError'> {
   repositoryId: string;
   lastError: string | null;
 }
-interface NativeDocument {
-  updateBase64: string;
-  stateVectorBase64: string;
-  revision: string | null;
-  generation: string;
-  accepted?: boolean;
-  changed?: boolean;
-}
+
 interface DocumentEvent {
   repositoryId: string;
   nodeId: string;
@@ -49,17 +90,41 @@ interface DocumentEvent {
   generation: string;
   replacement: boolean;
 }
+
 interface DataEvent {
   repositoryId: string;
   changed: string[];
   deleted: string[];
 }
+
 interface AuthEvent {
   repositoryId: string;
   credentialId: string;
   requestId: string;
   forceRefresh: boolean;
 }
+
+export type NativeRepositorySource =
+  | { kind: 'github'; owner: string; repo: string; branch: string }
+  | { kind: 'google-drive'; folderId: string };
+
+export type NativeRepositoryOptions = {
+  capabilities: RepositoryCapabilities;
+  storageRoot: string;
+} & (
+  | {
+      kind: 'local-storage';
+      source: null;
+      credentialId?: never;
+      getToken?: never;
+    }
+  | {
+      kind: 'github' | 'google-drive';
+      source: NativeRepositorySource;
+      credentialId: string;
+      getToken: (forceRefresh: boolean) => Promise<string>;
+    }
+);
 
 const logger = new Logger('NativeRepository');
 
@@ -70,14 +135,22 @@ function encode(bytes: Uint8Array): string {
   }
   return btoa(binary);
 }
+
 function decode(base64: string): Uint8Array {
   return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 }
 
-export class NativeRepository
-  extends BaseRepository
-  implements NativeDocumentTarget
-{
+// Announce deleted files so the tab layer can close tabs bound to them. Guarded
+// for non-DOM contexts (tests, background workers) where `window` is absent.
+function emitNodesDeleted(ids: VFSNodeId[]): void {
+  if (ids.length === 0 || typeof window === 'undefined') {
+    return;
+  }
+  const detail: NodesDeletedDetail = { ids };
+  window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
+}
+
+export class NativeRepository implements Repository {
   readonly capabilities: RepositoryCapabilities;
   readonly kind: string;
   private handle = '';
@@ -86,27 +159,19 @@ export class NativeRepository
   private readonly unlisteners: UnlistenFn[] = [];
   private nativeVersion = -1;
 
-  constructor(
-    private readonly config: RepositoryConfig,
-    private readonly storageRoot = '',
-  ) {
-    super();
-    this.kind = config.kind === 'local' ? 'local-storage' : config.kind;
-    this.capabilities = {
-      polling: false,
-      liveSync: config.kind !== 'local',
-      batchedCommit: config.kind === 'github',
-    };
+  constructor(private readonly backend: NativeRepositoryOptions) {
+    this.kind = backend.kind;
+    this.capabilities = backend.capabilities;
   }
 
   get nativeRepositoryHandle(): string {
     return this.handle;
   }
   private get repositoryId(): string {
-    return this.storageRoot || 'local';
+    return this.backend.storageRoot || 'local';
   }
 
-  override initialize(): Promise<void> {
+  initialize(): Promise<void> {
     this.initializing ??= this.open();
     return this.initializing;
   }
@@ -133,13 +198,13 @@ export class NativeRepository
         await listen<AuthEvent>('repository-auth-request', ({ payload }) => {
           if (
             payload.repositoryId !== this.repositoryId ||
-            this.config.kind === 'local' ||
-            payload.credentialId !== this.config.credentialId ||
+            !this.backend.source ||
+            payload.credentialId !== this.backend.credentialId ||
             this.disposed
           ) {
             return;
           }
-          void this.token(payload.forceRefresh).then(
+          void this.backend.getToken(payload.forceRefresh).then(
             (token) =>
               invoke('repository_auth_response', {
                 requestId: payload.requestId,
@@ -154,28 +219,16 @@ export class NativeRepository
         }),
       );
       const token =
-        this.config.kind === 'local'
-          ? ''
-          : await this.token(false).catch(() => '');
-      const source =
-        this.config.kind === 'local'
-          ? null
-          : this.config.kind === 'github'
-            ? {
-                kind: 'github',
-                owner: this.config.owner,
-                repo: this.config.repo,
-                branch: this.config.branch ?? 'main',
-                token,
-              }
-            : { kind: 'google-drive', folderId: this.config.folderId, token };
+        (await this.backend.getToken?.(false).catch(() => '')) ?? '';
+      const source = this.backend.source
+        ? { ...this.backend.source, token }
+        : null;
       const opened = await invoke<{ handle: string; status: NativeStatus }>(
         'repository_open',
         {
           request: {
-            storageRoot: this.storageRoot,
-            credentialId:
-              this.config.kind === 'local' ? '' : this.config.credentialId,
+            storageRoot: this.backend.storageRoot,
+            credentialId: this.backend.credentialId ?? '',
             source,
           },
         },
@@ -193,15 +246,6 @@ export class NativeRepository
       }
       throw error;
     }
-  }
-
-  private async token(forceRefresh: boolean): Promise<string> {
-    if (this.config.kind === 'local') {
-      return '';
-    }
-    return this.config.kind === 'github'
-      ? getGitHubToken(this.config.credentialId)
-      : getGoogleDriveToken(this.config.credentialId, { forceRefresh });
   }
 
   private applyStatus(status: NativeStatus): void {
@@ -246,61 +290,73 @@ export class NativeRepository
     }
   }
 
-  private async operation<T>(operation: object): Promise<T> {
+  private async operation<K extends keyof NativeOperationRequests>(
+    operation: NativeOperationRequests[K] & { kind: K },
+  ): Promise<NativeOperationResults[K]> {
     await this.initialize();
     if (this.disposed || !this.handle) {
       throw new Error('Repository is closed');
     }
-    return invoke<T>('repository_operation', {
+    return invoke<NativeOperationResults[K]>('repository_operation', {
       handle: this.handle,
       operation,
     });
   }
 
-  protected override loadManifestImpl(): Promise<{
+  protected loadManifestImpl(): Promise<{
     manifest: VFSManifest;
     revision: string;
   }> {
     return this.operation({ kind: 'manifest' });
   }
-  protected override async saveManifestImpl(
+  protected async saveManifestImpl(
     manifest: VFSManifest,
     revision: string | null,
   ): Promise<string> {
-    const result = await this.operation<{ revision: string }>({
+    const result = await this.operation({
       kind: 'save-manifest',
       manifest,
       revision: revision ?? '',
     });
     return result.revision;
   }
-  protected override isConflictError(error: unknown): boolean {
+  protected isConflictError(error: unknown): boolean {
     return String(error).includes('Native manifest conflict');
   }
-  protected override manifestMaxRetries(): number {
+  protected manifestMaxRetries(): number {
     return 4;
   }
-  protected override async loadFileBytes(
+  protected async loadFileBytes(
     nodeId: VFSNodeId,
   ): Promise<{ bytes: Uint8Array | null; revision: string | null }> {
     const node = await this.getNode(nodeId);
     if (!node || node.type !== 'file') {
       return { bytes: null, revision: null };
     }
-    const result = await this.operation<{
-      bytesBase64: string;
-      revision: string | null;
-    }>({ kind: 'read-file', nodeId });
+    const result = await this.operation({ kind: 'read-file', nodeId });
     const bytes = decode(result.bytesBase64);
     return { bytes: bytes.length ? bytes : null, revision: result.revision };
   }
-  private async writeBytes<T>(
-    operation: Record<string, unknown>,
-    field: 'bytesBase64' | 'updateBase64',
+  private writeBytes(
+    operation: WriteFileOperation,
     bytes: Uint8Array,
-  ): Promise<T> {
+  ): Promise<NativeRevision>;
+  private writeBytes(
+    operation: UpdateDocumentOperation,
+    bytes: Uint8Array,
+  ): Promise<NativeDocumentWrite>;
+  private async writeBytes(
+    operation: WriteFileOperation | UpdateDocumentOperation,
+    bytes: Uint8Array,
+  ): Promise<NativeRevision | NativeDocumentWrite> {
+    const withBytes = (
+      bytesBase64: string,
+    ): WriteFileOperation | UpdateDocumentOperation =>
+      operation.kind === 'write-file'
+        ? { ...operation, bytesBase64 }
+        : { ...operation, updateBase64: bytesBase64 };
     if (bytes.length <= 8192) {
-      return this.operation<T>({ ...operation, [field]: encode(bytes) });
+      return this.operation(withBytes(encode(bytes)));
     }
     const transferId = crypto.randomUUID();
     try {
@@ -313,10 +369,10 @@ export class NativeRepository
         });
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
       }
-      return await this.operation<T>({
+      return await this.operation({
         kind: 'finish-transfer',
         transferId,
-        operation: { ...operation, [field]: '' },
+        operation: withBytes(''),
       });
     } catch (error) {
       await this.operation({ kind: 'cancel-transfer', transferId }).catch(
@@ -326,7 +382,7 @@ export class NativeRepository
     }
   }
 
-  protected override async saveFileBytes(
+  protected async saveFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
   ): Promise<string | null> {
@@ -334,19 +390,19 @@ export class NativeRepository
     if (!node || node.type !== 'file') {
       throw new Error('Repository file is missing');
     }
-    const result = await this.writeBytes<{ revision: string }>(
+    const result = await this.writeBytes(
       {
         kind: 'write-file',
+        bytesBase64: '',
         node,
         replace: true,
         overwriteRemote: false,
       },
-      'bytesBase64',
       bytes,
     );
     return result.revision;
   }
-  protected override async deleteFileBytes(
+  protected async deleteFileBytes(
     nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void> {
@@ -356,44 +412,66 @@ export class NativeRepository
       fileType: fileType ?? null,
     });
   }
-  protected override async onFileSaved(): Promise<void> {}
-  override async writeFileBytes(
-    nodeId: VFSNodeId,
-    bytes: Uint8Array,
-  ): Promise<void> {
+  async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
     await this.saveFileBytes(nodeId, bytes);
   }
   /** Publishes a new file only after its bytes are durable. */
-  override createFile(
+  createFile(
     name: string,
     fileType: FileType,
     parentId: VFSNodeId | null,
     bytes?: Uint8Array,
     options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
-    return this.batchManifestWrites(() =>
-      super.createFile(name, fileType, parentId, bytes, options),
-    );
+    return this.batchManifestWrites(async () => {
+      // Minted outside the mutator so a batched flush that replays this mutation
+      // after a conflict reuses the id the caller already received.
+      const id = createNodeId();
+      const now = Date.now();
+      await this.mutateManifest('Create file', (manifest) => {
+        manifest.nodes[id] = createFileNode(
+          id,
+          name,
+          fileType,
+          parentId,
+          now,
+          options?.system,
+        );
+        addChild(manifest, parentId, id);
+      });
+      this.searchMetadataRevision++;
+      if (bytes !== undefined) {
+        await this.writeFileBytes(id, bytes);
+      }
+      return id;
+    });
   }
-  override async importFile(
+  async importFile(
     name: string,
     fileType: FileType,
     parentId: VFSNodeId | null,
     source: FileImportSource,
   ): Promise<VFSNodeId> {
     return this.batchManifestWrites(async () => {
-      const id = await super.createFile(name, fileType, parentId);
+      const id = await this.createFile(name, fileType, parentId);
       const node = await this.getNode(id);
+      if (!node || node.type !== 'file') {
+        throw new Error('Repository file is missing');
+      }
       await this.operation({ kind: 'import-file', node, source });
       return id;
     });
   }
-  override renameReferences(
+  importOneNote(request: OneNoteImportRequest): Promise<OneNoteImportResult> {
+    return this.operation({ kind: 'import-one-note', ...request });
+  }
+
+  renameReferences(
     request: RenameReferencesRequest,
   ): Promise<RenameReferencesResult> {
     return this.operation({ kind: 'rename-references', ...request });
   }
-  override createFileVersionIfDue(
+  createFileVersionIfDue(
     nodeId: VFSNodeId,
     options: { force?: boolean } = {},
   ): Promise<FileVersion | null> {
@@ -403,26 +481,26 @@ export class NativeRepository
       force: options.force ?? false,
     });
   }
-  override async restoreFileVersion(
+  async restoreFileVersion(
     nodeId: VFSNodeId,
     versionId: VFSNodeId,
   ): Promise<void> {
     await this.operation({ kind: 'restore-file-version', nodeId, versionId });
   }
-  override getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
+  getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
     return this.operation({ kind: 'path', nodeId });
   }
-  override getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
+  getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     return this.getStoredAbsolutePath(nodeId);
   }
-  override async refresh(): Promise<void> {
+  async refresh(): Promise<void> {
     await this.initialize();
     await invoke('repository_sync', { handle: this.handle });
   }
-  override flushPending(): Promise<void> {
+  flushPending(): Promise<void> {
     return this.refresh();
   }
-  override async dispose(): Promise<void> {
+  async dispose(): Promise<void> {
     this.disposed = true;
     await this.initializing?.catch(() => undefined);
     for (const unlisten of this.unlisteners.splice(0)) {
@@ -434,14 +512,18 @@ export class NativeRepository
     }
   }
 
-  override loadDocument(nodeId: VFSNodeId): Promise<NativeDocumentSnapshot> {
+  openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+    return NoteSession.open(nodeId, this);
+  }
+
+  loadDocument(nodeId: VFSNodeId): Promise<NativeDocumentSnapshot> {
     return this.pullUpdates(nodeId);
   }
-  override async pullUpdates(
+  async pullUpdates(
     nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<NativeDocumentSnapshot> {
-    const result = await this.operation<NativeDocument>({
+    const result = await this.operation({
       kind: 'document',
       nodeId,
       stateVectorBase64: stateVector ? encode(stateVector) : null,
@@ -453,35 +535,26 @@ export class NativeRepository
       revision: result.revision,
     };
   }
-  override pushUpdates(
-    nodeId: VFSNodeId,
-    update: Uint8Array,
-    _options: YjsSyncPushOptions,
-  ): Promise<YjsSyncPushResult> {
-    return this.persistDocumentUpdate(nodeId, update);
-  }
   async persistDocumentUpdate(
     nodeId: string,
     update: Uint8Array,
     generation?: string,
     sourceSession?: string,
-  ): Promise<YjsSyncPushResult> {
-    const result = await this.writeBytes<NativeDocument>(
+  ): Promise<NativeDocumentWriteResult> {
+    const result = await this.writeBytes(
       {
         kind: 'update-document',
+        updateBase64: '',
         nodeId,
         origin: 'local',
         generation: generation ?? null,
         sourceSession: sourceSession ?? null,
       },
-      'updateBase64',
       update,
     );
     return {
-      accepted: result.accepted ?? true,
-      changed: result.changed ?? false,
-      update: null,
-      remoteUpdate: null,
+      accepted: result.accepted,
+      changed: result.changed,
       stateVector: decode(result.stateVectorBase64),
       revision: result.revision,
     };
@@ -534,5 +607,600 @@ export class NativeRepository
         await this.operation({ kind: 'unsubscribe', nodeId, sessionId });
       }
     };
+  }
+
+  private runtimeStatus: RepositoryRuntimeStatus = {
+    online: true,
+    pendingRemoteWrites: 0,
+    lastRemoteSyncAt: null,
+    lastError: null,
+    dataVersion: 0,
+  };
+
+  private readonly statusListeners = new Set<
+    (status: RepositoryRuntimeStatus) => void
+  >();
+
+  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index.
+  private nodeSearchCache: {
+    manifest: VFSManifest;
+    dataVersion: number;
+    index: SearchIndex<VFSNode>;
+  } | null = null;
+
+  private searchMetadataRevision = 0;
+
+  // While positive, manifest mutations accumulate on one held manifest and defer their save to the
+  // outermost close.
+  private manifestBatchDepth = 0;
+
+  // Loaded once. Reads inside the batch see pending writes because they share this object.
+  private manifestBatchLoad: Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> | null = null;
+
+  // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
+  // be replay-safe: ids and any values the caller kept are minted outside the mutator.
+  private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
+
+  getRuntimeStatus(): RepositoryRuntimeStatus {
+    return { ...this.runtimeStatus };
+  }
+
+  subscribeStatus(
+    listener: (status: RepositoryRuntimeStatus) => void,
+  ): () => void {
+    this.statusListeners.add(listener);
+    listener(this.getRuntimeStatus());
+    return () => {
+      this.statusListeners.delete(listener);
+    };
+  }
+
+  // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
+  // has no delete semantics, so callers must not delete nodes inside it. A throwing `fn` discards
+  // the batch — nothing partial is saved.
+  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
+    this.manifestBatchDepth += 1;
+    let succeeded = false;
+    try {
+      const result = await fn();
+      succeeded = true;
+      return result;
+    } finally {
+      this.manifestBatchDepth -= 1;
+      if (this.manifestBatchDepth === 0) {
+        const load = this.manifestBatchLoad;
+        const mutators = this.manifestBatchMutators;
+        this.manifestBatchLoad = null;
+        this.manifestBatchMutators = [];
+        // A read-only batch has nothing to save; a failed one is dropped so no partial manifest lands —
+        // the caller's own rollback handles bytes already written.
+        if (succeeded && load && mutators.length > 0) {
+          const { manifest, revision } = await load;
+          await this.flushBatchedManifest(manifest, revision, mutators);
+        }
+      }
+    }
+  }
+
+  // Conflicts retry like a single mutation: reload the manifest that won the race and replay the
+  // whole batch onto it so neither side's writes are lost.
+  private async flushBatchedManifest(
+    manifest: VFSManifest,
+    revision: string | null,
+    mutators: ReadonlyArray<(manifest: VFSManifest) => void>,
+  ): Promise<void> {
+    let pendingManifest = manifest;
+    let pendingRevision = revision;
+    const maxRetries = this.manifestMaxRetries();
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        await this.saveManifestImpl(pendingManifest, pendingRevision);
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+        return;
+      } catch (error) {
+        if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
+          throw error;
+        }
+        const fresh = await this.loadManifestImpl();
+        for (const mutator of mutators) {
+          mutator(fresh.manifest);
+        }
+        pendingManifest = fresh.manifest;
+        pendingRevision = fresh.revision;
+      }
+    }
+    throw new Error('Failed to import after retrying manifest conflicts.');
+  }
+
+  // Inside a batch this is the one held manifest, so reads and writes within the batch observe each
+  // other's pending changes; outside a batch it delegates straight to `loadManifestImpl`.
+  protected async loadManifest(): Promise<{
+    manifest: VFSManifest;
+    revision: string | null;
+  }> {
+    if (this.manifestBatchDepth === 0) {
+      return this.loadManifestImpl();
+    }
+    if (!this.manifestBatchLoad) {
+      const load = this.loadManifestImpl();
+      this.manifestBatchLoad = load;
+      // A failed load must not poison the batch's later reads.
+      load.catch(() => {
+        if (this.manifestBatchLoad === load) {
+          this.manifestBatchLoad = null;
+        }
+      });
+    }
+    return this.manifestBatchLoad;
+  }
+
+  async applyManifestMutation<T>(
+    action: string,
+    mutator: (manifest: VFSManifest) => T,
+  ): Promise<T> {
+    const result = await this.mutateManifest(action, mutator);
+    this.searchMetadataRevision++;
+    return result;
+  }
+
+  async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
+    await this.deleteFileBytes(nodeId, fileType);
+  }
+
+  protected updateRuntimeStatus(patch: Partial<RepositoryRuntimeStatus>): void {
+    this.runtimeStatus = { ...this.runtimeStatus, ...patch };
+    const snapshot = this.getRuntimeStatus();
+    for (const listener of this.statusListeners) {
+      listener(snapshot);
+    }
+  }
+
+  async getNode(nodeId: string): Promise<VFSNode | null> {
+    const { manifest } = await this.loadManifest();
+    return manifest.nodes[nodeId] ?? null;
+  }
+
+  async listDirectory(
+    folderId: string | null,
+  ): Promise<[VFSFolderNode[], VFSFileNode[]]> {
+    const { manifest } = await this.loadManifest();
+    return listDirectoryNodes(manifest, folderId);
+  }
+
+  /** Child ids including system nodes, which `listDirectory` filters out. */
+  async listChildIds(folderId: string | null): Promise<readonly string[]> {
+    const { manifest } = await this.loadManifest();
+    return getChildrenIds(manifest, folderId);
+  }
+
+  async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
+    const { manifest } = await this.loadManifest();
+    return getFolderChain(manifest, folderId);
+  }
+
+  async searchNodes(
+    query: string,
+    options: SearchNodesOptions = {},
+  ): Promise<NodeSearchResult[]> {
+    const { manifest } = await this.loadManifest();
+    if (noteContentIndex.isSource(this)) {
+      try {
+        return await noteContentIndex.search(
+          manifest,
+          this.searchMetadataRevision,
+          query,
+          options.limit,
+        );
+      } catch (error) {
+        logger.error(
+          'Search worker unavailable; using title and tag search',
+          error,
+        );
+      }
+    }
+    const index = this.getNodeSearchIndex(manifest);
+    return searchNodeResults(manifest, query, index).slice(0, options.limit);
+  }
+
+  // Rebuilt only when the manifest changes.
+  private getNodeSearchIndex(manifest: VFSManifest): SearchIndex<VFSNode> {
+    const cache = this.nodeSearchCache;
+    if (
+      cache &&
+      cache.manifest === manifest &&
+      cache.dataVersion === this.runtimeStatus.dataVersion
+    ) {
+      return cache.index;
+    }
+    const index = createNodeSearchIndex(manifest);
+    this.nodeSearchCache = {
+      manifest,
+      dataVersion: this.runtimeStatus.dataVersion,
+      index,
+    };
+    return index;
+  }
+
+  async getNodesByName(name: string): Promise<VFSNode[]> {
+    const { manifest } = await this.loadManifest();
+    return getNodesByExactName(manifest, name);
+  }
+
+  async getNodesByAnyTag(
+    tags: string[],
+    folderId: VFSNodeId | null = null,
+  ): Promise<VFSNode[]> {
+    const { manifest } = await this.loadManifest();
+    return getNodesByAnyTag(manifest, tags, folderId);
+  }
+
+  async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
+    const { manifest } = await this.loadManifest();
+    return includeAncestors
+      ? listHierarchicalTags(manifest)
+      : listTags(manifest);
+  }
+
+  async getStats(): Promise<RepositoryStats> {
+    const { manifest } = await this.loadManifest();
+    return getStats(manifest);
+  }
+
+  async getRecentFiles(limit: number = 3): Promise<VFSFileNode[]> {
+    const { manifest } = await this.loadManifest();
+    return getRecentFiles(manifest, limit);
+  }
+
+  async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
+    const { manifest } = await this.loadManifest();
+    return getBacklinks(manifest, noteId);
+  }
+
+  async getNoteGraph(): Promise<RepositoryNoteGraph> {
+    const { manifest } = await this.loadManifest();
+    return getNoteGraph(manifest);
+  }
+
+  async getUniqueFileName(
+    baseName: string,
+    parentId: string | null,
+  ): Promise<string> {
+    const { manifest } = await this.loadManifest();
+    return getUniqueFileName(manifest, baseName, parentId);
+  }
+
+  async createFolder(name: string, parentId: string | null): Promise<string> {
+    // Minted outside the mutator so a batched flush that replays this mutation
+    // after a conflict reuses the id the caller already received.
+    const id = createNodeId();
+    const now = Date.now();
+    await this.mutateManifest('Create folder', (manifest) => {
+      manifest.nodes[id] = createFolderNode(id, name, parentId, now);
+      addChild(manifest, parentId, id);
+    });
+    this.searchMetadataRevision++;
+    return id;
+  }
+
+  async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
+    const { manifest } = await this.loadManifest();
+    return getFileVersionNodes(manifest, nodeId).map(toFileVersion);
+  }
+
+  async readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null> {
+    const { bytes } = await this.loadFileBytes(nodeId);
+    return bytes ? new Uint8Array(bytes) : null;
+  }
+
+  async renameNode(nodeId: string, newName: string): Promise<void> {
+    await this.mutateManifest('Rename node', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (!node) {
+        return;
+      }
+      node.name = newName;
+      node.modifiedAt = Date.now();
+    });
+    this.searchMetadataRevision++;
+  }
+
+  async deleteNode(nodeId: string): Promise<void> {
+    const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
+      deleteNodeFromManifest(manifest, nodeId),
+    );
+
+    await Promise.all(
+      deletedFiles.map(async (file) => {
+        await this.deleteFileBytes(file.id, file.fileType);
+        await removeThumbnail(file.id);
+        if (file.fileType === 'mcanvas' && !file.system) {
+          noteContentIndex.remove(this, file.id);
+        }
+      }),
+    );
+    this.searchMetadataRevision++;
+
+    emitNodesDeleted(deletedFiles.map((file) => file.id));
+  }
+
+  async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
+    await this.mutateManifest('Move node', (manifest) => {
+      moveNodeInManifest(manifest, nodeId, newParentId);
+    });
+  }
+
+  async setTags(nodeId: string, tags: string[]): Promise<void> {
+    await this.mutateManifest('Set node tags', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (!node) {
+        return;
+      }
+      node.tags = tags;
+      node.modifiedAt = Date.now();
+    });
+    this.searchMetadataRevision++;
+  }
+
+  async setFolderColor(nodeId: string, color: string | null): Promise<void> {
+    const normalized = color === null ? null : normalizeCustomColor(color);
+    if (color !== null && !normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    await this.mutateManifest('Set folder color', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (node?.type !== 'folder') {
+        return;
+      }
+      node.color = normalized ?? undefined;
+      node.modifiedAt = Date.now();
+    });
+  }
+
+  async addTag(nodeId: string, tag: string): Promise<void> {
+    await this.mutateManifest('Add node tag', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (!node || node.tags.includes(tag)) {
+        return;
+      }
+      manifest.nodes[nodeId] = {
+        ...node,
+        tags: [...node.tags, tag],
+        modifiedAt: Date.now(),
+      };
+    });
+    this.searchMetadataRevision++;
+  }
+
+  async removeTag(nodeId: string, tag: string): Promise<void> {
+    await this.mutateManifest('Remove node tag', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (!node) {
+        return;
+      }
+      manifest.nodes[nodeId] = {
+        ...node,
+        tags: node.tags.filter((currentTag) => currentTag !== tag),
+        modifiedAt: Date.now(),
+      };
+    });
+    this.searchMetadataRevision++;
+  }
+
+  getNoteIndexSource(): object {
+    return this;
+  }
+
+  async listNoteIndexItems(): Promise<NoteIndexItem[]> {
+    const { manifest } = await this.loadManifest();
+    const items: NoteIndexItem[] = [];
+    let inspected = 0;
+    for (const id in manifest.nodes) {
+      const node = manifest.nodes[id];
+      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
+        continue;
+      }
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        items.push({ nodeId: node.id, path });
+      }
+      if (++inspected % 100 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+    return items;
+  }
+
+  async getCustomColors(tool: CustomColorTool): Promise<string[]> {
+    const { manifest } = await this.loadManifest();
+    return [...manifest.colors[tool]];
+  }
+
+  async addCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
+    const normalized = normalizeCustomColor(color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    return this.mutateManifest('Add custom color', (manifest) => {
+      const colors = manifest.colors[tool];
+      if (!colors.includes(normalized)) {
+        manifest.colors[tool] = [...colors, normalized];
+      }
+      return [...manifest.colors[tool]];
+    });
+  }
+
+  async removeCustomColor(
+    color: string,
+    tool: CustomColorTool,
+  ): Promise<string[]> {
+    const normalized = normalizeCustomColor(color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    return this.mutateManifest('Remove custom color', (manifest) => {
+      manifest.colors[tool] = manifest.colors[tool].filter(
+        (c) => c !== normalized,
+      );
+      return [...manifest.colors[tool]];
+    });
+  }
+
+  async getPenPresets(): Promise<PenPreset[]> {
+    const { manifest } = await this.loadManifest();
+    return manifest.penPresets.map((preset) => ({ ...preset }));
+  }
+
+  async addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]> {
+    const normalized = normalizeCustomColor(preset.color);
+    if (!normalized) {
+      throw new Error(`Invalid color: ${preset.color}`);
+    }
+    return this.mutateManifest('Add pen preset', (manifest) => {
+      const presets = manifest.penPresets;
+      const duplicate = presets.some(
+        (existing) =>
+          existing.tool === preset.tool &&
+          existing.color === normalized &&
+          existing.size === preset.size,
+      );
+      if (!duplicate) {
+        if (presets.length >= MAX_PEN_PRESETS) {
+          throw new Error(
+            `At most ${MAX_PEN_PRESETS} pen presets are allowed.`,
+          );
+        }
+        manifest.penPresets = [
+          ...presets,
+          { ...preset, color: normalized, id: createNodeId() },
+        ];
+      }
+      return manifest.penPresets.map((entry) => ({ ...entry }));
+    });
+  }
+
+  async updatePenPreset(
+    id: string,
+    changes: PenPresetChanges,
+  ): Promise<PenPreset[]> {
+    const normalized =
+      changes.color === undefined ? null : normalizeCustomColor(changes.color);
+    if (changes.color !== undefined && !normalized) {
+      throw new Error(`Invalid color: ${changes.color}`);
+    }
+    return this.mutateManifest('Update pen preset', (manifest) => {
+      manifest.penPresets = manifest.penPresets.map((preset) =>
+        preset.id === id
+          ? {
+              ...preset,
+              ...(normalized ? { color: normalized } : {}),
+              ...(changes.size !== undefined ? { size: changes.size } : {}),
+              ...(changes.inWheel !== undefined
+                ? { inWheel: changes.inWheel }
+                : {}),
+            }
+          : preset,
+      );
+      return manifest.penPresets.map((entry) => ({ ...entry }));
+    });
+  }
+
+  async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
+    return this.mutateManifest('Reorder pen presets', (manifest) => {
+      const presetsById = new Map(
+        manifest.penPresets.map((preset) => [preset.id, preset]),
+      );
+      if (
+        ids.length !== presetsById.size ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !presetsById.has(id))
+      ) {
+        throw new Error('Preset order must contain every preset exactly once.');
+      }
+      manifest.penPresets = ids.map((id) => presetsById.get(id)!);
+      return manifest.penPresets.map((preset) => ({ ...preset }));
+    });
+  }
+
+  async removePenPreset(id: string): Promise<PenPreset[]> {
+    return this.mutateManifest('Remove pen preset', (manifest) => {
+      manifest.penPresets = manifest.penPresets.filter(
+        (preset) => preset.id !== id,
+      );
+      return manifest.penPresets.map((entry) => ({ ...entry }));
+    });
+  }
+
+  async getRegistryTags(): Promise<string[]> {
+    const { manifest } = await this.loadManifest();
+    return [...manifest.tagRegistry];
+  }
+
+  async addRegistryTags(tags: string[]): Promise<string[]> {
+    // Registering `a/b` also registers its ancestor `a`, so parent tags exist
+    // as usable filters even before anything is attached to them.
+    const normalized = tags
+      .map(normalizeTagInput)
+      .filter((tag) => tag.length > 0)
+      .flatMap(expandTagWithAncestors);
+    return this.mutateManifest('Add registry tags', (manifest) => {
+      const next = new Set(manifest.tagRegistry);
+      for (const tag of normalized) {
+        next.add(tag);
+      }
+      manifest.tagRegistry = [...next];
+      return [...manifest.tagRegistry];
+    });
+  }
+
+  async removeRegistryTag(tag: string): Promise<string[]> {
+    return this.mutateManifest('Remove registry tag', (manifest) => {
+      manifest.tagRegistry = manifest.tagRegistry.filter((t) => t !== tag);
+      return [...manifest.tagRegistry];
+    });
+  }
+
+  protected async mutateManifest<T>(
+    action: string,
+    mutator: (manifest: VFSManifest) => T,
+  ): Promise<T> {
+    if (this.manifestBatchDepth > 0) {
+      // Apply to the held manifest and defer the save to the batch flush. The
+      // mutator is captured so a conflicting flush can replay it.
+      const { manifest } = await this.loadManifest();
+      const result = mutator(manifest);
+      this.manifestBatchMutators.push(mutator);
+      return result;
+    }
+
+    const maxRetries = this.manifestMaxRetries();
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const { manifest, revision } = await this.loadManifestImpl();
+      const result = mutator(manifest);
+
+      try {
+        await this.saveManifestImpl(manifest, revision);
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+        return result;
+      } catch (error) {
+        if (attempt < maxRetries - 1 && this.isConflictError(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new Error(
+      `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
+    );
   }
 }

@@ -1,6 +1,6 @@
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import type { NoteSession, Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, NoteSession, VFSNodeId } from '@/lib/sync';
 
 const logger = new Logger('CanvasFileImport');
 
@@ -19,7 +19,7 @@ export async function createCanvasFile({
   label,
   build,
 }: {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   /** Base name; uniquified against `parentId` before the node is created. */
   title: string;
@@ -33,7 +33,7 @@ export async function createCanvasFile({
   try {
     const name = await repository.getUniqueFileName(title, parentId);
     createdId = await repository.createFile(name, 'mcanvas', parentId);
-    session = await repository.openSession(createdId, { skipRemotePull: true });
+    session = await repository.openSession(createdId);
     await build(session.ydoc);
     await session.save();
     await session.close();

@@ -1,5 +1,5 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createCanvasFile } from './canvas-file';
 
 export const MARKDOWN_FILE_ACCEPT =
@@ -25,7 +25,7 @@ export async function importMarkdownFile({
   fallbackTitle,
 }: {
   file: File;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {

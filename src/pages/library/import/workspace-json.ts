@@ -11,7 +11,7 @@ import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
-  type Repository,
+  type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
 import {
@@ -41,7 +41,7 @@ export interface ImportWorkspaceJsonResult {
 }
 
 export interface ImportWorkspaceJsonOptions {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   /** Selected workspace folder, or an absolute path on desktop. */
   dirPath: string | PickedFolder;
@@ -272,7 +272,7 @@ async function createImportedNote({
   fallbackName,
 }: {
   note: NoteJson;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   folderPath: string;
   fallbackName: string;
@@ -294,7 +294,7 @@ async function createImportedNote({
  * round trips.
  */
 async function rebuildImportedNote(
-  repository: Repository,
+  repository: NativeRepository,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {

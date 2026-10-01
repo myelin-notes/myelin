@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { FileTypeDescriptors } from '@myelin/editor/sync/repo/file-types';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository } from '@/lib/sync';
+import type { NativeRepository } from '@/lib/sync';
 import { TabStateController } from '@/lib/tabs/controller';
 import { openNote, openNoteLink } from './navigation';
 
-function asRepository<T>(repository: T): T & Repository {
-  return repository as T & Repository;
+function asRepository<T>(repository: T): T & NativeRepository {
+  return repository as T & NativeRepository;
 }
 
 describe('note navigation', () => {

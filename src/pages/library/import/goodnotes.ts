@@ -1,5 +1,5 @@
 import { type Unzipped, unzip } from 'fflate';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
 import {
   addFolderAncestors,
@@ -33,7 +33,7 @@ export interface GoodnotesZipImportResult {
 
 export interface ImportGoodnotesZipOptions {
   scanned: ScannedGoodnotesZip;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;

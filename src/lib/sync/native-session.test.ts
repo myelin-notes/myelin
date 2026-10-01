@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { noopTransport } from '@myelin/editor/sync/live/transport';
-import type { YjsSyncPushResult } from '@myelin/editor/sync/types';
 import { saveSessionAndCreateVersion } from '@/pages/canvas/hooks/session-version-history';
 import type {
   NativeDocumentChange,
   NativeDocumentSnapshot,
   NativeDocumentTarget,
+  NativeDocumentWriteResult,
 } from './native-document-target';
 import { NoteSession } from './session';
 
@@ -34,7 +34,7 @@ function nativeTarget() {
       update: Uint8Array,
       expected?: string,
       _sourceSession?: string,
-    ): Promise<YjsSyncPushResult> => {
+    ): Promise<NativeDocumentWriteResult> => {
       if (expected && expected !== generation) {
         throw new Error('Native document replaced');
       }
@@ -43,7 +43,6 @@ function nativeTarget() {
         ...snapshot(),
         accepted: true,
         changed: false,
-        remoteUpdate: null,
       };
     },
   );
@@ -51,7 +50,6 @@ function nativeTarget() {
     nativeRepositoryHandle: 'native-handle',
     loadDocument: async () => snapshot(),
     pullUpdates: async (_id, vector) => snapshot(vector),
-    pushUpdates: (id, update) => persist(id, update),
     persistDocumentUpdate: persist,
     flushDocument: vi.fn(async () => {}),
     subscribeDocument: vi.fn(async (_id, callback, _sessionId) => {

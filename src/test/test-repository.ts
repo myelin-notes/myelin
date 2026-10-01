@@ -1,23 +1,42 @@
 import * as scoped from 'tauri-plugin-scoped-storage-api';
-import { BaseRepository } from '@/lib/sync/repo/base';
+import { Logger } from '@myelin/shared/logger';
+import type {
+  NativeDocumentSnapshot,
+  NativeDocumentWriteResult,
+} from '@/lib/sync/native-document-target';
+import { processDocumentAsync } from '@/lib/sync/repo/document-worker';
+import { NativeRepository } from '@/lib/sync/repo/native';
+import { noteContentIndex } from '@/lib/sync/repo/note-content-index';
+import { extractStoredNoteLinks } from '@/lib/sync/repo/note-link-index';
 import {
   computeRevision,
+  createDocFromBytes,
   createEmptyManifest,
+  ensureVersionHistoryRoot,
   getStoredFileName,
+  isFileVersionNode as isConcreteFileVersionNode,
   migrate,
+  setStoredNoteLinks,
+  toFileVersion,
+  VERSION_HISTORY_INTERVAL_MS,
+  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from '@/lib/sync/repo/shared';
 import type {
   FileImportSource,
   FileType,
+  FileVersion,
   RenameReferencesResult,
   RepositoryCapabilities,
+  StoredNoteLink,
   VFSNodeId,
 } from '@/lib/sync/repo/types';
 import { getRepositoryTestStorage } from './repository-test-utils';
 
+const logger = new Logger('TestRepository');
+
 /** Storage boundary for tests of shared repository behavior; native sync has its own tests. */
-export class TestRepository extends BaseRepository {
+export class TestRepository extends NativeRepository {
   readonly kind = 'local-storage';
   readonly capabilities: RepositoryCapabilities = {
     polling: false,
@@ -26,8 +45,133 @@ export class TestRepository extends BaseRepository {
   };
   private manifest: VFSManifest | null = null;
 
-  constructor(private readonly storageRoot = '') {
-    super();
+  constructor(private readonly testStorageRoot = '') {
+    super({
+      kind: 'local-storage',
+      storageRoot: testStorageRoot,
+      source: null,
+      capabilities: { polling: false, liveSync: false, batchedCommit: false },
+    });
+  }
+
+  override get nativeRepositoryHandle(): string {
+    return this.testStorageRoot;
+  }
+
+  override async initialize(): Promise<void> {
+    await this.loadManifestImpl();
+  }
+
+  override async refresh(): Promise<void> {}
+  override async dispose(): Promise<void> {}
+
+  override async loadDocument(
+    nodeId: VFSNodeId,
+  ): Promise<NativeDocumentSnapshot> {
+    return this.pullUpdates(nodeId);
+  }
+
+  override async pullUpdates(
+    nodeId: VFSNodeId,
+    stateVector?: Uint8Array | null,
+  ): Promise<NativeDocumentSnapshot> {
+    const { bytes, revision } = await this.loadFileBytes(nodeId);
+    const result = await processDocumentAsync({ bytes, stateVector });
+    return {
+      update: result.update,
+      stateVector: result.stateVector,
+      revision,
+      generation: 'test',
+    };
+  }
+
+  override async persistDocumentUpdate(
+    nodeId: VFSNodeId,
+    update: Uint8Array,
+  ): Promise<NativeDocumentWriteResult> {
+    const { bytes } = await this.loadFileBytes(nodeId);
+    const result = await processDocumentAsync({ bytes, update });
+    const revision = await this.saveFileBytes(nodeId, result.update!);
+    await this.onFileSaved(nodeId, result.links);
+    return {
+      stateVector: result.stateVector,
+      revision,
+      accepted: true,
+      changed: result.changed,
+    };
+  }
+
+  override async flushDocument(): Promise<void> {}
+
+  override async subscribeDocument(): Promise<() => Promise<void>> {
+    return async () => {};
+  }
+
+  override async createFileVersionIfDue(
+    nodeId: VFSNodeId,
+    options: { force?: boolean } = {},
+  ): Promise<FileVersion | null> {
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file' || node.system) {
+      return null;
+    }
+
+    const bytes = await this.readFileBytes(nodeId);
+    if (!bytes) {
+      return null;
+    }
+
+    const now = Date.now();
+    const sourceRevision = await computeRevision(bytes);
+    const versions = await this.listFileVersions(nodeId);
+    const latest = versions[0];
+    if (versions.some((version) => version.sourceRevision === sourceRevision)) {
+      return null;
+    }
+    if (
+      !options.force &&
+      latest &&
+      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
+    ) {
+      return null;
+    }
+
+    const parentId = await this.getOrCreateVersionHistoryRoot();
+    const versionId = await this.createFile(
+      `${node.name} ${new Date(now).toISOString()}`,
+      node.fileType,
+      parentId,
+      bytes,
+      {
+        system: {
+          kind: 'file-version',
+          sourceFileId: node.id,
+          sourceFileType: node.fileType,
+          sourceName: node.name,
+          sourceRevision,
+          capturedAt: now,
+          byteLength: bytes.byteLength,
+        },
+      },
+    );
+
+    await this.enforceFileVersionLimit(nodeId);
+
+    const versionNode = await this.getNode(versionId);
+    return isConcreteFileVersionNode(versionNode)
+      ? toFileVersion(versionNode)
+      : null;
+  }
+
+  override async writeFileBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+  ): Promise<void> {
+    const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
+    const nextRevision = await this.saveFileBytes(nodeId, bytes);
+    if (nextRevision !== null) {
+      await this.onFileSaved(nodeId, links);
+    }
   }
 
   override async importFile(
@@ -44,12 +188,12 @@ export class TestRepository extends BaseRepository {
   }
 
   private path(name: string): string {
-    return this.storageRoot ? `${this.storageRoot}/${name}` : name;
+    return this.testStorageRoot ? `${this.testStorageRoot}/${name}` : name;
   }
 
-  protected async loadManifestImpl(): Promise<{
+  protected override async loadManifestImpl(): Promise<{
     manifest: VFSManifest;
-    revision: null;
+    revision: string;
   }> {
     if (!this.manifest) {
       const storage = getRepositoryTestStorage();
@@ -60,19 +204,21 @@ export class TestRepository extends BaseRepository {
       migrate(this.manifest);
       await storage.writeTextFile(path, JSON.stringify(this.manifest));
     }
-    return { manifest: this.manifest, revision: null };
+    return { manifest: this.manifest, revision: '' };
   }
 
-  protected async saveManifestImpl(manifest: VFSManifest): Promise<null> {
+  protected override async saveManifestImpl(
+    manifest: VFSManifest,
+  ): Promise<string> {
     await getRepositoryTestStorage().writeTextFile(
       this.path('manifest.json'),
       JSON.stringify(manifest),
     );
     this.manifest = manifest;
-    return null;
+    return '';
   }
 
-  protected async loadFileBytes(nodeId: VFSNodeId): Promise<{
+  protected override async loadFileBytes(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
@@ -92,10 +238,10 @@ export class TestRepository extends BaseRepository {
     };
   }
 
-  protected async saveFileBytes(
+  protected override async saveFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
-  ): Promise<string | null> {
+  ): Promise<string> {
     const { manifest } = await this.loadManifestImpl();
     const node = manifest.nodes[nodeId];
     if (node?.type === 'file') {
@@ -104,10 +250,10 @@ export class TestRepository extends BaseRepository {
         bytes,
       );
     }
-    return computeRevision(bytes);
+    return (await computeRevision(bytes)) ?? '';
   }
 
-  protected async deleteFileBytes(
+  protected override async deleteFileBytes(
     nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void> {
@@ -149,5 +295,61 @@ export class TestRepository extends BaseRepository {
 
   override getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
     return this.getStoredAbsolutePath(nodeId);
+  }
+
+  protected async onFileSaved(
+    nodeId: VFSNodeId,
+    links?: readonly StoredNoteLink[],
+  ): Promise<void> {
+    let indexable = false;
+    await this.mutateManifest('Touch file', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (node && node.type === 'file') {
+        node.modifiedAt = Date.now();
+        indexable = node.fileType === 'mcanvas' && !node.system;
+        // Snapshots are system nodes; their links must not enter the graph.
+        if (node.fileType === 'mcanvas' && !node.system && links) {
+          setStoredNoteLinks(manifest, nodeId, links);
+        }
+      }
+    });
+    if (indexable) {
+      noteContentIndex.invalidate(this, nodeId);
+      void this.getStoredAbsolutePath(nodeId)
+        .then((path) => {
+          if (path) {
+            noteContentIndex.queueSaved(this, nodeId, path);
+          }
+        })
+        .catch((error) => {
+          logger.error('Could not queue note for indexing', error, { nodeId });
+        });
+    }
+  }
+
+  private async extractStoredNoteLinksForBytes(
+    nodeId: VFSNodeId,
+    bytes: Uint8Array,
+  ): Promise<StoredNoteLink[] | undefined> {
+    const node = await this.getNode(nodeId);
+    if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
+      return undefined;
+    }
+
+    return extractStoredNoteLinks(createDocFromBytes(bytes));
+  }
+
+  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
+    return this.mutateManifest('Create version history root', (manifest) =>
+      ensureVersionHistoryRoot(manifest, Date.now()),
+    );
+  }
+
+  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
+    const versions = await this.listFileVersions(nodeId);
+    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
+    for (const version of expired) {
+      await this.deleteNode(version.id);
+    }
   }
 }

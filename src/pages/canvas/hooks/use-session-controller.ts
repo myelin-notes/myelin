@@ -29,7 +29,7 @@ import {
 } from '@/lib/audio-recording-lifecycle';
 import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
-  type ActiveRepository,
+  type NativeRepository,
   type NoteSessionStatus,
   useRepository,
 } from '@/lib/sync';
@@ -104,7 +104,7 @@ export class CanvasSessionController {
   private onPageFrameRenamed: PageFrameRenameListener | null = null;
 
   constructor(
-    private readonly repository: ActiveRepository,
+    private readonly repository: NativeRepository,
     private readonly canvasRef: RefObject<HTMLCanvasElement | null>,
     private readonly bgHostRef: RefObject<HTMLDivElement | null>,
     private readonly overlayCanvasRef: RefObject<HTMLCanvasElement | null>,
