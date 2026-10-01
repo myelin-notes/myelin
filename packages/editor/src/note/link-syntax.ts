@@ -1,17 +1,17 @@
 /**
  * Escape syntax for note-link titles: `[[note ('#' frame)?]]`, where note may contain `/`-separated
- * path segments. Inside a segment, `\` and `#` are special and escapable:
+ * path segments. Inside a segment, `\`, `#` and `/` are special and escapable:
  *
  * - `\\` → literal `\`
  * - `\#` → literal `#` (does not start the frame)
+ * - `\/` → literal `/` (does not separate folders)
  * - `\X` for any other X → literal `X` (forgiving; never an error)
  * - a trailing lone `\` is preserved as a literal backslash
  *
- * `[[`, `]]` and `/` are NOT escapable: `]]` always ends the link and `/` always separates path
- * segments, since file systems disallow them in names.
+ * `[[` and `]]` are not escapable; `]]` always ends the link.
  */
 
-const SPECIAL_CHARS = new Set(['\\', '#']);
+const SPECIAL_CHARS = new Set(['\\', '#', '/']);
 
 export function escapeNoteLinkSegment(text: string): string {
   let out = '';
@@ -76,4 +76,19 @@ export function joinNoteLinkTitle(
 
 export function escapeNoteLinkPath(path: string): string {
   return path.split('/').map(escapeNoteLinkSegment).join('/');
+}
+
+export function splitNoteLinkPath(path: string): string[] {
+  const segments: string[] = [];
+  let start = 0;
+  for (let i = 0; i < path.length; i++) {
+    if (path[i] === '\\') {
+      i++;
+    } else if (path[i] === '/') {
+      segments.push(path.slice(start, i));
+      start = i + 1;
+    }
+  }
+  segments.push(path.slice(start));
+  return segments;
 }
