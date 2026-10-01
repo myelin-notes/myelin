@@ -1351,16 +1351,14 @@ async fn native_raw_sync_preserves_legacy_content_bases_and_makes_conflict_copie
 }
 
 #[tokio::test]
-async fn native_path_imports_store_bytes_before_publishing_and_leave_failed_sources_unpublished() {
+async fn native_imports_store_bytes_before_publishing() {
     let directory = TestDirectory::new();
     let engine = directory.engine(false);
     let bytes: Vec<u8> = (0..20000).map(|i| (i % 251) as u8).collect();
-    let path = directory.0.join("source.png");
-    fs::write(&path, &bytes).unwrap();
     engine
-        .operate(RepositoryOperation::ImportFile {
+        .operate(RepositoryOperation::ImportedFile {
             node: node("import", "png"),
-            path,
+            bytes: bytes.clone(),
         })
         .await
         .unwrap();
@@ -1373,15 +1371,6 @@ async fn native_path_imports_store_bytes_before_publishing_and_leave_failed_sour
     manifest["nodes"]["import"] = node("import", "png");
     save_manifest(&engine, manifest).await;
     assert_eq!(read(&engine, "import").await, bytes);
-    assert!(engine
-        .operate(RepositoryOperation::ImportFile {
-            node: node("failed", "png"),
-            path: directory.0.join("missing")
-        })
-        .await
-        .is_err());
-    assert!(!directory.0.join("data/files/failed.png").exists());
-    assert!(engine.store.lock().unwrap().manifest["nodes"]["failed"].is_null());
 }
 
 #[tokio::test]

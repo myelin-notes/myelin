@@ -1,32 +1,16 @@
 import { Import } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { readFile } from '@tauri-apps/plugin-fs';
-import { MOBILE_PLATFORM } from '@/lib/env';
 import {
   getFileTypeForName,
   ImportableFileTypes,
   type VFSNodeId,
 } from '@/lib/sync';
-import {
-  importStorageFile,
-  importStoragePath,
-  isStorageFile,
-  STORAGE_FILE_ACCEPT,
-} from '../files';
+import { importStoragePath, isStorageFile } from '../files';
 import { getPathBasename } from '../import-tree';
-import {
-  importMarkdownFile,
-  isMarkdownFile,
-  MARKDOWN_FILE_ACCEPT,
-} from '../markdown';
-import {
-  importPdfFile,
-  isNativeGoodnotesFile,
-  isPdfFile,
-  PDF_FILE_ACCEPT,
-} from '../pdf';
-import { expectFiles, type ImportProvider } from './types';
-
-const FILES_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
+import { importMarkdownFile, isMarkdownFile } from '../markdown';
+import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from '../pdf';
+import type { ImportProvider } from './types';
 
 interface NativeImportFile {
   path: string;
@@ -34,19 +18,17 @@ interface NativeImportFile {
   type: string;
 }
 
-type ImportFile = File | NativeImportFile;
-
 interface PartitionedFiles {
   /** Importable files, kept in the order the user picked them. */
-  supported: ImportFile[];
+  supported: NativeImportFile[];
   noteCount: number;
   mediaCount: number;
-  unsupported: ImportFile[];
+  unsupported: NativeImportFile[];
 }
 
-function partition(files: ImportFile[]): PartitionedFiles {
-  const supported: ImportFile[] = [];
-  const unsupported: ImportFile[] = [];
+function partition(files: NativeImportFile[]): PartitionedFiles {
+  const supported: NativeImportFile[] = [];
+  const unsupported: NativeImportFile[] = [];
   let noteCount = 0;
   let mediaCount = 0;
 
@@ -68,34 +50,26 @@ function partition(files: ImportFile[]): PartitionedFiles {
 export const filesProvider: ImportProvider = {
   id: 'files',
   icon: Import,
-  picker: MOBILE_PLATFORM
-    ? { kind: 'files', accept: FILES_ACCEPT, multiple: true }
-    : {
-        kind: 'native-files',
-        filters: [
-          {
-            name: 'Importable files',
-            extensions: [
-              'md',
-              'markdown',
-              'mdx',
-              'pdf',
-              ...ImportableFileTypes,
-            ],
-          },
-        ],
-        multiple: true,
+  picker: {
+    kind: 'native-files',
+    filters: [
+      {
+        name: 'Importable files',
+        extensions: ['md', 'markdown', 'mdx', 'pdf', ...ImportableFileTypes],
       },
+    ],
+    multiple: true,
+  },
 
   createJob({ selection, repository, parentId, strings }) {
-    const files: ImportFile[] =
-      selection.kind === 'native-files'
-        ? selection.paths.map((path) => ({
-            path,
-            name: getPathBasename(path, path),
-            type: '',
-          }))
-        : expectFiles(selection);
+    if (selection.kind !== 'native-files') {
+      throw new Error('Expected a native file selection');
+    }
+    const files = selection.paths.map((path) => ({
+      path,
+      name: getPathBasename(path, path),
+      type: '',
+    }));
     const source = strings.library.importSources.files;
     const shared = strings.library.importDialog;
     let scanned: PartitionedFiles | null = null;
@@ -108,6 +82,13 @@ export const filesProvider: ImportProvider = {
       emptyLabel: source.empty,
 
       async scan() {
+        for (const file of files) {
+          if (file.path.includes('://')) {
+            file.name = await invoke<string>('import_file_name', {
+              path: file.path,
+            });
+          }
+        }
         scanned = partition(files);
         return {
           name: source.selected(files.length),
@@ -142,7 +123,7 @@ export const filesProvider: ImportProvider = {
             fileName: file.name,
           });
 
-          if ('path' in file && isStorageFile(file) && !isPdfFile(file)) {
+          if (isStorageFile(file) && !isPdfFile(file)) {
             const name = await repository.getUniqueFileName(
               file.name,
               parentId,
@@ -156,10 +137,7 @@ export const filesProvider: ImportProvider = {
             });
             continue;
           }
-          const input =
-            'path' in file
-              ? new File([await readFile(file.path)], file.name)
-              : file;
+          const input = new File([await readFile(file.path)], file.name);
           if (isMarkdownFile(file)) {
             lastId = await importMarkdownFile({
               file: input,
@@ -173,12 +151,6 @@ export const filesProvider: ImportProvider = {
               repository,
               parentId,
               fallbackTitle,
-            });
-          } else {
-            lastId = await importStorageFile({
-              file: input,
-              repository,
-              parentId,
             });
           }
         }

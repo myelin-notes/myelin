@@ -16,13 +16,9 @@ vi.mock('@myelin/editor/pdf-renderer', () => ({
   getPdfPageSizes: vi.fn(async () => [{ w: 680, h: 880 }]),
 }));
 
-function markdownFile(name: string, body: string): File {
-  return new File([body], name, { type: 'text/markdown' });
-}
-
-function createJob(files: File[], repository: TestRepository) {
+function createJob(paths: string[], repository: TestRepository) {
   return filesProvider.createJob({
-    selection: { kind: 'files', files },
+    selection: { kind: 'native-files', paths },
     repository,
     parentId: null,
     strings: en,
@@ -39,11 +35,7 @@ describe('files import provider', () => {
     const repository = new TestRepository('files-provider-preview');
 
     const job = createJob(
-      [
-        markdownFile('Notes.md', '# Notes'),
-        new File([new Uint8Array([1, 2])], 'photo.png', { type: 'image/png' }),
-        new File([new Uint8Array([3])], 'archive.xyz', { type: '' }),
-      ],
+      ['/picked/Notes.md', '/picked/photo.png', '/picked/archive.xyz'],
       repository,
     );
 
@@ -57,15 +49,19 @@ describe('files import provider', () => {
   });
 
   it('imports supported files and reports counts', async () => {
-    getRepositoryTestStorage();
+    const storage = getRepositoryTestStorage();
+    await storage.writeFile(
+      '/picked/First.md',
+      new TextEncoder().encode('# First'),
+    );
+    await storage.writeFile(
+      '/picked/Second.md',
+      new TextEncoder().encode('# Second'),
+    );
     const repository = new TestRepository('files-provider-import');
 
     const job = createJob(
-      [
-        markdownFile('First.md', '# First'),
-        markdownFile('Second.md', '# Second'),
-        new File([new Uint8Array([3])], 'archive.xyz', { type: '' }),
-      ],
+      ['/picked/First.md', '/picked/Second.md', '/picked/archive.xyz'],
       repository,
     );
 
@@ -87,10 +83,7 @@ describe('files import provider', () => {
     getRepositoryTestStorage();
     const repository = new TestRepository('files-provider-empty');
 
-    const job = createJob(
-      [new File([new Uint8Array([1])], 'archive.xyz', { type: '' })],
-      repository,
-    );
+    const job = createJob(['/picked/archive.xyz'], repository);
 
     expect((await job.scan()).isEmpty).toBe(true);
   });
@@ -100,7 +93,7 @@ describe('files import provider', () => {
     const repository = new TestRepository('files-provider-unscanned');
 
     await expect(
-      createJob([markdownFile('A.md', '# A')], repository).run({
+      createJob(['/picked/A.md'], repository).run({
         conflictResolution: 'rename',
         onProgress: () => {},
       }),

@@ -1,3 +1,4 @@
+import * as scoped from 'tauri-plugin-scoped-storage-api';
 import { BaseRepository } from '@/lib/sync/repo/base';
 import {
   computeRevision,
@@ -7,6 +8,7 @@ import {
   type VFSManifest,
 } from '@/lib/sync/repo/shared';
 import type {
+  FileImportSource,
   FileType,
   RenameReferencesResult,
   RepositoryCapabilities,
@@ -26,6 +28,19 @@ export class TestRepository extends BaseRepository {
 
   constructor(private readonly storageRoot = '') {
     super();
+  }
+
+  override async importFile(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    source: FileImportSource,
+  ): Promise<VFSNodeId> {
+    const bytes =
+      source.kind === 'scoped'
+        ? await scoped.readFile(source.folderId, source.path)
+        : await getRepositoryTestStorage().readFile(source.path);
+    return this.createFile(name, fileType, parentId, bytes);
   }
 
   private path(name: string): string {

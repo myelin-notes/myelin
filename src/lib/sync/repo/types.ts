@@ -36,12 +36,16 @@ export interface RenameReferencesResult {
   linkCount: number;
 }
 
+export type FileImportSource =
+  | { kind: 'path'; path: string }
+  | { kind: 'scoped'; folderId: string; path: string };
+
 export interface Repository extends EditorRepository {
-  importFileFromPath?(
+  importFile(
     name: string,
     fileType: FileType,
     parentId: VFSNodeId | null,
-    path: string,
+    source: FileImportSource,
   ): Promise<VFSNodeId>;
   renameReferences(
     request: RenameReferencesRequest,

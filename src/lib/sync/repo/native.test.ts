@@ -1,9 +1,12 @@
+import * as scoped from 'tauri-plugin-scoped-storage-api';
 import { beforeEach, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import en from '@myelin/editor/i18n/messages/en';
 import { invoke } from '@tauri-apps/api/core';
 import { createCanvasFile } from '@/pages/library/import/canvas-file';
+import { importObsidianVault } from '@/pages/library/import/obsidian-vault';
 import { filesProvider } from '@/pages/library/import/providers/files';
+import { importWorkspaceJson } from '@/pages/library/import/workspace-json';
 import type { NativeDocumentChange } from '../native-document-target';
 import { NativeRepository } from './native';
 import { renameNoteReferences } from './rename-note-references';
@@ -17,6 +20,13 @@ const { listeners } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
   convertFileSrc: (path: string) => path,
+}));
+vi.mock('tauri-plugin-scoped-storage-api', () => ({
+  readDir: vi.fn(),
+  readFile: vi.fn(() => {
+    throw new Error('Raw imports must be read by Rust');
+  }),
+  readTextFile: vi.fn(),
 }));
 vi.mock('@tauri-apps/plugin-fs', () => ({
   readFile: vi.fn(() => {
@@ -400,7 +410,65 @@ it('keeps session subscriptions distinct and delivers metadata-only replacement 
   expect(listeners.size).toBe(0);
 });
 
-it('imports picked raw files with paths and publishes only after Rust has stored them', async () => {
+it.each([
+  { path: '/picked/photo.png', name: 'photo.png' },
+  { path: 'content://provider/document/123', name: 'holiday photo.png' },
+  { path: 'file:///picked/holiday%20photo.png', name: 'holiday photo.png' },
+])('imports picked raw files from $path and publishes only after Rust has stored them', async ({
+  path,
+  name,
+}) => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'import_file_name') {
+      expect(args).toEqual({ path });
+      return name;
+    }
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (command === 'repository_operation' && op?.kind === 'import-file') {
+      native.operations.push(op);
+      const node = op.node as { id: string };
+      expect(native.manifest().nodes[node.id]).toBeUndefined();
+      native.files.set(node.id, new Uint8Array([7, 8, 9]));
+      return { revision: 'imported' };
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  const job = filesProvider.createJob({
+    selection: { kind: 'native-files', paths: [path] },
+    repository,
+    parentId: null,
+    strings: en,
+  });
+  await job.scan();
+  const summary = await job.run({
+    conflictResolution: 'rename',
+    onProgress: () => {},
+  });
+  const id = summary.focusNodeId!;
+  expect(native.manifest().nodes[id]?.name).toBe(name);
+  expect(native.files.get(id)).toEqual(new Uint8Array([7, 8, 9]));
+  expect(native.operations.filter((op) => op.kind === 'import-file')).toEqual([
+    {
+      kind: 'import-file',
+      node: native.manifest().nodes[id],
+      source: { kind: 'path', path },
+    },
+  ]);
+  expect(
+    native.operations.some(
+      (op) => op.kind === 'write-file' || op.kind === 'read-file',
+    ),
+  ).toBe(false);
+  await repository.dispose();
+});
+
+it.each([
+  'obsidian',
+  'json',
+])('imports scoped %s media without reading bytes into JS', async (format) => {
   const native = nativeBoundary();
   const implementation = vi.mocked(invoke).getMockImplementation()!;
   vi.mocked(invoke).mockImplementation(async (command, args) => {
@@ -414,33 +482,77 @@ it('imports picked raw files with paths and publishes only after Rust has stored
     }
     return implementation(command, args);
   });
+  vi.mocked(scoped.readDir).mockImplementation(async (id, path) => {
+    expect(id).toBe('picked-folder');
+    return path === ''
+      ? [{ name: 'Nested', path: 'Nested', isDir: true, isFile: false }]
+      : [
+          {
+            name: 'photo.png',
+            path: 'Nested/photo.png',
+            isDir: false,
+            isFile: true,
+          },
+        ];
+  });
   const repository = new NativeRepository({ kind: 'local' });
-  const job = filesProvider.createJob({
-    selection: { kind: 'native-files', paths: ['/picked/photo.png'] },
-    repository,
-    parentId: null,
-    strings: en,
+  const folder = {
+    kind: 'scoped' as const,
+    handle: { id: 'picked-folder', name: 'Imported' },
+  };
+  const result =
+    format === 'obsidian'
+      ? await importObsidianVault({
+          repository,
+          parentId: null,
+          vaultPath: folder,
+        })
+      : await importWorkspaceJson({
+          repository,
+          parentId: null,
+          dirPath: folder,
+        });
+  expect(result.mediaImported).toBe(1);
+  const imported = native.operations.find((op) => op.kind === 'import-file')!;
+  expect(imported.source).toEqual({
+    kind: 'scoped',
+    folderId: 'picked-folder',
+    path: 'Nested/photo.png',
   });
-  await job.scan();
-  const summary = await job.run({
-    conflictResolution: 'rename',
-    onProgress: () => {},
-  });
-  const id = summary.focusNodeId!;
-  expect(native.manifest().nodes[id]?.name).toBe('photo.png');
-  expect(native.files.get(id)).toEqual(new Uint8Array([7, 8, 9]));
-  expect(native.operations.filter((op) => op.kind === 'import-file')).toEqual([
-    {
-      kind: 'import-file',
-      node: native.manifest().nodes[id],
-      path: '/picked/photo.png',
-    },
-  ]);
+  const node = imported.node as { id: string };
+  expect(native.files.get(node.id)).toEqual(new Uint8Array([7, 8, 9]));
+  expect(native.manifest().nodes[node.id]?.name).toBe('photo.png');
   expect(
     native.operations.some(
-      (op) => op.kind === 'write-file' || op.kind === 'read-file',
+      (op) =>
+        op.kind === 'stage-bytes' ||
+        op.kind === 'read-file' ||
+        op.kind === 'write-file',
     ),
   ).toBe(false);
+  await repository.dispose();
+});
+
+it('leaves a revoked scoped-folder import unpublished', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (command === 'repository_operation' && op?.kind === 'import-file') {
+      throw new Error('Folder permission revoked');
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  await expect(
+    repository.importFile('photo.png', 'png', null, {
+      kind: 'scoped',
+      folderId: 'revoked-folder',
+      path: 'photo.png',
+    }),
+  ).rejects.toThrow('Folder permission revoked');
+  expect(native.manifest().nodes).toEqual({});
+  expect(native.files.size).toBe(0);
   await repository.dispose();
 });
 

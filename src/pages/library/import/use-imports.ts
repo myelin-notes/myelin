@@ -90,6 +90,7 @@ export function useImports({
         const selected = await openDialog({
           multiple: provider.picker.multiple,
           filters: provider.picker.filters,
+          fileAccessMode: 'copy',
         });
         if (selected) {
           startJob(id, {

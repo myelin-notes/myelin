@@ -4,6 +4,7 @@ mod clipboard;
 mod code_runner;
 mod error_report;
 mod github_push;
+mod import_files;
 mod iroh_transport;
 mod mcp_server;
 mod note_text_index;
@@ -110,6 +111,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
+            import_files::import_file_name,
         ]);
 
     #[cfg(not(target_os = "ios"))]

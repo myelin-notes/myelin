@@ -12,7 +12,6 @@ import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import { createCanvasFile } from './canvas-file';
 
-export const PDF_FILE_ACCEPT = 'application/pdf,.pdf';
 export const PDF_EXTENSION_RE = /\.pdf$/i;
 const GOODNOTES_EXTENSION_RE = /\.goodnotes$/i;
 const PDF_MIME_TYPES = new Set(['application/pdf']);

@@ -7,6 +7,7 @@ mod tests;
 mod transfer;
 mod version_history;
 
+use crate::import_files::FileImportSource;
 use crate::repository_bootstrap::{download::RepositorySource, recover_cache, CachePaths};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,6 @@ use std::{
 };
 use store::{file_name, revision, FileWrite, Store};
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_fs::FsExt;
 use tokio::sync::{oneshot, Mutex as AsyncMutex, Notify};
 
 #[derive(Default)]
@@ -95,7 +95,12 @@ pub enum RepositoryOperation {
     },
     ImportFile {
         node: Value,
-        path: PathBuf,
+        source: FileImportSource,
+    },
+    #[serde(skip)]
+    ImportedFile {
+        node: Value,
+        bytes: Vec<u8>,
     },
     RenameReferences {
         source_ids: Vec<String>,
@@ -534,10 +539,10 @@ impl RepositoryOperation {
                     .map_err(|_| "Invalid repository file bytes")?;
                 return write_file(state, node, bytes, replace, overwrite_remote, Vec::new());
             }
-            Self::ImportFile { node, path } => {
-                let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+            Self::ImportedFile { node, bytes } => {
                 return write_file(state, node, bytes, true, false, Vec::new());
             }
+            Self::ImportFile { .. } => return Err("Import requires an application handle".into()),
             Self::RenameReferences {
                 source_ids,
                 target_id,
@@ -851,11 +856,6 @@ pub async fn repository_operation(
     operation: RepositoryOperation,
 ) -> Result<Value, String> {
     let engine = manager.engine(&handle).await?;
-    if let RepositoryOperation::ImportFile { path, .. } = &operation {
-        if !app.fs_scope().is_allowed(path) {
-            return Err("Import source is outside the selected filesystem scope".into());
-        }
-    }
     match &operation {
         RepositoryOperation::Subscribe { node_id, session_id } => {
             let mut handles = manager.handles.lock().await;
@@ -909,6 +909,16 @@ pub async fn repository_operation(
     };
     let Some(operation) = operation else {
         return Ok(Value::Null);
+    };
+    let operation = match operation {
+        RepositoryOperation::ImportFile { node, source } => {
+            let app = app.clone();
+            let bytes = tokio::task::spawn_blocking(move || source.read(&app))
+                .await
+                .map_err(|error| error.to_string())??;
+            RepositoryOperation::ImportedFile { node, bytes }
+        }
+        operation => operation,
     };
     let (result, changes) = engine.operate(operation).await?;
     engine.emit_changes(&app, changes).await;

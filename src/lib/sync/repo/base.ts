@@ -58,6 +58,7 @@ import { expandTagWithAncestors, normalizeTagInput } from './tag-hierarchy';
 import type {
   CreateFileOptions,
   CustomColorTool,
+  FileImportSource,
   FileType,
   FileVersion,
   NodeSearchResult,
@@ -100,6 +101,12 @@ export abstract class BaseRepository
     RepositoryLifecycle,
     RepositoryStatusSource
 {
+  public abstract importFile(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    source: FileImportSource,
+  ): Promise<VFSNodeId>;
   public abstract renameReferences(
     request: RenameReferencesRequest,
   ): Promise<RenameReferencesResult>;

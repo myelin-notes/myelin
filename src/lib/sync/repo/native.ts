@@ -20,6 +20,7 @@ import { noteContentIndex } from './note-content-index';
 import type { VFSManifest } from './shared';
 import type {
   CreateFileOptions,
+  FileImportSource,
   FileType,
   FileVersion,
   RenameReferencesRequest,
@@ -374,16 +375,16 @@ export class NativeRepository
       super.createFile(name, fileType, parentId, bytes, options),
     );
   }
-  async importFileFromPath(
+  override async importFile(
     name: string,
     fileType: FileType,
     parentId: VFSNodeId | null,
-    path: string,
+    source: FileImportSource,
   ): Promise<VFSNodeId> {
     return this.batchManifestWrites(async () => {
       const id = await super.createFile(name, fileType, parentId);
       const node = await this.getNode(id);
-      await this.operation({ kind: 'import-file', node, path });
+      await this.operation({ kind: 'import-file', node, source });
       return id;
     });
   }
