@@ -10,6 +10,7 @@ import type { PickedFolder } from './folder-picker';
 
 export interface FolderReader {
   root: string;
+  nativePath(path: string): string | null;
   join(parent: string, name: string): Promise<string>;
   readDir(path: string): Promise<DirEntry[]>;
   readFile(path: string): Promise<Uint8Array>;
@@ -22,6 +23,7 @@ export function createFolderReader(
   if (typeof folder === 'string' || folder.kind === 'native') {
     return {
       root: typeof folder === 'string' ? folder : folder.path,
+      nativePath: (path) => path,
       join,
       readDir,
       readFile,
@@ -31,6 +33,7 @@ export function createFolderReader(
   const id = folder.handle.id;
   return {
     root: '',
+    nativePath: () => null,
     join: async (parent, name) => (parent ? `${parent}/${name}` : name),
     readDir: async (path) =>
       (await scoped.readDir(id, path)).map((entry) => ({

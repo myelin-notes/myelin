@@ -10,6 +10,7 @@ import {
   type VFSNodeId,
 } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
+import { importStoragePath } from './files';
 import {
   addFolderAncestors,
   createImportedFolders,
@@ -452,12 +453,14 @@ async function importStorageVaultFile({
   repository: Repository;
   parentId: string | null;
 }): Promise<void> {
-  await repository.createFile(
-    file.name,
-    file.fileType,
+  await importStoragePath({
+    path: file.sourcePath,
+    name: file.name,
+    fileType: file.fileType,
     parentId,
-    await reader.readFile(file.sourcePath),
-  );
+    repository,
+    reader,
+  });
 }
 
 export async function importObsidianVault({

@@ -1,7 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import * as Y from 'yjs';
+import en from '@myelin/editor/i18n/messages/en';
 import { invoke } from '@tauri-apps/api/core';
+import { createCanvasFile } from '@/pages/library/import/canvas-file';
+import { filesProvider } from '@/pages/library/import/providers/files';
 import type { NativeDocumentChange } from '../native-document-target';
 import { NativeRepository } from './native';
+import { renameNoteReferences } from './rename-note-references';
+import { renamePageFrameReferences } from './rename-page-frame-references';
 import { createRepositoryFromConfig } from './repository-backends';
 import { createEmptyManifest, type VFSManifest } from './shared';
 
@@ -11,6 +17,11 @@ const { listeners } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
   convertFileSrc: (path: string) => path,
+}));
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  readFile: vi.fn(() => {
+    throw new Error('Raw imports must be read by Rust');
+  }),
 }));
 vi.mock('@tauri-apps/api/event', () => ({
   listen: vi.fn(
@@ -37,6 +48,8 @@ function nativeBoundary() {
   let version = 0;
   const files = new Map<string, Uint8Array>();
   const operations: Record<string, unknown>[] = [];
+  const transfers = new Map<string, number[]>();
+  const documents = new Map<string, Y.Doc>();
   const status = () => ({
     repositoryId: 'local',
     online: true,
@@ -56,8 +69,27 @@ function nativeBoundary() {
     if (command !== 'repository_operation') {
       throw new Error(`Unexpected command ${command}`);
     }
-    const op = (args as { operation: Record<string, unknown> }).operation;
+    let op = (args as { operation: Record<string, unknown> }).operation;
     operations.push(op);
+    if (op.kind === 'stage-bytes') {
+      const bytes = transfers.get(op.transferId as string) ?? [];
+      expect(bytes.length).toBe(op.offset);
+      bytes.push(...Buffer.from(op.bytesBase64 as string, 'base64'));
+      transfers.set(op.transferId as string, bytes);
+      return;
+    }
+    if (op.kind === 'cancel-transfer') {
+      transfers.delete(op.transferId as string);
+      return;
+    }
+    if (op.kind === 'finish-transfer') {
+      const bytes = Buffer.from(transfers.get(op.transferId as string)!);
+      transfers.delete(op.transferId as string);
+      const operation = op.operation as Record<string, unknown>;
+      const field =
+        operation.kind === 'update-document' ? 'updateBase64' : 'bytesBase64';
+      op = { ...operation, [field]: bytes.toString('base64') };
+    }
     switch (op.kind) {
       case 'manifest':
         return {
@@ -101,6 +133,35 @@ function nativeBoundary() {
           revision: 'file-revision',
         };
       }
+      case 'document': {
+        const doc = documents.get(op.nodeId as string) ?? new Y.Doc();
+        documents.set(op.nodeId as string, doc);
+        return {
+          updateBase64: Buffer.from(Y.encodeStateAsUpdate(doc)).toString(
+            'base64',
+          ),
+          stateVectorBase64: Buffer.from(Y.encodeStateVector(doc)).toString(
+            'base64',
+          ),
+          revision: 'doc-revision',
+          generation: 'original',
+        };
+      }
+      case 'update-document': {
+        const doc = documents.get(op.nodeId as string)!;
+        Y.applyUpdate(doc, Buffer.from(op.updateBase64 as string, 'base64'));
+        return {
+          stateVectorBase64: Buffer.from(Y.encodeStateVector(doc)).toString(
+            'base64',
+          ),
+          revision: 'doc-revision',
+          accepted: true,
+          changed: true,
+        };
+      }
+      case 'subscribe':
+      case 'unsubscribe':
+      case 'checkpoint-document':
       case 'path':
         return null;
       default:
@@ -109,6 +170,7 @@ function nativeBoundary() {
   });
   return {
     files,
+    documents,
     operations,
     manifest: () => manifest,
     compete: () => {
@@ -336,4 +398,175 @@ it('keeps session subscriptions distinct and delivers metadata-only replacement 
   ]);
   await repository.dispose();
   expect(listeners.size).toBe(0);
+});
+
+it('imports picked raw files with paths and publishes only after Rust has stored them', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (command === 'repository_operation' && op?.kind === 'import-file') {
+      native.operations.push(op);
+      const node = op.node as { id: string };
+      expect(native.manifest().nodes[node.id]).toBeUndefined();
+      native.files.set(node.id, new Uint8Array([7, 8, 9]));
+      return { revision: 'imported' };
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  const job = filesProvider.createJob({
+    selection: { kind: 'native-files', paths: ['/picked/photo.png'] },
+    repository,
+    parentId: null,
+    strings: en,
+  });
+  await job.scan();
+  const summary = await job.run({
+    conflictResolution: 'rename',
+    onProgress: () => {},
+  });
+  const id = summary.focusNodeId!;
+  expect(native.manifest().nodes[id]?.name).toBe('photo.png');
+  expect(native.files.get(id)).toEqual(new Uint8Array([7, 8, 9]));
+  expect(native.operations.filter((op) => op.kind === 'import-file')).toEqual([
+    {
+      kind: 'import-file',
+      node: native.manifest().nodes[id],
+      path: '/picked/photo.png',
+    },
+  ]);
+  expect(
+    native.operations.some(
+      (op) => op.kind === 'write-file' || op.kind === 'read-file',
+    ),
+  ).toBe(false);
+  await repository.dispose();
+});
+
+it('routes note and frame renames to Rust without fetching or replacing file content', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (
+      command === 'repository_operation' &&
+      op?.kind === 'rename-references'
+    ) {
+      native.operations.push(op);
+      return { sourceCount: 1, linkCount: 2 };
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  const backlinks = ['owner', 'source', 'source'].map((sourceId) => ({
+    sourceId,
+    sourceName: sourceId,
+    targetId: 'owner',
+    pageFrameId: 'frame',
+    title: 'Old#Draft',
+    snippet: '',
+  }));
+  expect(
+    await renameNoteReferences(repository, 'owner', 'New', backlinks),
+  ).toEqual({ sourceCount: 1, linkCount: 2 });
+  await renamePageFrameReferences(
+    repository,
+    'owner',
+    'frame',
+    'Final',
+    backlinks,
+  );
+  expect(native.operations).toEqual([
+    {
+      kind: 'rename-references',
+      sourceIds: ['owner', 'source'],
+      targetId: 'owner',
+      newName: 'New',
+      referenceKind: 'note',
+    },
+    {
+      kind: 'rename-references',
+      sourceIds: ['source'],
+      targetId: 'frame',
+      newName: 'Final',
+      referenceKind: 'page-frame',
+    },
+  ]);
+  await repository.dispose();
+});
+
+it('paces large JS file writes in bounded chunks and never publishes partial bytes', async () => {
+  const native = nativeBoundary();
+  const bytes = Uint8Array.from({ length: 8192 * 2 + 1 }, (_, i) => i % 251);
+  const repository = new NativeRepository({ kind: 'local' });
+  const id = await repository.createFile('Large', 'png', null, bytes);
+  expect(native.files.get(id)).toEqual(bytes);
+  const chunks = native.operations.filter((op) => op.kind === 'stage-bytes');
+  expect(
+    chunks.map((op) => Buffer.from(op.bytesBase64 as string, 'base64').length),
+  ).toEqual([8192, 8192, 1]);
+  expect(chunks.map((op) => op.offset)).toEqual([0, 8192, 16384]);
+  expect(native.operations.some((op) => op.kind === 'write-file')).toBe(false);
+  expect(
+    native.operations.findIndex((op) => op.kind === 'finish-transfer'),
+  ).toBeLessThan(
+    native.operations.findIndex((op) => op.kind === 'save-manifest'),
+  );
+  await repository.dispose();
+});
+
+it('cancels a failed JS transfer without publishing a new file', async () => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (op?.kind === 'stage-bytes' && op.offset === 8192) {
+      throw new Error('Transfer interrupted');
+    }
+    return implementation(command, args);
+  });
+  const repository = new NativeRepository({ kind: 'local' });
+  await expect(
+    repository.createFile('Failed', 'png', null, new Uint8Array(8193)),
+  ).rejects.toThrow('Transfer interrupted');
+  expect(native.manifest().nodes).toEqual({});
+  expect(native.files.size).toBe(0);
+  expect(native.operations.at(-1)?.kind).toBe('cancel-transfer');
+  await repository.dispose();
+});
+
+it('saves a JS-generated canvas import through bounded native document transfers', async () => {
+  const native = nativeBoundary();
+  const repository = new NativeRepository({ kind: 'local' });
+  const bytes = Uint8Array.from({ length: 20000 }, (_, i) => i % 251);
+  const id = await createCanvasFile({
+    repository,
+    parentId: null,
+    title: 'Generated',
+    label: 'Test',
+    build: (ydoc) => {
+      ydoc.doc.getMap('asset').set('bytes', bytes);
+    },
+  });
+  expect(native.documents.get(id)?.getMap('asset').get('bytes')).toEqual(bytes);
+  const chunks = native.operations.filter((op) => op.kind === 'stage-bytes');
+  expect(chunks.length).toBeGreaterThan(1);
+  expect(
+    chunks.every(
+      (op) => Buffer.from(op.bytesBase64 as string, 'base64').length <= 8192,
+    ),
+  ).toBe(true);
+  const finish = native.operations.find((op) => op.kind === 'finish-transfer');
+  expect(finish?.operation).toMatchObject({
+    kind: 'update-document',
+    nodeId: id,
+    generation: 'original',
+    origin: 'local',
+    updateBase64: '',
+  });
+  expect(native.operations.some((op) => op.kind === 'update-document')).toBe(
+    false,
+  );
+  await repository.dispose();
 });

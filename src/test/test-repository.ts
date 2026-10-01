@@ -8,6 +8,7 @@ import {
 } from '@/lib/sync/repo/shared';
 import type {
   FileType,
+  RenameReferencesResult,
   RepositoryCapabilities,
   VFSNodeId,
 } from '@/lib/sync/repo/types';
@@ -107,6 +108,10 @@ export class TestRepository extends BaseRepository {
     if (await storage.exists(path)) {
       await storage.remove(path);
     }
+  }
+
+  override async renameReferences(): Promise<RenameReferencesResult> {
+    throw new Error('Reference rewrites require the native repository.');
   }
 
   override async restoreFileVersion(): Promise<void> {

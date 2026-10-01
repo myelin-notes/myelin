@@ -21,11 +21,13 @@ const DEFAULT_PDF_IMPORT_OFFSET = {
   y: 80,
 } as const;
 
-export function isPdfFile(file: File): boolean {
+export function isPdfFile(file: Pick<File, 'name' | 'type'>): boolean {
   return PDF_EXTENSION_RE.test(file.name) || PDF_MIME_TYPES.has(file.type);
 }
 
-export function isNativeGoodnotesFile(file: File): boolean {
+export function isNativeGoodnotesFile(
+  file: Pick<File, 'name' | 'type'>,
+): boolean {
   return GOODNOTES_EXTENSION_RE.test(file.name);
 }
 

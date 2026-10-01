@@ -2,7 +2,7 @@ use super::*;
 use crate::repository_bootstrap::download::RemoteEndpoints;
 use std::{fs, sync::atomic::AtomicU64};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use yrs::{Any, Array, GetString, Map, Out, ReadTxn, Transact};
+use yrs::{Any, Array, GetString, Map, Out, ReadTxn, Text, Transact};
 
 struct TestDirectory(PathBuf);
 impl TestDirectory {
@@ -1348,4 +1348,296 @@ async fn native_raw_sync_preserves_legacy_content_bases_and_makes_conflict_copie
     assert!(name.starts_with("picture (Conflicted copy "));
     assert!(name.ends_with(").png"));
     assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
+
+#[tokio::test]
+async fn native_path_imports_store_bytes_before_publishing_and_leave_failed_sources_unpublished() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    let bytes: Vec<u8> = (0..20000).map(|i| (i % 251) as u8).collect();
+    let path = directory.0.join("source.png");
+    fs::write(&path, &bytes).unwrap();
+    engine
+        .operate(RepositoryOperation::ImportFile {
+            node: node("import", "png"),
+            path,
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        fs::read(directory.0.join("data/files/import.png")).unwrap(),
+        bytes
+    );
+    assert!(engine.store.lock().unwrap().manifest["nodes"]["import"].is_null());
+    let mut manifest = engine.store.lock().unwrap().manifest.clone();
+    manifest["nodes"]["import"] = node("import", "png");
+    save_manifest(&engine, manifest).await;
+    assert_eq!(read(&engine, "import").await, bytes);
+    assert!(engine
+        .operate(RepositoryOperation::ImportFile {
+            node: node("failed", "png"),
+            path: directory.0.join("missing")
+        })
+        .await
+        .is_err());
+    assert!(!directory.0.join("data/files/failed.png").exists());
+    assert!(engine.store.lock().unwrap().manifest["nodes"]["failed"].is_null());
+}
+
+#[tokio::test]
+async fn native_reference_renames_update_text_marks_indexes_and_mergeable_deltas_without_replacing_documents(
+) {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/yjs-renames.json")).unwrap();
+    let bytes = STANDARD
+        .decode(fixture["update"].as_str().unwrap())
+        .unwrap();
+    let original = document::decode(&bytes).unwrap();
+    // An embedded binary must not be sent back as part of a link rename.
+    let asset = vec![137u8; 1024 * 1024];
+    original.get_or_insert_map("asset").insert(
+        &mut original.transact_mut(),
+        "bytes",
+        Any::Buffer(asset.clone().into()),
+    );
+    let bytes = document::bytes(&original);
+    seed(&engine, "source", "mcanvas", bytes.clone()).await;
+    let before_generation =
+        engine.store.lock().unwrap().sync.document_generations["source"].clone();
+    let (result, changes) = engine
+        .operate(RepositoryOperation::RenameReferences {
+            source_ids: vec!["source".into(), "source".into(), "missing".into()],
+            target_id: "target".into(),
+            new_name: "新#Name\\x".into(),
+            reference_kind: references::ReferenceKind::Note,
+        })
+        .await
+        .unwrap();
+    assert_eq!(result, json!({"sourceCount": 1, "linkCount": 4}));
+    assert_eq!(changes.documents.len(), 1);
+    let change = &changes.documents[0];
+    assert!(!change.replacement);
+    assert_eq!(change.generation, before_generation);
+    assert!(change.bytes.len() < 8192);
+    let open_editor = document::decode(&bytes).unwrap();
+    open_editor.get_or_insert_text("unsaved").insert(
+        &mut open_editor.transact_mut(),
+        0,
+        "Keep my edit",
+    );
+    document::apply(&open_editor, &change.bytes).unwrap();
+    assert_eq!(
+        open_editor
+            .get_or_insert_text("unsaved")
+            .get_string(&open_editor.transact()),
+        "Keep my edit"
+    );
+    let renamed = document::decode(&read(&engine, "source").await).unwrap();
+    assert_eq!(document::links(&open_editor), document::links(&renamed));
+    let links = document::links(&renamed);
+    assert_eq!(
+        links
+            .iter()
+            .map(|link| link["title"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec![
+            "Folder/新\\#Name\\\\x#Draft",
+            "Folder/新\\#Name\\\\x#Draft",
+            "Other",
+            "新\\#Name\\\\x",
+            "No frame"
+        ]
+    );
+    assert_eq!(links[0]["snippet"], "😀 before [[Folder/新\\#Name\\\\x#Draft]] between [[Folder/新\\#Name\\\\x#Draft]][[Folder/新\\#Name\\\\x#Draft]] after");
+    assert_eq!(
+        json!(links),
+        engine.store.lock().unwrap().manifest["linksBySource"]["source"]
+    );
+    let (result, changes) = engine
+        .operate(RepositoryOperation::RenameReferences {
+            source_ids: vec!["source".into()],
+            target_id: "frame".into(),
+            new_name: "Final#\\😀".into(),
+            reference_kind: references::ReferenceKind::PageFrame,
+        })
+        .await
+        .unwrap();
+    assert_eq!(result, json!({"sourceCount": 1, "linkCount": 3}));
+    assert!(!changes.documents[0].replacement);
+    let reopened = directory.engine(true);
+    let restored = document::decode(&read(&reopened, "source").await).unwrap();
+    let links = document::links(&restored);
+    assert_eq!(
+        links
+            .iter()
+            .map(|link| link["title"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec![
+            "Folder/新\\#Name\\\\x#Final\\#\\\\😀",
+            "Folder/新\\#Name\\\\x#Final\\#\\\\😀",
+            "Other",
+            "新\\#Name\\\\x",
+            "No frame"
+        ]
+    );
+    let txn = restored.transact();
+    let xml = txn.get_xml_fragment("pf-source").unwrap().get_string(&txn);
+    assert!(xml.contains("[[Code]]"));
+    assert!(xml.contains("[[Math]]"));
+    assert!(!xml.contains("<bold>"));
+    assert!(
+        matches!(txn.get_map("asset").unwrap().get(&txn, "bytes"), Some(Out::Any(Any::Buffer(value))) if value.as_ref() == asset)
+    );
+    drop(txn);
+    let (result, changes) = reopened
+        .operate(RepositoryOperation::RenameReferences {
+            source_ids: vec!["source".into()],
+            target_id: "frame".into(),
+            new_name: "Final#\\😀".into(),
+            reference_kind: references::ReferenceKind::PageFrame,
+        })
+        .await
+        .unwrap();
+    assert_eq!(result, json!({"sourceCount": 0, "linkCount": 0}));
+    assert!(changes.documents.is_empty());
+    let before_failure = read(&reopened, "source").await;
+    seed(&reopened, "corrupt", "mcanvas", vec![0, 0]).await;
+    fs::write(directory.0.join("data/files/corrupt.myelin"), b"invalid").unwrap();
+    reopened.store.lock().unwrap().documents.remove("corrupt");
+    assert!(reopened
+        .operate(RepositoryOperation::RenameReferences {
+            source_ids: vec!["source".into(), "corrupt".into()],
+            target_id: "target".into(),
+            new_name: "Must roll back".into(),
+            reference_kind: references::ReferenceKind::Note,
+        })
+        .await
+        .is_err());
+    let before_failure = document::decode(&before_failure).unwrap();
+    let after_failure = document::decode(&read(&reopened, "source").await).unwrap();
+    assert_eq!(
+        after_failure.transact().state_vector(),
+        before_failure.transact().state_vector()
+    );
+    assert_eq!(
+        document::links(&after_failure),
+        document::links(&before_failure)
+    );
+}
+
+#[tokio::test]
+async fn native_chunk_transfers_reject_bad_chunks_and_commit_only_complete_file_and_document_payloads(
+) {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "image", "png", b"old".to_vec()).await;
+    let mut handle = RepositoryHandle {
+        engine: engine.clone(),
+        notes: HashMap::new(),
+        transfers: HashMap::new(),
+    };
+    let bytes: Vec<u8> = (0..17000).map(|i| (i % 251) as u8).collect();
+    for (index, chunk) in bytes.chunks(8192).enumerate() {
+        assert!(handle
+            .resolve_transfer(RepositoryOperation::StageBytes {
+                transfer_id: "file".into(),
+                offset: index * 8192,
+                bytes_base64: STANDARD.encode(chunk)
+            })
+            .unwrap()
+            .is_none());
+        assert_eq!(read(&engine, "image").await, b"old");
+    }
+    assert!(handle
+        .resolve_transfer(RepositoryOperation::StageBytes {
+            transfer_id: "file".into(),
+            offset: 0,
+            bytes_base64: STANDARD.encode([1])
+        })
+        .is_err());
+    assert!(handle
+        .resolve_transfer(RepositoryOperation::StageBytes {
+            transfer_id: "oversize".into(),
+            offset: 0,
+            bytes_base64: STANDARD.encode(vec![0; 8193])
+        })
+        .is_err());
+    let operation = handle
+        .resolve_transfer(RepositoryOperation::FinishTransfer {
+            transfer_id: "file".into(),
+            operation: Box::new(RepositoryOperation::WriteFile {
+                node: node("image", "png"),
+                bytes_base64: String::new(),
+                replace: true,
+                overwrite_remote: false,
+            }),
+        })
+        .unwrap()
+        .unwrap();
+    engine.operate(operation).await.unwrap();
+    assert_eq!(read(&engine, "image").await, bytes);
+    assert!(handle.transfers.is_empty());
+    seed(&engine, "canvas", "mcanvas", fixture_bytes("baseUpdate")).await;
+    let editor = document::decode(&read(&engine, "canvas").await).unwrap();
+    let before = document::vector(&editor);
+    let text = "😀".repeat(5000);
+    editor
+        .get_or_insert_text("imported")
+        .insert(&mut editor.transact_mut(), 0, &text);
+    let (delta, _) = document::diff(&editor, Some(&before)).unwrap();
+    for (index, chunk) in delta.chunks(8192).enumerate() {
+        handle
+            .resolve_transfer(RepositoryOperation::StageBytes {
+                transfer_id: "doc".into(),
+                offset: index * 8192,
+                bytes_base64: STANDARD.encode(chunk),
+            })
+            .unwrap();
+    }
+    let operation = handle
+        .resolve_transfer(RepositoryOperation::FinishTransfer {
+            transfer_id: "doc".into(),
+            operation: Box::new(RepositoryOperation::UpdateDocument {
+                node_id: "canvas".into(),
+                update_base64: String::new(),
+                origin: "local".into(),
+                generation: None,
+                source_session: Some("editor".into()),
+            }),
+        })
+        .unwrap()
+        .unwrap();
+    engine.operate(operation).await.unwrap();
+    let persisted = document::decode(&read(&directory.engine(false), "canvas").await).unwrap();
+    assert_eq!(
+        persisted
+            .get_or_insert_text("imported")
+            .get_string(&persisted.transact()),
+        text
+    );
+    handle
+        .resolve_transfer(RepositoryOperation::StageBytes {
+            transfer_id: "cancelled".into(),
+            offset: 0,
+            bytes_base64: STANDARD.encode([1, 2]),
+        })
+        .unwrap();
+    handle
+        .resolve_transfer(RepositoryOperation::CancelTransfer {
+            transfer_id: "cancelled".into(),
+        })
+        .unwrap();
+    assert!(handle
+        .resolve_transfer(RepositoryOperation::FinishTransfer {
+            transfer_id: "cancelled".into(),
+            operation: Box::new(RepositoryOperation::WriteFile {
+                node: node("image", "png"),
+                bytes_base64: String::new(),
+                replace: true,
+                overwrite_remote: false
+            })
+        })
+        .is_err());
+    assert_eq!(read(&engine, "image").await, bytes);
 }

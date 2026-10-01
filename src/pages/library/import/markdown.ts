@@ -7,7 +7,7 @@ export const MARKDOWN_FILE_ACCEPT =
 export const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
 const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/x-markdown']);
 
-export function isMarkdownFile(file: File): boolean {
+export function isMarkdownFile(file: Pick<File, 'name' | 'type'>): boolean {
   return (
     MARKDOWN_EXTENSION_RE.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type)
   );

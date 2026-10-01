@@ -22,6 +22,8 @@ import type {
   CreateFileOptions,
   FileType,
   FileVersion,
+  RenameReferencesRequest,
+  RenameReferencesResult,
   RepositoryCapabilities,
   VFSNodeId,
 } from './types';
@@ -291,6 +293,38 @@ export class NativeRepository
     const bytes = decode(result.bytesBase64);
     return { bytes: bytes.length ? bytes : null, revision: result.revision };
   }
+  private async writeBytes<T>(
+    operation: Record<string, unknown>,
+    field: 'bytesBase64' | 'updateBase64',
+    bytes: Uint8Array,
+  ): Promise<T> {
+    if (bytes.length <= 8192) {
+      return this.operation<T>({ ...operation, [field]: encode(bytes) });
+    }
+    const transferId = crypto.randomUUID();
+    try {
+      for (let offset = 0; offset < bytes.length; offset += 8192) {
+        await this.operation({
+          kind: 'stage-bytes',
+          transferId,
+          offset,
+          bytesBase64: encode(bytes.subarray(offset, offset + 8192)),
+        });
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      return await this.operation<T>({
+        kind: 'finish-transfer',
+        transferId,
+        operation: { ...operation, [field]: '' },
+      });
+    } catch (error) {
+      await this.operation({ kind: 'cancel-transfer', transferId }).catch(
+        () => {},
+      );
+      throw error;
+    }
+  }
+
   protected override async saveFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
@@ -299,13 +333,16 @@ export class NativeRepository
     if (!node || node.type !== 'file') {
       throw new Error('Repository file is missing');
     }
-    const result = await this.operation<{ revision: string }>({
-      kind: 'write-file',
-      node,
-      bytesBase64: encode(bytes),
-      replace: true,
-      overwriteRemote: false,
-    });
+    const result = await this.writeBytes<{ revision: string }>(
+      {
+        kind: 'write-file',
+        node,
+        replace: true,
+        overwriteRemote: false,
+      },
+      'bytesBase64',
+      bytes,
+    );
     return result.revision;
   }
   protected override async deleteFileBytes(
@@ -336,6 +373,24 @@ export class NativeRepository
     return this.batchManifestWrites(() =>
       super.createFile(name, fileType, parentId, bytes, options),
     );
+  }
+  async importFileFromPath(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    path: string,
+  ): Promise<VFSNodeId> {
+    return this.batchManifestWrites(async () => {
+      const id = await super.createFile(name, fileType, parentId);
+      const node = await this.getNode(id);
+      await this.operation({ kind: 'import-file', node, path });
+      return id;
+    });
+  }
+  override renameReferences(
+    request: RenameReferencesRequest,
+  ): Promise<RenameReferencesResult> {
+    return this.operation({ kind: 'rename-references', ...request });
   }
   override createFileVersionIfDue(
     nodeId: VFSNodeId,
@@ -410,14 +465,17 @@ export class NativeRepository
     generation?: string,
     sourceSession?: string,
   ): Promise<YjsSyncPushResult> {
-    const result = await this.operation<NativeDocument>({
-      kind: 'update-document',
-      nodeId,
-      updateBase64: encode(update),
-      origin: 'local',
-      generation: generation ?? null,
-      sourceSession: sourceSession ?? null,
-    });
+    const result = await this.writeBytes<NativeDocument>(
+      {
+        kind: 'update-document',
+        nodeId,
+        origin: 'local',
+        generation: generation ?? null,
+        sourceSession: sourceSession ?? null,
+      },
+      'updateBase64',
+      update,
+    );
     return {
       accepted: result.accepted ?? true,
       changed: result.changed ?? false,

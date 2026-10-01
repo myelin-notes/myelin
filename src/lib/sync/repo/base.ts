@@ -66,6 +66,8 @@ import type {
   OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
+  RenameReferencesRequest,
+  RenameReferencesResult,
   Repository,
   RepositoryCapabilities,
   RepositoryNoteGraph,
@@ -98,6 +100,9 @@ export abstract class BaseRepository
     RepositoryLifecycle,
     RepositoryStatusSource
 {
+  public abstract renameReferences(
+    request: RenameReferencesRequest,
+  ): Promise<RenameReferencesResult>;
   public abstract readonly kind: string;
   public abstract readonly capabilities: RepositoryCapabilities;
 

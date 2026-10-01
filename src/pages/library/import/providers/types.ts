@@ -23,11 +23,13 @@ export type ImportProviderId =
 export type ImportPicker =
   | { kind: 'files'; accept: string; multiple: boolean }
   | { kind: 'file'; filters: DialogFilter[] }
+  | { kind: 'native-files'; filters: DialogFilter[]; multiple: boolean }
   | { kind: 'directory' };
 
 export type ImportSelection =
   | { kind: 'files'; files: File[] }
   | { kind: 'file'; path: string }
+  | { kind: 'native-files'; paths: string[] }
   | { kind: 'directory'; folder: PickedFolder };
 
 export interface ImportJobContext {

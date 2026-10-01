@@ -7,6 +7,7 @@
 
 import type {
   Repository as EditorRepository,
+  FileType,
   VFSNodeId,
 } from '@myelin/editor/sync/repo/types';
 import type { NoteSession } from '../session';
@@ -23,7 +24,28 @@ export interface OpenSessionOptions {
   skipRemotePull?: boolean;
 }
 
+export interface RenameReferencesRequest {
+  sourceIds: readonly VFSNodeId[];
+  targetId: string;
+  newName: string;
+  referenceKind: 'note' | 'page-frame';
+}
+
+export interface RenameReferencesResult {
+  sourceCount: number;
+  linkCount: number;
+}
+
 export interface Repository extends EditorRepository {
+  importFileFromPath?(
+    name: string,
+    fileType: FileType,
+    parentId: VFSNodeId | null,
+    path: string,
+  ): Promise<VFSNodeId>;
+  renameReferences(
+    request: RenameReferencesRequest,
+  ): Promise<RenameReferencesResult>;
   getNoteIndexSource(): object;
   listNoteIndexItems(): Promise<NoteIndexItem[]>;
   openSession(

@@ -22,6 +22,7 @@ import {
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
 import type { ImportProgress } from './dialog';
+import { importStoragePath } from './files';
 import {
   createImportedFolders,
   getImportParentId,
@@ -445,12 +446,14 @@ export async function importWorkspaceJson({
       for (const file of scanned.media) {
         onProgress?.({ current: ++current, total, fileName: file.name });
         try {
-          await repository.createFile(
-            file.name,
-            file.fileType,
-            getImportParentId(root, folderIds, file.folderPath),
-            await reader.readFile(file.sourcePath),
-          );
+          await importStoragePath({
+            path: file.sourcePath,
+            name: file.name,
+            fileType: file.fileType,
+            parentId: getImportParentId(root, folderIds, file.folderPath),
+            repository,
+            reader,
+          });
           mediaImported += 1;
         } catch (error) {
           failedFiles += 1;

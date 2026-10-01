@@ -436,23 +436,31 @@ impl Store {
     }
 
     pub fn commit_update(&mut self, id: &str, bytes: &[u8]) -> Result<(), String> {
-        let count = self.delta_counts.entry(id.into()).or_default();
-        *count += 1;
-        if *count >= 64 {
-            let bytes = document::bytes(self.doc(id)?);
-            return self.commit(vec![FileWrite {
-                name: file_name(&self.manifest["nodes"][id])?,
-                bytes: Some(STANDARD.encode(bytes)),
-            }]);
+        self.commit_updates(vec![(id.into(), bytes.to_vec())])
+    }
+
+    pub fn commit_updates(&mut self, updates: Vec<(String, Vec<u8>)>) -> Result<(), String> {
+        let mut files = Vec::new();
+        let mut deltas = Vec::new();
+        for (id, bytes) in updates {
+            let count = self.delta_counts.entry(id.clone()).or_default();
+            *count += 1;
+            if *count >= 64 {
+                let bytes = document::bytes(self.doc(&id)?);
+                files.push(FileWrite {
+                    name: file_name(&self.manifest["nodes"][&id])?,
+                    bytes: Some(STANDARD.encode(bytes)),
+                });
+                self.delta_counts.remove(&id);
+            } else {
+                deltas.push(DeltaWrite {
+                    node_id: id,
+                    id: uuid::Uuid::new_v4().to_string(),
+                    bytes: STANDARD.encode(bytes),
+                });
+            }
         }
-        self.commit_journal(
-            Vec::new(),
-            vec![DeltaWrite {
-                node_id: id.into(),
-                id: uuid::Uuid::new_v4().to_string(),
-                bytes: STANDARD.encode(bytes),
-            }],
-        )
+        self.commit_journal(files, deltas)
     }
 
     fn commit_journal(

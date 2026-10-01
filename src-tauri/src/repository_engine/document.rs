@@ -55,7 +55,7 @@ pub(super) fn merge(remote: &[u8], local: &[u8]) -> Result<Vec<u8>, String> {
     Ok(bytes(&doc))
 }
 
-fn string(value: &Any) -> Option<&str> {
+pub(super) fn string(value: &Any) -> Option<&str> {
     if let Any::String(value) = value {
         Some(value)
     } else {

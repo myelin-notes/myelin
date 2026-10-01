@@ -1,8 +1,10 @@
 mod document;
+mod references;
 mod remote;
 mod store;
 #[cfg(test)]
 mod tests;
+mod transfer;
 mod version_history;
 
 use crate::repository_bootstrap::{download::RepositorySource, recover_cache, CachePaths};
@@ -19,6 +21,7 @@ use std::{
 };
 use store::{file_name, revision, FileWrite, Store};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_fs::FsExt;
 use tokio::sync::{oneshot, Mutex as AsyncMutex, Notify};
 
 #[derive(Default)]
@@ -31,6 +34,7 @@ pub struct RepositoryManager {
 struct RepositoryHandle {
     engine: Arc<RepositoryEngine>,
     notes: HashMap<String, HashSet<String>>,
+    transfers: HashMap<String, Vec<u8>>,
 }
 
 pub(crate) struct RepositoryEngine {
@@ -88,6 +92,28 @@ pub enum RepositoryOperation {
         bytes_base64: String,
         replace: bool,
         overwrite_remote: bool,
+    },
+    ImportFile {
+        node: Value,
+        path: PathBuf,
+    },
+    RenameReferences {
+        source_ids: Vec<String>,
+        target_id: String,
+        new_name: String,
+        reference_kind: references::ReferenceKind,
+    },
+    StageBytes {
+        transfer_id: String,
+        offset: usize,
+        bytes_base64: String,
+    },
+    FinishTransfer {
+        transfer_id: String,
+        operation: Box<RepositoryOperation>,
+    },
+    CancelTransfer {
+        transfer_id: String,
     },
     CreateFileVersion {
         node_id: String,
@@ -508,6 +534,21 @@ impl RepositoryOperation {
                     .map_err(|_| "Invalid repository file bytes")?;
                 return write_file(state, node, bytes, replace, overwrite_remote, Vec::new());
             }
+            Self::ImportFile { node, path } => {
+                let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+                return write_file(state, node, bytes, true, false, Vec::new());
+            }
+            Self::RenameReferences {
+                source_ids,
+                target_id,
+                new_name,
+                reference_kind,
+            } => {
+                return references::rename(state, source_ids, target_id, new_name, reference_kind);
+            }
+            Self::StageBytes { .. } | Self::FinishTransfer { .. } | Self::CancelTransfer { .. } => {
+                return Err("Transfer requires a repository handle".into());
+            }
             Self::CreateFileVersion { node_id, force } => {
                 return version_history::create(state, &node_id, force);
             }
@@ -778,6 +819,7 @@ pub async fn repository_open(
         RepositoryHandle {
             engine: engine.clone(),
             notes: HashMap::new(),
+            transfers: HashMap::new(),
         },
     );
     if request.source.is_some() {
@@ -809,6 +851,11 @@ pub async fn repository_operation(
     operation: RepositoryOperation,
 ) -> Result<Value, String> {
     let engine = manager.engine(&handle).await?;
+    if let RepositoryOperation::ImportFile { path, .. } = &operation {
+        if !app.fs_scope().is_allowed(path) {
+            return Err("Import source is outside the selected filesystem scope".into());
+        }
+    }
     match &operation {
         RepositoryOperation::Subscribe { node_id, session_id } => {
             let mut handles = manager.handles.lock().await;
@@ -853,6 +900,16 @@ pub async fn repository_operation(
         }
         _ => {}
     }
+    let operation = {
+        let mut handles = manager.handles.lock().await;
+        handles
+            .get_mut(&handle)
+            .ok_or("Repository handle is closed")?
+            .resolve_transfer(operation)?
+    };
+    let Some(operation) = operation else {
+        return Ok(Value::Null);
+    };
     let (result, changes) = engine.operate(operation).await?;
     engine.emit_changes(&app, changes).await;
     Ok(result)

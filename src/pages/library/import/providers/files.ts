@@ -1,10 +1,18 @@
 import { Import } from 'lucide-react';
-import type { VFSNodeId } from '@/lib/sync';
+import { readFile } from '@tauri-apps/plugin-fs';
+import { MOBILE_PLATFORM } from '@/lib/env';
+import {
+  getFileTypeForName,
+  ImportableFileTypes,
+  type VFSNodeId,
+} from '@/lib/sync';
 import {
   importStorageFile,
+  importStoragePath,
   isStorageFile,
   STORAGE_FILE_ACCEPT,
 } from '../files';
+import { getPathBasename } from '../import-tree';
 import {
   importMarkdownFile,
   isMarkdownFile,
@@ -20,17 +28,25 @@ import { expectFiles, type ImportProvider } from './types';
 
 const FILES_ACCEPT = `${MARKDOWN_FILE_ACCEPT},${PDF_FILE_ACCEPT},${STORAGE_FILE_ACCEPT}`;
 
-interface PartitionedFiles {
-  /** Importable files, kept in the order the user picked them. */
-  supported: File[];
-  noteCount: number;
-  mediaCount: number;
-  unsupported: File[];
+interface NativeImportFile {
+  path: string;
+  name: string;
+  type: string;
 }
 
-function partition(files: File[]): PartitionedFiles {
-  const supported: File[] = [];
-  const unsupported: File[] = [];
+type ImportFile = File | NativeImportFile;
+
+interface PartitionedFiles {
+  /** Importable files, kept in the order the user picked them. */
+  supported: ImportFile[];
+  noteCount: number;
+  mediaCount: number;
+  unsupported: ImportFile[];
+}
+
+function partition(files: ImportFile[]): PartitionedFiles {
+  const supported: ImportFile[] = [];
+  const unsupported: ImportFile[] = [];
   let noteCount = 0;
   let mediaCount = 0;
 
@@ -52,10 +68,34 @@ function partition(files: File[]): PartitionedFiles {
 export const filesProvider: ImportProvider = {
   id: 'files',
   icon: Import,
-  picker: { kind: 'files', accept: FILES_ACCEPT, multiple: true },
+  picker: MOBILE_PLATFORM
+    ? { kind: 'files', accept: FILES_ACCEPT, multiple: true }
+    : {
+        kind: 'native-files',
+        filters: [
+          {
+            name: 'Importable files',
+            extensions: [
+              'md',
+              'markdown',
+              'mdx',
+              'pdf',
+              ...ImportableFileTypes,
+            ],
+          },
+        ],
+        multiple: true,
+      },
 
   createJob({ selection, repository, parentId, strings }) {
-    const files = expectFiles(selection);
+    const files: ImportFile[] =
+      selection.kind === 'native-files'
+        ? selection.paths.map((path) => ({
+            path,
+            name: getPathBasename(path, path),
+            type: '',
+          }))
+        : expectFiles(selection);
     const source = strings.library.importSources.files;
     const shared = strings.library.importDialog;
     let scanned: PartitionedFiles | null = null;
@@ -102,22 +142,44 @@ export const filesProvider: ImportProvider = {
             fileName: file.name,
           });
 
+          if ('path' in file && isStorageFile(file) && !isPdfFile(file)) {
+            const name = await repository.getUniqueFileName(
+              file.name,
+              parentId,
+            );
+            lastId = await importStoragePath({
+              path: file.path,
+              name,
+              fileType: getFileTypeForName(file.name)!,
+              repository,
+              parentId,
+            });
+            continue;
+          }
+          const input =
+            'path' in file
+              ? new File([await readFile(file.path)], file.name)
+              : file;
           if (isMarkdownFile(file)) {
             lastId = await importMarkdownFile({
-              file,
+              file: input,
               repository,
               parentId,
               fallbackTitle,
             });
           } else if (isPdfFile(file)) {
             lastId = await importPdfFile({
-              file,
+              file: input,
               repository,
               parentId,
               fallbackTitle,
             });
           } else {
-            lastId = await importStorageFile({ file, repository, parentId });
+            lastId = await importStorageFile({
+              file: input,
+              repository,
+              parentId,
+            });
           }
         }
 
