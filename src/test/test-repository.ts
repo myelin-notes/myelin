@@ -29,6 +29,7 @@ import type {
   RenameReferencesResult,
   RepositoryCapabilities,
   StoredNoteLink,
+  VFSFileNode,
   VFSNodeId,
 } from '@/lib/sync/repo/types';
 import { getRepositoryTestStorage } from './repository-test-utils';
@@ -91,7 +92,11 @@ export class TestRepository extends NativeRepository {
   ): Promise<NativeDocumentWriteResult> {
     const { bytes } = await this.loadFileBytes(nodeId);
     const result = await processDocumentAsync({ bytes, update });
-    const revision = await this.saveFileBytes(nodeId, result.update!);
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file') {
+      throw new Error('Repository file is missing');
+    }
+    const revision = await this.saveFileBytes(node, result.update!);
     await this.onFileSaved(nodeId, result.links);
     return {
       stateVector: result.stateVector,
@@ -168,10 +173,8 @@ export class TestRepository extends NativeRepository {
     bytes: Uint8Array,
   ): Promise<void> {
     const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
-    const nextRevision = await this.saveFileBytes(nodeId, bytes);
-    if (nextRevision !== null) {
-      await this.onFileSaved(nodeId, links);
-    }
+    await super.writeFileBytes(nodeId, bytes);
+    await this.onFileSaved(nodeId, links);
   }
 
   override async importFile(
@@ -210,7 +213,33 @@ export class TestRepository extends NativeRepository {
   protected override async saveManifestImpl(
     manifest: VFSManifest,
   ): Promise<string> {
-    await getRepositoryTestStorage().writeTextFile(
+    const storage = getRepositoryTestStorage();
+    const previous = JSON.parse(
+      await storage.readTextFile(this.path('manifest.json')),
+    ) as VFSManifest;
+    for (const node of Object.values(manifest.nodes)) {
+      if (
+        node.type !== 'file' ||
+        node.fileType !== 'mcanvas' ||
+        node.system ||
+        previous.nodes[node.id]
+      ) {
+        continue;
+      }
+      const path = this.path(`files/${getStoredFileName(node)}`);
+      if (await storage.exists(path)) {
+        const doc = createDocFromBytes(await storage.readFile(path));
+        try {
+          const links = extractStoredNoteLinks(doc);
+          if (links.length > 0) {
+            setStoredNoteLinks(manifest, node.id, links);
+          }
+        } finally {
+          doc.destroy();
+        }
+      }
+    }
+    await storage.writeTextFile(
       this.path('manifest.json'),
       JSON.stringify(manifest),
     );
@@ -239,17 +268,13 @@ export class TestRepository extends NativeRepository {
   }
 
   protected override async saveFileBytes(
-    nodeId: VFSNodeId,
+    node: VFSFileNode,
     bytes: Uint8Array,
   ): Promise<string> {
-    const { manifest } = await this.loadManifestImpl();
-    const node = manifest.nodes[nodeId];
-    if (node?.type === 'file') {
-      await getRepositoryTestStorage().writeFile(
-        this.path(`files/${getStoredFileName(node)}`),
-        bytes,
-      );
-    }
+    await getRepositoryTestStorage().writeFile(
+      this.path(`files/${getStoredFileName(node)}`),
+      bytes,
+    );
     return (await computeRevision(bytes)) ?? '';
   }
 

@@ -225,6 +225,7 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(repository).toBeInstanceOf(NativeRepository);
   await repository.initialize();
   let fileId = '';
+  native.compete();
   await repository.batchManifestWrites(async () => {
     const folder = await repository.createFolder('Imported', null);
     fileId = await repository.createFile(
@@ -401,6 +402,73 @@ it('does not publish a new file while its native byte write is still in flight',
   const id = await creating;
   expect(native.manifest().nodes[id]?.name).toBe('Large import');
   expect(native.files.get(id)).toEqual(new Uint8Array([4, 5, 6]));
+  await repository.dispose();
+});
+
+it.each([
+  { kind: 'create', failureFirst: false },
+  { kind: 'create', failureFirst: true },
+  { kind: 'import', failureFirst: false },
+  { kind: 'import', failureFirst: true },
+])('isolates overlapping $kind calls when failureFirst=$failureFirst', async ({
+  kind,
+  failureFirst,
+}) => {
+  const native = nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  let rejectFailure!: (error: Error) => void;
+  let releaseSuccess!: () => void;
+  const failureGate = new Promise<void>((_resolve, reject) => {
+    rejectFailure = reject;
+  });
+  const successGate = new Promise<void>((resolve) => {
+    releaseSuccess = resolve;
+  });
+  const started = new Set<string>();
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    const op = (args as { operation?: Record<string, unknown> })?.operation;
+    if (
+      command === 'repository_operation' &&
+      (op?.kind === 'write-file' || op?.kind === 'import-file')
+    ) {
+      const node = op.node as { id: string; name: string };
+      started.add(node.name);
+      await (node.name === 'Failed' ? failureGate : successGate);
+      if (op.kind === 'import-file') {
+        native.files.set(node.id, new Uint8Array([7, 8, 9]));
+        return { revision: 'imported' };
+      }
+    }
+    return implementation(command, args);
+  });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const create = (name: string) =>
+    kind === 'create'
+      ? repository.createFile(name, 'png', null, new Uint8Array([7, 8, 9]))
+      : repository.importFile(name, 'png', null, {
+          kind: 'path',
+          path: `/picked/${name}.png`,
+        });
+  const failed = create('Failed').catch((error: unknown) => error);
+  await vi.waitFor(() => expect(started.has('Failed')).toBe(true));
+  const succeeded = create('Success');
+  await vi.waitFor(() => expect(started.has('Success')).toBe(true));
+  if (failureFirst) {
+    rejectFailure(new Error('Disk failed'));
+    await failed;
+  }
+  releaseSuccess();
+  const id = await succeeded;
+  const publishedAtAcknowledgement = native.manifest().nodes[id]?.name;
+  if (!failureFirst) {
+    rejectFailure(new Error('Disk failed'));
+  }
+  expect(await failed).toEqual(new Error('Disk failed'));
+  expect(publishedAtAcknowledgement).toBe('Success');
+  expect(
+    Object.values(native.manifest().nodes).map((node) => node.name),
+  ).toEqual(['Success']);
+  expect(native.files.get(id)).toEqual(new Uint8Array([7, 8, 9]));
   await repository.dispose();
 });
 

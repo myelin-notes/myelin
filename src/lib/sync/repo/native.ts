@@ -383,13 +383,9 @@ export class NativeRepository implements Repository {
   }
 
   protected async saveFileBytes(
-    nodeId: VFSNodeId,
+    node: VFSFileNode,
     bytes: Uint8Array,
   ): Promise<string | null> {
-    const node = await this.getNode(nodeId);
-    if (!node || node.type !== 'file') {
-      throw new Error('Repository file is missing');
-    }
     const result = await this.writeBytes(
       {
         kind: 'write-file',
@@ -413,38 +409,32 @@ export class NativeRepository implements Repository {
     });
   }
   async writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void> {
-    await this.saveFileBytes(nodeId, bytes);
+    const node = await this.getNode(nodeId);
+    if (!node || node.type !== 'file') {
+      throw new Error('Repository file is missing');
+    }
+    await this.saveFileBytes(node, bytes);
   }
   /** Publishes a new file only after its bytes are durable. */
-  createFile(
+  async createFile(
     name: string,
     fileType: FileType,
     parentId: VFSNodeId | null,
     bytes?: Uint8Array,
     options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
-    return this.batchManifestWrites(async () => {
-      // Minted outside the mutator so a batched flush that replays this mutation
-      // after a conflict reuses the id the caller already received.
-      const id = createNodeId();
-      const now = Date.now();
-      await this.mutateManifest('Create file', (manifest) => {
-        manifest.nodes[id] = createFileNode(
-          id,
-          name,
-          fileType,
-          parentId,
-          now,
-          options?.system,
-        );
-        addChild(manifest, parentId, id);
-      });
-      this.searchMetadataRevision++;
-      if (bytes !== undefined) {
-        await this.writeFileBytes(id, bytes);
-      }
-      return id;
-    });
+    const node = createFileNode(
+      createNodeId(),
+      name,
+      fileType,
+      parentId,
+      Date.now(),
+      options?.system,
+    );
+    if (bytes !== undefined) {
+      await this.saveFileBytes(node, bytes);
+    }
+    return this.publishFile(node);
   }
   async importFile(
     name: string,
@@ -452,15 +442,24 @@ export class NativeRepository implements Repository {
     parentId: VFSNodeId | null,
     source: FileImportSource,
   ): Promise<VFSNodeId> {
-    return this.batchManifestWrites(async () => {
-      const id = await this.createFile(name, fileType, parentId);
-      const node = await this.getNode(id);
-      if (!node || node.type !== 'file') {
-        throw new Error('Repository file is missing');
-      }
-      await this.operation({ kind: 'import-file', node, source });
-      return id;
+    const node = createFileNode(
+      createNodeId(),
+      name,
+      fileType,
+      parentId,
+      Date.now(),
+    );
+    await this.operation({ kind: 'import-file', node, source });
+    return this.publishFile(node);
+  }
+  private async publishFile(node: VFSFileNode): Promise<VFSNodeId> {
+    // Replays after manifest conflicts must reuse the already-written file's ID.
+    await this.mutateManifest('Create file', (manifest) => {
+      manifest.nodes[node.id] = node;
+      addChild(manifest, node.parentId, node.id);
     });
+    this.searchMetadataRevision++;
+    return node.id;
   }
   importOneNote(request: OneNoteImportRequest): Promise<OneNoteImportResult> {
     return this.operation({ kind: 'import-one-note', ...request });
