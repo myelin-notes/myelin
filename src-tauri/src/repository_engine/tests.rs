@@ -996,6 +996,7 @@ struct DriveFile {
     name: String,
     revision: String,
     bytes: Vec<u8>,
+    app_properties: HashMap<String, String>,
 }
 struct DriveFixture {
     files: Vec<DriveFile>,
@@ -1011,6 +1012,7 @@ impl DriveFixture {
                     parent: "folder-1".into(),
                     name: "manifest.json".into(),
                     revision: "manifest-r1".into(),
+                    app_properties: HashMap::new(),
                     bytes: serde_json::to_vec(&manifest_with("canvas", "mcanvas")).unwrap(),
                 },
                 DriveFile {
@@ -1018,6 +1020,7 @@ impl DriveFixture {
                     parent: "folder-1".into(),
                     name: "files".into(),
                     revision: "folder-r1".into(),
+                    app_properties: HashMap::new(),
                     bytes: Vec::new(),
                 },
                 DriveFile {
@@ -1025,6 +1028,7 @@ impl DriveFixture {
                     parent: "files-folder".into(),
                     name: "canvas.myelin".into(),
                     revision: "canvas-r1".into(),
+                    app_properties: HashMap::new(),
                     bytes: fixture_bytes("baseUpdate"),
                 },
             ],
@@ -1033,7 +1037,7 @@ impl DriveFixture {
         }
     }
     fn metadata(file: &DriveFile) -> Value {
-        json!({"id": file.id, "name": file.name, "headRevisionId": file.revision})
+        json!({"id": file.id, "name": file.name, "headRevisionId": file.revision, "appProperties": file.app_properties})
     }
     fn handle(&mut self, request: &Request) -> (u16, Vec<u8>) {
         let url =
@@ -1088,6 +1092,8 @@ impl DriveFixture {
                 parent: body["parents"][0].as_str().unwrap().into(),
                 name: body["name"].as_str().unwrap().into(),
                 revision: format!("create-r{}", self.counter),
+                app_properties: serde_json::from_value(body["appProperties"].clone())
+                    .unwrap_or_default(),
                 bytes: Vec::new(),
             };
             let result = Self::metadata(&file);
@@ -1904,5 +1910,177 @@ async fn out_of_order_document_inserts_and_deletions_are_durable_before_acknowle
             if delete { "" } else { "AB" }
         );
         assert_eq!(ack["changed"], true);
+    }
+}
+
+#[tokio::test]
+async fn native_drive_new_file_uploads_resume_after_interruption_and_reopen() {
+    for failure in ["media", "manifest", "media-response", "create-response"] {
+        let directory = TestDirectory::new();
+        let engine = directory.engine(true);
+        let state = Arc::new(Mutex::new(DriveFixture::new()));
+        let remote = state.clone();
+        let fail_upload = Arc::new(AtomicBool::new(false));
+        let fail = fail_upload.clone();
+        let server = TestServer::new(move |request| {
+            let matched = match failure {
+                "manifest" => {
+                    request.method == "PATCH"
+                        && request.path.starts_with("/upload/files/manifest-entry")
+                }
+                "create-response" => {
+                    request.method == "POST" && request.path.starts_with("/drive/files?")
+                }
+                _ => {
+                    request.method == "PATCH" && request.path.starts_with("/upload/files/created-")
+                }
+            };
+            if matched && fail.swap(false, Ordering::SeqCst) {
+                if failure.ends_with("response") {
+                    remote.lock().unwrap().handle(request);
+                    return (200, b"lost response body".to_vec());
+                }
+                return (500, b"interrupted upload".to_vec());
+            }
+            remote.lock().unwrap().handle(request)
+        })
+        .await;
+        engine
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        seed(&engine, "new-picture", "png", b"new picture".to_vec()).await;
+        fail_upload.store(true, Ordering::SeqCst);
+        assert!(
+            engine
+                .cycle(drive_source(), &server.endpoints)
+                .await
+                .is_err(),
+            "{failure}"
+        );
+        drop(engine);
+        let reopened = directory.engine(true);
+        seed(&reopened, "new-picture", "png", b"newer picture".to_vec()).await;
+        reopened
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        assert!(reopened.store.lock().unwrap().outbox.is_empty());
+        let remote = state.lock().unwrap();
+        let uploaded = remote
+            .files
+            .iter()
+            .filter(|file| file.name == "new-picture.png")
+            .collect::<Vec<_>>();
+        assert_eq!(uploaded.len(), 1, "{failure}");
+        assert_eq!(uploaded[0].bytes, b"newer picture", "{failure}");
+        let manifest: Value = serde_json::from_slice(
+            &remote
+                .files
+                .iter()
+                .find(|file| file.id == "manifest-entry")
+                .unwrap()
+                .bytes,
+        )
+        .unwrap();
+        assert!(manifest["nodes"]["new-picture"].is_object());
+        assert!(!reopened
+            .cache_dir
+            .join(format!(
+                ".drive-uploads-{}.json",
+                store::revision(b"folder-1")
+            ))
+            .exists());
+    }
+}
+
+#[tokio::test]
+async fn native_drive_unpublished_files_are_reused_only_when_bytes_match_or_upload_is_owned() {
+    for owned in [false, true] {
+        let directory = TestDirectory::new();
+        let engine = directory.engine(true);
+        let state = Arc::new(Mutex::new(DriveFixture::new()));
+        let remote = state.clone();
+        let fail_manifest = Arc::new(AtomicBool::new(false));
+        let fail = fail_manifest.clone();
+        let server = TestServer::new(move |request| {
+            if request.method == "PATCH"
+                && request.path.starts_with("/upload/files/manifest-entry")
+                && fail.swap(false, Ordering::SeqCst)
+            {
+                return (500, b"manifest upload failed".to_vec());
+            }
+            remote.lock().unwrap().handle(request)
+        })
+        .await;
+        engine
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        seed(&engine, "new-picture", "png", b"new picture".to_vec()).await;
+        fail_manifest.store(true, Ordering::SeqCst);
+        assert!(engine
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .is_err());
+        if !owned {
+            fs::remove_file(engine.cache_dir.join(format!(
+                ".drive-uploads-{}.json",
+                store::revision(b"folder-1")
+            )))
+            .unwrap();
+        }
+        {
+            let mut remote = state.lock().unwrap();
+            let file = remote
+                .files
+                .iter_mut()
+                .find(|file| file.name == "new-picture.png")
+                .unwrap();
+            file.bytes = b"another client's picture".to_vec();
+            file.revision = "another-upload".into();
+            if !owned {
+                file.app_properties.clear();
+            }
+        }
+        assert!(engine
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .err()
+            .unwrap()
+            .contains("file changed"));
+        let remote = state.lock().unwrap();
+        assert_eq!(
+            remote
+                .files
+                .iter()
+                .find(|file| file.name == "new-picture.png")
+                .unwrap()
+                .bytes,
+            b"another client's picture"
+        );
+        assert!(!engine.store.lock().unwrap().outbox.is_empty());
+        drop(remote);
+        if !owned {
+            let mut remote = state.lock().unwrap();
+            let file = remote
+                .files
+                .iter_mut()
+                .find(|file| file.name == "new-picture.png")
+                .unwrap();
+            file.bytes = b"new picture".to_vec();
+            file.revision = "legacy-upload".into();
+            drop(remote);
+            let before = server.requests.lock().unwrap().len();
+            engine
+                .cycle(drive_source(), &server.endpoints)
+                .await
+                .unwrap();
+            assert!(engine.store.lock().unwrap().outbox.is_empty());
+            assert!(!server.requests.lock().unwrap()[before..]
+                .iter()
+                .any(|request| request.method == "PATCH"
+                    && request.path.starts_with("/upload/files/created-")));
+        }
     }
 }

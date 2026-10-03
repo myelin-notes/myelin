@@ -465,6 +465,8 @@ pub(crate) struct DriveEntry {
     #[serde(default)]
     pub(crate) name: String,
     pub(crate) head_revision_id: Option<String>,
+    #[serde(default)]
+    pub(crate) app_properties: HashMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -491,7 +493,10 @@ pub(crate) async fn list_drive(
         let mut url = endpoint(&endpoints.drive, &["files"])?;
         url.query_pairs_mut()
             .append_pair("q", query)
-            .append_pair("fields", "nextPageToken,files(id,name,headRevisionId)")
+            .append_pair(
+                "fields",
+                "nextPageToken,files(id,name,headRevisionId,appProperties)",
+            )
             .append_pair("pageSize", page_size);
         if let Some(token) = &page_token {
             url.query_pairs_mut().append_pair("pageToken", token);

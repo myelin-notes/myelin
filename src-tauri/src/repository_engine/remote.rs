@@ -11,6 +11,7 @@ use crate::{
     },
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -25,6 +26,13 @@ struct Snapshot {
     manifest: Value,
     files: HashMap<String, Vec<u8>>,
     sync: SyncState,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DriveUpload {
+    marker: String,
+    revision: Option<String>,
+    content_revision: String,
 }
 
 struct Captured {
@@ -871,7 +879,7 @@ async fn upload(
         }
         RepositorySource::GoogleDrive { folder_id, token } => {
             let client = RemoteClient::new(token.clone(), false)?;
-            drive_push(&client, endpoints, folder_id, plan).await?;
+            drive_push(cache_dir, &client, endpoints, folder_id, plan).await?;
         }
     }
     Ok(())
@@ -960,11 +968,29 @@ async fn github_rest_push(
 }
 
 async fn drive_push(
+    cache_dir: &Path,
     client: &RemoteClient,
     endpoints: &RemoteEndpoints,
     folder: &str,
     plan: &mut Plan,
 ) -> Result<(), String> {
+    let journal = cache_dir.join(format!(
+        ".drive-uploads-{}.json",
+        super::store::revision(folder.as_bytes())
+    ));
+    let mut uploads: HashMap<String, DriveUpload> = match std::fs::read(&journal) {
+        Ok(bytes) => {
+            serde_json::from_slice(&bytes).map_err(|_| "Unreadable Google Drive upload journal")?
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+        Err(error) => return Err(error.to_string()),
+    };
+    let save_uploads = |uploads: &HashMap<String, DriveUpload>| {
+        super::store::atomic_write(
+            &journal,
+            &serde_json::to_vec(uploads).map_err(|error| error.to_string())?,
+        )
+    };
     let manifest = find_drive(client, endpoints, folder, "manifest.json", false).await?;
     if manifest
         .as_ref()
@@ -984,7 +1010,7 @@ async fn drive_push(
         let name = path
             .strip_prefix("files/")
             .ok_or("Invalid repository upload path")?;
-        let existing = find_drive(client, endpoints, &files_folder, name, false).await?;
+        let mut existing = find_drive(client, endpoints, &files_folder, name, false).await?;
         let id = plan.snapshot.manifest["nodes"]
             .as_object()
             .unwrap()
@@ -992,7 +1018,79 @@ async fn drive_push(
             .find_map(|(id, node)| {
                 (file_name(node).ok().as_deref() == Some(name)).then_some(id.clone())
             });
-        if let Some(id) = &id {
+        let unpublished = id
+            .as_ref()
+            .is_some_and(|id| !plan.snapshot.sync.file_ids.contains_key(id));
+        let mut reuse = false;
+        if unpublished {
+            if let Some(entry) = &existing {
+                let owned = uploads.get(name).filter(|upload| {
+                    entry.app_properties.get("myelinUpload") == Some(&upload.marker)
+                });
+                if !owned.is_some_and(|upload| {
+                    upload.revision.is_some() && upload.revision == entry.head_revision_id
+                }) {
+                    let mut url = endpoint(&endpoints.drive, &["files", &entry.id])?;
+                    if let Some(revision) = &entry.head_revision_id {
+                        url = endpoint(
+                            &endpoints.drive,
+                            &["files", &entry.id, "revisions", revision],
+                        )?;
+                    }
+                    url.query_pairs_mut().append_pair("alt", "media");
+                    let remote_bytes = require_success(
+                        client
+                            .request("Google Drive download failed", Method::GET, url, None)
+                            .await?,
+                        "Google Drive download failed",
+                    )?
+                    .bytes()
+                    .await
+                    .map_err(|_| "Google Drive download unreadable")?;
+                    reuse = remote_bytes.as_ref() == bytes;
+                    if !reuse
+                        && !owned.is_some_and(|upload| {
+                            super::store::revision(&remote_bytes) == upload.content_revision
+                                || (upload.revision.is_none() && remote_bytes.is_empty())
+                        })
+                    {
+                        return Err("Google Drive file changed during sync; retrying".into());
+                    }
+                    if find_drive(client, endpoints, &files_folder, name, false).await? != existing
+                    {
+                        return Err("Google Drive file changed during sync; retrying".into());
+                    }
+                }
+            } else {
+                let upload = uploads.entry(name.into()).or_insert_with(|| DriveUpload {
+                    marker: uuid::Uuid::new_v4().to_string(),
+                    revision: None,
+                    content_revision: super::store::revision(bytes),
+                });
+                upload.revision = None;
+                upload.content_revision = super::store::revision(bytes);
+                let marker = upload.marker.clone();
+                save_uploads(&uploads)?;
+                let mut url = endpoint(&endpoints.drive, &["files"])?;
+                url.query_pairs_mut()
+                    .append_pair("fields", "id,name,headRevisionId,appProperties");
+                let created = client.json("Google Drive file creation failed", Method::POST, url,
+                    Some(json!({"name": name, "parents": [&files_folder], "appProperties": {"myelinUpload": marker}}))).await?;
+                existing = Some(
+                    serde_json::from_value(created)
+                        .map_err(|_| "Google Drive file revision unreadable")?,
+                );
+            }
+            if !reuse {
+                if let Some(upload) = uploads.get_mut(name) {
+                    upload.revision = existing
+                        .as_ref()
+                        .and_then(|entry| entry.head_revision_id.clone());
+                    upload.content_revision = super::store::revision(bytes);
+                    save_uploads(&uploads)?;
+                }
+            }
+        } else if let Some(id) = &id {
             if existing
                 .as_ref()
                 .and_then(|entry| entry.head_revision_id.clone())
@@ -1002,7 +1100,15 @@ async fn drive_push(
                 return Err("Google Drive file changed during sync; retrying".into());
             }
         }
-        let entry = drive_write(client, endpoints, &files_folder, name, existing, bytes).await?;
+        let entry = if reuse {
+            existing.unwrap()
+        } else {
+            drive_write(client, endpoints, &files_folder, name, existing, bytes).await?
+        };
+        if let Some(upload) = uploads.get_mut(name) {
+            upload.revision = entry.head_revision_id.clone();
+            save_uploads(&uploads)?;
+        }
         if let Some(id) = id {
             plan.snapshot.sync.file_ids.insert(id.clone(), entry.id);
             plan.snapshot
@@ -1042,6 +1148,10 @@ async fn drive_push(
         let entry =
             drive_write(client, endpoints, folder, "manifest.json", manifest, bytes).await?;
         plan.snapshot.sync.head_revision = entry.head_revision_id;
+    }
+    if journal.exists() {
+        std::fs::remove_file(&journal).map_err(|error| error.to_string())?;
+        crate::repository_bootstrap::sync_directory(cache_dir)?;
     }
     Ok(())
 }
@@ -1113,7 +1223,7 @@ async fn drive_write(
     let mut url = endpoint(&endpoints.drive_upload, &["files", &id])?;
     url.query_pairs_mut()
         .append_pair("uploadType", "media")
-        .append_pair("fields", "id,name,headRevisionId");
+        .append_pair("fields", "id,name,headRevisionId,appProperties");
     let response = client
         .client
         .patch(url)
