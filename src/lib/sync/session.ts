@@ -36,7 +36,6 @@ export class NoteSession {
   private closed = false;
   private closing: Promise<void> | null = null;
   private changeEpoch = 0;
-  private remoteStateVector: Uint8Array;
   private flushedEpoch = 0;
   private transport: Transport = noopTransport;
   private readonly localPeer: {
@@ -81,7 +80,6 @@ export class NoteSession {
       lastSyncedAt: Date.now(),
       remoteRevision: initial.revision,
     };
-    this.remoteStateVector = initial.stateVector;
     this.nativeGeneration = initial.generation;
 
     this.ydoc.doc.on('update', (update: Uint8Array, origin: unknown) => {
@@ -319,14 +317,12 @@ export class NoteSession {
         pulledUpdateByteLength = result.update.byteLength;
       }
 
-      this.remoteStateVector = result.stateVector;
       this.setStatus({ remoteRevision: result.revision });
     });
     logger.debug('Pulled note session updates', {
       nodeId: this.id,
       remoteRevision: this.status.remoteRevision,
       pulledUpdateByteLength,
-      remoteStateVectorByteLength: this.remoteStateVector.byteLength,
       ...summarizeYDocManager(this.ydoc),
     });
     return pulledUpdate;
@@ -450,7 +446,6 @@ export class NoteSession {
           this.nativeSessionId,
         );
         this.nativeQueue.splice(0, count);
-        this.remoteStateVector = result.stateVector;
         this.setStatus({
           remoteRevision: result.revision,
           lastError: null,
