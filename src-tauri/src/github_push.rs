@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use git2::{
     build::{RepoBuilder, TreeUpdateBuilder},
@@ -33,7 +33,6 @@ pub struct GitPushRequest {
 pub struct GitPushResponse {
     pub(crate) status: &'static str,
     pub(crate) commit_oid: Option<String>,
-    pub(crate) blob_shas: HashMap<String, String>,
     pub(crate) failure_reason: Option<String>,
 }
 
@@ -171,7 +170,6 @@ fn push_batch_to_url(
         return Ok(GitPushResponse {
             status: "head-conflict",
             commit_oid: None,
-            blob_shas: HashMap::new(),
             failure_reason: None,
         });
     }
@@ -180,13 +178,11 @@ fn push_batch_to_url(
         .tree()
         .map_err(|error| git_failure("Git tree unavailable", error))?;
     let mut updates = TreeUpdateBuilder::new();
-    let mut blob_shas = HashMap::new();
     for file in &request.additions {
         let blob = repo
             .blob_path(&stage.join(file.index.to_string()))
             .map_err(|error| git_failure("Git blob write failed", error))?;
         updates.upsert(&file.path, blob, FileMode::Blob);
-        blob_shas.insert(file.path.clone(), blob.to_string());
     }
     for path in &request.deletions {
         if baseline.get_path(Path::new(path)).is_ok() {
@@ -200,7 +196,6 @@ fn push_batch_to_url(
         return Ok(GitPushResponse {
             status: "pushed",
             commit_oid: Some(parent.id().to_string()),
-            blob_shas,
             failure_reason: None,
         });
     }
@@ -250,7 +245,6 @@ fn push_batch_to_url(
             "push-failed"
         },
         commit_oid: Some(commit.to_string()),
-        blob_shas,
         failure_reason,
     })
 }
