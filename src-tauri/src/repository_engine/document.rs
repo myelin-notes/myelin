@@ -15,6 +15,7 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Doc, String> {
 }
 
 pub(super) fn apply(doc: &Doc, bytes: &[u8]) -> Result<bool, String> {
+    let pending = pending_state(doc);
     let changed = Arc::new(AtomicBool::new(false));
     let observed = changed.clone();
     let _subscription = doc
@@ -25,7 +26,17 @@ pub(super) fn apply(doc: &Doc, bytes: &[u8]) -> Result<bool, String> {
             .apply_update(Update::decode_v1(bytes).map_err(|_| "Invalid Yjs document update")?)
             .map_err(|_| "Could not apply Yjs document update")?;
     }
-    Ok(changed.load(Ordering::Relaxed))
+    Ok(changed.load(Ordering::Relaxed) || pending != pending_state(doc))
+}
+
+fn pending_state(doc: &Doc) -> (Option<Vec<u8>>, Option<yrs::IdSet>) {
+    let txn = doc.transact();
+    (
+        txn.store()
+            .pending_update()
+            .map(|pending| pending.update.encode_v1()),
+        txn.store().pending_ds().cloned(),
+    )
 }
 
 pub(super) fn vector(doc: &Doc) -> Vec<u8> {

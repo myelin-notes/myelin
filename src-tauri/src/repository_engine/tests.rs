@@ -1857,3 +1857,52 @@ async fn onenote_import_preserves_shared_section_groups_and_rejects_missing_dest
         );
     }
 }
+
+#[tokio::test]
+async fn out_of_order_document_inserts_and_deletions_are_durable_before_acknowledgement() {
+    for delete in [false, true] {
+        let directory = TestDirectory::new();
+        let engine = directory.engine(false);
+        seed(&engine, "canvas", "mcanvas", vec![0, 0]).await;
+        let source = yrs::Doc::new();
+        let text = source.get_or_insert_text("content");
+        let first = {
+            let mut txn = source.transact_mut();
+            text.insert(&mut txn, 0, "A");
+            txn.encode_update_v1()
+        };
+        let second = {
+            let mut txn = source.transact_mut();
+            if delete {
+                text.remove_range(&mut txn, 0, 1);
+            } else {
+                text.insert(&mut txn, 1, "B");
+            }
+            txn.encode_update_v1()
+        };
+        let apply = |bytes: &[u8]| RepositoryOperation::UpdateDocument {
+            node_id: "canvas".into(),
+            update_base64: STANDARD.encode(bytes),
+            origin: "peer".into(),
+            generation: None,
+            source_session: None,
+        };
+        let (ack, _) = engine.operate(apply(&second)).await.unwrap();
+        assert_eq!(ack["accepted"], true);
+        let (repeated, changes) = engine.operate(apply(&second)).await.unwrap();
+        assert_eq!(repeated["changed"], false);
+        assert_eq!(repeated["revision"], ack["revision"]);
+        assert!(changes.documents.is_empty());
+        assert!(!changes.wake_remote);
+        drop(engine);
+        let reopened = directory.engine(false);
+        reopened.operate(apply(&first)).await.unwrap();
+        let doc = document::decode(&read(&reopened, "canvas").await).unwrap();
+        assert_eq!(
+            doc.get_or_insert_text("content")
+                .get_string(&doc.transact()),
+            if delete { "" } else { "AB" }
+        );
+        assert_eq!(ack["changed"], true);
+    }
+}
