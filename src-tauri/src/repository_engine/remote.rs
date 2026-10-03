@@ -6,8 +6,8 @@ use super::{
 use crate::{
     github_push::{GitPushFile, GitPushRequest},
     repository_bootstrap::download::{
-        self, endpoint, find_drive, require_success, DriveEntry, RemoteClient, RemoteEndpoints,
-        RepositorySource,
+        self, endpoint, find_drive, require_success, CachedFile, DriveEntry, RemoteClient,
+        RemoteEndpoints, RepositorySource,
     },
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -106,7 +106,42 @@ impl Snapshot {
         })
     }
 
-    fn save_basis(&mut self, cache: &Path) -> Result<(), String> {
+    fn cached_files(&self, cache: &Path) -> Result<HashMap<String, CachedFile>, String> {
+        let Some(basis_id) = &self.sync.basis_id else {
+            return Ok(HashMap::new());
+        };
+        let root = cache.join(basis_id);
+        let mut files = HashMap::new();
+        for (id, node) in self.manifest["nodes"].as_object().unwrap() {
+            if node["type"] != "file" {
+                continue;
+            }
+            if let Some(revision) = self
+                .sync
+                .file_revisions
+                .get(id)
+                .and_then(Option::as_ref)
+                .filter(|revision| !revision.is_empty())
+            {
+                let name = file_name(node)?;
+                files.insert(
+                    name.clone(),
+                    CachedFile {
+                        path: root.join("files").join(name),
+                        revision: revision.clone(),
+                        drive_id: self.sync.file_ids.get(id).cloned(),
+                    },
+                );
+            }
+        }
+        Ok(files)
+    }
+
+    fn save_basis(
+        &mut self,
+        cache: &Path,
+        cached: &HashMap<String, CachedFile>,
+    ) -> Result<(), String> {
         let id = uuid::Uuid::new_v4().to_string();
         let root = cache.join(&id);
         std::fs::create_dir_all(root.join("files")).map_err(|error| error.to_string())?;
@@ -114,13 +149,27 @@ impl Snapshot {
             if self.manifest["nodes"][id]["type"] != "file" {
                 continue;
             }
-            super::store::atomic_write(
-                &root
-                    .join("files")
-                    .join(file_name(&self.manifest["nodes"][id])?),
-                bytes,
-            )?;
+            let name = file_name(&self.manifest["nodes"][id])?;
+            let destination = root.join("files").join(&name);
+            let linked = self
+                .sync
+                .file_revisions
+                .get(id)
+                .and_then(Option::as_deref)
+                .is_some_and(|revision| {
+                    cached.get(&name).is_some_and(|file| {
+                        file.link(
+                            &destination,
+                            revision,
+                            self.sync.file_ids.get(id).map(String::as_str),
+                        )
+                    })
+                });
+            if !linked {
+                super::store::atomic_write(&destination, bytes)?;
+            }
         }
+        crate::repository_bootstrap::sync_directory(&root.join("files"))?;
         super::store::atomic_write(
             &root.join("manifest.json"),
             &serde_json::to_vec(&self.manifest).map_err(|error| error.to_string())?,
@@ -129,7 +178,8 @@ impl Snapshot {
         super::store::atomic_write(
             &root.join("sync.json"),
             &serde_json::to_vec(&self.sync).map_err(|error| error.to_string())?,
-        )
+        )?;
+        crate::repository_bootstrap::sync_directory(cache)
     }
 
     fn read_basis(cache: &Path, sync: &SyncState) -> Result<Option<Self>, String> {
@@ -146,21 +196,28 @@ impl Snapshot {
         let manifest = download::parse_manifest(
             &std::fs::read(root.join("manifest.json")).map_err(|error| error.to_string())?,
         )?;
-        let saved: SyncState = serde_json::from_slice(
-            &std::fs::read(root.join("sync.json")).map_err(|error| error.to_string())?,
-        )
-        .map_err(|_| "Invalid native remote basis")?;
+        let saved = match std::fs::read(root.join("sync.json")) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.to_string()),
+        };
+        let saved: SyncState =
+            serde_json::from_slice(&saved).map_err(|_| "Invalid native remote basis")?;
+        if saved.basis_id.as_ref() != Some(id) {
+            return Err("Invalid native remote basis".into());
+        }
         if saved.head_revision != sync.head_revision {
             return Ok(None);
         }
         let mut files = HashMap::new();
         for (id, node) in manifest["nodes"].as_object().unwrap() {
             if node["type"] == "file" {
-                files.insert(
-                    id.clone(),
-                    std::fs::read(root.join("files").join(file_name(node)?))
-                        .map_err(|error| error.to_string())?,
-                );
+                let bytes = match std::fs::read(root.join("files").join(file_name(node)?)) {
+                    Ok(bytes) => bytes,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                    Err(error) => return Err(error.to_string()),
+                };
+                files.insert(id.clone(), bytes);
             }
         }
         Ok(Some(Self {
@@ -427,6 +484,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         }
         if previous["nodes"][id]["type"] == "file"
             && store.sync.file_revisions.get(id) == plan.snapshot.sync.file_revisions.get(id)
+            && store.sync.file_ids.get(id) == plan.snapshot.sync.file_ids.get(id)
             && !remaining.contains(id)
             && !captured
                 .operations
@@ -667,19 +725,27 @@ impl RepositoryEngine {
             .await
             .map_err(|error| error.to_string())?;
         let result = async {
-            let basis = if unchanged_head {
-                let cache = self.basis_dir();
-                let sync = captured.snapshot.sync.clone();
+            let cache = self.basis_dir();
+            let sync = captured.snapshot.sync.clone();
+            let basis =
                 tauri::async_runtime::spawn_blocking(move || Snapshot::read_basis(&cache, &sync))
                     .await
-                    .map_err(|error| error.to_string())??
-            } else {
-                None
-            };
+                    .map_err(|error| error.to_string())??;
+            let cached = basis
+                .as_ref()
+                .map(|basis| basis.cached_files(&self.basis_dir()))
+                .transpose()?
+                .unwrap_or_default();
             let remote = match basis {
-                Some(basis) => basis,
-                None => {
-                    download::download_repository(&stage, source.clone(), endpoints).await?;
+                Some(basis) if unchanged_head => basis,
+                _ => {
+                    download::download_repository_cached(
+                        &stage,
+                        source.clone(),
+                        endpoints,
+                        &cached,
+                    )
+                    .await?;
                     let path = stage.clone();
                     tauri::async_runtime::spawn_blocking(move || Snapshot::read(&path))
                         .await
@@ -697,7 +763,7 @@ impl RepositoryEngine {
             }
             let cache = self.basis_dir();
             let mut plan = tauri::async_runtime::spawn_blocking(move || {
-                plan.snapshot.save_basis(&cache)?;
+                plan.snapshot.save_basis(&cache, &cached)?;
                 Ok::<_, String>(plan)
             })
             .await

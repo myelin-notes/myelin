@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    path::Path,
+    path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -51,6 +51,21 @@ pub(crate) struct RemoteClient {
     pub(crate) client: Client,
     pub(crate) token: String,
     pub(crate) github: bool,
+}
+
+pub(crate) struct CachedFile {
+    pub(crate) path: PathBuf,
+    pub(crate) revision: String,
+    pub(crate) drive_id: Option<String>,
+}
+
+impl CachedFile {
+    pub(crate) fn link(&self, destination: &Path, revision: &str, drive_id: Option<&str>) -> bool {
+        !revision.is_empty()
+            && self.revision == revision
+            && self.drive_id.as_deref() == drive_id
+            && std::fs::hard_link(&self.path, destination).is_ok()
+    }
 }
 
 impl RemoteClient {
@@ -225,6 +240,15 @@ pub(crate) async fn download_repository(
     source: RepositorySource,
     endpoints: &RemoteEndpoints,
 ) -> Result<(usize, u64), String> {
+    download_repository_cached(stage, source, endpoints, &HashMap::new()).await
+}
+
+pub(crate) async fn download_repository_cached(
+    stage: &Path,
+    source: RepositorySource,
+    endpoints: &RemoteEndpoints,
+    cached: &HashMap<String, CachedFile>,
+) -> Result<(usize, u64), String> {
     match source {
         RepositorySource::Github {
             owner,
@@ -239,6 +263,15 @@ pub(crate) async fn download_repository(
                 return Err("Invalid GitHub repository configuration".into());
             }
             let client = RemoteClient::new(token, true)?;
+            if !cached.is_empty() {
+                if let Some(result) = download_github_cached(
+                    stage, &client, endpoints, &owner, &repo, &branch, cached,
+                )
+                .await?
+                {
+                    return Ok(result);
+                }
+            }
             download_github(stage, &client, endpoints, &owner, &repo, &branch).await
         }
         RepositorySource::GoogleDrive { folder_id, token } => {
@@ -246,7 +279,7 @@ pub(crate) async fn download_repository(
                 return Err("Google Drive folder is not configured".into());
             }
             let client = RemoteClient::new(token, false)?;
-            download_drive(stage, &client, endpoints, &folder_id).await
+            download_drive(stage, &client, endpoints, &folder_id, cached).await
         }
     }
 }
@@ -394,6 +427,129 @@ async fn download_github(
         }
     }
     Err("GitHub manifest changed during initialization".into())
+}
+
+async fn download_github_cached(
+    stage: &Path,
+    client: &RemoteClient,
+    endpoints: &RemoteEndpoints,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    cached: &HashMap<String, CachedFile>,
+) -> Result<Option<(usize, u64)>, String> {
+    let url = |parts: &[&str]| {
+        let mut segments = vec!["repos", owner, repo];
+        segments.extend(parts);
+        endpoint(&endpoints.github, &segments)
+    };
+    let head = client
+        .json(
+            "GitHub branch request failed",
+            Method::GET,
+            url(&["branches", branch])?,
+            None,
+        )
+        .await?;
+    let revision = head["commit"]["sha"]
+        .as_str()
+        .filter(|sha| git2::Oid::from_str(sha).is_ok())
+        .ok_or("Invalid GitHub branch revision")?;
+    let commit = client
+        .json(
+            "GitHub commit request failed",
+            Method::GET,
+            url(&["git", "commits", revision])?,
+            None,
+        )
+        .await?;
+    let tree_sha = commit["tree"]["sha"]
+        .as_str()
+        .filter(|sha| git2::Oid::from_str(sha).is_ok())
+        .ok_or("Invalid GitHub tree revision")?;
+    let mut tree_url = url(&["git", "trees", tree_sha])?;
+    tree_url.query_pairs_mut().append_pair("recursive", "1");
+    let tree = client
+        .json("GitHub tree request failed", Method::GET, tree_url, None)
+        .await?;
+    if tree["truncated"] == true {
+        return Ok(None);
+    }
+    let entries: HashMap<_, _> = tree["tree"]
+        .as_array()
+        .ok_or("Unreadable GitHub repository tree")?
+        .iter()
+        .filter_map(|entry| entry["path"].as_str().map(|path| (path, entry)))
+        .collect();
+    let blob_revision = |path: &str| -> Result<&str, String> {
+        let entry = entries
+            .get(path)
+            .ok_or("GitHub tree is missing a repository file")?;
+        if entry["type"] != "blob" || !matches!(entry["mode"].as_str(), Some("100644" | "100755")) {
+            return Err("GitHub tree contains an invalid repository file".into());
+        }
+        entry["sha"]
+            .as_str()
+            .filter(|sha| git2::Oid::from_str(sha).is_ok())
+            .ok_or("Invalid GitHub blob revision".into())
+    };
+    if !entries.contains_key("manifest.json") {
+        return Ok(None);
+    }
+    let manifest_bytes = github_blob(
+        client,
+        url(&["git", "blobs", blob_revision("manifest.json")?])?,
+        blob_revision("manifest.json")?,
+    )
+    .await?;
+    if manifest_bytes.is_empty() {
+        return Ok(None);
+    }
+    let manifest = parse_manifest(&manifest_bytes)?;
+    let files = manifest_files(&manifest)?;
+    let mut size = 0;
+    for name in &files {
+        let sha = blob_revision(&format!("files/{name}"))?;
+        let destination = stage.join("files").join(name);
+        if cached
+            .get(name)
+            .is_some_and(|file| file.link(&destination, sha, None))
+        {
+            continue;
+        }
+        let bytes = github_blob(client, url(&["git", "blobs", sha])?, sha).await?;
+        size += bytes.len() as u64;
+        write_durable(&destination, &bytes)?;
+    }
+    write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
+    write_durable(&stage.join(".remote-revision"), revision.as_bytes())?;
+    super::sync_directory(&stage.join("files"))?;
+    super::sync_directory(stage)?;
+    Ok(Some((files.len(), size)))
+}
+
+async fn github_blob(client: &RemoteClient, url: Url, revision: &str) -> Result<Vec<u8>, String> {
+    let blob = client
+        .json("GitHub blob download failed", Method::GET, url, None)
+        .await?;
+    if blob["encoding"] != "base64" {
+        return Err("Unreadable GitHub blob encoding".into());
+    }
+    let content: Vec<_> = blob["content"]
+        .as_str()
+        .ok_or("Unreadable GitHub blob content")?
+        .bytes()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect();
+    let bytes = STANDARD
+        .decode(content)
+        .map_err(|_| "Unreadable GitHub blob content")?;
+    let sha = git2::Oid::hash_object(git2::ObjectType::Blob, &bytes)
+        .map_err(|_| "GitHub blob revision unavailable")?;
+    if sha.to_string() != revision {
+        return Err("GitHub blob does not match its pinned revision".into());
+    }
+    Ok(bytes)
 }
 
 fn archive_name(path: &Path) -> Option<String> {
@@ -598,6 +754,7 @@ async fn download_drive(
     client: &RemoteClient,
     endpoints: &RemoteEndpoints,
     folder: &str,
+    cached: &HashMap<String, CachedFile>,
 ) -> Result<(usize, u64), String> {
     let manifest_entry = find_drive(client, endpoints, folder, "manifest.json", false).await?;
     if let Some(entry) = &manifest_entry {
@@ -646,6 +803,13 @@ async fn download_drive(
                 .ok_or("Google Drive is missing a repository file")?
                 .clone();
             let destination = stage.join("files").join(name);
+            if entry.head_revision_id.as_deref().is_some_and(|revision| {
+                cached
+                    .get(name)
+                    .is_some_and(|file| file.link(&destination, revision, Some(&entry.id)))
+            }) {
+                continue;
+            }
             let client = RemoteClient {
                 client: client.client.clone(),
                 token: client.token.clone(),
@@ -699,5 +863,7 @@ async fn download_drive(
     )
     .await
     .map_err(io_error)?;
+    super::sync_directory(&stage.join("files"))?;
+    super::sync_directory(stage)?;
     Ok((files.len(), size))
 }

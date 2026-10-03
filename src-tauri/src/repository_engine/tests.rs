@@ -862,6 +862,30 @@ impl GitHubFixture {
         if request.method == "GET" && request.path.contains("/git/commits/") {
             return reply(json!({"tree": {"sha": "b".repeat(40)}}));
         }
+        if request.method == "GET" && request.path.contains("/git/trees/") {
+            let manifest = serde_json::to_vec(&self.manifest).unwrap();
+            let mut tree = vec![
+                json!({"path": "manifest.json", "type": "blob", "mode": "100644", "sha": git2::Oid::hash_object(git2::ObjectType::Blob, &manifest).unwrap().to_string()}),
+            ];
+            for (id, bytes) in &self.files {
+                tree.push(json!({"path": format!("files/{}", file_name(&self.manifest["nodes"][id]).unwrap()), "type": "blob", "mode": "100644", "sha": git2::Oid::hash_object(git2::ObjectType::Blob, bytes).unwrap().to_string()}));
+            }
+            return reply(json!({"tree": tree, "truncated": false}));
+        }
+        if request.method == "GET" && request.path.contains("/git/blobs/") {
+            let sha = request.path.rsplit('/').next().unwrap();
+            let manifest = serde_json::to_vec(&self.manifest).unwrap();
+            let bytes = std::iter::once(&manifest)
+                .chain(self.files.values())
+                .find(|bytes| {
+                    git2::Oid::hash_object(git2::ObjectType::Blob, bytes)
+                        .unwrap()
+                        .to_string()
+                        == sha
+                })
+                .unwrap();
+            return reply(json!({"encoding": "base64", "content": STANDARD.encode(bytes)}));
+        }
         if request.path.ends_with("/git/blobs") {
             if self.fail_blob {
                 self.fail_blob = false;
@@ -1116,6 +1140,297 @@ fn drive_source() -> RepositorySource {
         folder_id: "folder-1".into(),
         token: "fixture".into(),
     }
+}
+
+#[tokio::test]
+async fn native_incremental_github_pull_keeps_unchanged_media_and_falls_back_without_a_basis() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["picture"] = node("picture", "png");
+    manifest["nodes"]["removed"] = node("removed", "png");
+    let picture = vec![42; 1024 * 1024];
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), fixture_bytes("baseUpdate")),
+            ("picture".into(), picture.clone()),
+            ("removed".into(), b"remove me".to_vec()),
+        ]),
+    )));
+    let remote = state.clone();
+    let truncate = Arc::new(AtomicBool::new(false));
+    let truncate_tree = truncate.clone();
+    let corrupt = Arc::new(AtomicBool::new(false));
+    let corrupt_blob = corrupt.clone();
+    let server = TestServer::new(move |request| {
+        if request.method == "GET"
+            && request.path.contains("/git/blobs/")
+            && corrupt_blob.swap(false, Ordering::SeqCst)
+        {
+            return (
+                200,
+                serde_json::to_vec(
+                    &json!({"encoding": "base64", "content": STANDARD.encode(b"wrong blob")}),
+                )
+                .unwrap(),
+            );
+        }
+        if request.method == "GET"
+            && request.path.contains("/git/trees/")
+            && truncate_tree.swap(false, Ordering::SeqCst)
+        {
+            return (
+                200,
+                serde_json::to_vec(&json!({"tree": [], "truncated": true})).unwrap(),
+            );
+        }
+        remote.lock().unwrap().handle(request)
+    })
+    .await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let basis_root = engine
+        .cache_dir
+        .join("repository-bases")
+        .join(store::revision(engine.id.as_bytes()));
+    let old_basis = basis_root.join(engine.store.lock().unwrap().sync.basis_id.as_ref().unwrap());
+    #[cfg(unix)]
+    let inode = {
+        use std::os::unix::fs::MetadataExt;
+        fs::metadata(old_basis.join("files/picture.png"))
+            .unwrap()
+            .ino()
+    };
+    {
+        let mut remote = state.lock().unwrap();
+        remote.files.insert(
+            "canvas".into(),
+            document::merge(&fixture_bytes("baseUpdate"), &fixture_bytes("localUpdate")).unwrap(),
+        );
+        remote.manifest["nodes"]["added"] = node("added", "png");
+        remote.files.insert("added".into(), b"new media".to_vec());
+        remote.manifest["nodes"]
+            .as_object_mut()
+            .unwrap()
+            .remove("removed");
+        remote.files.remove("removed");
+        remote.head = "d".repeat(40);
+    }
+    let before = server.requests.lock().unwrap().len();
+    let changes = engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(changes.deleted.contains(&"removed".to_owned()));
+    assert_eq!(read(&engine, "picture").await, picture);
+    assert_eq!(read(&engine, "added").await, b"new media");
+    let doc = document::decode(&read(&engine, "canvas").await).unwrap();
+    assert_eq!(
+        doc.transact()
+            .get_text("content")
+            .unwrap()
+            .get_string(&doc.transact()),
+        "seed local"
+    );
+    {
+        let requests = server.requests.lock().unwrap();
+        let requested = &requests[before..];
+        assert!(!requested
+            .iter()
+            .any(|request| request.path.contains("/tarball/")));
+        assert_eq!(
+            requested
+                .iter()
+                .filter(|request| request.method == "GET" && request.path.contains("/git/blobs/"))
+                .count(),
+            3
+        );
+        let picture_sha = git2::Oid::hash_object(git2::ObjectType::Blob, &picture)
+            .unwrap()
+            .to_string();
+        assert!(!requested
+            .iter()
+            .any(|request| request.path.ends_with(&format!("/git/blobs/{picture_sha}"))));
+        assert!(requested.iter().any(|request| request
+            .path
+            .ends_with(&format!("/git/commits/{}", "d".repeat(40)))));
+    }
+    let basis = basis_root.join(engine.store.lock().unwrap().sync.basis_id.as_ref().unwrap());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(
+            fs::metadata(basis.join("files/picture.png")).unwrap().ino(),
+            inode
+        );
+    }
+    drop(engine);
+    let engine = directory.engine(true);
+    assert_eq!(read(&engine, "picture").await, picture);
+    fs::remove_file(basis.join("files/picture.png")).unwrap();
+    state.lock().unwrap().head = "e".repeat(40);
+    let before = server.requests.lock().unwrap().len();
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(server.requests.lock().unwrap()[before..]
+        .iter()
+        .any(|request| request.path.contains("/tarball/")));
+    assert_eq!(read(&engine, "picture").await, picture);
+    truncate.store(true, Ordering::SeqCst);
+    state.lock().unwrap().head = "f".repeat(40);
+    let before = server.requests.lock().unwrap().len();
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(server.requests.lock().unwrap()[before..]
+        .iter()
+        .any(|request| request.path.contains("/tarball/")));
+    corrupt.store(true, Ordering::SeqCst);
+    state.lock().unwrap().head = "1".repeat(40);
+    assert!(engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .err()
+        .unwrap()
+        .contains("pinned revision"));
+    assert_eq!(read(&engine, "picture").await, picture);
+    let basis = basis_root.join(engine.store.lock().unwrap().sync.basis_id.as_ref().unwrap());
+    let sync = fs::read(basis.join("sync.json")).unwrap();
+    let mut invalid: Value = serde_json::from_slice(&sync).unwrap();
+    invalid["basisId"] = json!("../another-basis");
+    fs::write(
+        basis.join("sync.json"),
+        serde_json::to_vec(&invalid).unwrap(),
+    )
+    .unwrap();
+    assert!(engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .err()
+        .unwrap()
+        .contains("Invalid native remote basis"));
+    fs::write(basis.join("sync.json"), sync).unwrap();
+}
+
+#[tokio::test]
+async fn native_incremental_drive_pull_reuses_media_only_with_matching_id_and_revision() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let state = Arc::new(Mutex::new(DriveFixture::new()));
+    let picture = vec![42; 1024 * 1024];
+    {
+        let mut remote = state.lock().unwrap();
+        let mut manifest = manifest_with("canvas", "mcanvas");
+        manifest["nodes"]["picture"] = node("picture", "png");
+        remote.files[0].bytes = serde_json::to_vec(&manifest).unwrap();
+        remote.files.push(DriveFile {
+            id: "picture-entry".into(),
+            parent: "files-folder".into(),
+            name: "picture.png".into(),
+            revision: "picture-r1".into(),
+            bytes: picture.clone(),
+            app_properties: HashMap::new(),
+        });
+    }
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    engine
+        .cycle(drive_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let basis_root = engine
+        .cache_dir
+        .join("repository-bases")
+        .join(store::revision(engine.id.as_bytes()));
+    #[cfg(unix)]
+    let inode = {
+        use std::os::unix::fs::MetadataExt;
+        let basis = engine.store.lock().unwrap().sync.basis_id.clone().unwrap();
+        fs::metadata(basis_root.join(basis).join("files/picture.png"))
+            .unwrap()
+            .ino()
+    };
+    {
+        let mut remote = state.lock().unwrap();
+        let canvas = remote
+            .files
+            .iter_mut()
+            .find(|file| file.id == "canvas-entry")
+            .unwrap();
+        canvas.revision = "canvas-r2".into();
+        canvas.bytes =
+            document::merge(&fixture_bytes("baseUpdate"), &fixture_bytes("localUpdate")).unwrap();
+    }
+    let before = server.requests.lock().unwrap().len();
+    engine
+        .cycle(drive_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(read(&engine, "picture").await, picture);
+    let doc = document::decode(&read(&engine, "canvas").await).unwrap();
+    assert_eq!(
+        doc.transact()
+            .get_text("content")
+            .unwrap()
+            .get_string(&doc.transact()),
+        "seed local"
+    );
+    {
+        let requests = server.requests.lock().unwrap();
+        let requested = &requests[before..];
+        assert!(!requested
+            .iter()
+            .any(|request| request.path.contains("/drive/files/picture-entry/")));
+        assert_eq!(
+            requested
+                .iter()
+                .filter(|request| request
+                    .path
+                    .contains("/drive/files/canvas-entry/revisions/canvas-r2"))
+                .count(),
+            1
+        );
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let basis = engine.store.lock().unwrap().sync.basis_id.clone().unwrap();
+        assert_eq!(
+            fs::metadata(basis_root.join(basis).join("files/picture.png"))
+                .unwrap()
+                .ino(),
+            inode
+        );
+    }
+    drop(engine);
+    let engine = directory.engine(true);
+    {
+        let mut remote = state.lock().unwrap();
+        let media = remote
+            .files
+            .iter_mut()
+            .find(|file| file.name == "picture.png")
+            .unwrap();
+        media.id = "replacement-picture".into();
+        media.bytes = b"replacement media".to_vec();
+    }
+    let before = server.requests.lock().unwrap().len();
+    engine
+        .cycle(drive_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(read(&engine, "picture").await == b"replacement media");
+    assert!(server.requests.lock().unwrap()[before..]
+        .iter()
+        .any(|request| request
+            .path
+            .contains("/drive/files/replacement-picture/revisions/picture-r1")));
 }
 
 #[tokio::test]
