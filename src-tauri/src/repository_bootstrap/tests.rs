@@ -7,7 +7,6 @@ use std::sync::{
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-const STAGE_ID: &str = "12345678-1234-1234-1234-123456789abc";
 const ROOT: &str = "repositories/github/test";
 
 struct TestDirectory(PathBuf);
@@ -246,50 +245,6 @@ async fn github_rejects_an_archive_missing_repository_files() {
 }
 
 #[test]
-fn recovers_each_interrupted_publication_without_losing_outbox_or_sync_status() {
-    for phase in 0..3 {
-        let directory = TestDirectory::new();
-        directory.seed_cache();
-        let paths = directory.cache();
-        let stage = paths.stage(STAGE_ID).unwrap();
-        fs::create_dir_all(stage.join("files")).unwrap();
-        fs::write(stage.join("manifest.json"), b"new manifest").unwrap();
-        fs::write(stage.join("files/new.myelin"), b"new content").unwrap();
-        fs::write(stage.join("outbox.json"), b"[]").unwrap();
-        fs::write(stage.join("outbox.json.sync-status.json"), b"123").unwrap();
-        fs::write(
-            &paths.journal,
-            serde_json::to_vec(&InstallJournal {
-                stage_id: STAGE_ID.into(),
-                had_cache: true,
-            })
-            .unwrap(),
-        )
-        .unwrap();
-        if phase >= 1 {
-            fs::rename(&paths.cache, &paths.backup).unwrap();
-        }
-        if phase == 2 {
-            fs::rename(&stage, &paths.cache).unwrap();
-        }
-        recover_cache(&paths).unwrap();
-        let file = if phase == 2 {
-            "files/new.myelin"
-        } else {
-            "files/old.myelin"
-        };
-        assert!(paths.cache.join(file).exists());
-        assert_eq!(fs::read(paths.cache.join("outbox.json")).unwrap(), b"[]");
-        assert_eq!(
-            fs::read(paths.cache.join("outbox.json.sync-status.json")).unwrap(),
-            b"123"
-        );
-        assert!(!stage.exists() && !paths.backup.exists() && !paths.journal.exists());
-        recover_cache(&paths).unwrap();
-    }
-}
-
-#[test]
 fn rejects_traversal_and_symlinks() {
     let directory = TestDirectory::new();
     for root in [
@@ -301,11 +256,9 @@ fn rejects_traversal_and_symlinks() {
     ] {
         assert!(CachePaths::new(&directory.0, root).is_err());
     }
-    assert!(directory.cache().stage("../escape").is_err());
     #[cfg(unix)]
     {
-        std::os::unix::fs::symlink(&directory.0, directory.0.join("repositories/github/test"))
-            .unwrap();
+        std::os::unix::fs::symlink(&directory.0, directory.cache().cache).unwrap();
         assert!(CachePaths::new(&directory.0, ROOT).is_err());
     }
 }

@@ -9,7 +9,7 @@ mod transfer;
 mod version_history;
 
 use crate::import_files::FileImportSource;
-use crate::repository_bootstrap::{download::RepositorySource, recover_cache, CachePaths};
+use crate::repository_bootstrap::{download::RepositorySource, CachePaths};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -820,9 +820,7 @@ pub async fn repository_open(
             let path = if root.is_empty() {
                 app_data
             } else {
-                let paths = CachePaths::new(&app_data, &root)?;
-                recover_cache(&paths)?;
-                paths.cache
+                CachePaths::new(&app_data, &root)?.cache
             };
             Store::open(path, remote)
         })
