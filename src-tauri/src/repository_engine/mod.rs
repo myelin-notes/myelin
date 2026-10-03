@@ -44,7 +44,7 @@ pub(crate) struct RepositoryEngine {
     source: AsyncMutex<Option<RepositorySource>>,
     credential_id: Mutex<String>,
     network_lock: AsyncMutex<()>,
-    open_notes: Mutex<HashMap<String, HashSet<String>>>,
+    open_notes: Arc<Mutex<HashMap<String, HashSet<String>>>>,
     references: AtomicUsize,
     scheduling: AtomicBool,
     checkpoint_scheduling: AtomicBool,
@@ -241,6 +241,7 @@ impl RepositoryEngine {
         action: impl FnOnce(&mut Store) -> Result<T, String> + Send + 'static,
     ) -> Result<T, String> {
         let store = self.store.clone();
+        let open_notes = self.open_notes.clone();
         tauri::async_runtime::spawn_blocking(move || {
             let mut state = store
                 .lock()
@@ -264,6 +265,13 @@ impl RepositoryEngine {
                     }
                 }
             }
+            let notes = open_notes.lock().unwrap();
+            let Store {
+                documents,
+                delta_counts,
+                ..
+            } = &mut *state;
+            documents.retain(|id, _| notes.contains_key(id) || delta_counts.contains_key(id));
             result
         })
         .await
@@ -410,6 +418,32 @@ impl RepositoryEngine {
     }
 
     async fn operate(&self, operation: RepositoryOperation) -> Result<(Value, Changes), String> {
+        match &operation {
+            RepositoryOperation::Subscribe {
+                node_id,
+                session_id,
+            } => {
+                self.open_notes
+                    .lock()
+                    .unwrap()
+                    .entry(node_id.clone())
+                    .or_default()
+                    .insert(session_id.clone());
+            }
+            RepositoryOperation::Unsubscribe {
+                node_id,
+                session_id,
+            } => {
+                let mut notes = self.open_notes.lock().unwrap();
+                if let Some(sessions) = notes.get_mut(node_id) {
+                    sessions.remove(session_id);
+                    if sessions.is_empty() {
+                        notes.remove(node_id);
+                    }
+                }
+            }
+            _ => {}
+        }
         self.with_store(move |state| operation.apply(state)).await
     }
 
@@ -832,7 +866,7 @@ pub async fn repository_open(
             source: AsyncMutex::new(request.source.clone()),
             credential_id: Mutex::new(request.credential_id.clone()),
             network_lock: AsyncMutex::new(()),
-            open_notes: Mutex::new(HashMap::new()),
+            open_notes: Arc::new(Mutex::new(HashMap::new())),
             references: AtomicUsize::new(0),
             scheduling: AtomicBool::new(false),
             checkpoint_scheduling: AtomicBool::new(false),
@@ -890,46 +924,42 @@ pub async fn repository_operation(
 ) -> Result<Value, String> {
     let engine = manager.engine(&handle).await?;
     match &operation {
-        RepositoryOperation::Subscribe { node_id, session_id } => {
+        RepositoryOperation::Subscribe {
+            node_id,
+            session_id,
+        } => {
             let mut handles = manager.handles.lock().await;
             let handle = handles
                 .get_mut(&handle)
                 .ok_or("Repository handle is closed")?;
-            if handle
+            handle
                 .notes
                 .entry(node_id.clone())
                 .or_default()
-                .insert(session_id.clone())
-            {
-                engine
-                    .open_notes
-                    .lock()
-                    .unwrap()
-                    .entry(node_id.clone())
-                    .or_default()
-                    .insert(session_id.clone());
-            }
-            return Ok(Value::Null);
+                .insert(session_id.clone());
+            drop(handles);
+            return engine.operate(operation).await.map(|(result, _)| result);
         }
-        RepositoryOperation::Unsubscribe { node_id, session_id } => {
+        RepositoryOperation::Unsubscribe {
+            node_id,
+            session_id,
+        } => {
             let mut handles = manager.handles.lock().await;
+            let mut removed = false;
             if let Some(handle) = handles.get_mut(&handle) {
                 if let Some(sessions) = handle.notes.get_mut(node_id) {
-                    if sessions.remove(session_id) {
-                        let mut notes = engine.open_notes.lock().unwrap();
-                        if let Some(sessions) = notes.get_mut(node_id) {
-                            sessions.remove(session_id);
-                            if sessions.is_empty() {
-                                notes.remove(node_id);
-                            }
-                        }
-                    }
+                    removed = sessions.remove(session_id);
                     if sessions.is_empty() {
                         handle.notes.remove(node_id);
                     }
                 }
             }
-            return Ok(Value::Null);
+            drop(handles);
+            return if removed {
+                engine.operate(operation).await.map(|(result, _)| result)
+            } else {
+                Ok(Value::Null)
+            };
         }
         _ => {}
     }

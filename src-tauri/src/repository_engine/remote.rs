@@ -477,7 +477,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
     let previous = store.manifest.clone();
     let mut changes = Changes::default();
     let mut writes = Vec::new();
-    let mut merged_canvases = Vec::new();
+    let mut canvas_links = Vec::new();
     for (id, node) in plan.snapshot.manifest["nodes"].as_object().unwrap() {
         if node["type"] != "file" {
             continue;
@@ -501,6 +501,8 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         let Some(downloaded) = plan.snapshot.files.get(id) else {
             continue;
         };
+        let mut canvas_doc = None;
+        let mut canvas_update = Vec::new();
         let bytes = if node["fileType"] == "mcanvas" {
             let replaced = captured
                 .operations
@@ -510,13 +512,20 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 .outbox
                 .iter()
                 .any(|op| op["nodeId"] == *id && op["replaceFile"] == true);
-            if new_replacement {
-                current.clone()
+            let doc = document::decode(&current)?;
+            let before = document::vector(&doc);
+            let doc = if new_replacement {
+                doc
             } else if replaced && !remaining.contains(id) {
-                downloaded.clone()
+                document::decode(downloaded)?
             } else {
-                document::merge(downloaded, &current)?
-            }
+                document::apply(&doc, downloaded)?;
+                doc
+            };
+            canvas_update = document::diff(&doc, Some(&before))?.0;
+            let bytes = document::bytes(&doc);
+            canvas_doc = Some(doc);
+            bytes
         } else if remaining.contains(id) {
             current.clone()
         } else {
@@ -537,7 +546,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                     .clone();
                 changes.documents.push(super::DocumentNotification {
                     node_id: id.clone(),
-                    bytes: bytes.clone(),
+                    bytes: canvas_update,
                     source_session: None,
                     origin: "repository".into(),
                     generation,
@@ -545,27 +554,23 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 });
             }
         }
-        if node["fileType"] == "mcanvas" {
-            merged_canvases.push(id.clone());
-            store
-                .documents
-                .insert(id.clone(), document::decode(&bytes)?);
+        if let Some(doc) = canvas_doc {
+            if node["system"].is_null() {
+                canvas_links.push((id.clone(), document::links(&doc)));
+            }
+            if store.documents.contains_key(id) {
+                store.documents.insert(id.clone(), doc);
+            }
         }
     }
-    for id in merged_canvases {
-        if !plan.snapshot.manifest["nodes"][&id]["system"].is_null() {
-            continue;
-        }
-        if let Some(doc) = store.documents.get(&id) {
-            let links = document::links(doc);
-            if links.is_empty() {
-                plan.snapshot.manifest["linksBySource"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove(&id);
-            } else {
-                plan.snapshot.manifest["linksBySource"][&id] = json!(links);
-            }
+    for (id, links) in canvas_links {
+        if links.is_empty() {
+            plan.snapshot.manifest["linksBySource"]
+                .as_object_mut()
+                .unwrap()
+                .remove(&id);
+        } else {
+            plan.snapshot.manifest["linksBySource"][&id] = json!(links);
         }
     }
     for (id, node) in previous["nodes"].as_object().unwrap() {

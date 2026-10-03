@@ -25,7 +25,7 @@ impl TestDirectory {
             source: AsyncMutex::new(None),
             credential_id: Mutex::new("test".into()),
             network_lock: AsyncMutex::new(()),
-            open_notes: Mutex::new(HashMap::new()),
+            open_notes: Arc::new(Mutex::new(HashMap::new())),
             references: AtomicUsize::new(1),
             scheduling: AtomicBool::new(false),
             checkpoint_scheduling: AtomicBool::new(false),
@@ -475,6 +475,79 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
             .count(),
         1
     );
+}
+
+#[tokio::test]
+async fn closed_canvas_documents_are_released_after_their_last_session_and_checkpoint() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    seed(&engine, "canvas", "mcanvas", fixture_bytes("baseUpdate")).await;
+    let open = || RepositoryOperation::Document {
+        node_id: "canvas".into(),
+        state_vector_base64: None,
+    };
+    engine.operate(open()).await.unwrap();
+    assert!(engine.store.lock().unwrap().documents.is_empty());
+    for session in ["editor", "second-editor"] {
+        engine
+            .operate(RepositoryOperation::Subscribe {
+                node_id: "canvas".into(),
+                session_id: session.into(),
+            })
+            .await
+            .unwrap();
+    }
+    engine.operate(open()).await.unwrap();
+    update(&engine, "localUpdate", "local").await;
+    update(&engine, "remoteUpdate", "peer").await;
+    engine
+        .operate(RepositoryOperation::Unsubscribe {
+            node_id: "canvas".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    engine.checkpoint_pending().await.unwrap();
+    assert!(engine
+        .store
+        .lock()
+        .unwrap()
+        .documents
+        .contains_key("canvas"));
+    engine
+        .operate(RepositoryOperation::Unsubscribe {
+            node_id: "canvas".into(),
+            session_id: "second-editor".into(),
+        })
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().documents.is_empty());
+    engine
+        .operate(RepositoryOperation::Subscribe {
+            node_id: "canvas".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    engine.operate(open()).await.unwrap();
+    update(&engine, "deletionUpdate", "local").await;
+    engine
+        .operate(RepositoryOperation::Unsubscribe {
+            node_id: "canvas".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    assert!(engine
+        .store
+        .lock()
+        .unwrap()
+        .documents
+        .contains_key("canvas"));
+    engine.checkpoint_pending().await.unwrap();
+    assert!(engine.store.lock().unwrap().documents.is_empty());
+    assert_document(&read(&engine, "canvas").await);
+    assert_document(&read(&directory.engine(true), "canvas").await);
 }
 
 #[tokio::test]
@@ -1140,6 +1213,93 @@ fn drive_source() -> RepositorySource {
         folder_id: "folder-1".into(),
         token: "fixture".into(),
     }
+}
+
+#[tokio::test]
+async fn cloud_canvas_events_send_deltas_and_leave_unopened_documents_uncached() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["closed"] = node("closed", "mcanvas");
+    manifest["nodes"]["version"] = node("version", "mcanvas");
+    manifest["nodes"]["version"]["system"] = json!({
+        "kind": "file-version", "sourceFileId": "canvas", "capturedAt": 1,
+        "byteLength": fixture_bytes("baseUpdate").len()
+    });
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), fixture_bytes("baseUpdate")),
+            ("closed".into(), fixture_bytes("baseUpdate")),
+            ("version".into(), fixture_bytes("baseUpdate")),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().documents.is_empty());
+    engine
+        .operate(RepositoryOperation::Subscribe {
+            node_id: "canvas".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    let (opened, _) = engine
+        .operate(RepositoryOperation::Document {
+            node_id: "canvas".into(),
+            state_vector_base64: None,
+        })
+        .await
+        .unwrap();
+    let editor = document::decode(
+        &STANDARD
+            .decode(opened["updateBase64"].as_str().unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let edits = document::decode(&fixture_bytes("baseUpdate")).unwrap();
+    document::apply(&edits, &fixture_bytes("localUpdate")).unwrap();
+    document::apply(&edits, &fixture_bytes("remoteUpdate")).unwrap();
+    for (index, delete) in [false, true].into_iter().enumerate() {
+        if delete {
+            document::apply(&edits, &fixture_bytes("deletionUpdate")).unwrap();
+        }
+        {
+            let mut remote = state.lock().unwrap();
+            remote
+                .files
+                .insert("canvas".into(), document::bytes(&edits));
+            remote.head = format!("{:040x}", index + 2);
+        }
+        let changes = engine
+            .cycle(github_source(), &server.endpoints)
+            .await
+            .unwrap();
+        assert_eq!(changes.documents.len(), 1);
+        let mut events = Vec::new();
+        engine.emit_document_change(&changes.documents[0], |event, payload| {
+            events.push((event.to_owned(), serde_json::to_value(payload).unwrap()));
+        });
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].0, "repository-document-editor");
+        let delta = STANDARD
+            .decode(events[0].1["updateBase64"].as_str().unwrap())
+            .unwrap();
+        assert!(
+            delta.len() < 8192,
+            "existing PDF was included: {} bytes",
+            delta.len()
+        );
+        assert!(document::apply(&editor, &delta).unwrap());
+        assert!(!document::apply(&editor, &read(&engine, "canvas").await).unwrap());
+        assert_eq!(engine.store.lock().unwrap().documents.len(), 1);
+    }
+    assert_document(&document::bytes(&editor));
+    assert_document(&read(&engine, "canvas").await);
 }
 
 #[tokio::test]
@@ -2215,6 +2375,8 @@ async fn out_of_order_document_inserts_and_deletions_are_durable_before_acknowle
         assert_eq!(repeated["revision"], ack["revision"]);
         assert!(changes.documents.is_empty());
         assert!(!changes.wake_remote);
+        engine.checkpoint_pending().await.unwrap();
+        assert!(engine.store.lock().unwrap().documents.is_empty());
         drop(engine);
         let reopened = directory.engine(false);
         reopened.operate(apply(&first)).await.unwrap();
