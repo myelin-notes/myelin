@@ -1,5 +1,7 @@
+import * as Y from 'yjs';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
 import type { PickedFolder } from '@/lib/folder-picker';
 import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
@@ -404,14 +406,18 @@ async function writeMarkdownFile({
     await repository.setTags(file.nodeId, parsedMarkdown.tags);
   }
 
-  const session = await repository.openSession(file.nodeId);
+  const ydoc = new YDocManager();
   try {
-    await addMarkdownPageFrameToYDoc(session.ydoc, parsedMarkdown.body, {
+    await addMarkdownPageFrameToYDoc(ydoc, parsedMarkdown.body, {
       resolveNoteLinkId,
     });
-    await session.save();
+    ydoc.sweepOrphanPageFrameFragments();
+    await repository.writeFileBytes(
+      file.nodeId,
+      Y.encodeStateAsUpdate(ydoc.doc),
+    );
   } finally {
-    await session.close().catch(() => {});
+    ydoc.doc.destroy();
   }
 }
 
@@ -428,17 +434,17 @@ async function importPdfVaultFile({
 }): Promise<void> {
   const bytes = await reader.readFile(file.sourcePath);
   const pageSizes = await getPdfPageSizes(bytes);
-  const nodeId = await repository.createFile(
-    getPdfCanvasName(file.name),
-    'mcanvas',
-    parentId,
-  );
-  const session = await repository.openSession(nodeId);
+  const ydoc = new YDocManager();
   try {
-    addPdfElementToYDoc(session.ydoc, bytes, file.name, pageSizes);
-    await session.save();
+    addPdfElementToYDoc(ydoc, bytes, file.name, pageSizes);
+    await repository.createFile(
+      getPdfCanvasName(file.name),
+      'mcanvas',
+      parentId,
+      Y.encodeStateAsUpdate(ydoc.doc),
+    );
   } finally {
-    await session.close().catch(() => {});
+    ydoc.doc.destroy();
   }
 }
 

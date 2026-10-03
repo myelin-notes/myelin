@@ -1,9 +1,14 @@
 import * as scoped from 'tauri-plugin-scoped-storage-api';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import * as Y from 'yjs';
+import { ElementType } from '@myelin/editor/elements/element-type';
 import en from '@myelin/editor/i18n/messages/en';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { invoke } from '@tauri-apps/api/core';
 import { createCanvasFile } from '@/pages/library/import/canvas-file';
+import { importGoodnotesZip } from '@/pages/library/import/goodnotes';
 import { importObsidianVault } from '@/pages/library/import/obsidian-vault';
 import { filesProvider } from '@/pages/library/import/providers/files';
 import { onenoteProvider } from '@/pages/library/import/providers/onenote';
@@ -18,6 +23,14 @@ import { createEmptyManifest, type VFSManifest } from './shared';
 
 const { listeners } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
+}));
+vi.mock('@myelin/editor/pdf-renderer', () => ({
+  createDefaultPdfPageOrder: (pageCount: number) =>
+    Array.from({ length: pageCount }, (_, originalIndex) => ({
+      kind: 'pdf',
+      originalIndex,
+    })),
+  getPdfPageSizes: vi.fn(async () => [{ w: 680, h: 880 }]),
 }));
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
@@ -149,8 +162,19 @@ function nativeBoundary() {
         };
       }
       case 'document': {
-        const doc = documents.get(op.nodeId as string) ?? new Y.Doc();
-        documents.set(op.nodeId as string, doc);
+        const node = manifest.nodes[op.nodeId as string];
+        if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
+          throw new Error('Cannot open this file as a canvas document');
+        }
+        let doc = documents.get(node.id);
+        if (!doc) {
+          doc = new Y.Doc();
+          const bytes = files.get(node.id);
+          if (bytes) {
+            Y.applyUpdate(doc, bytes);
+          }
+          documents.set(node.id, doc);
+        }
         return {
           updateBase64: Buffer.from(Y.encodeStateAsUpdate(doc)).toString(
             'base64',
@@ -708,7 +732,7 @@ it('cancels a failed JS transfer without publishing a new file', async () => {
   await repository.dispose();
 });
 
-it('saves a JS-generated canvas import through bounded native document transfers', async () => {
+it('saves a JS-generated canvas import through bounded native byte transfers', async () => {
   const native = nativeBoundary();
   const repository = createRepositoryFromConfig({ kind: 'local' });
   const bytes = Uint8Array.from({ length: 20000 }, (_, i) => i % 251);
@@ -721,7 +745,9 @@ it('saves a JS-generated canvas import through bounded native document transfers
       ydoc.doc.getMap('asset').set('bytes', bytes);
     },
   });
-  expect(native.documents.get(id)?.getMap('asset').get('bytes')).toEqual(bytes);
+  const doc = new Y.Doc();
+  Y.applyUpdate(doc, native.files.get(id)!);
+  expect(doc.getMap('asset').get('bytes')).toEqual(bytes);
   const chunks = native.operations.filter((op) => op.kind === 'stage-bytes');
   expect(chunks.length).toBeGreaterThan(1);
   expect(
@@ -731,11 +757,9 @@ it('saves a JS-generated canvas import through bounded native document transfers
   ).toBe(true);
   const finish = native.operations.find((op) => op.kind === 'finish-transfer');
   expect(finish?.operation).toMatchObject({
-    kind: 'update-document',
-    nodeId: id,
-    generation: 'original',
-    origin: 'local',
-    updateBase64: '',
+    kind: 'write-file',
+    node: { id },
+    bytesBase64: '',
   });
   expect(native.operations.some((op) => op.kind === 'update-document')).toBe(
     false,
@@ -800,5 +824,104 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
   expect(summary.focusNodeId).toBe(result.rootFolderId);
   expect(summary.stats).toEqual({ count: 2, skipped: 0 });
   expect(native.operations.map((op) => op.kind)).toEqual(['manifest']);
+  await repository.dispose();
+});
+
+it('imports Obsidian notes and PDFs before publishing their manifest', async () => {
+  const native = nativeBoundary();
+  vi.mocked(scoped.readTextFile).mockImplementation(async (_id, path) =>
+    path === 'Alpha.md'
+      ? '---\ntags: [project]\n---\nSee [[Beta]].'
+      : 'Beta body',
+  );
+  vi.mocked(scoped.readFile).mockResolvedValueOnce(new Uint8Array([1, 2, 3]));
+  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const result = await importObsidianVault({
+    repository,
+    parentId: null,
+    vaultPath: { kind: 'scoped', handle: { id: 'folder', name: 'Vault' } },
+    scanned: {
+      folderPaths: new Set(),
+      skippedFiles: 0,
+      files: [
+        {
+          kind: 'markdown',
+          sourcePath: 'Alpha.md',
+          folderPath: '',
+          name: 'Alpha.md',
+          noteName: 'Alpha',
+          notePath: 'Alpha',
+          nodeId: null,
+        },
+        {
+          kind: 'markdown',
+          sourcePath: 'Beta.md',
+          folderPath: '',
+          name: 'Beta.md',
+          noteName: 'Beta',
+          notePath: 'Beta',
+          nodeId: null,
+        },
+        {
+          kind: 'pdf',
+          sourcePath: 'Deck.pdf',
+          folderPath: '',
+          name: 'Deck.pdf',
+        },
+      ],
+    },
+  });
+  expect(result.notesImported).toBe(2);
+  expect(result.mediaImported).toBe(1);
+  const [, nodes] = await repository.listDirectory(result.rootFolderId);
+  const alpha = nodes.find((node) => node.name === 'Alpha')!;
+  const beta = nodes.find((node) => node.name === 'Beta')!;
+  const pdf = nodes.find((node) => node.name === 'Deck')!;
+  expect(alpha.tags).toEqual(['project']);
+  const session = await repository.openSession(alpha.id);
+  const frame = session.ydoc.elements.get(0);
+  const content = yXmlFragmentToProseMirrorRootNode(
+    session.ydoc.getXmlFragment(frame.get('uuid') as string),
+    schema,
+  );
+  expect(content.textContent).toBe('See [[Beta]].');
+  expect(JSON.stringify(content.toJSON())).toContain(beta.id);
+  await session.close();
+  const pdfDoc = new YDocManager();
+  Y.applyUpdate(pdfDoc.doc, native.files.get(pdf.id)!);
+  expect(pdfDoc.elements.get(0).get('pdfData')).toEqual(
+    new Uint8Array([1, 2, 3]),
+  );
+  await repository.dispose();
+});
+
+it('imports a Goodnotes ZIP canvas while its manifest is unpublished', async () => {
+  const native = nativeBoundary();
+  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const result = await importGoodnotesZip({
+    scanned: {
+      pdfEntries: [
+        {
+          path: 'Unit/Deck.pdf',
+          folderPath: 'Unit',
+          fileName: 'Deck.pdf',
+          bytes: new Uint8Array([4, 5, 6]),
+        },
+      ],
+      skippedFiles: 0,
+    },
+    repository,
+    parentId: null,
+    fallbackTitle: 'Untitled Canvas',
+  });
+  expect(result.pdfsImported).toBe(1);
+  const node = Object.values(native.manifest().nodes).find(
+    (node) => node.type === 'file',
+  )!;
+  const doc = new YDocManager();
+  Y.applyUpdate(doc.doc, native.files.get(node.id)!);
+  expect(doc.elements.get(0).get('type')).toBe(ElementType.PDF);
+  expect(doc.elements.get(0).get('pdfData')).toEqual(new Uint8Array([4, 5, 6]));
+  expect(native.operations.some((op) => op.kind === 'document')).toBe(false);
   await repository.dispose();
 });
