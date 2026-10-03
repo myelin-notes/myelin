@@ -2084,3 +2084,195 @@ async fn native_drive_unpublished_files_are_reused_only_when_bytes_match_or_uplo
         }
     }
 }
+
+#[tokio::test]
+async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_reopen() {
+    for failure in [
+        "manifest",
+        "manifest-response",
+        "delete",
+        "delete-response",
+        "delete-changed",
+        "delete-restored",
+        "delete-restored-yjs",
+        "delete-restored-yjs-changed",
+        "delete-restored-yjs-upload-response",
+    ] {
+        let directory = TestDirectory::new();
+        let engine = directory.engine(true);
+        let state = Arc::new(Mutex::new(DriveFixture::new()));
+        if !failure.starts_with("delete-restored-yjs") {
+            let mut remote = state.lock().unwrap();
+            remote
+                .files
+                .iter_mut()
+                .find(|file| file.id == "manifest-entry")
+                .unwrap()
+                .bytes = serde_json::to_vec(&manifest_with("canvas", "png")).unwrap();
+            let file = remote
+                .files
+                .iter_mut()
+                .find(|file| file.id == "canvas-entry")
+                .unwrap();
+            file.name = "canvas.png".into();
+            file.bytes = b"saved picture".to_vec();
+        }
+        let remote = state.clone();
+        let interrupt = Arc::new(AtomicBool::new(false));
+        let fail = interrupt.clone();
+        let media_interrupt = Arc::new(AtomicBool::new(false));
+        let media_fail = media_interrupt.clone();
+        let server = TestServer::new(move |request| {
+            let matched = if failure.starts_with("manifest") {
+                request.method == "PATCH"
+                    && request.path.starts_with("/upload/files/manifest-entry")
+            } else {
+                request.method == "DELETE" && request.path.starts_with("/drive/files/canvas-entry")
+            };
+            if matched && fail.swap(false, Ordering::SeqCst) {
+                if failure == "manifest-response" || failure == "delete-response" {
+                    remote.lock().unwrap().handle(request);
+                }
+                return (400, b"interrupted response".to_vec());
+            }
+            if request.method == "PATCH"
+                && request.path.starts_with("/upload/files/canvas-entry")
+                && media_fail.swap(false, Ordering::SeqCst)
+            {
+                remote.lock().unwrap().handle(request);
+                return (400, b"lost upload response".to_vec());
+            }
+            remote.lock().unwrap().handle(request)
+        })
+        .await;
+        engine
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+        let mut manifest = saved["manifest"].clone();
+        manifest["nodes"].as_object_mut().unwrap().remove("canvas");
+        save_manifest(&engine, manifest).await;
+        interrupt.store(true, Ordering::SeqCst);
+        assert!(
+            engine
+                .cycle(drive_source(), &server.endpoints)
+                .await
+                .is_err(),
+            "{failure}"
+        );
+        let reader_directory = TestDirectory::new();
+        let reader = reader_directory.engine(true);
+        reader
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        if failure == "manifest" {
+            assert_eq!(read(&reader, "canvas").await, b"saved picture");
+        } else {
+            assert!(reader.store.lock().unwrap().manifest["nodes"]["canvas"].is_null());
+        }
+        if failure == "delete-changed" {
+            let mut remote = state.lock().unwrap();
+            let file = remote
+                .files
+                .iter_mut()
+                .find(|file| file.id == "canvas-entry")
+                .unwrap();
+            file.bytes = b"another device's edit".to_vec();
+            file.revision = "concurrent-revision".into();
+        }
+        drop(engine);
+        let reopened = directory.engine(true);
+        if failure == "delete-restored" {
+            seed(&reopened, "canvas", "png", b"saved picture".to_vec()).await;
+        } else if failure.starts_with("delete-restored-yjs") {
+            seed(&reopened, "canvas", "mcanvas", fixture_bytes("baseUpdate")).await;
+            update(&reopened, "localUpdate", "local").await;
+        }
+        if failure == "delete-restored-yjs-upload-response"
+            || failure == "delete-restored-yjs-changed"
+        {
+            media_interrupt.store(true, Ordering::SeqCst);
+            assert!(reopened
+                .cycle(drive_source(), &server.endpoints)
+                .await
+                .is_err());
+            update(&reopened, "remoteUpdate", "local").await;
+            if failure == "delete-restored-yjs-changed" {
+                let mut remote = state.lock().unwrap();
+                let file = remote
+                    .files
+                    .iter_mut()
+                    .find(|file| file.id == "canvas-entry")
+                    .unwrap();
+                file.bytes = b"another device's edit".to_vec();
+                file.revision = "concurrent-revision".into();
+            }
+        }
+        if failure == "delete-restored-yjs-changed" {
+            assert!(reopened
+                .cycle(drive_source(), &server.endpoints)
+                .await
+                .err()
+                .unwrap()
+                .contains("file changed"));
+            assert!(!reopened.store.lock().unwrap().outbox.is_empty());
+            assert_eq!(
+                state
+                    .lock()
+                    .unwrap()
+                    .files
+                    .iter()
+                    .find(|file| file.id == "canvas-entry")
+                    .unwrap()
+                    .bytes,
+                b"another device's edit"
+            );
+            continue;
+        }
+        reopened
+            .cycle(drive_source(), &server.endpoints)
+            .await
+            .unwrap();
+        assert!(reopened.store.lock().unwrap().outbox.is_empty());
+        let remote = state.lock().unwrap();
+        let file = remote.files.iter().find(|file| file.id == "canvas-entry");
+        match failure {
+            "delete-changed" => assert_eq!(file.unwrap().bytes, b"another device's edit"),
+            "delete-restored" | "delete-restored-yjs" | "delete-restored-yjs-upload-response" => {
+                if failure.starts_with("delete-restored-yjs") {
+                    let doc = document::decode(&file.unwrap().bytes).unwrap();
+                    let txn = doc.transact();
+                    assert_eq!(
+                        txn.get_text("content").unwrap().get_string(&txn),
+                        if failure == "delete-restored-yjs-upload-response" {
+                            "remote seed local"
+                        } else {
+                            "seed local"
+                        }
+                    );
+                }
+                assert!(file.is_some());
+                let manifest: Value = serde_json::from_slice(
+                    &remote
+                        .files
+                        .iter()
+                        .find(|file| file.id == "manifest-entry")
+                        .unwrap()
+                        .bytes,
+                )
+                .unwrap();
+                assert!(manifest["nodes"]["canvas"].is_object());
+            }
+            _ => assert!(file.is_none(), "{failure}"),
+        }
+        assert!(!reopened
+            .cache_dir
+            .join(format!(
+                ".drive-deletions-{}.json",
+                store::revision(b"folder-1")
+            ))
+            .exists());
+    }
+}

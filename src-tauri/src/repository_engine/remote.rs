@@ -635,6 +635,7 @@ impl RepositoryEngine {
     ) -> Result<Changes, String> {
         let captured = self.with_store(capture).await?;
         let mut unchanged_head = false;
+        let mut pending_drive_deletions = false;
         if let RepositorySource::Github {
             owner,
             repo,
@@ -653,7 +654,8 @@ impl RepositoryEngine {
             let client = RemoteClient::new(token.clone(), false)?;
             unchanged_head =
                 drive_unchanged(&client, endpoints, folder_id, &captured.snapshot).await?;
-            if captured.operations.is_empty() && unchanged_head {
+            pending_drive_deletions = drive_deletions_path(&self.cache_dir, folder_id).exists();
+            if captured.operations.is_empty() && unchanged_head && !pending_drive_deletions {
                 return Ok(Changes::default());
             }
         }
@@ -690,7 +692,7 @@ impl RepositoryEngine {
             })
             .await
             .map_err(|error| error.to_string())??;
-            if !plan.additions.is_empty() || !plan.deletions.is_empty() {
+            if !plan.additions.is_empty() || !plan.deletions.is_empty() || pending_drive_deletions {
                 upload(&self.cache_dir, &source, endpoints, &mut plan).await?;
             }
             let cache = self.basis_dir();
@@ -967,6 +969,13 @@ async fn github_rest_push(
     Ok(commit)
 }
 
+fn drive_deletions_path(cache_dir: &Path, folder: &str) -> std::path::PathBuf {
+    cache_dir.join(format!(
+        ".drive-deletions-{}.json",
+        super::store::revision(folder.as_bytes())
+    ))
+}
+
 async fn drive_push(
     cache_dir: &Path,
     client: &RemoteClient,
@@ -982,6 +991,13 @@ async fn drive_push(
         Ok(bytes) => {
             serde_json::from_slice(&bytes).map_err(|_| "Unreadable Google Drive upload journal")?
         }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+        Err(error) => return Err(error.to_string()),
+    };
+    let deletion_journal = drive_deletions_path(cache_dir, folder);
+    let mut deletions: HashMap<String, DriveEntry> = match std::fs::read(&deletion_journal) {
+        Ok(bytes) => serde_json::from_slice(&bytes)
+            .map_err(|_| "Unreadable Google Drive deletion journal")?,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
         Err(error) => return Err(error.to_string()),
     };
@@ -1021,11 +1037,29 @@ async fn drive_push(
         let unpublished = id
             .as_ref()
             .is_some_and(|id| !plan.snapshot.sync.file_ids.contains_key(id));
+        let restored = existing
+            .as_ref()
+            .is_some_and(|entry| deletions.get(name) == Some(entry));
+        if restored {
+            let upload = uploads.entry(name.into()).or_insert_with(|| DriveUpload {
+                marker: uuid::Uuid::new_v4().to_string(),
+                revision: None,
+                content_revision: String::new(),
+            });
+            upload.revision = existing
+                .as_ref()
+                .and_then(|entry| entry.head_revision_id.clone());
+            upload.content_revision = super::store::revision(bytes);
+            save_uploads(&uploads)?;
+        }
         let mut reuse = false;
-        if unpublished {
+        if unpublished && !restored {
             if let Some(entry) = &existing {
                 let owned = uploads.get(name).filter(|upload| {
                     entry.app_properties.get("myelinUpload") == Some(&upload.marker)
+                        || deletions
+                            .get(name)
+                            .is_some_and(|previous| previous.id == entry.id)
                 });
                 if !owned.is_some_and(|upload| {
                     upload.revision.is_some() && upload.revision == entry.head_revision_id
@@ -1090,7 +1124,7 @@ async fn drive_push(
                     save_uploads(&uploads)?;
                 }
             }
-        } else if let Some(id) = &id {
+        } else if let Some(id) = id.as_ref().filter(|_| !restored) {
             if existing
                 .as_ref()
                 .and_then(|entry| entry.head_revision_id.clone())
@@ -1109,6 +1143,13 @@ async fn drive_push(
             upload.revision = entry.head_revision_id.clone();
             save_uploads(&uploads)?;
         }
+        if restored {
+            deletions.insert(name.into(), entry.clone());
+            super::store::atomic_write(
+                &deletion_journal,
+                &serde_json::to_vec(&deletions).map_err(|error| error.to_string())?,
+            )?;
+        }
         if let Some(id) = id {
             plan.snapshot.sync.file_ids.insert(id.clone(), entry.id);
             plan.snapshot
@@ -1118,22 +1159,61 @@ async fn drive_push(
         }
     }
     for path in &plan.deletions {
-        if let Some(entry) = find_drive(
-            client,
-            endpoints,
-            &files_folder,
-            path.strip_prefix("files/")
-                .ok_or("Invalid repository delete path")?,
-            false,
-        )
-        .await?
+        let name = path
+            .strip_prefix("files/")
+            .ok_or("Invalid repository delete path")?;
+        if let Some(entry) = find_drive(client, endpoints, &files_folder, name, false).await? {
+            if plan.snapshot.sync.file_ids.iter().any(|(id, file_id)| {
+                file_id == &entry.id
+                    && plan.snapshot.sync.file_revisions.get(id) == Some(&entry.head_revision_id)
+            }) {
+                deletions.entry(name.into()).or_insert(entry);
+            }
+        }
+    }
+    if !deletions.is_empty() {
+        super::store::atomic_write(
+            &deletion_journal,
+            &serde_json::to_vec(&deletions).map_err(|error| error.to_string())?,
+        )?;
+    }
+    if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest {
+        return Err("Google Drive manifest changed during sync; retrying".into());
+    }
+    let published_manifest = if let Some(bytes) = plan.additions.get("manifest.json") {
+        let entry =
+            drive_write(client, endpoints, folder, "manifest.json", manifest, bytes).await?;
+        plan.snapshot.sync.head_revision = entry.head_revision_id.clone();
+        Some(entry)
+    } else {
+        manifest
+    };
+    // A failed manifest upload must leave every published file readable by other devices.
+    for (name, expected) in deletions {
+        if plan.snapshot.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .any(|node| node["type"] == "file" && file_name(node).ok().as_deref() == Some(&name))
+        {
+            continue;
+        }
+        if find_drive(client, endpoints, folder, "manifest.json", false).await?
+            != published_manifest
+        {
+            return Err("Google Drive manifest changed during sync; retrying".into());
+        }
+        if find_drive(client, endpoints, &files_folder, &name, false)
+            .await?
+            .as_ref()
+            == Some(&expected)
         {
             require_success(
                 client
                     .request(
                         "Google Drive delete failed",
                         Method::DELETE,
-                        endpoint(&endpoints.drive, &["files", &entry.id])?,
+                        endpoint(&endpoints.drive, &["files", &expected.id])?,
                         None,
                     )
                     .await?,
@@ -1141,13 +1221,9 @@ async fn drive_push(
             )?;
         }
     }
-    if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest {
-        return Err("Google Drive manifest changed during sync; retrying".into());
-    }
-    if let Some(bytes) = plan.additions.get("manifest.json") {
-        let entry =
-            drive_write(client, endpoints, folder, "manifest.json", manifest, bytes).await?;
-        plan.snapshot.sync.head_revision = entry.head_revision_id;
+    if deletion_journal.exists() {
+        std::fs::remove_file(&deletion_journal).map_err(|error| error.to_string())?;
+        crate::repository_bootstrap::sync_directory(cache_dir)?;
     }
     if journal.exists() {
         std::fs::remove_file(&journal).map_err(|error| error.to_string())?;
