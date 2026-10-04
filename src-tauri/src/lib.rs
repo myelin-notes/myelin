@@ -13,6 +13,7 @@ mod onenote_import;
 mod pdf_export;
 mod repository_bootstrap;
 mod repository_engine;
+mod repository_metadata;
 mod transcription;
 mod workspace_export;
 

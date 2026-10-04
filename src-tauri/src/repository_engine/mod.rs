@@ -2,7 +2,7 @@ mod document;
 mod onenote;
 mod references;
 mod remote;
-mod store;
+pub(crate) mod store;
 #[cfg(test)]
 mod tests;
 mod transfer;
@@ -54,6 +54,29 @@ pub(crate) struct RepositoryEngine {
     cache_dir: PathBuf,
 }
 
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MetadataPatch {
+    nodes: Vec<NodeMetadata>,
+    deleted_node_ids: Vec<String>,
+    settings: Option<RepositoryPreferences>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NodeMetadata {
+    node: Value,
+    links: Vec<Value>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RepositoryPreferences {
+    colors: Value,
+    tag_registry: Vec<String>,
+    pen_presets: Vec<Value>,
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenRepositoryRequest {
@@ -81,8 +104,8 @@ struct NativeStatus {
 )]
 pub enum RepositoryOperation {
     Manifest,
-    SaveManifest {
-        manifest: Value,
+    SaveMetadata {
+        patch: MetadataPatch,
         revision: String,
     },
     ReadFile {
@@ -467,34 +490,53 @@ impl RepositoryOperation {
         let mut changes = Changes::default();
         let result = match self {
             Self::Manifest => {
-                json!({"manifest": state.manifest, "revision": state.manifest_revision()})
+                json!({"manifest": state.manifest, "revision": state.metadata_revision()})
             }
-            Self::SaveManifest {
-                mut manifest,
+            Self::SaveMetadata {
+                patch,
                 revision: expected,
             } => {
-                if expected != state.manifest_revision() {
-                    return Err("Native manifest conflict".into());
+                if expected != state.metadata_revision() {
+                    return Err("Native metadata conflict".into());
                 }
-                crate::repository_bootstrap::download::manifest_files(&manifest)?;
-                store::migrate(&mut manifest);
+                let mut ids = std::collections::HashSet::new();
+                for record in &patch.nodes {
+                    let id = record.node["id"]
+                        .as_str()
+                        .ok_or("Invalid repository node ID")?;
+                    crate::repository_metadata::validate_node(id, &record.node)?;
+                    if !ids.insert(id) {
+                        return Err("Duplicate metadata change".into());
+                    }
+                }
+                for id in &patch.deleted_node_ids {
+                    if !crate::repository_bootstrap::valid_component(id) || !ids.insert(id) {
+                        return Err("Invalid metadata deletion".into());
+                    }
+                }
                 state.transaction_active = true;
-                let previous = state.manifest.clone();
-                let old_nodes = previous["nodes"]
-                    .as_object()
-                    .ok_or("Invalid repository manifest")?;
-                let nodes = manifest["nodes"]
-                    .as_object()
-                    .ok_or("Invalid repository manifest")?;
                 let mut files = Vec::new();
-                for (id, node) in nodes {
-                    if old_nodes.get(id) != Some(node)
-                        || previous["linksBySource"][id] != manifest["linksBySource"][id]
+                for record in patch.nodes {
+                    let id = record.node["id"].as_str().unwrap().to_owned();
+                    let previous = state.manifest["nodes"][&id].clone();
+                    let new_file = record.node["type"] == "file" && previous.is_null();
+                    if previous != record.node
+                        || state.manifest["linksBySource"][&id] != json!(record.links)
                     {
-                        state.queue("upsert-manifest-node", Some(id), json!({}));
+                        state.queue("upsert-manifest-node", Some(&id), json!({}));
                         changes.changed.push(id.clone());
                     }
-                    if node["type"] == "file" && !old_nodes.contains_key(id) {
+                    state.manifest["nodes"][&id] = record.node;
+                    if record.links.is_empty() {
+                        state.manifest["linksBySource"]
+                            .as_object_mut()
+                            .unwrap()
+                            .remove(&id);
+                    } else {
+                        state.manifest["linksBySource"][&id] = json!(record.links);
+                    }
+                    if new_file {
+                        let node = &state.manifest["nodes"][&id];
                         let name = file_name(node)?;
                         if !state.root.join("files").join(&name).exists() {
                             files.push(FileWrite {
@@ -502,65 +544,61 @@ impl RepositoryOperation {
                                 bytes: Some(String::new()),
                             });
                         }
-                        state.queue("push-note", Some(id), json!({"baseFileRevision": null}));
+                        if node["fileType"] == "mcanvas" && node["system"].is_null() {
+                            let links = document::links(state.doc(&id)?);
+                            if !links.is_empty() {
+                                state.manifest["linksBySource"][&id] = json!(links);
+                            }
+                        }
+                        state.queue("push-note", Some(&id), json!({"baseFileRevision":null}));
                     }
                 }
-                for (id, node) in old_nodes {
-                    if !nodes.contains_key(id) {
-                        changes.deleted.push(id.clone());
+                for id in patch.deleted_node_ids {
+                    let node = state.manifest["nodes"].as_object_mut().unwrap().remove(&id);
+                    if let Some(node) = node {
+                        state.manifest["linksBySource"]
+                            .as_object_mut()
+                            .unwrap()
+                            .remove(&id);
+                        state.outbox.retain(|op| op["nodeId"] != id);
                         let deleted_files = if node["type"] == "file" {
                             vec![id.clone()]
                         } else {
                             vec![]
                         };
-                        state.outbox.retain(|op| op["nodeId"] != *id);
                         state.queue(
                             "delete-manifest-node",
-                            Some(id),
-                            json!({"deletedFileIds": deleted_files}),
+                            Some(&id),
+                            json!({"deletedFileIds":deleted_files}),
                         );
                         if node["type"] == "file" {
                             files.push(FileWrite {
-                                name: file_name(node)?,
+                                name: file_name(&node)?,
                                 bytes: None,
                             });
-                            state.documents.remove(id);
+                            state.documents.remove(&id);
                         }
+                        state.sync.document_generations.remove(&id);
+                        changes.deleted.push(id);
                     }
                 }
-                for (field, kind) in [
-                    ("colors", "sync-custom-colors"),
-                    ("tagRegistry", "sync-tag-registry"),
-                    ("penPresets", "sync-pen-presets"),
-                ] {
-                    if previous[field] != manifest[field] {
-                        state.queue(kind, None, json!({}));
-                    }
-                }
-                state.manifest = manifest;
-                for id in &changes.deleted {
-                    state.sync.document_generations.remove(id);
-                }
-                let new_canvases = state.manifest["nodes"]
-                    .as_object()
-                    .unwrap()
-                    .iter()
-                    .filter_map(|(id, node)| {
-                        (node["fileType"] == "mcanvas"
-                            && node["system"].is_null()
-                            && !old_nodes.contains_key(id))
-                        .then_some(id.clone())
-                    })
-                    .collect::<Vec<_>>();
-                for id in new_canvases {
-                    let links = document::links(state.doc(&id)?);
-                    if !links.is_empty() {
-                        state.manifest["linksBySource"][&id] = json!(links);
+                if let Some(settings) = patch.settings {
+                    let mut settings = serde_json::to_value(settings).map_err(|e| e.to_string())?;
+                    crate::repository_metadata::normalize(&mut settings);
+                    for (field, kind) in [
+                        ("colors", "sync-custom-colors"),
+                        ("tagRegistry", "sync-tag-registry"),
+                        ("penPresets", "sync-pen-presets"),
+                    ] {
+                        if state.manifest[field] != settings[field] {
+                            state.manifest[field] = settings[field].clone();
+                            state.queue(kind, None, json!({}));
+                        }
                     }
                 }
                 state.commit(files)?;
                 changes.wake_remote = state.remote;
-                json!({"revision": state.manifest_revision()})
+                json!({"revision":state.metadata_revision()})
             }
             Self::ReadFile { node_id } => {
                 let bytes = state.read_file(&state.manifest["nodes"][&node_id])?;

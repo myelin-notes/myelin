@@ -16,10 +16,11 @@ import { importWorkspaceJson } from '@/pages/library/import/workspace-json';
 import type { NativeDocumentChange } from '../native-document-target';
 import { getGoogleDriveToken } from './google-drive/credentials';
 import { NativeRepository } from './native';
+import type { MetadataPatch } from './native-operations';
 import { renameNoteReferences } from './rename-note-references';
 import { renamePageFrameReferences } from './rename-page-frame-references';
 import { createRepositoryFromConfig } from './repository-backends';
-import { createEmptyManifest, type VFSManifest } from './shared';
+import { createEmptyManifest } from './shared';
 
 const { listeners } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
@@ -72,7 +73,7 @@ beforeEach(() => {
 });
 
 function nativeBoundary() {
-  let manifest = createEmptyManifest();
+  const manifest = createEmptyManifest();
   let version = 0;
   const files = new Map<string, Uint8Array>();
   const operations: Record<string, unknown>[] = [];
@@ -124,7 +125,7 @@ function nativeBoundary() {
           manifest: structuredClone(manifest),
           revision: String(version),
         };
-      case 'save-manifest': {
+      case 'save-metadata': {
         if (competingEdit) {
           competingEdit = false;
           manifest.colors.pen = ['#123456'];
@@ -139,9 +140,24 @@ function nativeBoundary() {
           version++;
         }
         if (op.revision !== String(version)) {
-          throw new Error('Native manifest conflict');
+          throw new Error('Native metadata conflict');
         }
-        manifest = structuredClone(op.manifest as VFSManifest);
+        const patch = op.patch as MetadataPatch;
+        for (const { node, links } of patch.nodes) {
+          manifest.nodes[node.id] = structuredClone(node);
+          if (links.length) {
+            manifest.linksBySource[node.id] = structuredClone(links);
+          } else {
+            delete manifest.linksBySource[node.id];
+          }
+        }
+        for (const id of patch.deletedNodeIds) {
+          delete manifest.nodes[id];
+          delete manifest.linksBySource[id];
+        }
+        if (patch.settings) {
+          Object.assign(manifest, structuredClone(patch.settings));
+        }
         version++;
         listeners.get('repository-status')?.({ payload: status() });
         return { revision: String(version) };
@@ -161,6 +177,9 @@ function nativeBoundary() {
           revision: 'file-revision',
         };
       }
+      case 'delete-file':
+        files.delete(op.nodeId as string);
+        return null;
       case 'document': {
         const node = manifest.nodes[op.nodeId as string];
         if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
@@ -225,9 +244,11 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(repository).toBeInstanceOf(NativeRepository);
   await repository.initialize();
   let fileId = '';
+  let folderId = '';
   native.compete();
-  await repository.batchManifestWrites(async () => {
+  await repository.batchMetadataWrites(async () => {
     const folder = await repository.createFolder('Imported', null);
+    folderId = folder;
     fileId = await repository.createFile(
       'Image',
       'png',
@@ -243,6 +264,25 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(native.manifest().nodes[fileId]?.name).toBe('Renamed');
   expect(native.manifest().colors.pen).toEqual(['#123456']);
   expect(native.manifest().linksBySource.concurrent[0]?.title).toBe('Target');
+  const rename = native.operations.at(-1)!;
+  expect(rename).not.toHaveProperty('manifest');
+  expect(rename).toMatchObject({
+    kind: 'save-metadata',
+    patch: { deletedNodeIds: [], settings: null },
+  });
+  expect(
+    (rename.patch as MetadataPatch).nodes.map(({ node }) => node.id),
+  ).toEqual([fileId]);
+  await repository.addCustomColor('#abcdef', 'pen');
+  expect(native.operations.at(-1)).toMatchObject({
+    kind: 'save-metadata',
+    patch: {
+      nodes: [],
+      deletedNodeIds: [],
+      settings: { colors: { pen: ['#123456', '#abcdef'] } },
+    },
+  });
+  expect(native.manifest().nodes[fileId]?.name).toBe('Renamed');
   const before = repository.getRuntimeStatus().dataVersion;
   listeners.get('repository-status')?.({
     payload: {
@@ -251,6 +291,16 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
     },
   });
   expect(repository.getRuntimeStatus().dataVersion).toBeGreaterThan(before);
+  await repository.deleteNode(folderId);
+  const deletion = native.operations
+    .filter((op) => op.kind === 'save-metadata')
+    .at(-1)!;
+  expect((deletion.patch as MetadataPatch).deletedNodeIds.sort()).toEqual(
+    [folderId, fileId].sort(),
+  );
+  expect((deletion.patch as MetadataPatch).nodes).toEqual([]);
+  expect(native.manifest().nodes[folderId]).toBeUndefined();
+  expect(native.files.has(fileId)).toBe(false);
   expect(
     vi
       .mocked(invoke)
@@ -775,7 +825,7 @@ it('paces large JS file writes in bounded chunks and never publishes partial byt
   expect(
     native.operations.findIndex((op) => op.kind === 'finish-transfer'),
   ).toBeLessThan(
-    native.operations.findIndex((op) => op.kind === 'save-manifest'),
+    native.operations.findIndex((op) => op.kind === 'save-metadata'),
   );
   await repository.dispose();
 });

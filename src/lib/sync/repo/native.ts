@@ -15,6 +15,7 @@ import type {
 import { NoteSession } from '../session';
 import { MAX_PEN_PRESETS, type RepositoryRuntimeStatus } from './config';
 import type {
+  MetadataPatch,
   NativeDocumentWrite,
   NativeOperationRequests,
   NativeOperationResults,
@@ -76,6 +77,11 @@ import type {
   VFSNode,
   VFSNodeId,
 } from './types';
+
+export interface MetadataTargets {
+  nodes?: string[];
+  settings?: boolean;
+}
 
 interface NativeStatus extends Omit<RepositoryRuntimeStatus, 'lastError'> {
   repositoryId: string;
@@ -275,7 +281,7 @@ export class NativeRepository implements Repository {
     if (!data.changed.length) {
       return;
     }
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadMetadataImpl();
     for (const id of data.changed) {
       const node = manifest.nodes[id];
       if (node?.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
@@ -303,27 +309,27 @@ export class NativeRepository implements Repository {
     });
   }
 
-  protected loadManifestImpl(): Promise<{
+  protected loadMetadataImpl(): Promise<{
     manifest: VFSManifest;
     revision: string;
   }> {
     return this.operation({ kind: 'manifest' });
   }
-  protected async saveManifestImpl(
-    manifest: VFSManifest,
+  protected async saveMetadataImpl(
+    patch: MetadataPatch,
     revision: string | null,
   ): Promise<string> {
     const result = await this.operation({
-      kind: 'save-manifest',
-      manifest,
+      kind: 'save-metadata',
+      patch,
       revision: revision ?? '',
     });
     return result.revision;
   }
   protected isConflictError(error: unknown): boolean {
-    return String(error).includes('Native manifest conflict');
+    return String(error).includes('Native metadata conflict');
   }
-  protected manifestMaxRetries(): number {
+  protected metadataMaxRetries(): number {
     return 4;
   }
   protected async loadFileBytes(
@@ -454,10 +460,14 @@ export class NativeRepository implements Repository {
   }
   private async publishFile(node: VFSFileNode): Promise<VFSNodeId> {
     // Replays after manifest conflicts must reuse the already-written file's ID.
-    await this.mutateManifest('Create file', (manifest) => {
-      manifest.nodes[node.id] = node;
-      addChild(manifest, node.parentId, node.id);
-    });
+    await this.mutateMetadata(
+      'Create file',
+      { nodes: [node.id] },
+      (manifest) => {
+        manifest.nodes[node.id] = node;
+        addChild(manifest, node.parentId, node.id);
+      },
+    );
     this.searchMetadataRevision++;
     return node.id;
   }
@@ -631,17 +641,20 @@ export class NativeRepository implements Repository {
 
   // While positive, manifest mutations accumulate on one held manifest and defer their save to the
   // outermost close.
-  private manifestBatchDepth = 0;
+  private metadataBatchDepth = 0;
 
   // Loaded once. Reads inside the batch see pending writes because they share this object.
-  private manifestBatchLoad: Promise<{
+  private metadataBatchLoad: Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> | null = null;
 
   // Replayed onto the manifest that wins the race if the flush hits a conflict — so mutators must
   // be replay-safe: ids and any values the caller kept are minted outside the mutator.
-  private manifestBatchMutators: Array<(manifest: VFSManifest) => void> = [];
+  private metadataBatchMutators: Array<{
+    run: (manifest: VFSManifest) => void;
+    targets: MetadataTargets;
+  }> = [];
 
   getRuntimeStatus(): RepositoryRuntimeStatus {
     return { ...this.runtimeStatus };
@@ -660,25 +673,25 @@ export class NativeRepository implements Repository {
   // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
   // has no delete semantics, so callers must not delete nodes inside it. A throwing `fn` discards
   // the batch — nothing partial is saved.
-  async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    this.manifestBatchDepth += 1;
+  async batchMetadataWrites<T>(fn: () => Promise<T>): Promise<T> {
+    this.metadataBatchDepth += 1;
     let succeeded = false;
     try {
       const result = await fn();
       succeeded = true;
       return result;
     } finally {
-      this.manifestBatchDepth -= 1;
-      if (this.manifestBatchDepth === 0) {
-        const load = this.manifestBatchLoad;
-        const mutators = this.manifestBatchMutators;
-        this.manifestBatchLoad = null;
-        this.manifestBatchMutators = [];
+      this.metadataBatchDepth -= 1;
+      if (this.metadataBatchDepth === 0) {
+        const load = this.metadataBatchLoad;
+        const mutators = this.metadataBatchMutators;
+        this.metadataBatchLoad = null;
+        this.metadataBatchMutators = [];
         // A read-only batch has nothing to save; a failed one is dropped so no partial manifest lands —
         // the caller's own rollback handles bytes already written.
         if (succeeded && load && mutators.length > 0) {
           const { manifest, revision } = await load;
-          await this.flushBatchedManifest(manifest, revision, mutators);
+          await this.flushBatchedMetadata(manifest, revision, mutators);
         }
       }
     }
@@ -686,17 +699,26 @@ export class NativeRepository implements Repository {
 
   // Conflicts retry like a single mutation: reload the manifest that won the race and replay the
   // whole batch onto it so neither side's writes are lost.
-  private async flushBatchedManifest(
+  private async flushBatchedMetadata(
     manifest: VFSManifest,
     revision: string | null,
-    mutators: ReadonlyArray<(manifest: VFSManifest) => void>,
+    mutators: ReadonlyArray<{
+      run: (manifest: VFSManifest) => void;
+      targets: MetadataTargets;
+    }>,
   ): Promise<void> {
     let pendingManifest = manifest;
     let pendingRevision = revision;
-    const maxRetries = this.manifestMaxRetries();
+    const maxRetries = this.metadataMaxRetries();
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        await this.saveManifestImpl(pendingManifest, pendingRevision);
+        await this.saveMetadataImpl(
+          this.metadataPatch(
+            pendingManifest,
+            mutators.map((entry) => entry.targets),
+          ),
+          pendingRevision,
+        );
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
@@ -705,46 +727,37 @@ export class NativeRepository implements Repository {
         if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
           throw error;
         }
-        const fresh = await this.loadManifestImpl();
+        const fresh = await this.loadMetadataImpl();
         for (const mutator of mutators) {
-          mutator(fresh.manifest);
+          mutator.run(fresh.manifest);
         }
         pendingManifest = fresh.manifest;
         pendingRevision = fresh.revision;
       }
     }
-    throw new Error('Failed to import after retrying manifest conflicts.');
+    throw new Error('Failed to import after retrying metadata conflicts.');
   }
 
   // Inside a batch this is the one held manifest, so reads and writes within the batch observe each
-  // other's pending changes; outside a batch it delegates straight to `loadManifestImpl`.
-  protected async loadManifest(): Promise<{
+  // other's pending changes; outside a batch it delegates straight to `loadMetadataImpl`.
+  protected async loadMetadata(): Promise<{
     manifest: VFSManifest;
     revision: string | null;
   }> {
-    if (this.manifestBatchDepth === 0) {
-      return this.loadManifestImpl();
+    if (this.metadataBatchDepth === 0) {
+      return this.loadMetadataImpl();
     }
-    if (!this.manifestBatchLoad) {
-      const load = this.loadManifestImpl();
-      this.manifestBatchLoad = load;
+    if (!this.metadataBatchLoad) {
+      const load = this.loadMetadataImpl();
+      this.metadataBatchLoad = load;
       // A failed load must not poison the batch's later reads.
       load.catch(() => {
-        if (this.manifestBatchLoad === load) {
-          this.manifestBatchLoad = null;
+        if (this.metadataBatchLoad === load) {
+          this.metadataBatchLoad = null;
         }
       });
     }
-    return this.manifestBatchLoad;
-  }
-
-  async applyManifestMutation<T>(
-    action: string,
-    mutator: (manifest: VFSManifest) => T,
-  ): Promise<T> {
-    const result = await this.mutateManifest(action, mutator);
-    this.searchMetadataRevision++;
-    return result;
+    return this.metadataBatchLoad;
   }
 
   async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
@@ -760,25 +773,25 @@ export class NativeRepository implements Repository {
   }
 
   async getNode(nodeId: string): Promise<VFSNode | null> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return manifest.nodes[nodeId] ?? null;
   }
 
   async listDirectory(
     folderId: string | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return listDirectoryNodes(manifest, folderId);
   }
 
   /** Child ids including system nodes, which `listDirectory` filters out. */
   async listChildIds(folderId: string | null): Promise<readonly string[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getChildrenIds(manifest, folderId);
   }
 
   async getFolderChain(folderId: string | null): Promise<VFSFolderNode[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getFolderChain(manifest, folderId);
   }
 
@@ -786,7 +799,7 @@ export class NativeRepository implements Repository {
     query: string,
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     if (noteContentIndex.isSource(this)) {
       try {
         return await noteContentIndex.search(
@@ -826,7 +839,7 @@ export class NativeRepository implements Repository {
   }
 
   async getNodesByName(name: string): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getNodesByExactName(manifest, name);
   }
 
@@ -834,34 +847,34 @@ export class NativeRepository implements Repository {
     tags: string[],
     folderId: VFSNodeId | null = null,
   ): Promise<VFSNode[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getNodesByAnyTag(manifest, tags, folderId);
   }
 
   async listTags(includeAncestors = false): Promise<RepositoryTag[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return includeAncestors
       ? listHierarchicalTags(manifest)
       : listTags(manifest);
   }
 
   async getStats(): Promise<RepositoryStats> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getStats(manifest);
   }
 
   async getRecentFiles(limit: number = 3): Promise<VFSFileNode[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getRecentFiles(manifest, limit);
   }
 
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getBacklinks(manifest, noteId);
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getNoteGraph(manifest);
   }
 
@@ -869,7 +882,7 @@ export class NativeRepository implements Repository {
     baseName: string,
     parentId: string | null,
   ): Promise<string> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getUniqueFileName(manifest, baseName, parentId);
   }
 
@@ -878,7 +891,7 @@ export class NativeRepository implements Repository {
     // after a conflict reuses the id the caller already received.
     const id = createNodeId();
     const now = Date.now();
-    await this.mutateManifest('Create folder', (manifest) => {
+    await this.mutateMetadata('Create folder', { nodes: [id] }, (manifest) => {
       manifest.nodes[id] = createFolderNode(id, name, parentId, now);
       addChild(manifest, parentId, id);
     });
@@ -887,7 +900,7 @@ export class NativeRepository implements Repository {
   }
 
   async listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return getFileVersionNodes(manifest, nodeId).map(toFileVersion);
   }
 
@@ -897,20 +910,27 @@ export class NativeRepository implements Repository {
   }
 
   async renameNode(nodeId: string, newName: string): Promise<void> {
-    await this.mutateManifest('Rename node', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-      node.name = newName;
-      node.modifiedAt = Date.now();
-    });
+    await this.mutateMetadata(
+      'Rename node',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (!node) {
+          return;
+        }
+        node.name = newName;
+        node.modifiedAt = Date.now();
+      },
+    );
     this.searchMetadataRevision++;
   }
 
   async deleteNode(nodeId: string): Promise<void> {
-    const deletedFiles = await this.mutateManifest('Delete node', (manifest) =>
-      deleteNodeFromManifest(manifest, nodeId),
+    const targets = { nodes: [] as string[] };
+    const deletedFiles = await this.mutateMetadata(
+      'Delete node',
+      targets,
+      (manifest) => deleteNodeFromManifest(manifest, nodeId, targets.nodes),
     );
 
     await Promise.all(
@@ -928,20 +948,24 @@ export class NativeRepository implements Repository {
   }
 
   async moveNode(nodeId: string, newParentId: string | null): Promise<void> {
-    await this.mutateManifest('Move node', (manifest) => {
+    await this.mutateMetadata('Move node', { nodes: [nodeId] }, (manifest) => {
       moveNodeInManifest(manifest, nodeId, newParentId);
     });
   }
 
   async setTags(nodeId: string, tags: string[]): Promise<void> {
-    await this.mutateManifest('Set node tags', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-      node.tags = tags;
-      node.modifiedAt = Date.now();
-    });
+    await this.mutateMetadata(
+      'Set node tags',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (!node) {
+          return;
+        }
+        node.tags = tags;
+        node.modifiedAt = Date.now();
+      },
+    );
     this.searchMetadataRevision++;
   }
 
@@ -950,43 +974,55 @@ export class NativeRepository implements Repository {
     if (color !== null && !normalized) {
       throw new Error(`Invalid color: ${color}`);
     }
-    await this.mutateManifest('Set folder color', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (node?.type !== 'folder') {
-        return;
-      }
-      node.color = normalized ?? undefined;
-      node.modifiedAt = Date.now();
-    });
+    await this.mutateMetadata(
+      'Set folder color',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (node?.type !== 'folder') {
+          return;
+        }
+        node.color = normalized ?? undefined;
+        node.modifiedAt = Date.now();
+      },
+    );
   }
 
   async addTag(nodeId: string, tag: string): Promise<void> {
-    await this.mutateManifest('Add node tag', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node || node.tags.includes(tag)) {
-        return;
-      }
-      manifest.nodes[nodeId] = {
-        ...node,
-        tags: [...node.tags, tag],
-        modifiedAt: Date.now(),
-      };
-    });
+    await this.mutateMetadata(
+      'Add node tag',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (!node || node.tags.includes(tag)) {
+          return;
+        }
+        manifest.nodes[nodeId] = {
+          ...node,
+          tags: [...node.tags, tag],
+          modifiedAt: Date.now(),
+        };
+      },
+    );
     this.searchMetadataRevision++;
   }
 
   async removeTag(nodeId: string, tag: string): Promise<void> {
-    await this.mutateManifest('Remove node tag', (manifest) => {
-      const node = manifest.nodes[nodeId];
-      if (!node) {
-        return;
-      }
-      manifest.nodes[nodeId] = {
-        ...node,
-        tags: node.tags.filter((currentTag) => currentTag !== tag),
-        modifiedAt: Date.now(),
-      };
-    });
+    await this.mutateMetadata(
+      'Remove node tag',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (!node) {
+          return;
+        }
+        manifest.nodes[nodeId] = {
+          ...node,
+          tags: node.tags.filter((currentTag) => currentTag !== tag),
+          modifiedAt: Date.now(),
+        };
+      },
+    );
     this.searchMetadataRevision++;
   }
 
@@ -995,7 +1031,7 @@ export class NativeRepository implements Repository {
   }
 
   async listNoteIndexItems(): Promise<NoteIndexItem[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     const items: NoteIndexItem[] = [];
     let inspected = 0;
     for (const id in manifest.nodes) {
@@ -1015,7 +1051,7 @@ export class NativeRepository implements Repository {
   }
 
   async getCustomColors(tool: CustomColorTool): Promise<string[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return [...manifest.colors[tool]];
   }
 
@@ -1027,13 +1063,17 @@ export class NativeRepository implements Repository {
     if (!normalized) {
       throw new Error(`Invalid color: ${color}`);
     }
-    return this.mutateManifest('Add custom color', (manifest) => {
-      const colors = manifest.colors[tool];
-      if (!colors.includes(normalized)) {
-        manifest.colors[tool] = [...colors, normalized];
-      }
-      return [...manifest.colors[tool]];
-    });
+    return this.mutateMetadata(
+      'Add custom color',
+      { settings: true },
+      (manifest) => {
+        const colors = manifest.colors[tool];
+        if (!colors.includes(normalized)) {
+          manifest.colors[tool] = [...colors, normalized];
+        }
+        return [...manifest.colors[tool]];
+      },
+    );
   }
 
   async removeCustomColor(
@@ -1044,16 +1084,20 @@ export class NativeRepository implements Repository {
     if (!normalized) {
       throw new Error(`Invalid color: ${color}`);
     }
-    return this.mutateManifest('Remove custom color', (manifest) => {
-      manifest.colors[tool] = manifest.colors[tool].filter(
-        (c) => c !== normalized,
-      );
-      return [...manifest.colors[tool]];
-    });
+    return this.mutateMetadata(
+      'Remove custom color',
+      { settings: true },
+      (manifest) => {
+        manifest.colors[tool] = manifest.colors[tool].filter(
+          (c) => c !== normalized,
+        );
+        return [...manifest.colors[tool]];
+      },
+    );
   }
 
   async getPenPresets(): Promise<PenPreset[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return manifest.penPresets.map((preset) => ({ ...preset }));
   }
 
@@ -1062,27 +1106,31 @@ export class NativeRepository implements Repository {
     if (!normalized) {
       throw new Error(`Invalid color: ${preset.color}`);
     }
-    return this.mutateManifest('Add pen preset', (manifest) => {
-      const presets = manifest.penPresets;
-      const duplicate = presets.some(
-        (existing) =>
-          existing.tool === preset.tool &&
-          existing.color === normalized &&
-          existing.size === preset.size,
-      );
-      if (!duplicate) {
-        if (presets.length >= MAX_PEN_PRESETS) {
-          throw new Error(
-            `At most ${MAX_PEN_PRESETS} pen presets are allowed.`,
-          );
+    return this.mutateMetadata(
+      'Add pen preset',
+      { settings: true },
+      (manifest) => {
+        const presets = manifest.penPresets;
+        const duplicate = presets.some(
+          (existing) =>
+            existing.tool === preset.tool &&
+            existing.color === normalized &&
+            existing.size === preset.size,
+        );
+        if (!duplicate) {
+          if (presets.length >= MAX_PEN_PRESETS) {
+            throw new Error(
+              `At most ${MAX_PEN_PRESETS} pen presets are allowed.`,
+            );
+          }
+          manifest.penPresets = [
+            ...presets,
+            { ...preset, color: normalized, id: createNodeId() },
+          ];
         }
-        manifest.penPresets = [
-          ...presets,
-          { ...preset, color: normalized, id: createNodeId() },
-        ];
-      }
-      return manifest.penPresets.map((entry) => ({ ...entry }));
-    });
+        return manifest.penPresets.map((entry) => ({ ...entry }));
+      },
+    );
   }
 
   async updatePenPreset(
@@ -1094,51 +1142,65 @@ export class NativeRepository implements Repository {
     if (changes.color !== undefined && !normalized) {
       throw new Error(`Invalid color: ${changes.color}`);
     }
-    return this.mutateManifest('Update pen preset', (manifest) => {
-      manifest.penPresets = manifest.penPresets.map((preset) =>
-        preset.id === id
-          ? {
-              ...preset,
-              ...(normalized ? { color: normalized } : {}),
-              ...(changes.size !== undefined ? { size: changes.size } : {}),
-              ...(changes.inWheel !== undefined
-                ? { inWheel: changes.inWheel }
-                : {}),
-            }
-          : preset,
-      );
-      return manifest.penPresets.map((entry) => ({ ...entry }));
-    });
+    return this.mutateMetadata(
+      'Update pen preset',
+      { settings: true },
+      (manifest) => {
+        manifest.penPresets = manifest.penPresets.map((preset) =>
+          preset.id === id
+            ? {
+                ...preset,
+                ...(normalized ? { color: normalized } : {}),
+                ...(changes.size !== undefined ? { size: changes.size } : {}),
+                ...(changes.inWheel !== undefined
+                  ? { inWheel: changes.inWheel }
+                  : {}),
+              }
+            : preset,
+        );
+        return manifest.penPresets.map((entry) => ({ ...entry }));
+      },
+    );
   }
 
   async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
-    return this.mutateManifest('Reorder pen presets', (manifest) => {
-      const presetsById = new Map(
-        manifest.penPresets.map((preset) => [preset.id, preset]),
-      );
-      if (
-        ids.length !== presetsById.size ||
-        new Set(ids).size !== ids.length ||
-        ids.some((id) => !presetsById.has(id))
-      ) {
-        throw new Error('Preset order must contain every preset exactly once.');
-      }
-      manifest.penPresets = ids.map((id) => presetsById.get(id)!);
-      return manifest.penPresets.map((preset) => ({ ...preset }));
-    });
+    return this.mutateMetadata(
+      'Reorder pen presets',
+      { settings: true },
+      (manifest) => {
+        const presetsById = new Map(
+          manifest.penPresets.map((preset) => [preset.id, preset]),
+        );
+        if (
+          ids.length !== presetsById.size ||
+          new Set(ids).size !== ids.length ||
+          ids.some((id) => !presetsById.has(id))
+        ) {
+          throw new Error(
+            'Preset order must contain every preset exactly once.',
+          );
+        }
+        manifest.penPresets = ids.map((id) => presetsById.get(id)!);
+        return manifest.penPresets.map((preset) => ({ ...preset }));
+      },
+    );
   }
 
   async removePenPreset(id: string): Promise<PenPreset[]> {
-    return this.mutateManifest('Remove pen preset', (manifest) => {
-      manifest.penPresets = manifest.penPresets.filter(
-        (preset) => preset.id !== id,
-      );
-      return manifest.penPresets.map((entry) => ({ ...entry }));
-    });
+    return this.mutateMetadata(
+      'Remove pen preset',
+      { settings: true },
+      (manifest) => {
+        manifest.penPresets = manifest.penPresets.filter(
+          (preset) => preset.id !== id,
+        );
+        return manifest.penPresets.map((entry) => ({ ...entry }));
+      },
+    );
   }
 
   async getRegistryTags(): Promise<string[]> {
-    const { manifest } = await this.loadManifest();
+    const { manifest } = await this.loadMetadata();
     return [...manifest.tagRegistry];
   }
 
@@ -1149,43 +1211,82 @@ export class NativeRepository implements Repository {
       .map(normalizeTagInput)
       .filter((tag) => tag.length > 0)
       .flatMap(expandTagWithAncestors);
-    return this.mutateManifest('Add registry tags', (manifest) => {
-      const next = new Set(manifest.tagRegistry);
-      for (const tag of normalized) {
-        next.add(tag);
-      }
-      manifest.tagRegistry = [...next];
-      return [...manifest.tagRegistry];
-    });
+    return this.mutateMetadata(
+      'Add registry tags',
+      { settings: true },
+      (manifest) => {
+        const next = new Set(manifest.tagRegistry);
+        for (const tag of normalized) {
+          next.add(tag);
+        }
+        manifest.tagRegistry = [...next];
+        return [...manifest.tagRegistry];
+      },
+    );
   }
 
   async removeRegistryTag(tag: string): Promise<string[]> {
-    return this.mutateManifest('Remove registry tag', (manifest) => {
-      manifest.tagRegistry = manifest.tagRegistry.filter((t) => t !== tag);
-      return [...manifest.tagRegistry];
-    });
+    return this.mutateMetadata(
+      'Remove registry tag',
+      { settings: true },
+      (manifest) => {
+        manifest.tagRegistry = manifest.tagRegistry.filter((t) => t !== tag);
+        return [...manifest.tagRegistry];
+      },
+    );
   }
 
-  protected async mutateManifest<T>(
+  private metadataPatch(
+    manifest: VFSManifest,
+    targets: readonly MetadataTargets[],
+  ): MetadataPatch {
+    const ids = new Set(targets.flatMap((target) => target.nodes ?? []));
+    return {
+      nodes: [...ids].flatMap((id) =>
+        manifest.nodes[id]
+          ? [
+              {
+                node: manifest.nodes[id],
+                links: manifest.linksBySource[id] ?? [],
+              },
+            ]
+          : [],
+      ),
+      deletedNodeIds: [...ids].filter((id) => !manifest.nodes[id]),
+      settings: targets.some((target) => target.settings)
+        ? {
+            colors: manifest.colors,
+            tagRegistry: manifest.tagRegistry,
+            penPresets: manifest.penPresets,
+          }
+        : null,
+    };
+  }
+
+  protected async mutateMetadata<T>(
     action: string,
+    targets: MetadataTargets,
     mutator: (manifest: VFSManifest) => T,
   ): Promise<T> {
-    if (this.manifestBatchDepth > 0) {
+    if (this.metadataBatchDepth > 0) {
       // Apply to the held manifest and defer the save to the batch flush. The
       // mutator is captured so a conflicting flush can replay it.
-      const { manifest } = await this.loadManifest();
+      const { manifest } = await this.loadMetadata();
       const result = mutator(manifest);
-      this.manifestBatchMutators.push(mutator);
+      this.metadataBatchMutators.push({ run: mutator, targets });
       return result;
     }
 
-    const maxRetries = this.manifestMaxRetries();
+    const maxRetries = this.metadataMaxRetries();
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const { manifest, revision } = await this.loadManifestImpl();
+      const { manifest, revision } = await this.loadMetadataImpl();
       const result = mutator(manifest);
 
       try {
-        await this.saveManifestImpl(manifest, revision);
+        await this.saveMetadataImpl(
+          this.metadataPatch(manifest, [targets]),
+          revision,
+        );
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
@@ -1199,7 +1300,7 @@ export class NativeRepository implements Repository {
     }
 
     throw new Error(
-      `Failed to ${action.toLowerCase()} after retrying manifest conflicts.`,
+      `Failed to ${action.toLowerCase()} after retrying metadata conflicts.`,
     );
   }
 }

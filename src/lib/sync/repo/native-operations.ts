@@ -6,7 +6,9 @@ import type {
   FileVersion,
   RenameReferencesRequest,
   RenameReferencesResult,
+  StoredNoteLink,
   VFSFileNode,
+  VFSNode,
 } from './types';
 
 export interface NativeDocument {
@@ -30,6 +32,18 @@ export interface NativeRevision {
 
 export interface NativeManifest extends NativeRevision {
   manifest: VFSManifest;
+}
+
+export interface RepositoryPreferences {
+  colors: VFSManifest['colors'];
+  tagRegistry: string[];
+  penPresets: VFSManifest['penPresets'];
+}
+
+export interface MetadataPatch {
+  nodes: Array<{ node: VFSNode; links: StoredNoteLink[] }>;
+  deletedNodeIds: string[];
+  settings: RepositoryPreferences | null;
 }
 
 export interface NativeFile {
@@ -76,9 +90,9 @@ export interface OneNoteImportResult {
 
 export interface NativeOperationRequests {
   manifest: { kind: 'manifest' };
-  'save-manifest': {
-    kind: 'save-manifest';
-    manifest: VFSManifest;
+  'save-metadata': {
+    kind: 'save-metadata';
+    patch: MetadataPatch;
     revision: string;
   };
   'read-file': { kind: 'read-file'; nodeId: string };
@@ -131,7 +145,7 @@ export interface NativeOperationRequests {
 
 export interface NativeOperationResults {
   manifest: NativeManifest;
-  'save-manifest': NativeRevision;
+  'save-metadata': NativeRevision;
   'read-file': NativeFile;
   'write-file': NativeRevision;
   'import-file': NativeRevision;

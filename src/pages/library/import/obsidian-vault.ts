@@ -490,7 +490,7 @@ export async function importObsidianVault({
   try {
     // Every folder and note this import creates lands on one manifest, saved
     // once when the batch closes, instead of a manifest write per node.
-    return await repository.batchManifestWrites(async () => {
+    return await repository.batchMetadataWrites(async () => {
       const root = await repository.createFolder(vaultName, parentId);
       rootFolderId = root;
       const folderIds = await createImportedFolders(

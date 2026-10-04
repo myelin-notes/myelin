@@ -1,8 +1,9 @@
 use super::{
     document,
-    store::{file_name, migrate, now, FileWrite, Store, SyncState},
+    store::{file_name, now, FileWrite, Store, SyncState},
     Changes, RepositoryEngine, RepositoryManager,
 };
+use crate::repository_metadata as metadata;
 use crate::{
     github_push::{GitPushFile, GitPushRequest},
     repository_bootstrap::download::{
@@ -24,6 +25,10 @@ use tauri_plugin_http::reqwest::Method;
 #[derive(Clone)]
 struct Snapshot {
     manifest: Value,
+    records: HashMap<String, Vec<u8>>,
+    legacy: Option<Vec<u8>>,
+    corrupt: Vec<String>,
+    marker: bool,
     files: HashMap<String, Vec<u8>>,
     sync: SyncState,
 }
@@ -47,10 +52,8 @@ struct Plan {
 
 impl Snapshot {
     fn read(root: &Path) -> Result<Self, String> {
-        let mut manifest = download::parse_manifest(
-            &std::fs::read(root.join("manifest.json")).map_err(|error| error.to_string())?,
-        )?;
-        migrate(&mut manifest);
+        let loaded = metadata::load(root)?;
+        let manifest = loaded.manifest;
         let mut files = HashMap::new();
         let mut revisions = HashMap::new();
         let mut file_ids = HashMap::new();
@@ -89,11 +92,21 @@ impl Snapshot {
             files.insert(id.clone(), bytes);
             revisions.insert(id.clone(), revision);
         }
+        let sidecars = loaded.legacy.is_none();
         let drive_head = drive
-            .get("manifest.json")
+            .get(if sidecars {
+                metadata::SETTINGS
+            } else {
+                "manifest.json"
+            })
             .and_then(|entry| entry.head_revision_id.clone());
         Ok(Self {
             manifest,
+            records: loaded.records,
+            legacy: loaded.legacy,
+            corrupt: loaded.corrupt,
+            marker: std::fs::read(root.join("manifest.json"))
+                .is_ok_and(|bytes| metadata::is_marker(&bytes)),
             files,
             sync: SyncState {
                 last_remote_sync_at: None,
@@ -102,6 +115,19 @@ impl Snapshot {
                 basis_id: None,
                 file_ids,
                 document_generations: HashMap::new(),
+                sidecars,
+                metadata_entries: drive
+                    .into_iter()
+                    .filter_map(|(name, entry)| {
+                        if name == metadata::SETTINGS || name == "manifest.json" {
+                            Some((name, entry))
+                        } else if name.ends_with(metadata::SUFFIX) {
+                            Some((format!("files/{name}"), entry))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
             },
         })
     }
@@ -133,6 +159,39 @@ impl Snapshot {
                     },
                 );
             }
+        }
+        for (path, bytes) in &self.records {
+            let entry = self.sync.metadata_entries.get(path);
+            let revision = if self
+                .sync
+                .head_revision
+                .as_ref()
+                .is_some_and(|head| git2::Oid::from_str(head).is_ok())
+            {
+                Some(blob_sha(bytes)?)
+            } else {
+                entry.and_then(|entry| entry.head_revision_id.clone())
+            };
+            if let Some(revision) = revision {
+                files.insert(
+                    path.clone(),
+                    CachedFile {
+                        path: root.join(path),
+                        revision,
+                        drive_id: entry.map(|entry| entry.id.clone()),
+                    },
+                );
+            }
+        }
+        if self.sync.sidecars {
+            files.insert(
+                "manifest.json".into(),
+                CachedFile {
+                    path: root.join("manifest.json"),
+                    revision: blob_sha(metadata::MARKER)?,
+                    drive_id: None,
+                },
+            );
         }
         Ok(files)
     }
@@ -170,10 +229,23 @@ impl Snapshot {
             }
         }
         crate::repository_bootstrap::sync_directory(&root.join("files"))?;
-        super::store::atomic_write(
-            &root.join("manifest.json"),
-            &serde_json::to_vec(&self.manifest).map_err(|error| error.to_string())?,
-        )?;
+        for (path, bytes) in &self.records {
+            let entry = self.sync.metadata_entries.get(path);
+            let revision = match entry {
+                Some(entry) => entry.head_revision_id.clone(),
+                None => Some(blob_sha(bytes)?),
+            };
+            let destination = root.join(path);
+            let linked = revision.as_deref().is_some_and(|revision| {
+                cached.get(path).is_some_and(|file| {
+                    file.link(&destination, revision, entry.map(|entry| entry.id.as_str()))
+                })
+            });
+            if !linked {
+                super::store::atomic_write(&destination, bytes)?;
+            }
+        }
+        super::store::atomic_write(&root.join("manifest.json"), metadata::MARKER)?;
         self.sync.basis_id = Some(id);
         super::store::atomic_write(
             &root.join("sync.json"),
@@ -193,9 +265,11 @@ impl Snapshot {
         if !root.join("manifest.json").exists() {
             return Ok(None);
         }
-        let manifest = download::parse_manifest(
-            &std::fs::read(root.join("manifest.json")).map_err(|error| error.to_string())?,
-        )?;
+        let loaded = metadata::load(&root)?;
+        if !loaded.corrupt.is_empty() {
+            return Ok(None);
+        }
+        let manifest = loaded.manifest;
         let saved = match std::fs::read(root.join("sync.json")) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -222,6 +296,10 @@ impl Snapshot {
         }
         Ok(Some(Self {
             manifest,
+            records: loaded.records,
+            legacy: loaded.legacy,
+            corrupt: loaded.corrupt,
+            marker: true,
             files,
             sync: saved,
         }))
@@ -254,6 +332,10 @@ fn capture(store: &mut Store) -> Result<Captured, String> {
     Ok(Captured {
         snapshot: Snapshot {
             manifest: store.manifest.clone(),
+            records: store.metadata_records(),
+            legacy: None,
+            corrupt: Vec::new(),
+            marker: true,
             files,
             sync: store.sync.clone(),
         },
@@ -262,12 +344,25 @@ fn capture(store: &mut Store) -> Result<Captured, String> {
 }
 
 fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(), String> {
+    if !manifest["deletedNodes"].is_object() {
+        manifest["deletedNodes"] = json!({});
+    }
     for op in operations {
         let id = op["nodeId"].as_str().unwrap_or("");
         match op["kind"].as_str() {
             Some("upsert-manifest-node" | "push-note") => {
-                if local["nodes"][id].is_null() {
+                if local["nodes"][id].is_null()
+                    || (!manifest["deletedNodes"][id].is_null()
+                        && local["restoredNodes"][id] != manifest["deletedNodes"][id])
+                {
                     continue;
+                }
+                manifest["deletedNodes"].as_object_mut().unwrap().remove(id);
+                if !local["restoredNodes"][id].is_null() {
+                    if !manifest["restoredNodes"].is_object() {
+                        manifest["restoredNodes"] = json!({});
+                    }
+                    manifest["restoredNodes"][id] = local["restoredNodes"][id].clone();
                 }
                 let mut pending = vec![id.to_owned()];
                 let mut visited = HashSet::new();
@@ -276,7 +371,7 @@ fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(
                         return Err("Repository folder ancestry contains a cycle".into());
                     }
                     let node = &local["nodes"][&id];
-                    if node.is_null() {
+                    if node.is_null() || !manifest["deletedNodes"][&id].is_null() {
                         continue;
                     }
                     if let Some(parent) = node["parentId"].as_str() {
@@ -286,7 +381,10 @@ fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(
                     }
                     manifest["nodes"][&id] = node.clone();
                     if let Some(parent) = node["parentId"].as_str() {
-                        if local["nodes"][parent].is_null() && manifest["nodes"][parent].is_null() {
+                        if manifest["nodes"][parent].is_null()
+                            && (local["nodes"][parent].is_null()
+                                || !manifest["deletedNodes"][parent].is_null())
+                        {
                             manifest["nodes"][&id]["parentId"] = Value::Null;
                         }
                     }
@@ -317,6 +415,7 @@ fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(
                     }
                 }
                 for id in removed {
+                    manifest["deletedNodes"][&id] = op["queueRevision"].clone();
                     manifest["nodes"].as_object_mut().unwrap().remove(&id);
                     manifest["linksBySource"]
                         .as_object_mut()
@@ -335,28 +434,68 @@ fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(
 
 fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
     let previous = remote.manifest.clone();
+    let previous_records = std::mem::take(&mut remote.records);
     replay(
         &mut remote.manifest,
         &captured.snapshot.manifest,
         &captured.operations,
     )?;
+    if remote.legacy.is_some() {
+        for path in remote.sync.metadata_entries.keys() {
+            if let Some(id) = path
+                .strip_prefix("files/")
+                .and_then(|name| name.strip_suffix(metadata::SUFFIX))
+            {
+                if remote.manifest["nodes"][id].is_null()
+                    && remote.manifest["deletedNodes"][id].is_null()
+                {
+                    remote.manifest["deletedNodes"][id] = json!(uuid::Uuid::new_v4().to_string());
+                }
+            }
+        }
+    }
     let mut additions = HashMap::new();
     for op in &captured.operations {
         if op["kind"] != "push-note" {
             continue;
         }
-        let id = op["nodeId"].as_str().ok_or("Invalid cached note ID")?;
-        let node = captured.snapshot.manifest["nodes"][id].clone();
-        if node["type"] != "file" || remote.manifest["nodes"][id].is_null() {
+        let source_id = op["nodeId"].as_str().ok_or("Invalid cached note ID")?;
+        let mut id = source_id.to_owned();
+        let mut node = captured.snapshot.manifest["nodes"][source_id].clone();
+        if node["type"] != "file" {
+            continue;
+        }
+        let recovered = remote.manifest["nodes"][&id].is_null()
+            && !remote.manifest["deletedNodes"][&id].is_null();
+        if recovered {
+            id = format!(
+                "conflict-{}",
+                op["queueRevision"]
+                    .as_str()
+                    .ok_or("Missing queued revision")?
+            );
+            node["id"] = json!(id);
+            node["name"] = json!(format!(
+                "{} (Recovered deleted file)",
+                node["name"].as_str().unwrap_or("File")
+            ));
+            if node["parentId"]
+                .as_str()
+                .is_some_and(|parent| remote.manifest["nodes"][parent].is_null())
+            {
+                node["parentId"] = Value::Null;
+            }
+            remote.manifest["nodes"][&id] = node.clone();
+        } else if remote.manifest["nodes"][&id].is_null() {
             continue;
         }
         let local = captured
             .snapshot
             .files
-            .get(id)
+            .get(source_id)
             .ok_or("Queued repository file is missing")?;
-        let old = remote.files.get(id).map(Vec::as_slice).unwrap_or_default();
-        let replacement = op["replaceFile"] == true;
+        let old = remote.files.get(&id).map(Vec::as_slice).unwrap_or_default();
+        let replacement = recovered || op["replaceFile"] == true;
         let bytes = if node["fileType"] == "mcanvas" {
             if replacement {
                 local.clone()
@@ -393,10 +532,13 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
                     Some(index) => format!("{}{suffix}{}", &name[..index], &name[index..]),
                     None => format!("{name}{suffix}"),
                 });
-                if previous["nodes"][id]["type"] == "file" {
-                    remote.manifest["nodes"][id] = previous["nodes"][id].clone();
+                if previous["nodes"][&id]["type"] == "file" {
+                    remote.manifest["nodes"][&id] = previous["nodes"][&id].clone();
                 } else {
-                    remote.manifest["nodes"].as_object_mut().unwrap().remove(id);
+                    remote.manifest["nodes"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove(&id);
                 }
                 remote.manifest["nodes"][&conflict_id] = conflict.clone();
                 additions.insert(format!("files/{}", file_name(&conflict)?), local.clone());
@@ -408,16 +550,16 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
         if old != bytes {
             additions.insert(format!("files/{}", file_name(&node)?), bytes.clone());
         }
-        remote.files.insert(id.into(), bytes.clone());
+        remote.files.insert(id.clone(), bytes.clone());
         if node["fileType"] == "mcanvas" && node["system"].is_null() {
             let links = document::links(&document::decode(&bytes)?);
             if links.is_empty() {
                 remote.manifest["linksBySource"]
                     .as_object_mut()
                     .unwrap()
-                    .remove(id);
+                    .remove(&id);
             } else {
-                remote.manifest["linksBySource"][id] = json!(links);
+                remote.manifest["linksBySource"][&id] = json!(links);
             }
         }
     }
@@ -428,12 +570,47 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
             remote.files.remove(id);
         }
     }
-    if previous != remote.manifest || !additions.is_empty() || !deletions.is_empty() {
+    let mut records = if remote.legacy.is_some() {
+        metadata::records(&remote.manifest)?
+    } else {
+        let mut records = previous_records.clone();
+        for id in metadata::changed_nodes(&previous, &remote.manifest) {
+            records.insert(
+                format!("files/{id}{}", metadata::SUFFIX),
+                metadata::node_record(&remote.manifest, &id)?,
+            );
+        }
+        records.insert(
+            metadata::SETTINGS.into(),
+            metadata::settings(&remote.manifest)?,
+        );
+        records
+    };
+    for (path, bytes) in &records {
+        if previous_records.get(path) != Some(bytes) {
+            additions.insert(path.clone(), bytes.clone());
+        }
+    }
+    if let Some(legacy) = remote.legacy.take() {
+        additions.insert(metadata::BACKUP.into(), legacy);
+        additions.insert("manifest.json".into(), metadata::MARKER.to_vec());
+    }
+    if !remote.marker {
+        additions.insert("manifest.json".into(), metadata::MARKER.to_vec());
+    }
+    remote.marker = true;
+    if !additions.is_empty() || !deletions.is_empty() {
+        remote.manifest["generation"] = json!(uuid::Uuid::new_v4().to_string());
+        records.insert(
+            metadata::SETTINGS.into(),
+            metadata::settings(&remote.manifest)?,
+        );
         additions.insert(
-            "manifest.json".into(),
-            serde_json::to_vec_pretty(&remote.manifest).map_err(|error| error.to_string())?,
+            metadata::SETTINGS.into(),
+            records[metadata::SETTINGS].clone(),
         );
     }
+    remote.records = records;
     Ok(Plan {
         snapshot: remote,
         additions,
@@ -450,6 +627,55 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 && old["nodeId"] == op["nodeId"]
         })
     });
+    let mut recovered_updates = Vec::new();
+    for op in store.outbox.clone() {
+        let Some(id) = op["nodeId"].as_str() else {
+            continue;
+        };
+        if op["kind"] != "push-note"
+            || plan.snapshot.manifest["deletedNodes"][id].is_null()
+            || store.manifest["nodes"][id]["type"] != "file"
+        {
+            continue;
+        }
+        let captured_op = captured
+            .operations
+            .iter()
+            .find(|old| old["kind"] == "push-note" && old["nodeId"] == id)
+            .unwrap_or(&op);
+        let recovery_id = format!(
+            "conflict-{}",
+            captured_op["queueRevision"]
+                .as_str()
+                .ok_or("Missing queued revision")?
+        );
+        let mut node = store.manifest["nodes"][id].clone();
+        let local = store.read_file(&node)?;
+        let base = plan.snapshot.files.get(&recovery_id);
+        let base_revision = base
+            .map(|bytes| json!(super::store::revision(bytes)))
+            .unwrap_or(Value::Null);
+        let bytes = if node["fileType"] == "mcanvas" {
+            document::merge(base.map(Vec::as_slice).unwrap_or_default(), &local)?
+        } else {
+            local
+        };
+        node["id"] = json!(recovery_id);
+        node["name"] = json!(format!(
+            "{} (Recovered deleted file)",
+            node["name"].as_str().unwrap_or("File")
+        ));
+        if node["parentId"]
+            .as_str()
+            .is_some_and(|parent| plan.snapshot.manifest["nodes"][parent].is_null())
+        {
+            node["parentId"] = Value::Null;
+        }
+        plan.snapshot.manifest["nodes"][&recovery_id] = node;
+        plan.snapshot.files.insert(recovery_id.clone(), bytes);
+        store.outbox.retain(|pending| pending["nodeId"] != id);
+        recovered_updates.push((recovery_id, base_revision));
+    }
     replay(&mut plan.snapshot.manifest, &store.manifest, &store.outbox)?;
     for op in &mut store.outbox {
         let id = op["nodeId"].as_str().unwrap_or("");
@@ -587,7 +813,15 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             changes.changed.push(id.clone());
         }
     }
-    store.manifest = plan.snapshot.manifest;
+    store.replace_metadata(plan.snapshot.manifest);
+    for (id, base_revision) in recovered_updates {
+        store.queue(
+            "push-note",
+            Some(&id),
+            json!({"baseFileRevision":base_revision}),
+        );
+        store.queue("upsert-manifest-node", Some(&id), json!({}));
+    }
     let generations = std::mem::take(&mut store.sync.document_generations);
     store.sync = plan.snapshot.sync;
     store.sync.document_generations = generations;
@@ -709,7 +943,7 @@ impl RepositoryEngine {
             let client = RemoteClient::new(token.clone(), true)?;
             let head = github_head(&client, endpoints, owner, repo, branch).await?;
             unchanged_head = captured.snapshot.sync.head_revision.as_deref() == Some(&head);
-            if captured.operations.is_empty() && unchanged_head {
+            if captured.operations.is_empty() && unchanged_head && captured.snapshot.sync.sidecars {
                 return Ok(Changes::default());
             }
         }
@@ -718,7 +952,11 @@ impl RepositoryEngine {
             unchanged_head =
                 drive_unchanged(&client, endpoints, folder_id, &captured.snapshot).await?;
             pending_drive_deletions = drive_deletions_path(&self.cache_dir, folder_id).exists();
-            if captured.operations.is_empty() && unchanged_head && !pending_drive_deletions {
+            if captured.operations.is_empty()
+                && unchanged_head
+                && !pending_drive_deletions
+                && captured.snapshot.sync.sidecars
+            {
                 return Ok(Changes::default());
             }
         }
@@ -741,8 +979,8 @@ impl RepositoryEngine {
                 .map(|basis| basis.cached_files(&self.basis_dir()))
                 .transpose()?
                 .unwrap_or_default();
-            let remote = match basis {
-                Some(basis) if unchanged_head => basis,
+            let mut remote = match basis {
+                Some(basis) if unchanged_head && basis.sync.sidecars => basis,
                 _ => {
                     download::download_repository_cached(
                         &stage,
@@ -757,6 +995,35 @@ impl RepositoryEngine {
                         .map_err(|error| error.to_string())??
                 }
             };
+            if remote.sync.sidecars && captured.snapshot.sync.sidecars {
+                for id in captured.snapshot.manifest["nodes"].as_object().unwrap().keys() {
+                    let path = format!("files/{id}{}", metadata::SUFFIX);
+                    let published = captured.snapshot.sync.file_revisions.contains_key(id) || captured.snapshot.sync.metadata_entries.contains_key(&path) || cached.contains_key(&path);
+                    if published && remote.manifest["nodes"][id].is_null() && remote.manifest["deletedNodes"][id].is_null() {
+                        remote.corrupt.push(path);
+                    }
+                }
+            }
+            if !remote.corrupt.is_empty() {
+                return self.with_store(move |store| {
+                    let local = metadata::records(&store.manifest)?;
+                    let mut readable = remote.records.clone();
+                    for id in store.manifest["nodes"].as_object().unwrap().keys() {
+                        if remote.manifest["nodes"][id].is_null() && remote.manifest["deletedNodes"][id].is_null() {
+                            let path = format!("files/{id}{}", metadata::SUFFIX);
+                            readable.insert(path.clone(), local[&path].clone());
+                        }
+                    }
+                    if remote.corrupt.iter().any(|path|path == metadata::SETTINGS) { readable.insert(metadata::SETTINGS.into(), local[metadata::SETTINGS].clone()); }
+                    remote.manifest = metadata::assemble(&readable)?;
+                    remote.sync.sidecars = false;
+                    let error = format!("Remote repository metadata requires recovery; remote sync is paused: {}", remote.corrupt.join(", "));
+                    let changes = publish(store, Captured { snapshot: captured.snapshot, operations: Vec::new() }, Plan { snapshot:remote,additions:HashMap::new(),deletions:Vec::new() })?;
+                    super::store::atomic_write(&store.root.join(".native-recovery-error"), error.as_bytes())?;
+                    store.recovery_error = Some(error);
+                    Ok(changes)
+                }).await;
+            }
             let (captured, mut plan) = tauri::async_runtime::spawn_blocking(move || {
                 let planned = plan(&captured, remote)?;
                 Ok::<_, String>((captured, planned))
@@ -943,6 +1210,7 @@ async fn upload(
                 }
             };
             plan.snapshot.sync.head_revision = Some(commit);
+            plan.snapshot.sync.sidecars = true;
             for (id, bytes) in &plan.snapshot.files {
                 plan.snapshot
                     .sync
@@ -1078,20 +1346,25 @@ async fn drive_push(
             &serde_json::to_vec(uploads).map_err(|error| error.to_string())?,
         )
     };
-    let manifest = find_drive(client, endpoints, folder, "manifest.json", false).await?;
-    if manifest
+    let head_name = if plan.snapshot.sync.sidecars {
+        metadata::SETTINGS
+    } else {
+        "manifest.json"
+    };
+    let head = find_drive(client, endpoints, folder, head_name, false).await?;
+    if head
         .as_ref()
         .and_then(|entry| entry.head_revision_id.as_ref())
         != plan.snapshot.sync.head_revision.as_ref()
     {
-        return Err("Google Drive manifest changed during sync; retrying".into());
+        return Err("Google Drive metadata changed during sync; retrying".into());
     }
     let files_folder = match find_drive(client, endpoints, folder, "files", true).await? {
         Some(entry) => entry.id,
         None => client.json("Google Drive folder creation failed", Method::POST, endpoint(&endpoints.drive, &["files"])?, Some(json!({"name": "files", "mimeType": "application/vnd.google-apps.folder", "parents": [folder]}))).await?["id"].as_str().ok_or("Google Drive folder ID unavailable")?.to_owned(),
     };
     for (path, bytes) in &plan.additions {
-        if path == "manifest.json" {
+        if !path.starts_with("files/") || metadata::is_metadata_path(path) {
             continue;
         }
         let name = path
@@ -1248,18 +1521,90 @@ async fn drive_push(
             &serde_json::to_vec(&deletions).map_err(|error| error.to_string())?,
         )?;
     }
-    if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest {
-        return Err("Google Drive manifest changed during sync; retrying".into());
+    if find_drive(client, endpoints, folder, head_name, false).await? != head {
+        return Err("Google Drive metadata changed during sync; retrying".into());
     }
-    let published_manifest = if let Some(bytes) = plan.additions.get("manifest.json") {
-        let entry =
-            drive_write(client, endpoints, folder, "manifest.json", manifest, bytes).await?;
+    if let Some(bytes) = plan.additions.get(metadata::BACKUP) {
+        if find_drive(client, endpoints, folder, metadata::BACKUP, false)
+            .await?
+            .is_none()
+        {
+            drive_metadata_write(client, endpoints, folder, metadata::BACKUP, None, bytes).await?;
+        }
+    }
+    let mut metadata_paths: Vec<_> = plan
+        .additions
+        .keys()
+        .filter(|path| metadata::is_metadata_path(path))
+        .collect();
+    metadata_paths.sort();
+    for path in metadata_paths {
+        let name = path.strip_prefix("files/").unwrap();
+        let existing = find_drive(client, endpoints, &files_folder, name, false).await?;
+        let bytes = &plan.additions[path];
+        if plan.snapshot.sync.sidecars
+            && existing.as_ref() != plan.snapshot.sync.metadata_entries.get(path)
+        {
+            if !drive_bytes_match(client, endpoints, existing.as_ref(), bytes).await? {
+                return Err("Google Drive node metadata changed during sync; retrying".into());
+            }
+            plan.snapshot
+                .sync
+                .metadata_entries
+                .insert(path.clone(), existing.unwrap());
+        } else {
+            let entry =
+                drive_metadata_write(client, endpoints, &files_folder, name, existing, bytes)
+                    .await?;
+            plan.snapshot
+                .sync
+                .metadata_entries
+                .insert(path.clone(), entry);
+        }
+    }
+    if find_drive(client, endpoints, folder, head_name, false).await? != head {
+        return Err("Google Drive metadata changed during sync; retrying".into());
+    }
+    let published_head = if let Some(bytes) = plan.additions.get(metadata::SETTINGS) {
+        let existing = find_drive(client, endpoints, folder, metadata::SETTINGS, false).await?;
+        let entry = drive_metadata_write(
+            client,
+            endpoints,
+            folder,
+            metadata::SETTINGS,
+            existing,
+            bytes,
+        )
+        .await?;
         plan.snapshot.sync.head_revision = entry.head_revision_id.clone();
+        plan.snapshot
+            .sync
+            .metadata_entries
+            .insert(metadata::SETTINGS.into(), entry.clone());
         Some(entry)
     } else {
-        manifest
+        head.clone()
     };
-    // A failed manifest upload must leave every published file readable by other devices.
+    if let Some(bytes) = plan.additions.get("manifest.json") {
+        let existing = find_drive(client, endpoints, folder, "manifest.json", false).await?;
+        let expected = if plan.snapshot.sync.sidecars {
+            plan.snapshot.sync.metadata_entries.get("manifest.json")
+        } else {
+            head.as_ref()
+        };
+        if existing.as_ref() != expected {
+            return Err("Google Drive migration changed during sync; retrying".into());
+        }
+        let entry =
+            drive_metadata_write(client, endpoints, folder, "manifest.json", existing, bytes)
+                .await?;
+        plan.snapshot
+            .sync
+            .metadata_entries
+            .insert("manifest.json".into(), entry);
+    }
+    plan.snapshot.sync.sidecars = true;
+    // Publish tombstones before deleting content; failed uploads leave other devices readable.
     for (name, expected) in deletions {
         if plan.snapshot.manifest["nodes"]
             .as_object()
@@ -1269,8 +1614,7 @@ async fn drive_push(
         {
             continue;
         }
-        if find_drive(client, endpoints, folder, "manifest.json", false).await?
-            != published_manifest
+        if find_drive(client, endpoints, folder, metadata::SETTINGS, false).await? != published_head
         {
             return Err("Google Drive manifest changed during sync; retrying".into());
         }
@@ -1312,8 +1656,18 @@ async fn drive_unchanged(
     let Some(head) = &snapshot.sync.head_revision else {
         return Ok(false);
     };
-    let manifest = find_drive(client, endpoints, folder, "manifest.json", false).await?;
-    if manifest
+    if !snapshot.sync.sidecars {
+        return Ok(false);
+    }
+    if find_drive(client, endpoints, folder, "manifest.json", false)
+        .await?
+        .as_ref()
+        != snapshot.sync.metadata_entries.get("manifest.json")
+    {
+        return Ok(false);
+    }
+    let settings = find_drive(client, endpoints, folder, metadata::SETTINGS, false).await?;
+    if settings
         .as_ref()
         .and_then(|entry| entry.head_revision_id.as_ref())
         != Some(head)
@@ -1322,11 +1676,34 @@ async fn drive_unchanged(
     }
     let files_folder = find_drive(client, endpoints, folder, "files", true).await?;
     let Some(files_folder) = files_folder else {
-        return Ok(snapshot.sync.file_revisions.is_empty());
+        return Ok(snapshot.sync.file_revisions.is_empty()
+            && !snapshot
+                .sync
+                .metadata_entries
+                .keys()
+                .any(|path| metadata::is_metadata_path(path)));
     };
     let escaped = files_folder.id.replace('\\', "\\\\").replace('\'', "\\'");
     let query = format!("'{escaped}' in parents and trashed = false");
     let entries = download::list_drive(client, endpoints, &query, "1000").await?;
+    let metadata_entries: HashMap<_, _> = entries
+        .iter()
+        .filter(|entry| entry.name.ends_with(metadata::SUFFIX))
+        .map(|entry| (format!("files/{}", entry.name), entry))
+        .collect();
+    let known: HashMap<_, _> = snapshot
+        .sync
+        .metadata_entries
+        .iter()
+        .filter(|(path, _)| metadata::is_metadata_path(path))
+        .collect();
+    if metadata_entries.len() != known.len()
+        || metadata_entries
+            .iter()
+            .any(|(path, entry)| known.get(path).copied() != Some(*entry))
+    {
+        return Ok(false);
+    }
     for (id, node) in snapshot.manifest["nodes"].as_object().unwrap() {
         if node["type"] != "file" {
             continue;
@@ -1385,4 +1762,74 @@ async fn drive_write(
         .await
         .map_err(|_| "Google Drive upload response unreadable")?;
     serde_json::from_slice(&response).map_err(|_| "Google Drive upload revision unreadable".into())
+}
+
+async fn drive_bytes_match(
+    client: &RemoteClient,
+    endpoints: &RemoteEndpoints,
+    entry: Option<&DriveEntry>,
+    bytes: &[u8],
+) -> Result<bool, String> {
+    let Some(entry) = entry else {
+        return Ok(false);
+    };
+    let mut url = endpoint(&endpoints.drive, &["files", &entry.id])?;
+    url.query_pairs_mut().append_pair("alt", "media");
+    let response = require_success(
+        client
+            .request(
+                "Google Drive metadata download failed",
+                Method::GET,
+                url,
+                None,
+            )
+            .await?,
+        "Google Drive metadata download failed",
+    )?;
+    let remote = response
+        .bytes()
+        .await
+        .map_err(|_| "Google Drive metadata download unreadable")?;
+    Ok(remote.as_ref() == bytes)
+}
+
+async fn drive_metadata_write(
+    client: &RemoteClient,
+    endpoints: &RemoteEndpoints,
+    parent: &str,
+    name: &str,
+    existing: Option<DriveEntry>,
+    bytes: &[u8],
+) -> Result<DriveEntry, String> {
+    if existing.is_some() {
+        return drive_write(client, endpoints, parent, name, existing, bytes).await;
+    }
+    // Creating metadata and media together prevents an interrupted create from exposing an empty sidecar.
+    let boundary = uuid::Uuid::new_v4().to_string();
+    let metadata = json!({"name": name, "parents": [parent]});
+    let mut body = format!("--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n--{boundary}\r\nContent-Type: application/json\r\n\r\n").into_bytes();
+    body.extend_from_slice(bytes);
+    body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+    let mut url = endpoint(&endpoints.drive_upload, &["files"])?;
+    url.query_pairs_mut()
+        .append_pair("uploadType", "multipart")
+        .append_pair("fields", "id,name,headRevisionId,appProperties");
+    let response = client
+        .client
+        .post(url)
+        .bearer_auth(&client.token)
+        .header(
+            "Content-Type",
+            format!("multipart/related; boundary={boundary}"),
+        )
+        .body(body)
+        .send()
+        .await
+        .map_err(|_| "Google Drive metadata upload failed before receiving a response")?;
+    let bytes = require_success(response, "Google Drive metadata upload failed")?
+        .bytes()
+        .await
+        .map_err(|_| "Google Drive metadata upload response unreadable")?;
+    serde_json::from_slice(&bytes)
+        .map_err(|_| "Google Drive metadata upload revision unreadable".into())
 }

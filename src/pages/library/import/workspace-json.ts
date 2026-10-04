@@ -379,7 +379,7 @@ export async function importWorkspaceJson({
   // Every folder and note lands on one manifest, saved once when the batch closes. Fatal setup
   // aborts and rolls back; per-file failures are isolated so one bad file can't discard the rest.
   try {
-    await repository.batchManifestWrites(async () => {
+    await repository.batchMetadataWrites(async () => {
       const root = await repository.createFolder(rootName, parentId);
       rootFolderId = root;
       const folderIds = await createImportedFolders(

@@ -317,7 +317,7 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
 }
 
 #[tokio::test]
-async fn initializes_missing_and_zero_length_github_manifests_without_sending_files_through_js() {
+async fn prepares_empty_github_repositories_without_creating_a_legacy_manifest() {
     for existing_empty in [false, true] {
         let directory = TestDirectory::new();
         let stage = directory.0.join("download");
@@ -335,7 +335,6 @@ async fn initializes_missing_and_zero_length_github_manifests_without_sending_fi
             "/github/repos/owner/repo/tarball/1111111111111111111111111111111111111111" => {
                 (200, tarball.clone())
             }
-            "/github/repos/owner/repo/contents/manifest.json" => (201, b"{}".to_vec()),
             _ => (404, vec![]),
         })
         .await;
@@ -343,46 +342,35 @@ async fn initializes_missing_and_zero_length_github_manifests_without_sending_fi
             .await
             .unwrap();
         assert_eq!((prepared.0, prepared.1), (0, 0));
-        let messages = server.messages.lock().unwrap();
-        let write = messages
+        let loaded = crate::repository_metadata::load(&stage).unwrap();
+        assert!(loaded.legacy.is_none());
+        assert!(loaded.corrupt.is_empty());
+        assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
+        assert!(stage.join("repository.json").exists());
+        assert!(server
+            .messages
+            .lock()
+            .unwrap()
             .iter()
-            .find(|message| message.starts_with("PUT "))
-            .unwrap();
-        let body: serde_json::Value =
-            serde_json::from_str(write.split_once("\r\n\r\n").unwrap().1).unwrap();
-        assert_eq!(body["branch"], "feature/notes");
-        assert_eq!(body["sha"].is_string(), existing_empty);
-        if existing_empty {
-            assert_eq!(body["sha"], "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
-        }
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(body["content"].as_str().unwrap())
-            .unwrap();
-        let manifest: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert_eq!(manifest["version"], 3);
-        assert_eq!(manifest["nodes"], serde_json::json!({}));
-        assert_eq!(fs::read(stage.join("manifest.json")).unwrap(), bytes);
+            .all(|message| message.starts_with("GET ")));
     }
 }
 
 #[tokio::test]
-async fn initializes_new_and_zero_length_drive_manifests_with_the_existing_format() {
+async fn prepares_empty_drive_repositories_without_creating_a_legacy_manifest() {
     for existing_empty in [false, true] {
         let directory = TestDirectory::new();
         let stage = directory.0.join("download");
         fs::create_dir_all(stage.join("files")).unwrap();
         let server = TestServer::new(move |path| {
             if path.starts_with("/drive/files?") {
-                let files = if existing_empty {
+                let files = if existing_empty && path.contains("manifest.json") {
                     serde_json::json!([{ "id": "manifest", "name": "manifest.json", "headRevisionId": "empty" }])
                 } else { serde_json::json!([]) };
                 return (200, serde_json::to_vec(&serde_json::json!({ "files": files })).unwrap());
             }
             match path {
                 "/drive/files/manifest/revisions/empty?alt=media" => (200, vec![]),
-                "/drive/files" => (200, br#"{"id":"manifest"}"#.to_vec()),
-                "/upload/files/manifest?uploadType=media" => (200, br#"{"id":"manifest","headRevisionId":"new"}"#.to_vec()),
                 _ => (404, vec![]),
             }
         }).await;
@@ -398,29 +386,16 @@ async fn initializes_new_and_zero_length_drive_manifests_with_the_existing_forma
         .unwrap();
         assert_eq!(prepared.0, 0);
 
-        let manifest: serde_json::Value =
-            serde_json::from_slice(&fs::read(stage.join("manifest.json")).unwrap()).unwrap();
-        assert_eq!(manifest["version"], 3);
-        assert_eq!(manifest["nodes"], serde_json::json!({}));
-        assert_eq!(
-            manifest["colors"],
-            serde_json::json!({"pen": [], "highlighter": [], "text": [], "folder": []})
-        );
-        let messages = server.messages.lock().unwrap();
-        let upload = messages
+        let loaded = crate::repository_metadata::load(&stage).unwrap();
+        assert!(loaded.legacy.is_none());
+        assert!(loaded.corrupt.is_empty());
+        assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
+        assert!(stage.join("repository.json").exists());
+        assert!(server
+            .messages
+            .lock()
+            .unwrap()
             .iter()
-            .find(|message| message.starts_with("PATCH "))
-            .unwrap();
-        let body: serde_json::Value =
-            serde_json::from_str(upload.split_once("\r\n\r\n").unwrap().1).unwrap();
-        assert_eq!(body, manifest);
-        let created = messages.iter().find(|message| message.starts_with("POST "));
-        assert_eq!(created.is_none(), existing_empty);
-        if let Some(created) = created {
-            let body: serde_json::Value =
-                serde_json::from_str(created.split_once("\r\n\r\n").unwrap().1).unwrap();
-            assert_eq!(body["parents"], serde_json::json!(["folder"]));
-            assert_eq!(body["name"], "manifest.json");
-        }
+            .all(|message| message.starts_with("GET ")));
     }
 }

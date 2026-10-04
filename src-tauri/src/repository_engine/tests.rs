@@ -52,11 +52,20 @@ fn node(id: &str, kind: &str) -> Value {
     json!({"id": id, "type": "file", "fileType": kind, "name": format!("{id}.{kind}"), "parentId": null, "tags": [], "createdAt": 1, "modifiedAt": 1})
 }
 
+fn metadata_patch(previous: &Value, next: &Value) -> MetadataPatch {
+    serde_json::from_value(json!({
+        "nodes":next["nodes"].as_object().unwrap().iter().filter(|(id,node)| previous["nodes"][*id] != **node || previous["linksBySource"][*id] != next["linksBySource"][*id])
+            .map(|(id,node)|json!({"node":node,"links":next["linksBySource"][id].as_array().cloned().unwrap_or_default()})).collect::<Vec<_>>(),
+        "deletedNodeIds":previous["nodes"].as_object().unwrap().keys().filter(|id|next["nodes"][*id].is_null()).collect::<Vec<_>>(),
+        "settings":{"colors":next["colors"],"tagRegistry":next["tagRegistry"],"penPresets":next["penPresets"]}
+    })).unwrap()
+}
+
 async fn save_manifest(engine: &RepositoryEngine, manifest: Value) {
     let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     engine
-        .operate(RepositoryOperation::SaveManifest {
-            manifest,
+        .operate(RepositoryOperation::SaveMetadata {
+            patch: metadata_patch(&saved["manifest"], &manifest),
             revision: saved["revision"].as_str().unwrap().into(),
         })
         .await
@@ -630,6 +639,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     let engine = directory.engine(false);
     let links: Value = serde_json::from_str(include_str!("fixtures/yjs-links.json")).unwrap();
     let file = node("canvas", "mcanvas");
+    let (before_import, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     engine
         .operate(RepositoryOperation::WriteFile {
             node: file.clone(),
@@ -639,9 +649,15 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
         })
         .await
         .unwrap();
-    let mut manifest = crate::repository_bootstrap::download::empty_manifest();
+    let mut manifest = crate::repository_metadata::empty_manifest();
     manifest["nodes"]["canvas"] = file.clone();
-    save_manifest(&engine, manifest).await;
+    engine
+        .operate(RepositoryOperation::SaveMetadata {
+            patch: metadata_patch(&before_import["manifest"], &manifest),
+            revision: before_import["revision"].as_str().unwrap().into(),
+        })
+        .await
+        .unwrap();
     let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     assert_eq!(
         saved["manifest"]["linksBySource"]["canvas"],
@@ -738,8 +754,8 @@ async fn failed_durability_blocks_more_writes_then_replays_the_delta_on_reopen()
     assert!(!directory.0.join("data/.native-journal.json").exists());
     let version = reopened.status().await.data_version;
     assert!(reopened
-        .operate(RepositoryOperation::SaveManifest {
-            manifest: crate::repository_bootstrap::download::empty_manifest(),
+        .operate(RepositoryOperation::SaveMetadata {
+            patch: MetadataPatch::default(),
             revision: "stale".into()
         })
         .await
@@ -871,28 +887,18 @@ impl Drop for TestServer {
     }
 }
 
-fn archive(manifest: &Value, files: &HashMap<String, Vec<u8>>) -> Vec<u8> {
+fn archive(entries: HashMap<String, Vec<u8>>) -> Vec<u8> {
     let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
         Vec::new(),
         flate2::Compression::fast(),
     ));
-    let mut entries = vec![(
-        "root/manifest.json".to_owned(),
-        serde_json::to_vec(manifest).unwrap(),
-    )];
-    for (id, bytes) in files {
-        entries.push((
-            format!("root/files/{}", file_name(&manifest["nodes"][id]).unwrap()),
-            bytes.clone(),
-        ));
-    }
     for (path, bytes) in entries {
         let mut header = tar::Header::new_gnu();
         header.set_size(bytes.len() as u64);
         header.set_mode(0o644);
         header.set_cksum();
         archive
-            .append_data(&mut header, path, bytes.as_slice())
+            .append_data(&mut header, format!("root/{path}"), bytes.as_slice())
             .unwrap();
     }
     archive.into_inner().unwrap().finish().unwrap()
@@ -900,6 +906,8 @@ fn archive(manifest: &Value, files: &HashMap<String, Vec<u8>>) -> Vec<u8> {
 
 struct GitHubFixture {
     manifest: Value,
+    sidecars: bool,
+    backup: Option<Vec<u8>>,
     files: HashMap<String, Vec<u8>>,
     head: String,
     counter: u64,
@@ -913,6 +921,8 @@ impl GitHubFixture {
     fn new(manifest: Value, files: HashMap<String, Vec<u8>>) -> Self {
         Self {
             manifest,
+            sidecars: false,
+            backup: None,
             files,
             head: "a".repeat(40),
             counter: 1,
@@ -923,6 +933,33 @@ impl GitHubFixture {
             advance_on_commit: false,
         }
     }
+    fn repository_files(&self) -> HashMap<String, Vec<u8>> {
+        let mut entries = if self.sidecars {
+            crate::repository_metadata::records(&self.manifest).unwrap()
+        } else {
+            HashMap::new()
+        };
+        entries.insert(
+            "manifest.json".into(),
+            if self.sidecars {
+                crate::repository_metadata::MARKER.to_vec()
+            } else {
+                serde_json::to_vec(&self.manifest).unwrap()
+            },
+        );
+        if let Some(backup) = &self.backup {
+            entries.insert(crate::repository_metadata::BACKUP.into(), backup.clone());
+        }
+        for (id, bytes) in &self.files {
+            if self.manifest["nodes"][id]["type"] == "file" {
+                entries.insert(
+                    format!("files/{}", file_name(&self.manifest["nodes"][id]).unwrap()),
+                    bytes.clone(),
+                );
+            }
+        }
+        entries
+    }
     fn handle(&mut self, request: &Request) -> (u16, Vec<u8>) {
         let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
         let reply = |value: Value| (200, serde_json::to_vec(&value).unwrap());
@@ -930,26 +967,20 @@ impl GitHubFixture {
             return reply(json!({"commit": {"sha": self.head}}));
         }
         if request.path.contains("/tarball/") {
-            return (200, archive(&self.manifest, &self.files));
+            return (200, archive(self.repository_files()));
         }
         if request.method == "GET" && request.path.contains("/git/commits/") {
             return reply(json!({"tree": {"sha": "b".repeat(40)}}));
         }
         if request.method == "GET" && request.path.contains("/git/trees/") {
-            let manifest = serde_json::to_vec(&self.manifest).unwrap();
-            let mut tree = vec![
-                json!({"path": "manifest.json", "type": "blob", "mode": "100644", "sha": git2::Oid::hash_object(git2::ObjectType::Blob, &manifest).unwrap().to_string()}),
-            ];
-            for (id, bytes) in &self.files {
-                tree.push(json!({"path": format!("files/{}", file_name(&self.manifest["nodes"][id]).unwrap()), "type": "blob", "mode": "100644", "sha": git2::Oid::hash_object(git2::ObjectType::Blob, bytes).unwrap().to_string()}));
-            }
+            let tree: Vec<_> = self.repository_files().iter().map(|(path,bytes)|json!({"path":path,"type":"blob","mode":"100644","sha":git2::Oid::hash_object(git2::ObjectType::Blob,bytes).unwrap().to_string()})).collect();
             return reply(json!({"tree": tree, "truncated": false}));
         }
         if request.method == "GET" && request.path.contains("/git/blobs/") {
             let sha = request.path.rsplit('/').next().unwrap();
-            let manifest = serde_json::to_vec(&self.manifest).unwrap();
-            let bytes = std::iter::once(&manifest)
-                .chain(self.files.values())
+            let entries = self.repository_files();
+            let bytes = entries
+                .values()
                 .find(|bytes| {
                     git2::Oid::hash_object(git2::ObjectType::Blob, bytes)
                         .unwrap()
@@ -984,21 +1015,41 @@ impl GitHubFixture {
             return reply(json!({"sha": format!("{:040x}", self.counter)}));
         }
         if request.method == "PATCH" && request.path.contains("/git/refs/heads/") {
+            let mut records = if self.sidecars {
+                crate::repository_metadata::records(&self.manifest).unwrap()
+            } else {
+                HashMap::new()
+            };
             for item in &self.tree {
                 let path = item["path"].as_str().unwrap();
+                let bytes = item["sha"].as_str().map(|sha| self.blobs[sha].clone());
                 if path == "manifest.json" {
-                    self.manifest =
-                        serde_json::from_slice(&self.blobs[item["sha"].as_str().unwrap()]).unwrap();
-                    continue;
-                }
-                let file = path.strip_prefix("files/").unwrap();
-                let id = file.rsplit_once('.').unwrap().0;
-                if item["sha"].is_null() {
-                    self.files.remove(id);
+                    self.sidecars = crate::repository_metadata::is_marker(bytes.as_ref().unwrap());
+                    if !self.sidecars {
+                        self.manifest = serde_json::from_slice(bytes.as_ref().unwrap()).unwrap();
+                    }
+                } else if path == crate::repository_metadata::BACKUP {
+                    self.backup = bytes;
+                } else if path == crate::repository_metadata::SETTINGS
+                    || crate::repository_metadata::is_metadata_path(path)
+                {
+                    if let Some(bytes) = bytes {
+                        records.insert(path.into(), bytes);
+                    } else {
+                        records.remove(path);
+                    }
                 } else {
-                    self.files
-                        .insert(id.into(), self.blobs[item["sha"].as_str().unwrap()].clone());
+                    let file = path.strip_prefix("files/").unwrap();
+                    let id = file.rsplit_once('.').unwrap().0;
+                    if let Some(bytes) = bytes {
+                        self.files.insert(id.into(), bytes);
+                    } else {
+                        self.files.remove(id);
+                    }
                 }
+            }
+            if self.sidecars {
+                self.manifest = crate::repository_metadata::assemble(&records).unwrap();
             }
             self.head = body["sha"].as_str().unwrap().into();
             if self.fail_ref_response {
@@ -1133,6 +1184,32 @@ impl DriveFixture {
             fail_upload: false,
         }
     }
+    fn manifest(&self) -> Value {
+        let marker = &self
+            .files
+            .iter()
+            .find(|file| file.name == "manifest.json")
+            .unwrap()
+            .bytes;
+        if !crate::repository_metadata::is_marker(marker) {
+            return serde_json::from_slice(marker).unwrap();
+        }
+        let records = self
+            .files
+            .iter()
+            .filter_map(|file| {
+                let path = if file.name == "repository.json" {
+                    file.name.clone()
+                } else {
+                    format!("files/{}", file.name)
+                };
+                (path == crate::repository_metadata::SETTINGS
+                    || crate::repository_metadata::is_metadata_path(&path))
+                .then(|| (path, file.bytes.clone()))
+            })
+            .collect();
+        crate::repository_metadata::assemble(&records).unwrap()
+    }
     fn metadata(file: &DriveFile) -> Value {
         json!({"id": file.id, "name": file.name, "headRevisionId": file.revision, "appProperties": file.app_properties})
     }
@@ -1180,6 +1257,40 @@ impl DriveFixture {
             file.revision = format!("upload-r{}", self.counter);
             file.bytes = request.body.clone();
             return reply(Self::metadata(file));
+        }
+        if request.method == "POST" && url.path() == "/upload/files" {
+            let body = String::from_utf8(request.body.clone()).unwrap();
+            let boundary = body.lines().next().unwrap();
+            let parts: Vec<_> = body.split(boundary).collect();
+            let info: Value =
+                serde_json::from_str(parts[1].split_once("\r\n\r\n").unwrap().1.trim()).unwrap();
+            let bytes = parts[2]
+                .split_once("\r\n\r\n")
+                .unwrap()
+                .1
+                .strip_suffix("\r\n")
+                .unwrap()
+                .as_bytes()
+                .to_vec();
+            self.counter += 1;
+            let name = info["name"].as_str().unwrap();
+            let id = match name {
+                "repository.json" => "settings-entry".into(),
+                "manifest.legacy.json" => "backup-entry".into(),
+                "manifest.json" => "manifest-entry".into(),
+                _ => format!("meta-{}", name.strip_suffix(".meta.json").unwrap()),
+            };
+            let file = DriveFile {
+                id,
+                name: name.into(),
+                parent: info["parents"][0].as_str().unwrap().into(),
+                revision: format!("create-r{}", self.counter),
+                app_properties: HashMap::new(),
+                bytes,
+            };
+            let result = Self::metadata(&file);
+            self.files.push(file);
+            return reply(result);
         }
         if request.method == "POST" && url.path() == "/drive/files" {
             let body: Value = serde_json::from_slice(&request.body).unwrap();
@@ -1273,7 +1384,7 @@ async fn cloud_canvas_events_send_deltas_and_leave_unopened_documents_uncached()
             remote
                 .files
                 .insert("canvas".into(), document::bytes(&edits));
-            remote.head = format!("{:040x}", index + 2);
+            remote.head = format!("{:040x}", index + 200);
         }
         let changes = engine
             .cycle(github_source(), &server.endpoints)
@@ -1377,6 +1488,7 @@ async fn native_incremental_github_pull_keeps_unchanged_media_and_falls_back_wit
             .unwrap()
             .remove("removed");
         remote.files.remove("removed");
+        remote.manifest["deletedNodes"]["removed"] = json!("remote-deletion");
         remote.head = "d".repeat(40);
     }
     let before = server.requests.lock().unwrap().len();
@@ -1406,7 +1518,7 @@ async fn native_incremental_github_pull_keeps_unchanged_media_and_falls_back_wit
                 .iter()
                 .filter(|request| request.method == "GET" && request.path.contains("/git/blobs/"))
                 .count(),
-            3
+            4
         );
         let picture_sha = git2::Oid::hash_object(git2::ObjectType::Blob, &picture)
             .unwrap()
@@ -1453,6 +1565,7 @@ async fn native_incremental_github_pull_keeps_unchanged_media_and_falls_back_wit
         .any(|request| request.path.contains("/tarball/")));
     corrupt.store(true, Ordering::SeqCst);
     state.lock().unwrap().head = "1".repeat(40);
+    state.lock().unwrap().manifest["nodes"]["canvas"]["name"] = json!("Changed metadata");
     assert!(engine
         .cycle(github_source(), &server.endpoints)
         .await
@@ -1631,15 +1744,7 @@ async fn native_drive_pull_upload_retry_reopen_and_idle_metadata_check_preserve_
             .unwrap()
             .bytes,
     );
-    let manifest: Value = serde_json::from_slice(
-        &remote
-            .files
-            .iter()
-            .find(|file| file.id == "manifest-entry")
-            .unwrap()
-            .bytes,
-    )
-    .unwrap();
+    let manifest = remote.manifest();
     assert_eq!(
         manifest["linksBySource"]["canvas"],
         fixture()["expected"]["links"]
@@ -1659,7 +1764,7 @@ async fn native_drive_pull_upload_retry_reopen_and_idle_metadata_check_preserve_
         .filter(|request| request.method == "PATCH" && request.path.starts_with("/upload/"))
         .collect::<Vec<_>>();
     assert!(uploads.iter().any(|request| request.body.len() > 8192));
-    assert!(uploads.last().unwrap().path.contains("manifest-entry"));
+    assert!(uploads.last().unwrap().path.contains("settings-entry"));
     let basis_root = reopened
         .cache_dir
         .join("repository-bases")
@@ -1675,7 +1780,7 @@ fn github_source() -> RepositorySource {
     }
 }
 fn manifest_with(id: &str, kind: &str) -> Value {
-    let mut manifest = crate::repository_bootstrap::download::empty_manifest();
+    let mut manifest = crate::repository_metadata::empty_manifest();
     manifest["nodes"][id] = node(id, kind);
     manifest
 }
@@ -2402,8 +2507,9 @@ async fn native_drive_new_file_uploads_resume_after_interruption_and_reopen() {
         let server = TestServer::new(move |request| {
             let matched = match failure {
                 "manifest" => {
-                    request.method == "PATCH"
-                        && request.path.starts_with("/upload/files/manifest-entry")
+                    request.method == "POST"
+                        && request.path.starts_with("/upload/files?")
+                        && String::from_utf8_lossy(&request.body).contains("new-picture.meta.json")
                 }
                 "create-response" => {
                     request.method == "POST" && request.path.starts_with("/drive/files?")
@@ -2451,15 +2557,7 @@ async fn native_drive_new_file_uploads_resume_after_interruption_and_reopen() {
             .collect::<Vec<_>>();
         assert_eq!(uploaded.len(), 1, "{failure}");
         assert_eq!(uploaded[0].bytes, b"newer picture", "{failure}");
-        let manifest: Value = serde_json::from_slice(
-            &remote
-                .files
-                .iter()
-                .find(|file| file.id == "manifest-entry")
-                .unwrap()
-                .bytes,
-        )
-        .unwrap();
+        let manifest = remote.manifest();
         assert!(manifest["nodes"]["new-picture"].is_object());
         assert!(!reopened
             .cache_dir
@@ -2481,8 +2579,9 @@ async fn native_drive_unpublished_files_are_reused_only_when_bytes_match_or_uplo
         let fail_manifest = Arc::new(AtomicBool::new(false));
         let fail = fail_manifest.clone();
         let server = TestServer::new(move |request| {
-            if request.method == "PATCH"
-                && request.path.starts_with("/upload/files/manifest-entry")
+            if request.method == "POST"
+                && request.path.starts_with("/upload/files?")
+                && String::from_utf8_lossy(&request.body).contains("new-picture.meta.json")
                 && fail.swap(false, Ordering::SeqCst)
             {
                 return (500, b"manifest upload failed".to_vec());
@@ -2601,8 +2700,7 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
         let media_fail = media_interrupt.clone();
         let server = TestServer::new(move |request| {
             let matched = if failure.starts_with("manifest") {
-                request.method == "PATCH"
-                    && request.path.starts_with("/upload/files/manifest-entry")
+                request.method == "PATCH" && request.path.starts_with("/upload/files/meta-canvas")
             } else {
                 request.method == "DELETE" && request.path.starts_with("/drive/files/canvas-entry")
             };
@@ -2731,15 +2829,7 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
                     );
                 }
                 assert!(file.is_some());
-                let manifest: Value = serde_json::from_slice(
-                    &remote
-                        .files
-                        .iter()
-                        .find(|file| file.id == "manifest-entry")
-                        .unwrap()
-                        .bytes,
-                )
-                .unwrap();
+                let manifest = remote.manifest();
                 assert!(manifest["nodes"]["canvas"].is_object());
             }
             _ => assert!(file.is_none(), "{failure}"),
@@ -2753,3 +2843,6 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
             .exists());
     }
 }
+
+#[path = "metadata_tests.rs"]
+mod metadata_tests;

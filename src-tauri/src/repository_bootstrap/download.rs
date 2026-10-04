@@ -7,11 +7,12 @@ use std::{
 
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tauri_plugin_http::reqwest::{self, Client, Method, Response, Url};
 use tokio::io::AsyncWriteExt;
 
 use super::{io_error, valid_component, write_durable};
+use crate::repository_metadata as metadata;
 
 #[derive(Clone, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -188,21 +189,6 @@ pub(crate) fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
     Ok(url)
 }
 
-pub(crate) fn empty_manifest() -> Value {
-    json!({ "version": 3, "nodes": {}, "linksBySource": {}, "colors": { "pen": [], "highlighter": [], "text": [], "folder": [] }, "tagRegistry": [], "penPresets": [] })
-}
-
-pub(crate) fn parse_manifest(bytes: &[u8]) -> Result<Value, String> {
-    let manifest: Value =
-        serde_json::from_slice(bytes).map_err(|_| "Unreadable repository manifest")?;
-    if !manifest.get("version").is_some_and(Value::is_number)
-        || !manifest.get("nodes").is_some_and(Value::is_object)
-    {
-        return Err("Invalid repository manifest".into());
-    }
-    Ok(manifest)
-}
-
 pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
     for (key, node) in manifest["nodes"]
@@ -305,15 +291,6 @@ async fn save_response(
     Ok(size)
 }
 
-async fn save_manifest(stage: &Path, manifest: &Value) -> Result<(), String> {
-    let bytes = serde_json::to_vec_pretty(manifest).map_err(|error| error.to_string())?;
-    let mut file = tokio::fs::File::create(stage.join("manifest.json"))
-        .await
-        .map_err(io_error)?;
-    file.write_all(&bytes).await.map_err(io_error)?;
-    file.sync_all().await.map_err(io_error)
-}
-
 async fn download_github(
     stage: &Path,
     client: &RemoteClient,
@@ -322,111 +299,61 @@ async fn download_github(
     repo: &str,
     branch: &str,
 ) -> Result<(usize, u64), String> {
-    for _ in 0..4 {
-        let head = client
-            .json(
-                "GitHub branch request failed",
-                Method::GET,
-                endpoint(
-                    &endpoints.github,
-                    &["repos", owner, repo, "branches", branch],
-                )?,
-                None,
-            )
-            .await?;
-        let revision = head["commit"]["sha"]
-            .as_str()
-            .filter(|value| git2::Oid::from_str(value).is_ok())
-            .ok_or("Invalid GitHub branch revision")?;
-        let url = endpoint(
-            &endpoints.github,
-            &["repos", owner, repo, "tarball", revision],
-        )?;
-        let mut response = client
-            .request("GitHub tarball request failed", Method::GET, url, None)
-            .await?;
-        if response.status().is_redirection() {
-            let location = response
-                .headers()
-                .get("location")
-                .and_then(|value| value.to_str().ok())
-                .ok_or("GitHub tarball redirect missing Location")?;
-            let url = Url::parse(location).map_err(|_| "Invalid GitHub tarball redirect")?;
-            if url.scheme() != "https" || url.host_str() != Some("codeload.github.com") {
-                return Err("Invalid GitHub tarball redirect".into());
-            }
-            response = client
-                .client
-                .get(url)
-                .send()
-                .await
-                .map_err(|_| "GitHub tarball download failed")?;
-        }
-        let archive = stage.join(".archive.tar.gz");
-        save_response(
-            require_success(response, "GitHub tarball request failed")?,
-            &archive,
-            "GitHub tarball download failed",
+    let head = client
+        .json(
+            "GitHub branch request failed",
+            Method::GET,
+            endpoint(
+                &endpoints.github,
+                &["repos", owner, repo, "branches", branch],
+            )?,
+            None,
         )
         .await?;
-        let stage_path = stage.to_owned();
-        let extracted = tauri::async_runtime::spawn_blocking(move || extract_archive(&stage_path))
+    let revision = head["commit"]["sha"]
+        .as_str()
+        .filter(|value| git2::Oid::from_str(value).is_ok())
+        .ok_or("Invalid GitHub branch revision")?;
+    let url = endpoint(
+        &endpoints.github,
+        &["repos", owner, repo, "tarball", revision],
+    )?;
+    let mut response = client
+        .request("GitHub tarball request failed", Method::GET, url, None)
+        .await?;
+    if response.status().is_redirection() {
+        let location = response
+            .headers()
+            .get("location")
+            .and_then(|value| value.to_str().ok())
+            .ok_or("GitHub tarball redirect missing Location")?;
+        let url = Url::parse(location).map_err(|_| "Invalid GitHub tarball redirect")?;
+        if url.scheme() != "https" || url.host_str() != Some("codeload.github.com") {
+            return Err("Invalid GitHub tarball redirect".into());
+        }
+        response = client
+            .client
+            .get(url)
+            .send()
             .await
-            .map_err(|_| "GitHub archive extraction task failed")??;
-        std::fs::remove_file(archive).map_err(io_error)?;
-        if let Some(result) = extracted {
-            tokio::fs::write(stage.join(".remote-revision"), revision)
-                .await
-                .map_err(io_error)?;
-            return Ok(result);
-        }
-        let existing_empty = stage.join("manifest.json").exists();
-        let manifest = empty_manifest();
-        let bytes = serde_json::to_vec_pretty(&manifest).map_err(|error| error.to_string())?;
-        let mut body = json!({ "message": "Initialize empty repository manifest", "content": STANDARD.encode(&bytes), "branch": branch });
-        if existing_empty {
-            body["sha"] = json!(git2::Oid::hash_object(git2::ObjectType::Blob, &[])
-                .map_err(|_| "GitHub manifest revision unavailable")?
-                .to_string());
-        }
-        let response = client
-            .request(
-                "GitHub manifest initialization failed",
-                Method::PUT,
-                endpoint(
-                    &endpoints.github,
-                    &["repos", owner, repo, "contents", "manifest.json"],
-                )?,
-                Some(body),
-            )
-            .await;
-        match response {
-            Ok(response) if response.status().is_success() => {
-                let response = response
-                    .bytes()
-                    .await
-                    .map_err(|_| "GitHub manifest initialization response failed")?;
-                let payload: Value = serde_json::from_slice(&response).unwrap_or(Value::Null);
-                tokio::fs::write(
-                    stage.join(".remote-revision"),
-                    payload["commit"]["sha"].as_str().unwrap_or(revision),
-                )
-                .await
-                .map_err(io_error)?;
-                save_manifest(stage, &manifest).await?;
-                return Ok((0, 0));
-            }
-            Err(error) if error.contains("(409)") || error.contains("(422)") => continue,
-            Ok(response) => {
-                return Err(format!(
-                    "GitHub manifest initialization failed ({})",
-                    response.status().as_u16()
-                ))
-            }
-            Err(error) => return Err(error),
-        }
+            .map_err(|_| "GitHub tarball download failed")?;
     }
-    Err("GitHub manifest changed during initialization".into())
+    let archive = stage.join(".archive.tar.gz");
+    save_response(
+        require_success(response, "GitHub tarball request failed")?,
+        &archive,
+        "GitHub tarball download failed",
+    )
+    .await?;
+    let stage_path = stage.to_owned();
+    let extracted = tauri::async_runtime::spawn_blocking(move || extract_archive(&stage_path))
+        .await
+        .map_err(|_| "GitHub archive extraction task failed")??;
+    std::fs::remove_file(archive).map_err(io_error)?;
+    tokio::fs::write(stage.join(".remote-revision"), revision)
+        .await
+        .map_err(io_error)?;
+    Ok(extracted)
 }
 
 async fn download_github_cached(
@@ -496,16 +423,45 @@ async fn download_github_cached(
     if !entries.contains_key("manifest.json") {
         return Ok(None);
     }
-    let manifest_bytes = github_blob(
-        client,
-        url(&["git", "blobs", blob_revision("manifest.json")?])?,
-        blob_revision("manifest.json")?,
-    )
-    .await?;
+    let manifest_sha = blob_revision("manifest.json")?;
+    let manifest_bytes = if cached
+        .get("manifest.json")
+        .is_some_and(|file| file.link(&stage.join("manifest.json"), manifest_sha, None))
+    {
+        std::fs::read(stage.join("manifest.json")).map_err(io_error)?
+    } else {
+        github_blob(client, url(&["git", "blobs", manifest_sha])?, manifest_sha).await?
+    };
     if manifest_bytes.is_empty() {
         return Ok(None);
     }
-    let manifest = parse_manifest(&manifest_bytes)?;
+    let manifest = if metadata::is_marker(&manifest_bytes)
+        || (metadata::legacy::parse_manifest(&manifest_bytes).is_err()
+            && entries
+                .keys()
+                .any(|path| *path == metadata::SETTINGS || metadata::is_metadata_path(path)))
+    {
+        if !stage.join("manifest.json").exists() {
+            write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
+        }
+        for path in entries
+            .keys()
+            .filter(|path| **path == metadata::SETTINGS || metadata::is_metadata_path(path))
+        {
+            let sha = blob_revision(path)?;
+            let destination = stage.join(path);
+            if !cached
+                .get(*path)
+                .is_some_and(|file| file.link(&destination, sha, None))
+            {
+                let bytes = github_blob(client, url(&["git", "blobs", sha])?, sha).await?;
+                write_durable(&destination, &bytes)?;
+            }
+        }
+        metadata::load(stage)?.manifest
+    } else {
+        metadata::legacy::parse_manifest(&manifest_bytes)?
+    };
     let files = manifest_files(&manifest)?;
     let mut size = 0;
     for name in &files {
@@ -521,7 +477,9 @@ async fn download_github_cached(
         size += bytes.len() as u64;
         write_durable(&destination, &bytes)?;
     }
-    write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
+    if !stage.join("manifest.json").exists() {
+        write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
+    }
     write_durable(&stage.join(".remote-revision"), revision.as_bytes())?;
     super::sync_directory(&stage.join("files"))?;
     super::sync_directory(stage)?;
@@ -558,7 +516,7 @@ fn archive_name(path: &Path) -> Option<String> {
     Some(name.to_owned())
 }
 
-fn extract_archive(stage: &Path) -> Result<Option<(usize, u64)>, String> {
+fn extract_archive(stage: &Path) -> Result<(usize, u64), String> {
     if stage.join("manifest.json").exists() {
         std::fs::remove_file(stage.join("manifest.json")).map_err(io_error)?;
     }
@@ -568,25 +526,52 @@ fn extract_archive(stage: &Path) -> Result<Option<(usize, u64)>, String> {
         )))
     };
     let mut manifest_bytes = None;
+    let mut records = HashMap::new();
     for entry in archive()?.entries().map_err(io_error)? {
         let mut entry = entry.map_err(io_error)?;
-        if entry.header().entry_type().is_file()
-            && archive_name(&entry.path().map_err(io_error)?) == Some("manifest.json".into())
+        let Some(name) = archive_name(&entry.path().map_err(io_error)?) else {
+            continue;
+        };
+        if name == "manifest.json"
+            || name == metadata::SETTINGS
+            || metadata::is_metadata_path(&name)
         {
+            if !entry.header().entry_type().is_file() {
+                return Err("GitHub archive contains invalid repository metadata".into());
+            }
             let mut bytes = Vec::new();
             std::io::Read::read_to_end(&mut entry, &mut bytes).map_err(io_error)?;
-            manifest_bytes = Some(bytes);
-            break;
+            if name == "manifest.json" {
+                manifest_bytes = Some(bytes);
+            } else if records.insert(name, bytes).is_some() {
+                return Err("Duplicate repository metadata in GitHub archive".into());
+            }
         }
     }
-    let Some(bytes) = manifest_bytes else {
-        return Ok(None);
+    let bytes = match manifest_bytes {
+        Some(bytes) => {
+            write_durable(&stage.join("manifest.json"), &bytes)?;
+            bytes
+        }
+        None => Vec::new(),
     };
-    write_durable(&stage.join("manifest.json"), &bytes)?;
-    if bytes.is_empty() {
-        return Ok(None);
+    if bytes.is_empty() && records.is_empty() {
+        write_durable(
+            &stage.join(metadata::SETTINGS),
+            &metadata::settings(&metadata::empty_manifest())?,
+        )?;
+        return Ok((0, 0));
     }
-    let manifest = parse_manifest(&bytes)?;
+    let manifest = if metadata::is_marker(&bytes)
+        || (metadata::legacy::parse_manifest(&bytes).is_err() && !records.is_empty())
+    {
+        for (path, bytes) in records {
+            write_durable(&stage.join(path), &bytes)?;
+        }
+        metadata::load(stage)?.manifest
+    } else {
+        metadata::legacy::parse_manifest(&bytes)?
+    };
     let files = manifest_files(&manifest)?;
     let mut remaining: HashMap<_, _> = files
         .iter()
@@ -611,7 +596,7 @@ fn extract_archive(stage: &Path) -> Result<Option<(usize, u64)>, String> {
     if !remaining.is_empty() {
         return Err("GitHub archive is missing a repository file".into());
     }
-    Ok(Some((files.len(), size)))
+    Ok((files.len(), size))
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -685,10 +670,13 @@ pub(crate) async fn find_drive(
     if folder {
         query.push_str(" and mimeType = 'application/vnd.google-apps.folder'");
     }
-    Ok(list_drive(client, endpoints, &query, "1")
-        .await?
-        .into_iter()
-        .next())
+    let mut entries = list_drive(client, endpoints, &query, "1000").await?;
+    if entries.len() > 1 {
+        return Err(format!(
+            "Duplicate Google Drive repository entry: {name}; recovery required"
+        ));
+    }
+    Ok(entries.pop())
 }
 
 async fn download_drive_entry(
@@ -715,40 +703,6 @@ async fn download_drive_entry(
     save_response(response, destination, "Google Drive download failed").await
 }
 
-async fn initialize_drive_manifest(
-    client: &RemoteClient,
-    endpoints: &RemoteEndpoints,
-    folder: &str,
-    existing: Option<&DriveEntry>,
-) -> Result<Value, String> {
-    let target = match existing {
-        Some(entry) => entry.id.clone(),
-        None => client
-            .json(
-                "Google Drive create failed",
-                Method::POST,
-                endpoint(&endpoints.drive, &["files"])?,
-                Some(json!({ "name": "manifest.json", "parents": [folder] })),
-            )
-            .await?["id"]
-            .as_str()
-            .ok_or("Google Drive create returned no file ID")?
-            .to_owned(),
-    };
-    let manifest = empty_manifest();
-    let mut url = endpoint(&endpoints.drive_upload, &["files", &target])?;
-    url.query_pairs_mut().append_pair("uploadType", "media");
-    client
-        .json(
-            "Google Drive manifest initialization failed",
-            Method::PATCH,
-            url,
-            Some(manifest.clone()),
-        )
-        .await?;
-    Ok(manifest)
-}
-
 async fn download_drive(
     stage: &Path,
     client: &RemoteClient,
@@ -767,17 +721,6 @@ async fn download_drive(
     } else {
         Vec::new()
     };
-    if bytes.is_empty() {
-        if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest_entry {
-            return Err("Google Drive manifest changed during initialization".into());
-        }
-        let manifest =
-            initialize_drive_manifest(client, endpoints, folder, manifest_entry.as_ref()).await?;
-        save_manifest(stage, &manifest).await?;
-        return Ok((0, 0));
-    }
-    let manifest = parse_manifest(&bytes)?;
-    let files = manifest_files(&manifest)?;
     let files_folder = find_drive(client, endpoints, folder, "files", true).await?;
     let query = files_folder.as_ref().map(|entry| {
         format!(
@@ -786,14 +729,65 @@ async fn download_drive(
         )
     });
     let entries: HashMap<_, _> = if let Some(query) = &query {
-        list_drive(client, endpoints, query, "1000")
-            .await?
-            .into_iter()
-            .map(|entry| (entry.name.clone(), entry))
-            .collect()
+        let mut entries = HashMap::new();
+        for entry in list_drive(client, endpoints, query, "1000").await? {
+            if entries.insert(entry.name.clone(), entry).is_some() {
+                return Err("Duplicate Google Drive repository filename; recovery required".into());
+            }
+        }
+        entries
     } else {
         HashMap::new()
     };
+    let settings_entry = if metadata::legacy::parse_manifest(&bytes).is_err() {
+        find_drive(client, endpoints, folder, metadata::SETTINGS, false).await?
+    } else {
+        None
+    };
+    let sidecars = metadata::is_marker(&bytes)
+        || (metadata::legacy::parse_manifest(&bytes).is_err()
+            && (settings_entry.is_some()
+                || entries.keys().any(|name| name.ends_with(metadata::SUFFIX))));
+    let fresh = bytes.is_empty() && !sidecars;
+    if fresh {
+        write_durable(
+            &stage.join(metadata::SETTINGS),
+            &metadata::settings(&metadata::empty_manifest())?,
+        )?;
+    }
+    let sidecars = sidecars || fresh;
+    let manifest = if sidecars {
+        if let Some(entry) = &settings_entry {
+            if !entry.head_revision_id.as_deref().is_some_and(|revision| {
+                cached.get(metadata::SETTINGS).is_some_and(|file| {
+                    file.link(&stage.join(metadata::SETTINGS), revision, Some(&entry.id))
+                })
+            }) {
+                download_drive_entry(client, endpoints, entry, &stage.join(metadata::SETTINGS))
+                    .await?;
+            }
+        }
+        for (name, entry) in entries
+            .iter()
+            .filter(|(name, _)| name.ends_with(metadata::SUFFIX))
+        {
+            let path = format!("files/{name}");
+            if !metadata::is_metadata_path(&path) {
+                return Err("Invalid Google Drive metadata path".into());
+            }
+            if !entry.head_revision_id.as_deref().is_some_and(|revision| {
+                cached
+                    .get(&path)
+                    .is_some_and(|file| file.link(&stage.join(&path), revision, Some(&entry.id)))
+            }) {
+                download_drive_entry(client, endpoints, entry, &stage.join(&path)).await?;
+            }
+        }
+        metadata::load(stage)?.manifest
+    } else {
+        metadata::legacy::parse_manifest(&bytes)?
+    };
+    let files = manifest_files(&manifest)?;
     let mut size = 0;
     for batch in files.chunks(8) {
         let mut tasks = tokio::task::JoinSet::new();
@@ -840,6 +834,11 @@ async fn download_drive(
     if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest_entry {
         return Err("Google Drive manifest changed during download".into());
     }
+    if sidecars
+        && find_drive(client, endpoints, folder, metadata::SETTINGS, false).await? != settings_entry
+    {
+        return Err("Google Drive metadata changed during download".into());
+    }
     if let Some(query) = query {
         let current: HashMap<_, _> = list_drive(client, endpoints, &query, "1000")
             .await?
@@ -849,11 +848,21 @@ async fn download_drive(
         if files
             .iter()
             .any(|name| entries.get(name) != current.get(name))
+            || entries
+                .iter()
+                .filter(|(name, _)| name.ends_with(metadata::SUFFIX))
+                .any(|(name, entry)| current.get(name) != Some(entry))
+            || current
+                .keys()
+                .any(|name| name.ends_with(metadata::SUFFIX) && !entries.contains_key(name))
         {
             return Err("Google Drive repository file changed during download".into());
         }
     }
     let mut revisions = entries;
+    if let Some(entry) = settings_entry {
+        revisions.insert(metadata::SETTINGS.into(), entry);
+    }
     if let Some(entry) = manifest_entry {
         revisions.insert("manifest.json".into(), entry);
     }

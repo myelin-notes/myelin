@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCanvasNoteState,
-  getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import { TestRepository } from '@/test/test-repository';
-import type { VFSManifest } from './shared';
 
 describe('repository file version history', () => {
   beforeEach(() => {
@@ -54,12 +52,8 @@ describe('repository file version history', () => {
       fileId,
     ]);
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-hidden-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
-    expect(Object.keys(manifest.nodes)).toHaveLength(3);
+    const stored = await repository.getNode(version?.id ?? '');
+    expect(stored?.system?.kind).toBe('file-version');
   });
 
   it('creates versions only when the file changed and the interval has passed', async () => {
@@ -142,13 +136,10 @@ describe('repository file version history', () => {
     const version = await repository.createFileVersionIfDue(sourceId);
     expect(version).not.toBeNull();
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-links-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
-    expect(manifest.linksBySource[sourceId]).toBeDefined();
-    expect(manifest.linksBySource[version?.id ?? '']).toBeUndefined();
+    expect(await repository.getBacklinks(targetId)).toHaveLength(1);
+    expect((await repository.getBacklinks(targetId))[0].sourceId).toBe(
+      sourceId,
+    );
   });
 
   it('removes version history and stored bytes when the source file is deleted', async () => {
@@ -176,16 +167,6 @@ describe('repository file version history', () => {
     expect(await repository.listFileVersions(fileId)).toHaveLength(0);
     expect(await repository.readFileBytes(version?.id ?? '')).toBeNull();
 
-    const manifest = JSON.parse(
-      getRepositoryTestStorage().readText(
-        'repositories/version-delete-test/manifest.json',
-      ) ?? '{}',
-    ) as VFSManifest;
-    expect(manifest.nodes[version?.id ?? '']).toBeUndefined();
-    expect(
-      Object.values(manifest.nodes).some(
-        (node) => node.type === 'file' && node.system?.kind === 'file-version',
-      ),
-    ).toBe(false);
+    expect(await repository.getNode(version?.id ?? '')).toBeNull();
   });
 });

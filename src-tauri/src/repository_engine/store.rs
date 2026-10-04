@@ -1,14 +1,12 @@
 use super::document;
-use crate::repository_bootstrap::{
-    download::{empty_manifest, parse_manifest},
-    reject_symlink, sync_directory, valid_component,
-};
+use crate::repository_bootstrap::{reject_symlink, sync_directory, valid_component};
+use crate::repository_metadata as metadata;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
 };
@@ -27,6 +25,10 @@ pub(super) struct SyncState {
     pub file_ids: HashMap<String, String>,
     #[serde(default)]
     pub document_generations: HashMap<String, String>,
+    #[serde(default)]
+    pub sidecars: bool,
+    #[serde(default)]
+    pub metadata_entries: HashMap<String, crate::repository_bootstrap::download::DriveEntry>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -37,10 +39,15 @@ pub(super) struct FileWrite {
 
 #[derive(Serialize, Deserialize)]
 struct Journal {
-    manifest: Value,
-    outbox: Vec<Value>,
+    #[serde(flatten)]
+    legacy: metadata::legacy::Journal,
+    #[serde(default)]
+    metadata: Vec<FileWrite>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    outbox: Option<Vec<Value>>,
     files: Vec<FileWrite>,
-    sync: SyncState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sync: Option<SyncState>,
     #[serde(default)]
     updates: Vec<DeltaWrite>,
 }
@@ -64,6 +71,13 @@ pub(super) struct Store {
     pub transaction_active: bool,
     pub blocked: Option<String>,
     pub delta_counts: HashMap<String, usize>,
+    persisted_metadata: HashMap<String, Vec<u8>>,
+    persisted_sync: Vec<u8>,
+    persisted_outbox: Vec<u8>,
+    dirty_nodes: HashSet<String>,
+    dirty_settings: bool,
+    metadata_epoch: String,
+    metadata_version: u64,
 }
 
 pub(super) fn now() -> u64 {
@@ -84,7 +98,7 @@ pub(super) fn file_name(node: &Value) -> Result<String, String> {
         .ok_or("Invalid repository node ID")?;
     let kind = node["fileType"]
         .as_str()
-        .filter(|kind| valid_component(kind))
+        .filter(|kind| valid_component(kind) && *kind != "meta.json")
         .ok_or("Invalid repository file type")?;
     Ok(format!(
         "{id}.{}",
@@ -96,7 +110,7 @@ fn io(error: std::io::Error) -> String {
     format!("Repository storage failed: {error}")
 }
 
-pub(super) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     reject_symlink(path)?;
     let temporary = path.with_file_name(format!(
         ".{}.native.tmp",
@@ -164,60 +178,39 @@ fn apply_journal(root: &Path, journal: &Journal) -> Result<(), String> {
                 .map_err(|_| "Invalid native document journal update")?,
         )?;
     }
-    atomic_write(
-        &root.join("manifest.json"),
-        &serde_json::to_vec_pretty(&journal.manifest).map_err(|error| error.to_string())?,
-    )?;
-    atomic_write(
-        &root.join("outbox.json"),
-        &serde_json::to_vec(&journal.outbox).map_err(|error| error.to_string())?,
-    )?;
-    atomic_write(
-        &root.join(".native-sync.json"),
-        &serde_json::to_vec(&journal.sync).map_err(|error| error.to_string())?,
-    )?;
+    journal.legacy.replay(root)?;
+    for write in &journal.metadata {
+        if !metadata::is_metadata_path(&write.name)
+            && !matches!(
+                write.name.as_str(),
+                metadata::SETTINGS | metadata::BACKUP | "manifest.json"
+            )
+        {
+            return Err("Invalid repository metadata journal path".into());
+        }
+        let bytes = STANDARD
+            .decode(
+                write
+                    .bytes
+                    .as_ref()
+                    .ok_or("Missing metadata journal bytes")?,
+            )
+            .map_err(|_| "Invalid metadata journal bytes")?;
+        atomic_write(&root.join(&write.name), &bytes)?;
+    }
+    if let Some(outbox) = &journal.outbox {
+        atomic_write(
+            &root.join("outbox.json"),
+            &serde_json::to_vec(outbox).map_err(|error| error.to_string())?,
+        )?;
+    }
+    if let Some(sync) = &journal.sync {
+        atomic_write(
+            &root.join(".native-sync.json"),
+            &serde_json::to_vec(sync).map_err(|error| error.to_string())?,
+        )?;
+    }
     Ok(())
-}
-
-pub(super) fn migrate(manifest: &mut Value) {
-    if manifest["version"].as_u64().unwrap_or(1) < 2 {
-        manifest.as_object_mut().unwrap().remove("children");
-        for node in manifest["nodes"].as_object_mut().unwrap().values_mut() {
-            if let Some(node) = node.as_object_mut() {
-                node.remove("children");
-            }
-        }
-    }
-    if manifest["version"].as_u64().unwrap_or(1) < 3 {
-        let pen = manifest["customColors"]
-            .as_array()
-            .map(|colors| colors.iter().take(8).cloned().collect::<Vec<_>>())
-            .unwrap_or_default();
-        manifest["colors"] = json!({"pen": pen, "highlighter": [], "text": [], "folder": []});
-        manifest.as_object_mut().unwrap().remove("customColors");
-    }
-    manifest["version"] = json!(3);
-    for key in ["linksBySource", "colors"] {
-        if !manifest[key].is_object() {
-            manifest[key] = json!({});
-        }
-    }
-    for key in ["pen", "highlighter", "text", "folder"] {
-        if !manifest["colors"][key].is_array() {
-            manifest["colors"][key] = json!([]);
-        }
-    }
-    if !manifest["tagRegistry"].is_array() {
-        manifest["tagRegistry"] = json!([]);
-    }
-    let presets = manifest["penPresets"].as_array().map(|entries| entries.iter().filter_map(|entry| {
-        let (min, max) = match entry["tool"].as_str()? { "pen" => (1.0, 40.0), "highlighter" => (12.0, 60.0), _ => return None };
-        let color = entry["color"].as_str()?.trim();
-        let color = color.strip_prefix('#').unwrap_or(color);
-        if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() { return None; }
-        Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max), "inWheel": entry["inWheel"] == true}))
-    }).take(6).collect::<Vec<_>>()).unwrap_or_default();
-    manifest["penPresets"] = json!(presets);
 }
 
 impl Store {
@@ -234,14 +227,15 @@ impl Store {
             apply_journal(&root, &saved)?;
             fs::remove_file(&journal).map_err(io)?;
         }
-        let manifest_path = root.join("manifest.json");
-        reject_symlink(&manifest_path)?;
-        let mut manifest = if manifest_path.exists() {
-            parse_manifest(&fs::read(&manifest_path).map_err(io)?)?
-        } else {
-            empty_manifest()
-        };
-        migrate(&mut manifest);
+        let loaded = metadata::load(&root)?;
+        let manifest = loaded.manifest;
+        if let Some(legacy) = &loaded.legacy {
+            let backup = root.join(metadata::BACKUP);
+            reject_symlink(&backup)?;
+            if !backup.exists() {
+                atomic_write(&backup, legacy)?;
+            }
+        }
         let outbox_path = root.join("outbox.json");
         reject_symlink(&outbox_path)?;
         let mut recovery_error: Option<String> = None;
@@ -268,6 +262,30 @@ impl Store {
             recovery_error =
                 Some(fs::read_to_string(root.join(".native-recovery-error")).map_err(io)?);
         }
+        if !loaded.corrupt.is_empty() {
+            recovery_error = Some(format!(
+                "Repository metadata requires recovery; remote sync is paused: {}",
+                loaded.corrupt.join(", ")
+            ));
+            atomic_write(
+                &root.join(".native-recovery-error"),
+                recovery_error.as_ref().unwrap().as_bytes(),
+            )?;
+            for path in &loaded.corrupt {
+                match fs::rename(
+                    root.join(path),
+                    root.join(format!(
+                        "metadata.corrupt.{}.{}.json",
+                        now(),
+                        path.replace('/', "_")
+                    )),
+                ) {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(io(error)),
+                }
+            }
+        }
         for op in &mut outbox {
             if !op["queueRevision"]
                 .as_str()
@@ -290,6 +308,23 @@ impl Store {
             .ok();
         }
         let mut store = Self {
+            dirty_nodes: manifest["nodes"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .chain(
+                    manifest["deletedNodes"]
+                        .as_object()
+                        .into_iter()
+                        .flat_map(|nodes| nodes.keys()),
+                )
+                .cloned()
+                .collect(),
+            dirty_settings: true,
+            metadata_epoch: uuid::Uuid::new_v4().to_string(),
+            metadata_version: 0,
+            persisted_sync: fs::read(root.join(".native-sync.json")).unwrap_or_default(),
+            persisted_outbox: fs::read(root.join("outbox.json")).unwrap_or_default(),
             root,
             manifest,
             outbox,
@@ -301,6 +336,7 @@ impl Store {
             transaction_active: false,
             blocked: None,
             delta_counts: HashMap::new(),
+            persisted_metadata: loaded.records,
         };
         let directory = store.root.join(".native-updates");
         reject_symlink(&directory)?;
@@ -325,8 +361,23 @@ impl Store {
         Ok(store)
     }
 
-    pub fn manifest_revision(&self) -> String {
-        revision(&serde_json::to_vec(&self.manifest).unwrap())
+    pub fn metadata_revision(&self) -> String {
+        format!("{}:{}", self.metadata_epoch, self.metadata_version)
+    }
+
+    pub fn mark_node(&mut self, id: &str) {
+        self.dirty_nodes.insert(id.to_owned());
+    }
+
+    pub fn replace_metadata(&mut self, next: Value) {
+        self.dirty_nodes
+            .extend(metadata::changed_nodes(&self.manifest, &next));
+        self.dirty_settings = true;
+        self.manifest = next;
+    }
+
+    pub fn metadata_records(&self) -> HashMap<String, Vec<u8>> {
+        self.persisted_metadata.clone()
     }
 
     pub fn read_file(&self, node: &Value) -> Result<Vec<u8>, String> {
@@ -379,6 +430,17 @@ impl Store {
     }
 
     pub fn queue(&mut self, kind: &str, id: Option<&str>, fields: Value) {
+        match kind {
+            "upsert-manifest-node" | "delete-manifest-node" => {
+                if let Some(id) = id {
+                    self.mark_node(id);
+                }
+            }
+            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" => {
+                self.dirty_settings = true
+            }
+            _ => {}
+        }
         if !self.remote {
             return;
         }
@@ -419,6 +481,7 @@ impl Store {
             }
         }
         self.manifest["nodes"][id]["modifiedAt"] = json!(now());
+        self.mark_node(id);
         if enqueue {
             self.queue("push-note", Some(id), json!({}));
             self.queue("upsert-manifest-node", Some(id), json!({}));
@@ -469,11 +532,66 @@ impl Store {
         updates: Vec<DeltaWrite>,
     ) -> Result<(), String> {
         self.transaction_active = true;
+        let dirty: Vec<_> = self.dirty_nodes.iter().cloned().collect();
+        let mut records = HashMap::new();
+        for id in &dirty {
+            if self.manifest["nodes"][id].is_null() {
+                if !self.manifest["deletedNodes"].is_object() {
+                    self.manifest["deletedNodes"] = json!({});
+                }
+                if self.manifest["deletedNodes"][id].is_null() {
+                    self.manifest["deletedNodes"][id] = self
+                        .outbox
+                        .iter()
+                        .find(|op| op["kind"] == "delete-manifest-node" && op["nodeId"] == *id)
+                        .map(|op| op["queueRevision"].clone())
+                        .unwrap_or_else(|| json!(uuid::Uuid::new_v4().to_string()));
+                }
+            } else if !self.manifest["deletedNodes"][id].is_null() {
+                if !self.manifest["restoredNodes"].is_object() {
+                    self.manifest["restoredNodes"] = json!({});
+                }
+                self.manifest["restoredNodes"][id] = self.manifest["deletedNodes"][id].clone();
+                self.manifest["deletedNodes"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(id);
+            }
+            records.insert(
+                format!("files/{id}{}", metadata::SUFFIX),
+                metadata::node_record(&self.manifest, id)?,
+            );
+        }
+        if self.dirty_settings {
+            records.insert(
+                metadata::SETTINGS.into(),
+                metadata::settings(&self.manifest)?,
+            );
+        }
+        let mut writes: Vec<FileWrite> = records
+            .iter()
+            .filter(|(path, bytes)| self.persisted_metadata.get(*path) != Some(*bytes))
+            .map(|(path, bytes)| FileWrite {
+                name: path.clone(),
+                bytes: Some(STANDARD.encode(bytes)),
+            })
+            .collect();
+        if !metadata::is_marker(&fs::read(self.root.join("manifest.json")).unwrap_or_default()) {
+            writes.push(FileWrite {
+                name: "manifest.json".into(),
+                bytes: Some(STANDARD.encode(metadata::MARKER)),
+            });
+        }
         let journal = Journal {
-            manifest: self.manifest.clone(),
-            outbox: self.outbox.clone(),
+            legacy: metadata::legacy::Journal::default(),
+            metadata: writes,
+            outbox: (self.persisted_outbox
+                != serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?)
+            .then(|| self.outbox.clone()),
             files,
-            sync: self.sync.clone(),
+            sync: (self.persisted_sync
+                != serde_json::to_vec(&self.sync).map_err(|e| e.to_string())?)
+            .then(|| self.sync.clone()),
             updates,
         };
         let path = self.root.join(".native-journal.json");
@@ -484,6 +602,14 @@ impl Store {
         apply_journal(&self.root, &journal)?;
         fs::remove_file(path).map_err(io)?;
         sync_directory(&self.root)?;
+        self.persisted_metadata.extend(records);
+        if !journal.metadata.is_empty() {
+            self.metadata_version += 1;
+        }
+        self.dirty_nodes.clear();
+        self.dirty_settings = false;
+        self.persisted_sync = serde_json::to_vec(&self.sync).map_err(|e| e.to_string())?;
+        self.persisted_outbox = serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?;
         self.data_version += 1;
         self.transaction_active = false;
         Ok(())

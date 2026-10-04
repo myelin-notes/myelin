@@ -6,6 +6,7 @@ import type {
 } from '@/lib/sync/native-document-target';
 import { processDocumentAsync } from '@/lib/sync/repo/document-worker';
 import { NativeRepository } from '@/lib/sync/repo/native';
+import type { MetadataPatch } from '@/lib/sync/repo/native-operations';
 import { noteContentIndex } from '@/lib/sync/repo/note-content-index';
 import { extractStoredNoteLinks } from '@/lib/sync/repo/note-link-index';
 import {
@@ -15,7 +16,6 @@ import {
   ensureVersionHistoryRoot,
   getStoredFileName,
   isFileVersionNode as isConcreteFileVersionNode,
-  migrate,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -44,7 +44,6 @@ export class TestRepository extends NativeRepository {
     liveSync: false,
     batchedCommit: false,
   };
-  private manifest: VFSManifest | null = null;
 
   constructor(private readonly testStorageRoot = '') {
     super({
@@ -60,7 +59,7 @@ export class TestRepository extends NativeRepository {
   }
 
   override async initialize(): Promise<void> {
-    await this.loadManifestImpl();
+    await this.loadMetadataImpl();
   }
 
   override async refresh(): Promise<void> {}
@@ -194,56 +193,87 @@ export class TestRepository extends NativeRepository {
     return this.testStorageRoot ? `${this.testStorageRoot}/${name}` : name;
   }
 
-  protected override async loadManifestImpl(): Promise<{
+  protected override async loadMetadataImpl(): Promise<{
     manifest: VFSManifest;
     revision: string;
   }> {
-    if (!this.manifest) {
-      const storage = getRepositoryTestStorage();
-      const path = this.path('manifest.json');
-      this.manifest = (await storage.exists(path))
-        ? (JSON.parse(await storage.readTextFile(path)) as VFSManifest)
-        : createEmptyManifest();
-      migrate(this.manifest);
-      await storage.writeTextFile(path, JSON.stringify(this.manifest));
-    }
-    return { manifest: this.manifest, revision: '' };
-  }
-
-  protected override async saveManifestImpl(
-    manifest: VFSManifest,
-  ): Promise<string> {
     const storage = getRepositoryTestStorage();
-    const previous = JSON.parse(
-      await storage.readTextFile(this.path('manifest.json')),
-    ) as VFSManifest;
-    for (const node of Object.values(manifest.nodes)) {
-      if (
-        node.type !== 'file' ||
-        node.fileType !== 'mcanvas' ||
-        node.system ||
-        previous.nodes[node.id]
-      ) {
+    const manifest = createEmptyManifest();
+    const settings = this.path('repository.json');
+    if (await storage.exists(settings)) {
+      Object.assign(
+        manifest,
+        JSON.parse(await storage.readTextFile(settings)),
+        { version: 3 },
+      );
+    } else {
+      await storage.writeTextFile(
+        settings,
+        JSON.stringify({
+          version: 1,
+          colors: manifest.colors,
+          tagRegistry: manifest.tagRegistry,
+          penPresets: manifest.penPresets,
+        }),
+      );
+    }
+    for (const entry of await storage.readDir(this.path('files'))) {
+      if (!entry.name.endsWith('.meta.json')) {
         continue;
       }
-      const path = this.path(`files/${getStoredFileName(node)}`);
-      if (await storage.exists(path)) {
-        const doc = createDocFromBytes(await storage.readFile(path));
-        try {
-          const links = extractStoredNoteLinks(doc);
-          if (links.length > 0) {
-            setStoredNoteLinks(manifest, node.id, links);
-          }
-        } finally {
-          doc.destroy();
-        }
+      const record = JSON.parse(
+        await storage.readTextFile(this.path(`files/${entry.name}`)),
+      );
+      if (record.deleted) {
+        continue;
+      }
+      manifest.nodes[record.node.id] = record.node;
+      if (record.links.length) {
+        manifest.linksBySource[record.node.id] = record.links;
       }
     }
-    await storage.writeTextFile(
-      this.path('manifest.json'),
-      JSON.stringify(manifest),
-    );
-    this.manifest = manifest;
+    return { manifest, revision: '' };
+  }
+
+  protected override async saveMetadataImpl(
+    patch: MetadataPatch,
+  ): Promise<string> {
+    const storage = getRepositoryTestStorage();
+    for (const { node, links: providedLinks } of patch.nodes) {
+      let links = providedLinks;
+      if (node.type === 'file' && node.fileType === 'mcanvas' && !node.system) {
+        const path = this.path(`files/${getStoredFileName(node)}`);
+        if (await storage.exists(path)) {
+          const doc = createDocFromBytes(await storage.readFile(path));
+          try {
+            links = extractStoredNoteLinks(doc);
+          } finally {
+            doc.destroy();
+          }
+        }
+      }
+      await storage.writeTextFile(
+        this.path(`files/${node.id}.meta.json`),
+        JSON.stringify({ version: 1, node, links }),
+      );
+    }
+    for (const id of patch.deletedNodeIds) {
+      await storage.writeTextFile(
+        this.path(`files/${id}.meta.json`),
+        JSON.stringify({
+          version: 1,
+          id,
+          deleted: true,
+          deletionId: crypto.randomUUID(),
+        }),
+      );
+    }
+    if (patch.settings) {
+      await storage.writeTextFile(
+        this.path('repository.json'),
+        JSON.stringify({ ...patch.settings, version: 1 }),
+      );
+    }
     return '';
   }
 
@@ -251,7 +281,7 @@ export class TestRepository extends NativeRepository {
     bytes: Uint8Array | null;
     revision: string | null;
   }> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadMetadataImpl();
     const node = manifest.nodes[nodeId];
     if (node?.type !== 'file') {
       return { bytes: null, revision: null };
@@ -282,7 +312,7 @@ export class TestRepository extends NativeRepository {
     nodeId: VFSNodeId,
     fileType?: FileType,
   ): Promise<void> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadMetadataImpl();
     const node = manifest.nodes[nodeId];
     if (node?.type !== 'file' && !fileType) {
       return;
@@ -307,7 +337,7 @@ export class TestRepository extends NativeRepository {
   override async getStoredAbsolutePath(
     nodeId: VFSNodeId,
   ): Promise<string | null> {
-    const { manifest } = await this.loadManifestImpl();
+    const { manifest } = await this.loadMetadataImpl();
     const node = manifest.nodes[nodeId];
     const storage = getRepositoryTestStorage();
     return node?.type === 'file'
@@ -327,7 +357,7 @@ export class TestRepository extends NativeRepository {
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
     let indexable = false;
-    await this.mutateManifest('Touch file', (manifest) => {
+    await this.mutateMetadata('Touch file', { nodes: [nodeId] }, (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
@@ -365,8 +395,15 @@ export class TestRepository extends NativeRepository {
   }
 
   private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
-    return this.mutateManifest('Create version history root', (manifest) =>
-      ensureVersionHistoryRoot(manifest, Date.now()),
+    const targets = { nodes: [] as string[] };
+    return this.mutateMetadata(
+      'Create version history root',
+      targets,
+      (manifest) => {
+        const id = ensureVersionHistoryRoot(manifest, Date.now());
+        targets.nodes.push(id);
+        return id;
+      },
     );
   }
 
