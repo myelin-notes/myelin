@@ -8338,7 +8338,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-scoped-storage"
 version = "1.5.1"
-source = "git+https://github.com/myelin-notes/tauri-plugin-scoped-storage.git#def945f7ccd32a4866792cf22d2770a593d3466e"
+source = "git+https://github.com/myelin-notes/tauri-plugin-scoped-storage.git?rev=02572c6891221b311091e69963bda7565a6d8c11#02572c6891221b311091e69963bda7565a6d8c11"
 dependencies = [
  "serde",
  "tauri",
