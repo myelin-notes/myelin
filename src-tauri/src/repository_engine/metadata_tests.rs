@@ -40,6 +40,10 @@ fn migration_replays_legacy_journals_and_resumes_before_switching_formats() {
     assert_eq!(serde_json::from_slice::<Value>(&backup).unwrap(), legacy);
     fs::remove_dir(obstruction).unwrap();
     let mut migrated = Store::open(root.clone(), true).unwrap();
+    assert_eq!(
+        fs::read(root.join("manifest.json")).unwrap(),
+        br#"{"version":4}"#
+    );
     assert!(parse_manifest(&fs::read(root.join("manifest.json")).unwrap()).is_err());
     assert_eq!(migrated.manifest["nodes"]["canvas"]["parentId"], "folder");
     assert_eq!(
@@ -86,6 +90,37 @@ fn migration_replays_legacy_journals_and_resumes_before_switching_formats() {
         "Later rename"
     );
     assert_eq!(fs::read(root.join(metadata::BACKUP)).unwrap(), backup);
+    for marker in [
+        br#"{"version":4}"#.as_slice(),
+        br#"{"version":4,"format":"myelin-sidecars","upgradeRequired":true}"#.as_slice(),
+    ] {
+        fs::write(root.join("manifest.json"), marker).unwrap();
+        let modified = fs::metadata(root.join("manifest.json"))
+            .unwrap()
+            .modified()
+            .unwrap();
+        assert_eq!(
+            Store::open(root.clone(), true).unwrap().manifest["nodes"]["canvas"]["name"],
+            "Later rename"
+        );
+        assert_eq!(fs::read(root.join("manifest.json")).unwrap(), marker);
+        assert_eq!(
+            fs::metadata(root.join("manifest.json"))
+                .unwrap()
+                .modified()
+                .unwrap(),
+            modified
+        );
+        assert_eq!(fs::read(root.join(metadata::BACKUP)).unwrap(), backup);
+    }
+    fs::write(root.join("manifest.json"), br#"{"version":5}"#).unwrap();
+    assert!(
+        matches!(Store::open(root.clone(), true), Err(error) if error.contains("Unsupported repository storage version"))
+    );
+    assert_eq!(
+        fs::read(root.join("manifest.json")).unwrap(),
+        br#"{"version":5}"#
+    );
 }
 
 #[tokio::test]

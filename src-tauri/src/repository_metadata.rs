@@ -16,8 +16,7 @@ pub(crate) fn empty_manifest() -> Value {
 }
 
 pub(crate) fn is_marker(bytes: &[u8]) -> bool {
-    serde_json::from_slice::<Value>(bytes)
-        .is_ok_and(|value| value["format"] == "myelin-sidecars" && value["version"] == 4)
+    serde_json::from_slice::<Value>(bytes).is_ok_and(|value| value["version"] == 4)
 }
 
 pub(crate) fn is_metadata_path(path: &str) -> bool {
@@ -220,10 +219,7 @@ pub(crate) fn load(root: &Path) -> Result<Loaded, String> {
     };
     if let Some(bytes) = &legacy {
         if let Ok(value) = serde_json::from_slice::<Value>(bytes) {
-            if (value["format"] == "myelin-sidecars" && value["version"] != 4)
-                || (value["nodes"].is_object()
-                    && value["version"].as_u64().is_some_and(|version| version > 3))
-            {
+            if value["version"].as_u64().is_some_and(|version| version > 4) {
                 return Err(
                     "Unsupported repository storage version; update Myelin before opening".into(),
                 );

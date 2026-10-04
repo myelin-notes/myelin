@@ -3,8 +3,7 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 // Omitting nodes makes older clients reject migrated repositories before writing.
-pub(crate) const MARKER: &[u8] =
-    br#"{"version":4,"format":"myelin-sidecars","upgradeRequired":true}"#;
+pub(crate) const MARKER: &[u8] = br#"{"version":4}"#;
 pub(crate) const BACKUP: &str = "manifest.legacy.json";
 
 pub(crate) fn parse_manifest(bytes: &[u8]) -> Result<Value, String> {

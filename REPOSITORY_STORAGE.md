@@ -6,7 +6,7 @@ JavaScript saves patches containing only affected nodes or repository settings. 
 
 A live sidecar contains `version: 1`, `node`, `links`, and an optional `restoredFrom` deletion revision. A deletion replaces the sidecar with `version: 1`, `id`, `deleted: true`, and `deletionId`. Keep these tombstones: an offline client must not resurrect deleted IDs. Unsynced content edits to deleted files become recovery copies with new IDs.
 
-`repository.json` stores repository-wide settings, with `version: 1`. Its `generation` changes after cloud uploads so readers can detect an overlapping sync. It contains no node listing. `manifest.json` is a constant upgrade marker without `nodes`, which makes older clients reject the new format. The library can be reconstructed when this marker is missing or corrupt.
+`repository.json` stores repository-wide settings, with `version: 1`. Its `generation` changes after cloud uploads so readers can detect an overlapping sync. It contains no node listing. `manifest.json` is the constant marker `{"version":4}`: version 4 identifies sidecar storage, and omitting `nodes` makes older clients reject it. The library can be reconstructed when this marker is missing or corrupt.
 
 ## Automatic migration
 
