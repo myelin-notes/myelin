@@ -24,6 +24,7 @@ export function useFolderItemContextMenu(
   onChanged: () => void | Promise<void>,
   options?: {
     initialRenaming?: boolean;
+    onRenameEnd?: (nodeId: string) => void;
     nodeIds?: readonly string[];
     createSubmenu?: ReactNode;
   },
@@ -50,6 +51,7 @@ export function useFolderItemContextMenu(
     nodeIds: options?.nodeIds,
     onChanged,
     initialRenaming: options?.initialRenaming,
+    onRenameEnd: options?.onRenameEnd,
   });
 
   const applyColor = async (color: string) => {
@@ -71,8 +73,8 @@ export function useFolderItemContextMenu(
       onRename={startRenaming}
       onRemove={handleRemove}
       onManageTags={() => setTagDialogOpen(true)}
+      createSubmenu={options?.createSubmenu}
     >
-      {options?.createSubmenu}
       <FolderColorSubmenu
         color={node.color}
         onSelect={(color) => void applyColor(color)}

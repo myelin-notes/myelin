@@ -38,6 +38,7 @@ interface Props {
   file: VFSFileNode;
   searchMatch?: NodeSearchResult;
   autoRename?: boolean;
+  onRenameEnd?: (nodeId: string) => void;
   onChanged: () => Promise<void>;
 }
 
@@ -45,6 +46,7 @@ export function GridFileItem({
   file,
   searchMatch,
   autoRename,
+  onRenameEnd,
   onChanged,
 }: Props) {
   const repository = useRepository();
@@ -73,6 +75,7 @@ export function GridFileItem({
     dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
+    onRenameEnd,
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 

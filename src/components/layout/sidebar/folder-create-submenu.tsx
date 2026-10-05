@@ -3,7 +3,6 @@ import { Plus } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import {
   ContextMenuItem,
-  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -27,21 +26,18 @@ export function FolderCreateSubmenu(actions: CreateNewActions) {
         {strings.library.createNew.button}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
-        {options.map(
-          ({ id, label, icon: Icon, onClick, disabled, separatorAfter }) => (
-            <Fragment key={id}>
-              <ContextMenuItem
-                className={createNewItemClass}
-                onClick={onClick}
-                disabled={disabled}
-              >
-                <Icon className="size-4" />
-                {label}
-              </ContextMenuItem>
-              {separatorAfter && <ContextMenuSeparator />}
-            </Fragment>
-          ),
-        )}
+        {options.map(({ id, label, icon: Icon, onClick, disabled }) => (
+          <Fragment key={id}>
+            <ContextMenuItem
+              className={createNewItemClass}
+              onClick={onClick}
+              disabled={disabled}
+            >
+              <Icon className="size-4" />
+              {label}
+            </ContextMenuItem>
+          </Fragment>
+        ))}
       </ContextMenuSubContent>
     </ContextMenuSub>
   );

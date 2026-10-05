@@ -19,7 +19,11 @@ import { useExplorerItem } from './use-explorer-item';
 export function useFileItemContextMenu(
   node: VFSFileNode,
   onChanged: () => void | Promise<void>,
-  options?: { initialRenaming?: boolean; nodeIds?: readonly string[] },
+  options?: {
+    initialRenaming?: boolean;
+    onRenameEnd?: (nodeId: string) => void;
+    nodeIds?: readonly string[];
+  },
 ) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -42,6 +46,7 @@ export function useFileItemContextMenu(
     nodeIds: options?.nodeIds,
     onChanged,
     initialRenaming: options?.initialRenaming,
+    onRenameEnd: options?.onRenameEnd,
     renameReferencesOnRename: node.fileType === 'mcanvas',
   });
 

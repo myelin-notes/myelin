@@ -10,6 +10,7 @@ import { useFolderItemContextMenu } from './use-folder-item-context-menu';
 interface FolderItemProps {
   folder: VFSFolderNode;
   autoRename?: boolean;
+  onRenameEnd?: (nodeId: string) => void;
   onNavigate: () => void;
   onMoved: () => void;
 }
@@ -17,6 +18,7 @@ interface FolderItemProps {
 export function FolderItem({
   folder,
   autoRename,
+  onRenameEnd,
   onNavigate,
   onMoved,
 }: FolderItemProps) {
@@ -31,6 +33,7 @@ export function FolderItem({
     dialogs,
   } = useFolderItemContextMenu(folder, onMoved, {
     initialRenaming: autoRename,
+    onRenameEnd,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({
