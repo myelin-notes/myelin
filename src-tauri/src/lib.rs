@@ -2,11 +2,13 @@ use tauri::Manager;
 
 mod clipboard;
 mod code_runner;
+mod crash_reports;
 mod error_report;
 mod github_push;
 mod import_files;
 mod iroh_transport;
 mod mcp_server;
+mod native_crash;
 mod note_text_index;
 mod oauth_loopback;
 mod onenote_import;
@@ -15,12 +17,17 @@ mod repository_bootstrap;
 mod repository_engine;
 mod repository_metadata;
 mod transcription;
+mod webview_crash;
 mod workspace_export;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
         .setup(|app| {
+            if let Err(error) = crash_reports::setup(app.handle()) {
+                eprintln!("could not initialize crash reporting: {error}");
+            }
+            webview_crash::setup(app.handle());
             #[cfg(desktop)]
             {
                 app.handle()
@@ -113,7 +120,20 @@ pub fn run() {
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::scan_onenote,
             import_files::import_file_name,
+            crash_reports::configure_crash_reporting,
+            crash_reports::acknowledge_crash_report,
         ]);
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        builder = builder.on_web_content_process_terminate(|webview| {
+            crash_reports::webview_terminated(
+                webview.app_handle(),
+                webview.label(),
+                "cause unavailable",
+            );
+        });
+    }
 
     #[cfg(not(target_os = "ios"))]
     {

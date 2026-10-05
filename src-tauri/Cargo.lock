@@ -1154,6 +1154,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "crash-context"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3748e166981fa3ba9dc54ff950ad0ed5ca4aab4b73eae21d9f539659fe806e28"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "mach2",
+]
+
+[[package]]
+name = "crash-handler"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9897480a6a7009a9ca940c1813daf2755d8a3e6857e5ac4fd0ae526ff5682d1"
+dependencies = [
+ "cfg-if",
+ "crash-context",
+ "libc",
+ "mach2",
+ "parking_lot",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4198,6 +4222,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3d25b0e0b648a86960ac23b7ad4abb9717601dec6f66c165f5b037f3f03065f"
 
 [[package]]
+name = "mach2"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
+
+[[package]]
 name = "markup5ever"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4366,6 +4396,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "chrono",
+ "crash-handler",
  "flate2",
  "form_urlencoded",
  "git2",
@@ -4379,7 +4410,9 @@ dependencies = [
  "iroh-gossip",
  "iroh-relay",
  "iroh-tickets",
+ "jni 0.21.1",
  "krilla",
+ "libc",
  "n0-future",
  "onenote_parser",
  "png 0.18.1",
@@ -4407,6 +4440,8 @@ dependencies = [
  "typed-path",
  "uuid",
  "webkit2gtk",
+ "webview2-com",
+ "windows-sys 0.61.2",
  "yrs",
 ]
 

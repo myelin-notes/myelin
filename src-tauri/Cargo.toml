@@ -64,6 +64,17 @@ flate2 = "1"
 tar = "0.4"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
+libc = "0.2"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+crash-handler = "0.8.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_IO"] }
+webview2-com = "0.38"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default

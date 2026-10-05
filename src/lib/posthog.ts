@@ -2,6 +2,7 @@ import posthog from 'posthog-js';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
 import { version } from '../../package.json';
+import { applyNativeCrashConsent } from './native-crashes';
 
 let initialized = false;
 
@@ -41,6 +42,7 @@ function ensureInitialized(): boolean {
 // alike. `captureEventName: false` keeps the opt-in from emitting its own event.
 function applyAnalyticsConsent(enabled: boolean): void {
   if (!enabled) {
+    applyNativeCrashConsent(false);
     if (initialized) {
       posthog.opt_out_capturing();
     }
@@ -48,6 +50,13 @@ function applyAnalyticsConsent(enabled: boolean): void {
   }
   if (ensureInitialized()) {
     posthog.opt_in_capturing({ captureEventName: false });
+    applyNativeCrashConsent(
+      true,
+      posthog.get_distinct_id(),
+      posthog.get_session_id(),
+    );
+  } else {
+    applyNativeCrashConsent(false);
   }
 }
 
