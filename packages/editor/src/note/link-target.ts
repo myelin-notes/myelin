@@ -1,4 +1,5 @@
 import {
+  splitNoteLinkPath,
   splitNoteLinkTargetFrame,
   unescapeNoteLinkSegment,
 } from './link-syntax';
@@ -15,9 +16,9 @@ export function parseNoteLinkTarget(
 ): ParsedNoteLinkTarget | null {
   const { noteTarget, frame } = splitNoteLinkTargetFrame(target);
 
-  const segments = noteTarget
-    .split('/')
-    .map((segment) => unescapeNoteLinkSegment(segment).trim());
+  const segments = splitNoteLinkPath(noteTarget).map((segment) =>
+    unescapeNoteLinkSegment(segment).trim(),
+  );
   if (segments.some((segment) => segment.length === 0)) {
     return null;
   }
