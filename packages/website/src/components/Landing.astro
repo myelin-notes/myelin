@@ -6,6 +6,7 @@ import CanvasIsland from '../canvas/CanvasIsland';
 import StaticSite from './static/StaticSite.astro';
 import Base from '../layouts/Base.astro';
 import { getCopy, getFaqs } from '../content/site';
+import { siteLinks } from '../content/site/links';
 import { type Locale, localeTags } from '../lib/locale';
 
 interface Props {
@@ -20,7 +21,13 @@ const languageTag = localeTags[locale];
 const softwareJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
+  '@id': new URL('#app', Astro.site).href,
   name: 'Myelin Notes',
+  alternateName: 'Myelin',
+  url: Astro.site?.href,
+  sameAs: [siteLinks.source],
+  downloadUrl: siteLinks.releases,
+  publisher: { '@id': new URL('#organization', Astro.site).href },
   applicationCategory: 'ProductivityApplication',
   operatingSystem: 'macOS, Windows, Linux',
   description: copy.meta.description,
@@ -42,13 +49,23 @@ const faqJsonLd = {
     acceptedAnswer: { '@type': 'Answer', text: answer },
   })),
 };
+
+const websiteJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': new URL('#website', Astro.site).href,
+  name: 'Myelin Notes',
+  alternateName: 'Myelin',
+  url: Astro.site?.href,
+  publisher: { '@id': new URL('#organization', Astro.site).href },
+};
 ---
 
 <Base
   locale={locale}
   title={copy.meta.title}
   description={copy.meta.description}
-  jsonLd={[softwareJsonLd, faqJsonLd]}
+  jsonLd={[websiteJsonLd, softwareJsonLd, faqJsonLd]}
 >
   <!-- Both renderings ship in the HTML; the gate in Base.astro picks one before
        first paint. Static first so it is what a crawler reads. -->

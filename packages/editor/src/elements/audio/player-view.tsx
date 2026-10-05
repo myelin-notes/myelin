@@ -14,7 +14,6 @@ import {
   Play as PlayIcon,
   Square as SquareIcon,
 } from 'lucide-react';
-import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
 import { getCanvasPalette, withCanvasAlpha } from '../../canvas-theme';
 import { VirtualList } from '../../components/virtual-list';
@@ -23,12 +22,21 @@ import { type AudioTranscriptionSession, getPlatform } from '../../platform';
 import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, PeerMode } from '../../sync/live/peers';
 import { getDevicePixelRatio } from '../../utils';
-import { activeSegmentIndex, segmentsToText } from './segments';
+import {
+  type AudioRecordingState,
+  type AudioRecordingStatus,
+  attachAudioRecording,
+  getAudioRecordingElapsedSeconds,
+  getAudioRecordingState,
+  getAudioRecordingStatus,
+  startAudioRecording,
+  stopAudioRecording,
+} from './recording';
+import { activeSegmentIndex } from './segments';
 import {
   canTranscribeHere,
   getTranscriptionSlotState,
   shouldAutoTranscribe,
-  shouldClaimOnRecordingStart,
   shouldStartAutoPickup,
   type TranscriptionCoordinationInput,
   type TranscriptionSlotState,
@@ -48,7 +56,7 @@ function formatPeerId(peerId: string): string {
   return `${peerId.slice(0, 8)}...${peerId.slice(-4)}`;
 }
 
-type RecordingState = 'idle' | 'requesting' | 'recording' | 'error';
+type RecordingState = AudioRecordingState | 'error';
 
 // Unwrapped row at scale 1: 11px text × 1.5 line-height + 2px padding each side.
 const estimateSegmentRowHeight = () => 21;
@@ -179,7 +187,8 @@ function drawPlaybackWaveformCanvas(
 
 interface AudioPlayerViewProps {
   elementId: string;
-  audioBytes: Uint8Array | null;
+  recordingOwnerId: string;
+  audioBuffer: ArrayBuffer | null;
   duration: number;
   mimeType: string;
   waveform: Float32Array | null;
@@ -197,39 +206,45 @@ interface AudioPlayerViewProps {
     mimeType: string,
     waveform: Float32Array | null,
   ) => void;
+  onRecordingSaved?: () => void | Promise<void>;
   onTranscribed: (segments: TranscriptSegment[]) => void;
   onTranscriptionClaimed: () => void;
   onTranscriptionClaimReleased: () => void;
 }
 
 interface AudioPlayerInteractionOptions {
-  audioBytes: Uint8Array | null;
+  audioBuffer: ArrayBuffer | null;
   hasTranscript: boolean;
   isCreator: boolean;
+  recordingState: RecordingState;
   slot: TranscriptionSlotState;
 }
 
 export interface AudioPlayerInteractionState {
   isWaitingForRemoteAudio: boolean;
+  isProcessingRecording: boolean;
   isCaptionsLoading: boolean;
   primaryButtonDisabled: boolean;
   captionsButtonDisabled: boolean;
 }
 
 export function getAudioPlayerInteractionState({
-  audioBytes,
+  audioBuffer,
   hasTranscript,
   isCreator,
+  recordingState,
   slot,
 }: AudioPlayerInteractionOptions): AudioPlayerInteractionState {
-  const hasAudio = Boolean(audioBytes);
+  const hasAudio = Boolean(audioBuffer);
   const isWaitingForRemoteAudio = !hasAudio && !isCreator;
+  const isProcessingRecording = recordingState === 'processing';
   const isCaptionsLoading =
     slot.kind === 'transcribing-here' || slot.kind === 'transcribing-remote';
   return {
     isWaitingForRemoteAudio,
+    isProcessingRecording,
     isCaptionsLoading,
-    primaryButtonDisabled: isWaitingForRemoteAudio,
+    primaryButtonDisabled: isWaitingForRemoteAudio || isProcessingRecording,
     // Enabled to toggle an existing transcript or to start a job here;
     // disabled while a job runs (here or remotely) and when unavailable.
     captionsButtonDisabled: !hasTranscript && slot.kind !== 'can-transcribe',
@@ -238,7 +253,8 @@ export function getAudioPlayerInteractionState({
 
 export function AudioPlayerView({
   elementId,
-  audioBytes,
+  recordingOwnerId,
+  audioBuffer,
   duration,
   mimeType,
   waveform,
@@ -249,6 +265,7 @@ export function AudioPlayerView({
   localMode,
   remotePeers,
   onRecorded,
+  onRecordingSaved,
   onTranscribed,
   onTranscriptionClaimed,
   onTranscriptionClaimReleased,
@@ -265,12 +282,9 @@ export function AudioPlayerView({
 
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const transcriptionSessionRef = useRef<AudioTranscriptionSession | null>(
     null,
   );
-  const recordChunksRef = useRef<Blob[]>([]);
-  const recordStartRef = useRef(0);
   const recordTickRef = useRef(0);
   const noticeTimerRef = useRef(0);
   const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -286,7 +300,7 @@ export function AudioPlayerView({
   const hasTranscript = segments.length > 0;
   const activeIndex = activeSegmentIndex(segments, currentTime);
   const claimInput: TranscriptionCoordinationInput = {
-    hasAudio: Boolean(audioBytes),
+    hasAudio: Boolean(audioBuffer),
     hasTranscript,
     claimPeerId: transcribingPeerId,
     localPeerId,
@@ -296,11 +310,12 @@ export function AudioPlayerView({
     remotePeers,
   };
   const slot = getTranscriptionSlotState(claimInput);
-  const showCaptionsButton = Boolean(audioBytes);
+  const showCaptionsButton = Boolean(audioBuffer);
   const interaction = getAudioPlayerInteractionState({
-    audioBytes,
+    audioBuffer,
     hasTranscript,
     isCreator,
+    recordingState,
     slot,
   });
   const redrawAfterResize = useEffectEvent(() => {
@@ -318,34 +333,40 @@ export function AudioPlayerView({
     );
   });
 
-  // Tear down recording resources when the element is deleted mid-recording.
+  const onRecordingStatusChange = useEffectEvent(
+    (status: AudioRecordingStatus) => {
+      setRecordingState(status.state);
+      setIsTranscribing(status.isTranscribing);
+    },
+  );
+  const onRecordingNoSpeech = useEffectEvent(() => {
+    flashNotice(strings.noSpeechDetected);
+  });
+
+  useEffect(() => {
+    return attachAudioRecording(elementId, {
+      onStatusChange: onRecordingStatusChange,
+      onNoSpeech: onRecordingNoSpeech,
+    });
+  }, [elementId]);
+
   useEffect(
     () => () => {
       disposedRef.current = true;
       clearInterval(recordTickRef.current);
       clearTimeout(noticeTimerRef.current);
-      const recorder = mediaRecorderRef.current;
-      mediaRecorderRef.current = null;
-      if (recorder && recorder.state !== 'inactive') {
-        // Skip finalizeRecording — the element is gone; just stop the mic.
-        recorder.onstop = null;
-        recorder.stop();
-        recorder.stream.getTracks().forEach((t) => {
-          t.stop();
-        });
+      if (getAudioRecordingState(elementId) === 'idle') {
+        void transcriptionSessionRef.current?.cancel();
+        transcriptionSessionRef.current = null;
       }
-      // Cancel rather than finish: the element is gone, so abort any
-      // in-flight whisper run instead of letting it grind to completion.
-      void transcriptionSessionRef.current?.cancel();
-      transcriptionSessionRef.current = null;
     },
-    [],
+    [elementId],
   );
 
   // Drop the player bound to the previous blob when a new one arrives
   // (re-recording or a remote Yjs update), and on unmount.
   useEffect(() => {
-    if (!audioBytes) {
+    if (!audioBuffer) {
       return;
     }
     return () => {
@@ -362,15 +383,15 @@ export function AudioPlayerView({
       setShowTranscript(false);
       setFollowPlayhead(true);
     };
-  }, [audioBytes]);
+  }, [audioBuffer]);
 
   const attemptAutoPickup = useEffectEvent(() => {
-    // transcriptionSessionRef is the synchronous "a job is already running here" signal — it stays
-    // accurate through onRecorded's flushSync re-render, where isTranscribingLocally hasn't committed.
     if (
       !shouldStartAutoPickup({
         eligible: shouldAutoTranscribe(claimInput),
-        sessionInFlight: transcriptionSessionRef.current !== null,
+        sessionInFlight:
+          getAudioRecordingStatus(elementId).isTranscribing ||
+          transcriptionSessionRef.current !== null,
         alreadyAttempted: autoPickupAttemptedRef.current,
       })
     ) {
@@ -390,6 +411,17 @@ export function AudioPlayerView({
   }, [autoPickupEligible]);
 
   // Animate recording visualization on the waveform canvas.
+  useEffect(() => {
+    if (!isRecording) {
+      return;
+    }
+    setCurrentTime(getAudioRecordingElapsedSeconds(elementId));
+    const tick = window.setInterval(() => {
+      setCurrentTime(getAudioRecordingElapsedSeconds(elementId));
+    }, 200);
+    return () => window.clearInterval(tick);
+  }, [elementId, isRecording]);
+
   useEffect(() => {
     if (!isRecording) {
       return;
@@ -463,198 +495,39 @@ export function AudioPlayerView({
     setCurrentTime(0);
     setNotice(null);
 
-    let stream: MediaStream | null = null;
     try {
-      if (
-        !navigator.mediaDevices?.getUserMedia ||
-        typeof MediaRecorder === 'undefined'
-      ) {
-        setRecordingState('error');
-        return;
-      }
-
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recordingStream = stream;
-      if (disposedRef.current) {
-        recordingStream.getTracks().forEach((t) => {
-          t.stop();
-        });
-        return;
-      }
-
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
-
-      const recorder = new MediaRecorder(
-        stream,
-        mime ? { mimeType: mime } : undefined,
+      const started = await startAudioRecording(
+        elementId,
+        recordingOwnerId,
+        localMode,
+        {
+          onRecorded,
+          onRecordingSaved,
+          onTranscribed,
+          onTranscriptionClaimed,
+          onTranscriptionClaimReleased,
+        },
       );
-      const transcriptionSession =
-        (await getPlatform().transcription?.startSession({
-          elementId,
-          stream: recordingStream,
-        })) ?? null;
-      if (disposedRef.current) {
-        recordingStream.getTracks().forEach((t) => {
-          t.stop();
-        });
-        void transcriptionSession?.cancel();
-        return;
+      if (!started && !disposedRef.current) {
+        setRecordingState('error');
       }
-      // Claim now, not when the transcript lands: audioData syncs with an empty transcript well before
-      // whisper finishes, and every capable peer would otherwise offer manual Transcribe in that window.
-      if (
-        shouldClaimOnRecordingStart({
-          transcriptionSessionStarted: transcriptionSession !== null,
-          localMode,
-        })
-      ) {
-        onTranscriptionClaimed();
-      }
-      recordChunksRef.current = [];
-      mediaRecorderRef.current = recorder;
-      transcriptionSessionRef.current = transcriptionSession;
-      recordStartRef.current = Date.now();
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          recordChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        clearInterval(recordTickRef.current);
-        recordingStream.getTracks().forEach((t) => {
-          t.stop();
-        });
-        // The ref stays set while whisper finishes so deleting the element
-        // mid-transcription can still cancel the backend session.
-        void finalizeRecording(
-          recorder.mimeType,
-          transcriptionSessionRef.current,
-        );
-      };
-
-      recorder.start(100);
-      // Capture opened above; anchor the transcript's clock to the file that starts here.
-      transcriptionSession?.markRecordingStart();
-      setRecordingState('recording');
-
-      clearInterval(recordTickRef.current);
-      recordTickRef.current = window.setInterval(() => {
-        setCurrentTime((Date.now() - recordStartRef.current) / 1000);
-      }, 200);
     } catch {
       clearInterval(recordTickRef.current);
-      mediaRecorderRef.current = null;
       void transcriptionSessionRef.current?.cancel();
       transcriptionSessionRef.current = null;
-      // The claim may already be written for a session that will never
-      // deliver; release it (a no-op unless the claim is ours).
       onTranscriptionClaimReleased();
-      stream?.getTracks().forEach((t) => {
-        t.stop();
-      });
       setRecordingState('error');
     }
   }
 
   function stopRecording() {
-    const recorder = mediaRecorderRef.current;
-    mediaRecorderRef.current = null;
     clearInterval(recordTickRef.current);
-    setRecordingState('idle');
-    if (recorder && recorder.state !== 'inactive') {
-      recorder.stop();
-    }
-  }
-
-  async function finalizeRecording(
-    recordedMimeType: string,
-    transcription: AudioTranscriptionSession | null,
-  ) {
-    const transcriptPromise =
-      transcription?.finish() ?? Promise.resolve<TranscriptSegment[]>([]);
-    const chunks = recordChunksRef.current;
-    recordChunksRef.current = [];
-
-    if (chunks.length === 0) {
-      if (transcriptionSessionRef.current === transcription) {
-        transcriptionSessionRef.current = null;
-      }
-      if (transcription) {
-        onTranscriptionClaimReleased();
-      }
-      return;
-    }
-
-    const blob = new Blob(chunks, { type: recordedMimeType });
-    const arrayBuffer = await blob.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-
-    let dur = 0;
-    let recordedWaveform: Float32Array | null = null;
-    try {
-      const decoded = await decodeAudio(bytes);
-      dur = decoded.duration;
-      recordedWaveform = decoded.waveform;
-    } catch {
-      dur = (Date.now() - recordStartRef.current) / 1000;
-      // An instant start/stop produces a header-only blob no decoder accepts. Discard it rather than
-      // leave an unplayable card. Longer recordings that fail to decode are kept with wall-clock duration.
-      if (dur < 1) {
-        if (transcriptionSessionRef.current === transcription) {
-          transcriptionSessionRef.current = null;
-        }
-        if (transcription) {
-          onTranscriptionClaimReleased();
-        }
-        return;
-      }
-    }
-
-    if (disposedRef.current) {
-      return;
-    }
-    // Publish right away — waveform and playback must not wait on whisper. transcriptionSessionRef is
-    // still set here, so the auto-pickup effect this render fires sees the live job and won't duplicate.
-    onRecorded(bytes, dur, recordedMimeType, recordedWaveform);
-
-    if (!transcription) {
-      return;
-    }
-    setIsTranscribing(true);
-    const transcribed = await transcriptPromise.catch(
-      (): TranscriptSegment[] => [],
-    );
-    if (transcriptionSessionRef.current === transcription) {
-      transcriptionSessionRef.current = null;
-    }
-    if (disposedRef.current) {
-      return;
-    }
-    setIsTranscribing(false);
-    trackEvent('transcription_completed', {
-      duration_seconds: Math.round(dur),
-      transcript_length: segmentsToText(transcribed).length,
-      had_speech: transcribed.length > 0,
-    });
-    if (transcribed.length > 0) {
-      onTranscribed(transcribed);
-    } else {
-      // The claim must not outlive the job: present-but-idle would read as
-      // "still transcribing" to remote peers forever.
-      onTranscriptionClaimReleased();
-      flashNotice(strings.noSpeechDetected);
-    }
+    void stopAudioRecording(elementId);
   }
 
   /** The player for the current blob, created on first use. `null` while no audio has arrived. */
   function ensureAudio(): HTMLAudioElement | null {
-    if (!audioBytes) {
+    if (!audioBuffer) {
       return null;
     }
 
@@ -672,11 +545,10 @@ export function AudioPlayerView({
     }
 
     if (!objectUrlRef.current) {
-      const buf = audioBytes.buffer.slice(
-        audioBytes.byteOffset,
-        audioBytes.byteOffset + audioBytes.byteLength,
-      ) as ArrayBuffer;
-      const blob = new Blob([buf], mimeType ? { type: mimeType } : undefined);
+      const blob = new Blob(
+        [audioBuffer],
+        mimeType ? { type: mimeType } : undefined,
+      );
       objectUrlRef.current = URL.createObjectURL(blob);
       audioElRef.current.src = objectUrlRef.current;
     }
@@ -723,14 +595,14 @@ export function AudioPlayerView({
   // recording only.
   async function handleTranscribe() {
     const transcription = getPlatform().transcription;
-    if (!audioBytes || !transcription || !canTranscribeHere(claimInput)) {
+    if (!audioBuffer || !transcription || !canTranscribeHere(claimInput)) {
       return;
     }
     setIsTranscribing(true);
     setNotice(null);
     onTranscriptionClaimed();
     try {
-      const { buffer } = await decodeAudio(audioBytes);
+      const { buffer } = await decodeAudio(new Uint8Array(audioBuffer));
       const session = await transcription.startBufferSession(elementId, buffer);
       if (!session) {
         // Backend unavailable (e.g. bundled model missing).
@@ -787,12 +659,12 @@ export function AudioPlayerView({
   }
 
   function handleButtonClick() {
-    if (isRequestingRecording || interaction.isWaitingForRemoteAudio) {
+    if (isRequestingRecording || interaction.primaryButtonDisabled) {
       return;
     }
     if (isRecording) {
       stopRecording();
-    } else if (audioBytes) {
+    } else if (audioBuffer) {
       if (isPlaying) {
         pausePlayback();
       } else {
@@ -805,24 +677,28 @@ export function AudioPlayerView({
 
   const ButtonIcon = isRecording
     ? SquareIcon
-    : audioBytes
-      ? isPlaying
-        ? PauseIcon
-        : PlayIcon
-      : MicIcon;
+    : interaction.isProcessingRecording
+      ? LoaderCircle
+      : audioBuffer
+        ? isPlaying
+          ? PauseIcon
+          : PlayIcon
+        : MicIcon;
 
   const timeLabel = isRequestingRecording
     ? strings.requestingMic
-    : recordingState === 'error'
-      ? strings.micUnavailable
-      : isRecording
-        ? formatTime(currentTime)
-        : (notice ??
-          (audioBytes
-            ? `${formatTime(currentTime)} / ${formatTime(duration)}`
-            : interaction.isWaitingForRemoteAudio
-              ? strings.waitingForRecording
-              : strings.tapToRecord));
+    : interaction.isProcessingRecording
+      ? strings.processingRecording
+      : recordingState === 'error'
+        ? strings.micUnavailable
+        : isRecording
+          ? formatTime(currentTime)
+          : (notice ??
+            (audioBuffer
+              ? `${formatTime(currentTime)} / ${formatTime(duration)}`
+              : interaction.isWaitingForRemoteAudio
+                ? strings.waitingForRecording
+                : strings.tapToRecord));
 
   const captionsLabel = hasTranscript
     ? showTranscript
@@ -838,17 +714,19 @@ export function AudioPlayerView({
 
   const buttonLabel = isRequestingRecording
     ? strings.requestingMicAccess
-    : isRecording
-      ? strings.stopRecording
-      : audioBytes
-        ? isPlaying
-          ? strings.pauseAudio
-          : strings.playAudio
-        : interaction.isWaitingForRemoteAudio
-          ? strings.waitingForRecording
-          : recordingState === 'error'
-            ? strings.tryRecordingAgain
-            : strings.startRecording;
+    : interaction.isProcessingRecording
+      ? strings.processingRecording
+      : isRecording
+        ? strings.stopRecording
+        : audioBuffer
+          ? isPlaying
+            ? strings.pauseAudio
+            : strings.playAudio
+          : interaction.isWaitingForRemoteAudio
+            ? strings.waitingForRecording
+            : recordingState === 'error'
+              ? strings.tryRecordingAgain
+              : strings.startRecording;
 
   return (
     <div className="canvas-audio-inner" data-recording-state={recordingState}>
@@ -860,7 +738,12 @@ export function AudioPlayerView({
         aria-label={buttonLabel}
         title={buttonLabel}
       >
-        <ButtonIcon size={16} />
+        <ButtonIcon
+          size={16}
+          className={
+            interaction.isProcessingRecording ? 'animate-spin' : undefined
+          }
+        />
       </button>
       <div className="canvas-audio-body">
         <canvas

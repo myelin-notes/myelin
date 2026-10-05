@@ -1,4 +1,4 @@
-import { NotebookPen } from 'lucide-react';
+import { OneNoteIcon } from '../brand-icons';
 import {
   countOneNotePages,
   importOneNote,
@@ -12,7 +12,7 @@ import { expectFilePath, type ImportProvider } from './types';
 
 export const onenoteProvider: ImportProvider = {
   id: 'onenote',
-  icon: NotebookPen,
+  icon: OneNoteIcon,
   picker: { kind: 'file', filters: ONENOTE_DIALOG_FILTERS },
 
   createJob({ selection, repository, parentId, strings }) {

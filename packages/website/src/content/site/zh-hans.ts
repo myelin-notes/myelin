@@ -29,6 +29,7 @@ const zhHans: SiteCopy = {
     linked: '笔记链接',
     sync: '同步与协作',
     'local-first': '本地优先',
+    import: '导入',
     download: '下载',
   },
   faqKicker: '常见问题',
@@ -54,7 +55,7 @@ const zhHans: SiteCopy = {
 
   pages: {
     heading: '真正的文档，\n就在画布上。',
-    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可在笔记中直接运行的代码块，支持九种语言。Python、JavaScript、TypeScript、Ruby、Bash、Go、Rust、C 和 C++。',
+    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可以直接运行的代码块。',
     annotation: '一个真正可编辑的页面，点进去看看。',
     pageTitle: '第 12 讲 · 动作电位',
     pageMarkdown: `# 动作电位
@@ -87,11 +88,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: '录下来，找得到。\n连手写也不例外。',
+    heading: '录下来，转成文字。\n在画布上找得到。',
     audioBody:
-      '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，因此每段录音都可搜索，而音频始终不会离开你的设备。',
+      '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。',
     searchBody:
-      '全文搜索与语义搜索都在本地运行，使用内置的 all-MiniLM-L6-v2 模型。在 macOS 上，手写内容通过 Apple 的 Vision 框架识别，音频转写文本同样可以搜索。',
+      '在资料库中搜索笔记标题、标签、已保存文字和音频转写内容；也可以在打开的画布中查找。',
     audioMock: {
       title: '第 12 讲 · 动作电位',
       duration: '48:12',
@@ -101,22 +102,17 @@ for step in range(3):
       match: '髓鞘',
     },
     searchMock: {
-      query: '郎飞结',
+      query: '第 12 讲',
       results: [
         {
           kind: 'page',
           title: '第 12 讲 · 动作电位',
-          snippet: '……信号在郎飞结之间跳跃……',
-        },
-        {
-          kind: 'ink',
-          title: '白板 · 髓鞘化草图',
-          snippet: '手写匹配，本地 OCR',
+          snippet: '画布笔记',
         },
         {
           kind: 'audio',
           title: '录音 · 第 12 讲',
-          snippet: '转写文本匹配，位于 31:42',
+          snippet: '画布笔记',
         },
       ],
     },
@@ -127,13 +123,40 @@ for step in range(3):
     body: '[[笔记链接]]、反向链接与悬停预览卡片，让相关的想法始终只有一步之遥。命令面板带你跳转到任何位置，按文件保存的版本历史可以还原笔记的任一早期状态。',
   },
 
+  importing: {
+    heading: '把旧笔记\n一起带过来。',
+    body: '从其他应用导入你的笔记',
+    annotation: '不用手动复制粘贴。',
+    sources: [
+      {
+        id: 'goodnotes',
+        label: '从 Goodnotes 导入',
+        detail: '把 Goodnotes 的内容导出为 PDF 压缩包后导入。',
+      },
+      {
+        id: 'onenote',
+        label: '从 OneNote 导入',
+        detail: '从 .onepkg 笔记本或 .one 分区导入 OneNote 的内容。',
+      },
+      {
+        id: 'obsidian',
+        label: '从 Obsidian 导入',
+        detail: '直接从 vault 文件夹导入 Obsidian 的内容。',
+      },
+      {
+        id: 'notion',
+        label: '从 Notion 导入',
+        detail: '把 Notion 的内容导出为 Markdown 与 CSV 后导入。',
+      },
+    ],
+  },
+
   localFirst: {
     heading: '一切都留在\n你自己的电脑上。',
     lede: '中间没有任何云端。你的笔记就是自己硬盘上的普通文件，Myelin 完全可以离线使用。',
     bullets: [
       '你的笔记是硬盘上的普通文件，采用开放、无冲突的格式（Yjs）。任何内容都不会被锁定。',
       '所有功能都能完全离线使用，无需账号，中间也没有服务器。',
-      '搜索、语义向量与手写 OCR（macOS）全部在你自己的设备上运行。',
       '自带 AI：模型通过本地 MCP 服务器接入，而不是我们替你选定的某个云服务。',
       '可从 Obsidian 或 GoodNotes 导入，导出为 PDF、图片或 JSON，并在 GitHub 上阅读每一行源码。',
     ],
@@ -170,7 +193,7 @@ for step in range(3):
 
   download: {
     heading: '下载',
-    body: '提供简体中文、英文与西班牙文版本。',
+    body: '提供简体中文、英文、西班牙文与法文版本。',
     cta: '下载 Myelin Notes',
     autoUpdates: '支持\n自动更新',
     platforms: [
@@ -232,9 +255,9 @@ for step in range(3):
 
 可以，现在就支持点对点的实时协作。没有 Myelin 账号，中间也没有任何服务。设备之间通过 GitHub 同步互相发现，因此双方都需要能访问同一个仓库。带权限管理的共享笔记本将在 v1.0 推出。
 
-## 可以从 Obsidian 或 GoodNotes 导入吗？
+## 可以从别的应用导入吗？
 
-两者都可以。Notion 导入功能已列入计划。
+可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 的内容可以通过它自己的 Markdown 与 CSV 导出导入，由文件导入器读取；能保留页面层级的专用 Notion 导入器已列入计划。
 
 ## 离线能用吗？
 
@@ -248,6 +271,7 @@ for step in range(3):
 
   linkLabels: {
     privacy: '隐私政策',
+    support: '支持',
   },
 
   footer: {

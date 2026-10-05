@@ -8,16 +8,17 @@ import { createRef } from 'react';
 import { Pencil as PencilIcon } from 'lucide-react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import { type ChromeMenuItem, openChromeMenu } from '../../chrome-menu';
+import type { ChromeMenuItem, ChromeMenuOpener } from '../../chrome-menu';
 import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
 import {
+  CANVAS_ROOT_SELECTOR,
   CHROME_BOTTOM_PADDING,
   CHROME_CORNER_RADIUS,
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
-  CONTROLS_LAYER_ID,
+  CONTROLS_LAYER_SELECTOR,
   getFrameChromeMenuButtonRect,
 } from './chrome-layout';
 import { FrameChromeView, type FrameChromeViewHandle } from './chrome-view';
@@ -34,26 +35,30 @@ export interface FrameChromeOptions {
   // Returning an empty array suppresses the menu. Called lazily per click so items reflect
   // current state.
   getMenuItems?: () => ChromeMenuItem[];
+  openChromeMenu?: ChromeMenuOpener;
   onTitleCommit?: (title: string) => string | undefined;
 }
 
 export class FrameChrome {
   public readonly root: HTMLDivElement;
   public readonly contentSlot: HTMLDivElement;
+  public readonly controlsLayer: HTMLElement | null;
 
   private readonly controlsSlot: HTMLDivElement;
   private readonly reactRoot: Root;
   private readonly viewRef = createRef<FrameChromeViewHandle>();
   private readonly getMenuItems?: () => ChromeMenuItem[];
+  private readonly openChromeMenu?: ChromeMenuOpener;
   private readonly onTitleCommit?: (title: string) => string | undefined;
 
   private fileName: string | null = null;
   private kindLabel: string;
   private disposed = false;
 
-  constructor(options: FrameChromeOptions) {
+  constructor(options: FrameChromeOptions, host: HTMLElement) {
     this.kindLabel = options.kindLabel;
     this.getMenuItems = options.getMenuItems;
+    this.openChromeMenu = options.openChromeMenu;
     this.onTitleCommit = options.onTitleCommit;
 
     this.root = document.createElement('div');
@@ -89,7 +94,8 @@ export class FrameChrome {
       willChange: 'transform',
     } as Partial<CSSStyleDeclaration>);
 
-    getFrameChromeControlsLayer()?.appendChild(this.controlsSlot);
+    this.controlsLayer = getFrameChromeControlsLayer(host);
+    this.controlsLayer?.appendChild(this.controlsSlot);
     this.reactRoot = createRoot(this.root);
     this.render();
   }
@@ -112,6 +118,11 @@ export class FrameChrome {
     }
     this.kindLabel = label;
     this.render();
+  }
+
+  public setZIndex(zIndex: string): void {
+    setStyleIfChanged(this.root, 'z-index', zIndex);
+    setStyleIfChanged(this.controlsSlot, 'z-index', zIndex);
   }
 
   // `screenX`/`screenY` are the device-pixel snapped screen coordinates of the underlying content's
@@ -243,7 +254,7 @@ export class FrameChrome {
     if (items.length === 0) {
       return;
     }
-    openChromeMenu(anchor, items);
+    this.openChromeMenu?.(anchor, items);
   };
 
   private getChromeMenuItems(): ChromeMenuItem[] {
@@ -263,6 +274,12 @@ export class FrameChrome {
   }
 }
 
-export function getFrameChromeControlsLayer(): HTMLElement | null {
-  return document.getElementById(CONTROLS_LAYER_ID);
+export function getFrameChromeControlsLayer(
+  host: HTMLElement,
+): HTMLElement | null {
+  return (
+    host
+      .closest<HTMLElement>(CANVAS_ROOT_SELECTOR)
+      ?.querySelector<HTMLElement>(CONTROLS_LAYER_SELECTOR) ?? null
+  );
 }

@@ -15,6 +15,7 @@ import { formatExplorerItemAccessibleName } from '../accessibility-labels';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { getFileTypeIcon } from './file-icon';
 import { ItemContextMenu } from './item-context-menu';
+import { MoveItemDialog } from './move-item-dialog';
 import { RenameReferencesDialog } from './rename-references-dialog';
 import { SearchHighlight } from './search-highlight';
 import { TagList } from './tag-list';
@@ -35,6 +36,7 @@ export function FileItem({
 }: FileItemProps) {
   const repository = useRepository();
   const tabController = useTabController();
+  const [moveOpen, setMoveOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
@@ -70,7 +72,7 @@ export function FileItem({
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  openNote(tabController, file, file.name, 'explorer');
+                  openNote(tabController, file, file.name);
                 }
               }}
               onDragStart={handleDragStart}
@@ -123,6 +125,7 @@ export function FileItem({
           )}
         </ContextMenuTrigger>
         <ItemContextMenu
+          onMove={() => setMoveOpen(true)}
           onRename={startRenaming}
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
@@ -139,6 +142,12 @@ export function FileItem({
           }
         />
       </ContextMenu>
+      <MoveItemDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        nodeIds={[file.id]}
+        onChanged={onChanged}
+      />
       <TagManageDialog
         open={tagDialogOpen}
         onOpenChange={setTagDialogOpen}

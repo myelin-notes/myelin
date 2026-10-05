@@ -27,8 +27,10 @@ const {
 const organization = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': new URL('#organization', Astro.site).href,
   name: 'Myelin Notes',
   url: Astro.site?.href,
+  sameAs: ['https://github.com/myelin-notes'],
 };
 const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
 ---

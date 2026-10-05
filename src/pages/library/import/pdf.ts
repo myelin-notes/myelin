@@ -68,14 +68,36 @@ export async function importPdfFile({
   fallbackTitle: string;
 }): Promise<VFSNodeId> {
   const bytes = new Uint8Array(await file.arrayBuffer());
+  return importPdfBytes({
+    bytes,
+    fileName: file.name,
+    repository,
+    parentId,
+    fallbackTitle,
+  });
+}
+
+export async function importPdfBytes({
+  bytes,
+  fileName,
+  repository,
+  parentId,
+  fallbackTitle,
+}: {
+  bytes: Uint8Array;
+  fileName: string;
+  repository: Repository;
+  parentId: string | null;
+  fallbackTitle: string;
+}): Promise<VFSNodeId> {
   const pageSizes = await getPdfPageSizes(bytes);
   return createCanvasFile({
     repository,
     parentId,
-    title: getPdfCanvasTitle(file.name, fallbackTitle),
+    title: getPdfCanvasTitle(fileName, fallbackTitle),
     label: 'PDF',
     build: (ydoc) => {
-      addPdfElementToYDoc(ydoc, bytes, file.name, pageSizes);
+      addPdfElementToYDoc(ydoc, bytes, fileName, pageSizes);
     },
   });
 }

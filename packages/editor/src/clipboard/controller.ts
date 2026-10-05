@@ -1,3 +1,4 @@
+import { MYELIN_CANVAS_CLIPBOARD_LABEL } from './formats';
 import { createCanvasPastePlacementTracker } from './placement';
 import {
   buildCanvasClipboardSnapshot,
@@ -35,19 +36,31 @@ export class CanvasClipboardController {
       return false;
     }
 
-    const selection = port.getSelection();
-    if (!selection) {
+    const payload = this.copyPayload(port);
+    if (!payload) {
       return false;
     }
-
-    const snapshot = buildCanvasClipboardSnapshot(selection);
-    const payload = serializeCanvasClipboardSnapshot(snapshot);
     if (!writeCanvasClipboardPayload(event, payload)) {
       return false;
     }
 
     event.preventDefault();
     return true;
+  }
+
+  public copyPayload(port: CanvasClipboardPort): string | null {
+    if (port.isEditing()) {
+      return null;
+    }
+
+    const selection = port.getSelection();
+    if (!selection) {
+      return null;
+    }
+
+    return serializeCanvasClipboardSnapshot(
+      buildCanvasClipboardSnapshot(selection),
+    );
   }
 
   public handleCut(event: ClipboardEvent, port: CanvasClipboardPort): boolean {
@@ -71,24 +84,11 @@ export class CanvasClipboardController {
 
     const clipboardPayload = readCanvasClipboardPayload(event);
     if (clipboardPayload) {
-      const snapshot = parseCanvasClipboardSnapshot(clipboardPayload);
-      const context = snapshot ? port.getPasteContext() : null;
-      if (!snapshot || !context) {
-        return false;
+      const handled = this.pastePayload(clipboardPayload, port);
+      if (handled) {
+        event.preventDefault();
       }
-
-      const placement = this.placementTracker.next(
-        snapshot,
-        context,
-        clipboardPayload,
-      );
-      const result = port.pasteSnapshot(snapshot, placement);
-      if (!result) {
-        return false;
-      }
-
-      event.preventDefault();
-      return true;
+      return handled;
     }
 
     if (onMediaPaste?.(event)) {
@@ -96,6 +96,27 @@ export class CanvasClipboardController {
       return true;
     }
 
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    if (
+      text.trim() &&
+      text !== MYELIN_CANVAS_CLIPBOARD_LABEL &&
+      port.pasteText(text)
+    ) {
+      event.preventDefault();
+      return true;
+    }
+
     return false;
+  }
+
+  public pastePayload(payload: string, port: CanvasClipboardPort): boolean {
+    const snapshot = parseCanvasClipboardSnapshot(payload);
+    const context = snapshot ? port.getPasteContext() : null;
+    if (!snapshot || !context) {
+      return false;
+    }
+
+    const placement = this.placementTracker.next(snapshot, context, payload);
+    return port.pasteSnapshot(snapshot, placement) !== null;
   }
 }

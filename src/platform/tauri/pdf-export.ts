@@ -1,14 +1,22 @@
 import type { PdfExportCapability } from '@myelin/editor/platform/types';
 import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
+import { MOBILE_PLATFORM } from '@/lib/env';
 
-/**
- * Destination picking plus the Rust `export_pdf` command. Fire-and-forget on
- * the Rust side: it renders the display list and writes the file at the picked
- * path itself; nothing comes back.
- */
 export const pdfExport: PdfExportCapability = {
   async export({ suggestedName, buildRequest }) {
+    if (MOBILE_PLATFORM === 'ios') {
+      const request = await buildRequest();
+      if (!request) {
+        return { cancelled: true };
+      }
+      const saved = await invoke<boolean>('export_pdf_ios', {
+        request,
+        suggestedName,
+      });
+      return { cancelled: !saved };
+    }
+
     const path = await save({
       defaultPath: suggestedName,
       filters: [{ name: 'PDF', extensions: ['pdf'] }],

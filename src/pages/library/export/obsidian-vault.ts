@@ -4,7 +4,7 @@ import { serializeDocToMarkdownChunked } from '@myelin/editor/page-frame/markdow
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import { invoke } from '@tauri-apps/api/core';
+import type { PickedFolder } from '@/lib/folder-picker';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import {
   type ExportPlan,
@@ -14,6 +14,7 @@ import {
   sanitizeName,
   type VaultFileEntry,
 } from './workspace-plan';
+import { writeVault } from './write-vault';
 
 const logger = new Logger('ObsidianVaultExport');
 
@@ -25,8 +26,8 @@ export interface ExportObsidianVaultResult {
 
 export interface ExportObsidianVaultOptions {
   repository: ReadableRepository;
-  /** Absolute directory the user picked; the vault is created as a subfolder. */
-  destDir: string;
+  /** Selected destination; the vault is created as a subfolder. */
+  destDir: PickedFolder;
   /** Name of the root vault folder created under {@link destDir}. */
   vaultName: string;
   onProgress?: (progress: ExportProgress) => void;
@@ -144,13 +145,11 @@ export async function exportObsidianVault({
     }
   }
 
-  const vaultPath = await invoke<string>('export_obsidian_vault', {
-    request: {
-      destDir,
-      vaultName: sanitizeName(vaultName) || 'Vault',
-      folders: plan.folders,
-      files: entries,
-    },
+  const vaultPath = await writeVault({
+    destDir,
+    vaultName: sanitizeName(vaultName) || 'Vault',
+    folders: plan.folders,
+    files: entries,
   });
 
   return { vaultPath, notesExported, filesCopied };

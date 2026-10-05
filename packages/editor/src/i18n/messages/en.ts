@@ -24,8 +24,6 @@ const en = {
   },
   sidebar: {
     searchPlaceholder: 'Search your library...',
-    searchModeText: 'Text',
-    searchModeSemantic: 'Semantic',
     explorer: 'Explorer',
     tags: 'Tags',
     collapse: 'Collapse sidebar',
@@ -95,7 +93,6 @@ const en = {
       description: 'Hit a bug or have an idea? Tell us in a short form.',
     },
     searchPlaceholder: 'Search studio...',
-    semanticSearchLabel: 'Semantic search',
     explorer: 'Explorer',
     sortLabel: (label: string) => `Sort: ${label}`,
     sortModes: {
@@ -139,7 +136,7 @@ const en = {
           `Imported ${count} file${count === 1 ? '' : 's'}`,
       },
       goodnotes_zip: {
-        label: 'Goodnotes ZIP',
+        label: 'Import from Goodnotes',
         description: 'A Goodnotes folder exported as PDFs.',
         title: 'Import Goodnotes ZIP',
         scanning: 'Reading archive...',
@@ -149,7 +146,7 @@ const en = {
           `Imported ${count} PDF${count === 1 ? '' : 's'}`,
       },
       onenote: {
-        label: 'OneNote',
+        label: 'Import from OneNote',
         description:
           'A .onepkg notebook or .one section exported from OneNote.',
         title: 'Import OneNote',
@@ -164,7 +161,7 @@ const en = {
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
       },
       obsidian_vault: {
-        label: 'Obsidian Vault',
+        label: 'Import from Obsidian',
         description: 'A vault folder, with its notes and attachments.',
         title: 'Import Obsidian Vault',
         scanning: 'Scanning vault...',
@@ -224,8 +221,13 @@ const en = {
       insights: 'Studio Insights',
       addTag: 'New tag',
       addChild: (tag: string) => `Add tag under #${tag}`,
+      toggleChildren: (tag: string) => `Toggle tags under #${tag}`,
       placeholder: 'Tag name...',
       deleteTag: (tag: string) => `Delete #${tag}`,
+      deleteUsedTitle: 'Delete used tag?',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} is used by ${count} ${count === 1 ? 'item' : 'items'}. Deleting it will also remove matching child tags from those items.`,
+      deleteUsedAction: 'Delete tag',
       stats: {
         totalFiles: 'Total Files',
         folders: 'Folders',
@@ -233,15 +235,30 @@ const en = {
       },
     },
     explorerTree: {
+      preparingIndex: 'Indexing notes… More results may appear.',
+      indexingUnavailable:
+        'Could not index notes. Saved content search will retry later.',
+      indexingNotes: (indexed: number, total: number) =>
+        `Indexing notes… ${indexed}/${total}. More results may appear.`,
+      indexingFailed: (count: number) => `${count} notes could not be indexed.`,
       repositorySetupRequired:
         'Repository setup required. Finish setup in Settings to view files.',
       emptySearch: 'No results found',
       emptyFilter: 'No items match the selected tags',
       emptyDefault: 'No files yet',
+      selectedCount: (count: number) => `${count} items`,
     },
     itemMenu: {
+      moveTo: 'Move to…',
+      moveHere: 'Move here',
+      workspace: 'Workspace',
+      back: 'Back',
+      loadError: 'Unable to load folders.',
+      moveError: 'Unable to move items.',
+
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
       remove: 'Remove',
@@ -295,7 +312,6 @@ const en = {
     restoreFailed: 'Could not restore version',
   },
   settings: {
-    title: 'Preferences',
     theme: {
       title: 'Theme',
       eyebrow: 'Appearance',
@@ -334,12 +350,16 @@ const en = {
       mode: {
         label: 'Drawing input',
         description:
-          'What a finger does on the canvas. Auto draws with a finger until a stylus turns up; Pen leaves drawing to the stylus; Touch always draws with a finger, and pans and zooms with two.',
+          'What a finger does on the canvas. Pen leaves drawing to the stylus and pans with a finger; Touch draws with a finger, and pans and zooms with two.',
         options: {
-          auto: 'Auto',
           pen: 'Pen',
           touch: 'Touch',
         },
+      },
+      penBarrelButtonImmediate: {
+        label: 'Switch to eraser immediately',
+        description:
+          'Switch to the eraser as soon as the pen button is pressed. When off, apply the switch after the pen lifts.',
       },
     },
     pageFrameEditing: {
@@ -714,6 +734,10 @@ const en = {
         title: 'Quote',
         subtitle: 'Turn this block into a blockquote',
       },
+      callout: {
+        title: 'Callout',
+        subtitle: 'Insert a highlighted note callout',
+      },
       bulletList: {
         title: 'Bullet list',
         subtitle: 'Turn this block into a bulleted list item',
@@ -733,6 +757,14 @@ const en = {
       table: {
         title: 'Table',
         subtitle: 'Insert a table with header and body rows',
+      },
+      codeBlock: {
+        title: 'Code block',
+        subtitle: 'Insert a fenced code block',
+      },
+      mathBlock: {
+        title: 'Math block',
+        subtitle: 'Insert a fenced math block',
       },
       bold: {
         title: 'Bold',
@@ -786,19 +818,38 @@ const en = {
     },
     selectionToolbar: {
       label: 'Selection order',
+      copy: 'Copy',
+      copied: 'Copied to clipboard',
+      cut: 'Cut',
       moveHigher: 'Move forward',
       moveLower: 'Move backward',
       delete: 'Delete',
+      lock: 'Lock',
+      unlock: 'Unlock',
       crop: 'Crop',
       applyCrop: 'Apply crop',
       addToPage: 'Add to page',
       removeFromPage: 'Remove from page',
       makeRoom: 'Make room',
       floatOverText: 'Float over text',
+      editPoints: 'Edit points',
+      finishEditingPoints: 'Finish editing points',
+      bold: 'Bold',
+      italic: 'Italic',
+    },
+    pdfNavigator: {
+      previousPage: 'Previous page',
+      nextPage: 'Next page',
+      goToPage: 'Go to page',
+      pageNumber: 'Page number',
     },
     insert: {
       title: 'Insert',
       soon: 'Soon',
+      paste: {
+        label: 'Paste',
+        description: 'Paste from the clipboard',
+      },
       frame: {
         label: 'Page frame',
         description: 'A new page to write in',
@@ -806,6 +857,10 @@ const en = {
       embed: {
         label: 'Image or PDF',
         description: 'Drop in files or paste a URL',
+      },
+      photo: {
+        label: 'Take photo',
+        description: 'Capture and insert a photo',
       },
       latex: {
         label: 'LaTeX',
@@ -816,6 +871,13 @@ const en = {
         description: 'Record or import a voice memo',
       },
     },
+    camera: {
+      requesting: 'Opening camera...',
+      unavailable: 'Camera unavailable',
+      takePhoto: 'Take photo',
+      cancel: 'Cancel',
+      captureFailed: 'Could not capture photo',
+    },
     audioPlayer: {
       requestingMic: 'Requesting microphone...',
       requestingMicAccess: 'Requesting microphone access',
@@ -824,6 +886,7 @@ const en = {
       waitingForRecording: 'Waiting for recording',
       startRecording: 'Start recording',
       stopRecording: 'Stop recording',
+      processingRecording: 'Processing recording...',
       tryRecordingAgain: 'Try recording again',
       playAudio: 'Play audio',
       pauseAudio: 'Pause audio',
@@ -872,9 +935,12 @@ const en = {
       mode: 'Mode',
       rectangle: 'Rectangle',
       lasso: 'Lasso',
+      precise: 'Precise',
       fine: (value: number) => `Fine (${value})`,
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
+      pressure: 'Pressure',
+      stabilization: 'Stabilization',
       addCustomColor: 'Add custom color',
       deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',
@@ -959,6 +1025,12 @@ const en = {
         'An infinite canvas for handwriting, text, and everything in between. Four quick questions and you are done.',
       language: 'Language',
       start: 'Get started',
+    },
+    input: {
+      eyebrow: 'Pen & Touch',
+      title: 'How will you draw?',
+      description:
+        'Pick what a finger does on the canvas. You can change this any time in Settings.',
     },
     privacy: {
       eyebrow: 'Privacy',

@@ -2,7 +2,10 @@ import { PenTool as PenIcon } from 'lucide-react';
 import { ADAPTIVE_INK } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ShapeElement } from '../elements/shape-element';
-import { StrokeElement } from '../elements/stroke-element';
+import {
+  DEFAULT_STABILIZATION,
+  StrokeElement,
+} from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
 import type { AnchorMode } from '../page-frame/anchor/capture';
 import { anchorToPageFrame } from '../page-frame/anchor/capture';
@@ -23,7 +26,7 @@ export const PEN_COLORS = [
 /** Pen must dwell this long (ms) before recognition is attempted. */
 const DWELL_MS = 600;
 /** Movement beyond this (px) re-arms the dwell timer (cancels recognition). */
-const DWELL_MOVE_PX = 12;
+const DWELL_MOVE_PX = 3;
 
 export class PenTool implements ITool {
   public constructor(protected readonly getStrings: MessageGetter) {}
@@ -36,13 +39,18 @@ export class PenTool implements ITool {
   protected recognizeShapes: boolean = true;
   /** When false, stylus pressure is dropped and stroke width stays uniform. */
   protected usePressure: boolean = true;
+  /** 0–10 slider position; 0 is raw input. */
+  protected stabilization: number = DEFAULT_STABILIZATION * 10;
 
   /** Pen-down point in world space; decides which page frame, if any, claims the stroke. */
   private origin: Vector2 | null = null;
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
   private snapped: boolean = false;
+  /** World-space handle the pen keeps steering after the snap, until release. */
+  private snapDrag: SnapDrag | null = null;
   private dwellTimer: ReturnType<typeof setTimeout> | null = null;
+  private dwellDueAt = 0;
 
   get id(): ToolId {
     return 'pen';
@@ -60,6 +68,8 @@ export class PenTool implements ITool {
         new StrokeElement(uuid, [], false, {
           color: this.color,
           size: this.size,
+          stabilization: this.stabilization / 10,
+          simulatePressure: this.usePressure ? undefined : false,
         }),
     );
   }
@@ -69,8 +79,8 @@ export class PenTool implements ITool {
     event: PointerEvent,
     position: Vector2,
   ): void {
-    // Once snapped, the shape is committed in place; release finalizes it.
     if (this.snapped) {
+      this.dragSnappedShape(canvas, position);
       return;
     }
     this.origin ??= { x: position.x, y: position.y };
@@ -80,19 +90,29 @@ export class PenTool implements ITool {
       this.usePressure ? event.pressure : undefined,
     );
 
-    // Every meaningful move resets the anchor and re-arms a single timer, so recognition fires exactly
-    // once per stationary hold even when pointermove stops firing for a still pen.
+    // Keep one timer while moving; re-arming on every pointer sample stalls fast ink.
     if (
       this.dwellAnchor === null ||
-      distance(position, this.dwellAnchor) > DWELL_MOVE_PX
+      distance(position, this.dwellAnchor) >
+        DWELL_MOVE_PX / (canvas.viewport?.zoom ?? 1)
     ) {
-      this.clearDwellTimer();
       this.dwellAnchor = { x: position.x, y: position.y };
       this.recognitionAttemptedForAnchor = false;
-      this.dwellTimer = setTimeout(() => {
-        this.tryRecognize(canvas);
-      }, DWELL_MS);
+      this.dwellDueAt = Date.now() + DWELL_MS;
+      if (this.dwellTimer === null) {
+        this.dwellTimer = setTimeout(() => this.onDwellTimer(canvas), DWELL_MS);
+      }
     }
+  }
+
+  private onDwellTimer(canvas: DrawableCanvas): void {
+    const remaining = this.dwellDueAt - Date.now();
+    if (remaining > 0) {
+      this.dwellTimer = setTimeout(() => this.onDwellTimer(canvas), remaining);
+      return;
+    }
+    this.dwellTimer = null;
+    this.tryRecognize(canvas);
   }
 
   private tryRecognize(canvas: DrawableCanvas): void {
@@ -116,6 +136,8 @@ export class PenTool implements ITool {
     const world = result.geom;
     const { offsetX, offsetY } = geomOffset(result.shapeType, world);
     const localGeom = shiftGeom(result.shapeType, world, offsetX, offsetY);
+    const points = stroke.xyPoints;
+    const [penX, penY] = points[points.length - 1];
 
     canvas.transact(() => {
       canvas.removeElement(stroke);
@@ -127,6 +149,40 @@ export class PenTool implements ITool {
     });
     this.currentStroke = null;
     this.snapped = true;
+    this.snapDrag = snapDragTarget(result.shapeType, world, {
+      x: penX,
+      y: penY,
+    });
+  }
+
+  // Line/triangle: the vertex nearest the pen at snap time sits under the pen. Rect/ellipse: the
+  // nearest bbox corner does, with the opposite corner pinned.
+  private dragSnappedShape(canvas: DrawableCanvas, position: Vector2): void {
+    const shape = this.currentShape;
+    const drag = this.snapDrag;
+    if (shape === null || drag === null) {
+      return;
+    }
+    let world: number[];
+    if (drag.kind === 'vertex') {
+      drag.geom[drag.index * 2] = position.x;
+      drag.geom[drag.index * 2 + 1] = position.y;
+      world = drag.geom;
+    } else {
+      const x = Math.min(drag.pinned.x, position.x);
+      const y = Math.min(drag.pinned.y, position.y);
+      world = [
+        x,
+        y,
+        Math.abs(position.x - drag.pinned.x),
+        Math.abs(position.y - drag.pinned.y),
+      ];
+    }
+    const { offsetX, offsetY } = geomOffset(shape.shapeType, world);
+    canvas.transact(() => {
+      shape.setGeom(shiftGeom(shape.shapeType, world, offsetX, offsetY));
+      shape.setOffset(offsetX, offsetY);
+    });
   }
 
   /** Ink laid down by this tool may reserve space in a page frame. A highlighter never does. */
@@ -178,6 +234,7 @@ export class PenTool implements ITool {
     this.currentStroke = null;
     this.currentShape = null;
     this.snapped = false;
+    this.snapDrag = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
   }
@@ -224,12 +281,66 @@ export class PenTool implements ITool {
           this.size = size;
         },
       },
+      {
+        type: 'toggle',
+        key: 'pressure',
+        label: strings.canvas.toolOptions.pressure,
+        value: this.usePressure,
+        set: (usePressure) => {
+          this.usePressure = usePressure;
+        },
+      },
+      {
+        type: 'size',
+        key: 'stabilization',
+        label: strings.canvas.toolOptions.stabilization,
+        value: this.stabilization,
+        min: 0,
+        max: 10,
+        step: 1,
+        set: (stabilization) => {
+          this.stabilization = stabilization;
+        },
+      },
     ];
   }
 }
 
 function distance(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+type SnapDrag =
+  | { kind: 'vertex'; geom: number[]; index: number }
+  | { kind: 'box'; pinned: Vector2 };
+
+function snapDragTarget(
+  shapeType: ShapeElement['shapeType'],
+  world: number[],
+  pen: Vector2,
+): SnapDrag {
+  const candidates: Vector2[] =
+    shapeType === 'rect' || shapeType === 'ellipse'
+      ? [
+          { x: world[0], y: world[1] },
+          { x: world[0] + world[2], y: world[1] },
+          { x: world[0] + world[2], y: world[1] + world[3] },
+          { x: world[0], y: world[1] + world[3] },
+        ]
+      : Array.from({ length: world.length / 2 }, (_, i) => ({
+          x: world[i * 2],
+          y: world[i * 2 + 1],
+        }));
+  let index = 0;
+  for (let i = 1; i < candidates.length; i++) {
+    if (distance(candidates[i], pen) < distance(candidates[index], pen)) {
+      index = i;
+    }
+  }
+  if (shapeType === 'rect' || shapeType === 'ellipse') {
+    return { kind: 'box', pinned: candidates[(index + 2) % 4] };
+  }
+  return { kind: 'vertex', geom: [...world], index };
 }
 
 /** Bounding-box min of a world-space geom — becomes the element offset. */

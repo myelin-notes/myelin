@@ -1,37 +1,13 @@
 import { clearAllThumbnails } from '@myelin/editor/thumbnails';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Logger } from '@myelin/shared/logger';
+import type { RepositoryConfig } from './config';
 import {
-  DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
-  DEFAULT_REPOSITORY_CONFIG,
   getRepositoryStorageKey,
-  type RepositoryConfig,
-} from './config';
+  normalizeRepositoryConfig,
+} from './repository-backends';
 
 const logger = new Logger('RepositorySettings');
-
-function normalizeRepositoryConfig(config: RepositoryConfig): RepositoryConfig {
-  switch (config.kind) {
-    case 'local':
-      return DEFAULT_REPOSITORY_CONFIG;
-    case 'github':
-      return {
-        kind: 'github',
-        owner: config.owner.trim(),
-        repo: config.repo.trim(),
-        branch: config.branch?.trim() || 'main',
-        credentialId: config.credentialId.trim() || 'default',
-      };
-    case 'google-drive':
-      return {
-        kind: 'google-drive',
-        folderName:
-          config.folderName.trim() || DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
-        folderId: config.folderId.trim(),
-        credentialId: config.credentialId.trim() || 'default',
-      };
-  }
-}
 
 export function getRepositoryConfig(): RepositoryConfig {
   return normalizeRepositoryConfig(UserPrefs.get('repositoryConfig'));

@@ -26,9 +26,7 @@ export class HighlighterTool extends PenTool {
     super(getStrings);
     this.color = '#facc15';
     this.size = 36;
-    this.recognizeShapes = false;
-    // A highlighter is a chisel tip: it should lay down an even band of colour
-    // regardless of how hard the stylus is pressed.
+    this.recognizeShapes = true;
     this.usePressure = false;
   }
 
@@ -42,6 +40,8 @@ export class HighlighterTool extends PenTool {
         new StrokeElement(uuid, [], false, {
           color: hexToRgba(this.color, 0.3),
           size: this.size,
+          stabilization: this.stabilization / 10,
+          simulatePressure: false,
         }),
     );
   }
@@ -82,6 +82,18 @@ export class HighlighterTool extends PenTool {
         step: 2,
         set: (size) => {
           this.size = size;
+        },
+      },
+      {
+        type: 'size',
+        key: 'stabilization',
+        label: strings.toolOptions.stabilization,
+        value: this.stabilization,
+        min: 0,
+        max: 10,
+        step: 1,
+        set: (stabilization) => {
+          this.stabilization = stabilization;
         },
       },
     ];

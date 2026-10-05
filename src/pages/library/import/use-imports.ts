@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { trackEvent } from '@/lib/analytics';
+import { pickFolder } from '@/lib/folder-picker';
 import type { VFSNodeId } from '@/lib/sync';
 import { useRepository } from '@/lib/sync';
 import type { ImportJob, ImportSummaryData } from './dialog';
@@ -72,15 +74,15 @@ export function useImports({
       const provider = getImportProvider(id);
 
       if (provider.picker.kind === 'directory') {
-        const selected = await openDialog({
-          directory: true,
-          multiple: false,
-          recursive: true,
-        });
-        if (!selected || Array.isArray(selected)) {
-          return;
+        try {
+          const selected = await pickFolder();
+          if (!selected) {
+            return;
+          }
+          startJob(id, { kind: 'directory', folder: selected });
+        } catch (error) {
+          toast.error(String(error));
         }
-        startJob(id, { kind: 'directory', path: selected });
         return;
       }
 

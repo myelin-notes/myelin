@@ -18,6 +18,7 @@ describe('thumbnail service', () => {
       createFakePlatform({
         artifactCache: {
           getUrl: async () => null,
+          read: async () => null,
           write: writeArtifact,
           remove: async () => {},
         },

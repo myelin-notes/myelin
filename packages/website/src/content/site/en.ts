@@ -1,18 +1,13 @@
 import type { SiteCopy } from './index';
 
 /**
- * English site copy, and the reference every other locale is written against.
- * The shape is `SiteCopy` in `./index`, so a key added there is a compile error
- * here and in `es.ts` and `zh-hans.ts` until all three are written.
- *
  * Site style: no em dashes.
  */
 const en: SiteCopy = {
   meta: {
-    title:
-      'Myelin Notes: a local-first note-taking app for handwriting, type, and PDFs',
+    title: 'Myelin Notes | Cross-Platform Note-Taking App',
     description:
-      'Myelin Notes is a native, local-first note-taking app for Mac, Windows, and Linux, with iPhone, iPad, and Android on the way: one canvas where handwriting, type, PDFs, images, and audio live in the same note, on your own device. Completely free for personal use.',
+      'Combine handwriting, typed notes, and PDFs in Myelin Notes for Mac, Windows, and Linux. Works offline, with no account. Free for personal use.',
   },
 
   topbar: {
@@ -30,6 +25,7 @@ const en: SiteCopy = {
     linked: 'Linked notes',
     sync: 'Sync & collab',
     'local-first': 'Local-first',
+    import: 'Import',
     download: 'Download',
   },
   /** The one static-page section with no scene of its own. */
@@ -40,10 +36,10 @@ const en: SiteCopy = {
     // static page has no such anchor, so it labels the hero directly. Keeps the
     // hero readable as a standalone chunk, which is how crawlers and answer
     // engines lift it.
-    eyebrow: 'Myelin Notes · a local-first note-taking app',
-    headline: 'Handwriting, typing,\nand PDFs. One note.',
+    eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
+    headline: 'Myelin Notes: handwriting, typing,\nand PDFs. One note.',
     subheadline:
-      'Myelin Notes is a native, local-first note-taking app: one canvas where ink, rich text, PDFs, images, and audio live together. Your notes stay on your machine, and you can still edit live with others, no server required.',
+      'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:
       'Completely free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
@@ -61,7 +57,7 @@ const en: SiteCopy = {
 
   pages: {
     heading: 'Real documents,\nright on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run in nine languages, right in the note. Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C, and C++.',
+    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run.',
     annotation: 'a real, editable page. click into it.',
     pageTitle: 'Lecture 12 · Action potentials',
     pageMarkdown: `# Action potentials
@@ -94,11 +90,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Record it. Find it.\nEven your handwriting.',
+    heading: 'Record it. Transcribe it.\nFind it on the canvas.',
     audioBody:
-      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so every recording is searchable and no audio leaves your machine.',
+      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
-      'Full-text and semantic search run locally, on a bundled all-MiniLM-L6-v2 model. Handwriting is recognized on macOS through Apple’s Vision framework, and audio transcripts are searchable too.',
+      'Search your library by note title, tags, and saved text or audio transcripts. Find matches within an open canvas, too.',
     // Content of the mock app cards standing in for real screenshots
     // (see world-layer.tsx).
     audioMock: {
@@ -110,22 +106,17 @@ for step in range(3):
       match: 'myelin sheath',
     },
     searchMock: {
-      query: 'node of ranvier',
+      query: 'Lecture 12',
       results: [
         {
           kind: 'page',
           title: 'Lecture 12 · Action potentials',
-          snippet: '…the signal jumps between nodes of Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Whiteboard · myelination sketch',
-          snippet: 'Handwriting match, OCR on-device',
+          snippet: 'Canvas note',
         },
         {
           kind: 'audio',
           title: 'Recording · Lecture 12',
-          snippet: 'Transcript match at 31:42',
+          snippet: 'Canvas note',
         },
       ],
     },
@@ -136,13 +127,44 @@ for step in range(3):
     body: '[[Note links]], backlinks, and hover preview cards keep related ideas one hop away. The command palette jumps you anywhere, and per-file version history restores any earlier state of a note.',
   },
 
+  importing: {
+    heading: 'Bring your old notes\nwith you.',
+    body: 'Import your notes from other apps',
+    annotation: 'no copying and pasting.',
+    sources: [
+      {
+        id: 'goodnotes',
+        label: 'Import from Goodnotes',
+        detail:
+          'Import your Goodnotes content by exporting it as a zip of PDFs.',
+      },
+      {
+        id: 'onenote',
+        label: 'Import from OneNote',
+        detail:
+          'Import your OneNote content from a .onepkg notebook or .one section.',
+      },
+      {
+        id: 'obsidian',
+        label: 'Import from Obsidian',
+        detail: 'Import your Obsidian content with the vault folder.',
+      },
+      {
+        id: 'notion',
+        label: 'Import from Notion',
+        detail:
+          'Import your Notion content by exporting it as Markdown and CSV.',
+      },
+    ],
+  },
+
   localFirst: {
     heading: 'It all lives\non your machine.',
     lede: 'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',
-      'Search, semantic embeddings, and handwriting OCR (macOS) all run on your own machine.',
+      'Your notes stay on your own machine.',
       'Bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
       'Import from Obsidian or GoodNotes, export to PDF, images, or JSON, and read every line of source on GitHub.',
     ],
@@ -179,7 +201,7 @@ for step in range(3):
 
   download: {
     heading: 'Download',
-    body: 'Available in English, Spanish, and Simplified Chinese.',
+    body: 'Available in English, Spanish, French, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
     autoUpdates: 'auto-updates\nincluded',
     platforms: [
@@ -241,13 +263,13 @@ Not quite. The source is public, so anyone can read it and check what the app do
 
 Yes, live and peer to peer, today. There is no Myelin account and nothing sitting in the middle. Devices find each other through GitHub sync, so both ends need access to the same repo. Shared notebooks with permissions arrive in v1.0.
 
-## Can I import from Obsidian or GoodNotes?
+## Can I import from another app?
 
-Yes, both. A Notion importer is on the roadmap.
+Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
 
 ## Does it work offline?
 
-Fully. Editing, full-text and semantic search, handwriting recognition, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
+Fully. Editing, audio transcription, PDF annotation, and export all run on your own machine, so the app behaves identically with the network off. Only GitHub sync and live collaboration need a connection, and both are optional.
 
 ## What about iPhone, iPad, and Android?
 
@@ -258,6 +280,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   /** Labels for the shared link set; the hrefs live in `index.ts`. */
   linkLabels: {
     privacy: 'Privacy',
+    support: 'Support',
   },
 
   footer: {

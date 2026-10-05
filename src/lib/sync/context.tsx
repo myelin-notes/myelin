@@ -5,14 +5,22 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
+import { isTauri } from '@tauri-apps/api/core';
+import { createSyncCompletionTracker } from './analytics';
+import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import {
-  getRepositoryStorageKey,
-  type RepositoryConfig,
-  type RepositoryRuntimeStatus,
-} from './repo/config';
+  type CredentialChange,
+  subscribeCredentialChanges,
+} from './repo/credential-vault';
 import { createRepository } from './repo/factory';
+import { noteContentIndex } from './repo/note-content-index';
+import { credentialTokenKey } from './repo/oauth/client';
+import { isRepositoryFullyConfigured } from './repo/readiness';
+import {
+  getRepositoryConfigIdentity,
+  getRepositoryStorageKey,
+} from './repo/repository-backends';
 import {
   getRepositoryConfig,
   subscribeRepositoryConfig,
@@ -25,6 +33,21 @@ import {
 import { RepositoryShutdownGate } from './shutdown-gate';
 
 const logger = new Logger('RepositoryProvider');
+const READINESS_RETRY_DELAY_MS = 30_000;
+
+function credentialChangeAffectsConfig(
+  change: CredentialChange,
+  config: RepositoryConfig,
+): boolean {
+  if (config.kind === 'local') {
+    return false;
+  }
+
+  return (
+    change.clientName === config.kind &&
+    change.key === credentialTokenKey(config.credentialId)
+  );
+}
 
 function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
   return {
@@ -52,23 +75,6 @@ function mergeRuntimeStatus(
   };
 }
 
-function getConfigKey(config: RepositoryConfig): string {
-  switch (config.kind) {
-    case 'local':
-      return 'local';
-    case 'github':
-      return [
-        'github',
-        config.owner,
-        config.repo,
-        config.branch ?? '',
-        config.credentialId,
-      ].join('\0');
-    case 'google-drive':
-      return ['google-drive', config.folderId, config.credentialId].join('\0');
-  }
-}
-
 export function RepositoryProvider({
   children,
   config,
@@ -79,7 +85,8 @@ export function RepositoryProvider({
   const setResolvedConfigIfChanged = useCallback(
     (nextConfig: RepositoryConfig) => {
       setResolvedConfig((current) =>
-        getConfigKey(current) === getConfigKey(nextConfig)
+        getRepositoryConfigIdentity(current) ===
+        getRepositoryConfigIdentity(nextConfig)
           ? current
           : nextConfig,
       );
@@ -111,80 +118,100 @@ export function RepositoryProvider({
     return subscribeRepositoryConfig(setResolvedConfigIfChanged);
   }, [config, setResolvedConfigIfChanged]);
 
+  useEffect(
+    () =>
+      subscribeCredentialChanges((change) => {
+        setResolvedConfig((current) =>
+          credentialChangeAffectsConfig(change, current)
+            ? { ...current }
+            : current,
+        );
+      }),
+    [],
+  );
+
   useEffect(() => {
-    setStatus(
-      mergeRuntimeStatus(
-        createRepositoryStatus(resolvedConfig),
-        repository.getRuntimeStatus(),
-      ),
+    let currentStatus = mergeRuntimeStatus(
+      createRepositoryStatus(resolvedConfig),
+      repository.getRuntimeStatus(),
     );
+    const trackSyncCompletion = createSyncCompletionTracker();
+    trackSyncCompletion(currentStatus);
+    setStatus(currentStatus);
+
+    const updateStatus = (patch: Partial<RepositoryStatus>) => {
+      currentStatus = { ...currentStatus, ...patch };
+      trackSyncCompletion(currentStatus);
+      setStatus(currentStatus);
+    };
 
     let disposed = false;
+    let readinessRetryTimer: number | null = null;
     const unsubscribeStatus = repository.subscribeStatus((runtimeStatus) => {
       if (disposed) {
         return;
       }
 
-      setStatus((current) => mergeRuntimeStatus(current, runtimeStatus));
+      updateStatus(runtimeStatus);
     });
 
-    void repository
-      .initialize()
-      .then(() => {
+    const initialize = async (): Promise<void> => {
+      try {
+        const ready = await isRepositoryFullyConfigured(resolvedConfig);
         if (disposed) {
           return;
         }
 
-        setStatus((current) => ({
-          ...current,
-          initializing: false,
-        }));
-
-        // Hydrate the search corpus and backfill any unindexed notes in the
-        // background. The index cache is namespaced per repository; Rust skips
-        // notes whose content hash is unchanged. Both engines are optional
-        // platform capabilities; absence means no indexing on this client.
-        const { noteIndex, handwriting } = getPlatform();
-        handwriting?.init(getRepositoryStorageKey(resolvedConfig));
-        if (noteIndex || handwriting) {
-          void (
-            noteIndex?.init(getRepositoryStorageKey(resolvedConfig)) ??
-            Promise.resolve()
-          )
-            .then(() => repository.listIndexBackfillItems())
-            .then((items) => {
-              // A repo switch may have run cleanup (reset + next init) while
-              // this chain was resolving; bail so we don't backfill the
-              // previous repo's items under the now-current repo.
-              if (disposed) {
-                return;
-              }
-              noteIndex?.startBackfill(items);
-              handwriting?.startBackfill(items);
-            })
-            .catch((error) => {
-              logger.error('Failed to start note-index backfill', error);
-            });
+        if (!ready) {
+          updateStatus({
+            initializing: false,
+            online: false,
+            lastError: null,
+          });
+          if (typeof window !== 'undefined') {
+            readinessRetryTimer = window.setTimeout(() => {
+              void initialize();
+            }, READINESS_RETRY_DELAY_MS);
+          }
+          return;
         }
-      })
-      .catch((error) => {
+
+        updateStatus({ initializing: true });
+        await repository.initialize();
         if (disposed) {
           return;
         }
 
-        setStatus((current) => ({
-          ...current,
+        if (isTauri()) {
+          noteContentIndex.start(
+            `${resolvedConfig.kind}__${getRepositoryStorageKey(resolvedConfig)}`,
+            repository.getNoteIndexSource(),
+            () => repository.listNoteIndexItems(),
+          );
+        }
+
+        updateStatus({ initializing: false });
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        updateStatus({
           initializing: false,
           lastError: error instanceof Error ? error : new Error(String(error)),
-        }));
-      });
+        });
+      }
+    };
+
+    void initialize();
 
     return () => {
       disposed = true;
+      noteContentIndex.stop();
+      if (readinessRetryTimer !== null) {
+        window.clearTimeout(readinessRetryTimer);
+      }
       unsubscribeStatus();
-      // Drop the previous repo's search corpus so it can't leak into the next.
-      getPlatform().noteIndex?.reset();
-      getPlatform().handwriting?.reset();
       void repository.dispose().catch((error) => {
         logger.error('Failed to dispose repository', error);
       });

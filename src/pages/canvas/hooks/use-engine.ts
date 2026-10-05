@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { AllSelection } from 'prosemirror-state';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import type { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import type { ActionBinding } from '@myelin/editor/keybinds';
@@ -9,6 +10,7 @@ import { TOOL_ACTIONS } from '@myelin/editor/tools/tool-keybinds';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import type { VFSNodeId } from '@/lib/sync';
+import type { TabId } from '@/lib/tabs/types';
 import { useCanvasClipboard } from './use-clipboard';
 import { useDrawableCanvasViewState } from './use-drawable-canvas-view-state';
 import type { EmbedFilesFn } from './use-embed-files';
@@ -19,6 +21,7 @@ import { useCanvasThumbnailProducer } from './use-thumbnail-producer';
 
 interface UseCanvasEngineArgs {
   id: VFSNodeId | undefined;
+  recordingOwnerId: TabId;
   thumbnailRootRef: React.RefObject<HTMLElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   bgHostRef: React.RefObject<HTMLDivElement | null>;
@@ -27,15 +30,18 @@ interface UseCanvasEngineArgs {
   wheelRef: React.RefObject<WheelPickerHandle | null>;
   drawableCanvasRef: React.RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
+  selectedToolIndex: number;
   setSelectedToolIndex: (i: number) => void;
   onCanvasPointerDown: () => void;
   onInsertFrame: () => void;
   onInsertEmbed: () => void;
   embedFiles: EmbedFilesFn;
+  uiServices: CanvasUiServices;
 }
 
 export function useCanvasEngine({
   id,
+  recordingOwnerId,
   thumbnailRootRef,
   canvasRef,
   bgHostRef,
@@ -44,11 +50,13 @@ export function useCanvasEngine({
   wheelRef,
   drawableCanvasRef,
   canvasTools,
+  selectedToolIndex,
   setSelectedToolIndex,
   onCanvasPointerDown,
   onInsertFrame,
   onInsertEmbed,
   embedFiles,
+  uiServices,
 }: UseCanvasEngineArgs) {
   usePageCanvasBindings({
     canvasRef,
@@ -65,12 +73,15 @@ export function useCanvasEngine({
 
   const sessionController = useCanvasSessionController({
     id,
+    recordingOwnerId,
     canvasRef,
     bgHostRef,
     overlayCanvasRef,
     domOverlayRef,
     drawableCanvasRef,
     canvasTools,
+    selectedToolIndex,
+    uiServices,
   });
   const canvasViewState = useDrawableCanvasViewState(drawableCanvasRef.current);
 
@@ -89,7 +100,7 @@ export function useCanvasEngine({
     noteSession: sessionController.noteSession,
   });
 
-  useCanvasClipboard({
+  const clipboard = useCanvasClipboard({
     id,
     drawableCanvasRef,
     embedFiles,
@@ -163,6 +174,7 @@ export function useCanvasEngine({
 
   return {
     drawableCanvasRef,
+    clipboard,
     ...canvasViewState,
     ...sessionController,
     ...saving,

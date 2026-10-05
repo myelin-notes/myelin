@@ -5,12 +5,14 @@ interface AddColorSwatchProps {
   onClick: () => void;
   title?: string;
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
+  size?: 'sm' | 'md';
 }
 
 export function AddColorSwatch({
   onClick,
   onPointerDown,
   title = 'Add custom color',
+  size = 'sm',
 }: AddColorSwatchProps) {
   return (
     <button
@@ -19,7 +21,7 @@ export function AddColorSwatch({
       aria-label={title}
       onPointerDown={onPointerDown}
       onClick={onClick}
-      className="flex size-5 cursor-pointer items-center justify-center rounded-lg border-none bg-transparent p-0 text-text-muted transition-all duration-150 hover:scale-110 hover:text-text-primary"
+      className={`${size === 'md' ? 'pointer-coarse:size-8 size-6' : 'size-5'} flex cursor-pointer items-center justify-center rounded-lg border-none bg-transparent p-0 text-text-muted transition-all duration-150 hover:scale-110 hover:text-text-primary`}
       style={{
         boxShadow: 'inset 0 0 0 1px var(--border-divider)',
       }}

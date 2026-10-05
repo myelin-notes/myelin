@@ -1,24 +1,35 @@
-import { Hand, PenLine, Wand2 } from 'lucide-react';
+import { Hand, PenLine } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import type { InputMode } from '@myelin/editor/input-mode';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
+import { ToggleRow } from '../components/toggle-row';
 
-export function InputSection() {
+export function InputModeRow() {
   const strings = useMessages();
   const inputMode = useUserPref('inputMode');
 
   const modeOptions = strings.settings.input.mode.options;
   const rowOptions: ReadonlyArray<OptionsRowOption<InputMode>> = [
-    { value: 'auto', label: modeOptions.auto, Icon: Wand2 },
     { value: 'pen', label: modeOptions.pen, Icon: PenLine },
     { value: 'touch', label: modeOptions.touch, Icon: Hand },
   ];
 
-  const handleInputMode = (mode: InputMode) => {
-    UserPrefs.set('inputMode', mode);
-  };
+  return (
+    <OptionsRow
+      value={inputMode}
+      onChange={(mode) => UserPrefs.set('inputMode', mode)}
+      label={strings.settings.input.mode.label}
+      description={strings.settings.input.mode.description}
+      options={rowOptions}
+    />
+  );
+}
+
+export function InputSection() {
+  const strings = useMessages();
+  const penBarrelButtonImmediate = useUserPref('penBarrelButtonImmediate');
 
   return (
     <section id="input" className="scroll-mt-12">
@@ -28,13 +39,19 @@ export function InputSection() {
           {strings.settings.input.eyebrow}
         </span>
       </div>
-      <OptionsRow
-        value={inputMode}
-        onChange={handleInputMode}
-        label={strings.settings.input.mode.label}
-        description={strings.settings.input.mode.description}
-        options={rowOptions}
-      />
+      <InputModeRow />
+      <div className="mt-2">
+        <ToggleRow
+          checked={penBarrelButtonImmediate}
+          onToggle={() =>
+            UserPrefs.set('penBarrelButtonImmediate', !penBarrelButtonImmediate)
+          }
+          label={strings.settings.input.penBarrelButtonImmediate.label}
+          description={
+            strings.settings.input.penBarrelButtonImmediate.description
+          }
+        />
+      </div>
     </section>
   );
 }

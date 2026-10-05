@@ -186,6 +186,26 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: node scripts/set-version.mjs "${TAG#v}"
 
+      - name: Require macOS signing secrets for releases
+        if: matrix.platform == 'macos-latest' && github.event_name == 'release'
+        env:
+          CERTIFICATE: ${{ secrets.MACOS_DEVELOPER_ID_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.MACOS_NOTARIZATION_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MACOS_NOTARIZATION_PASSWORD }}
+        run: |
+          missing=()
+          for secret in CERTIFICATE CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD; do
+            if [ -z "${!secret}" ]; then
+              missing+=("$secret")
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing macOS release secrets: ${missing[*]}"
+            echo "::error::Use a Developer ID Application certificate and an Apple app-specific password for notarization."
+            exit 1
+          fi
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -199,6 +219,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Desktop releases use a Developer ID Application certificate, which is
+          # distinct from the Apple Distribution certificate used by the iOS job.
+          APPLE_CERTIFICATE: ${{ github.event_name == 'release' && secrets.MACOS_DEVELOPER_ID_CERTIFICATE || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ github.event_name == 'release' && secrets.MACOS_DEVELOPER_ID_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ github.event_name == 'release' && secrets.MACOS_NOTARIZATION_APPLE_ID || '' }}
+          APPLE_PASSWORD: ${{ github.event_name == 'release' && secrets.MACOS_NOTARIZATION_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ matrix.platform == 'macos-latest' && 'P4Z946QP26' || '' }}
+          APPLE_PROVIDER_SHORT_NAME: ${{ secrets.MACOS_NOTARIZATION_PROVIDER_SHORT_NAME }}
           # Source maps for posthog-js exception symbolication. yarn build (run
           # by tauri-action) injects chunk IDs and uploads the maps via
           # scripts/posthog-sourcemaps.mjs. The key is only set on release
@@ -257,6 +285,8 @@ jobs:
           for v in ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK ANDROID_NDK_LATEST_HOME NDK_HOME; do
             echo "$v=$NDK_PATH" >> "$GITHUB_ENV"
           done
+          # openssl-src needs the NDK's llvm-ranlib when building Git HTTPS.
+          echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -349,7 +379,10 @@ jobs:
           # fail the compile-time size assertions (E0080 overflow). Pointing
           # bindgen at the sysroot lets it generate correct per-ABI bindings.
           BINDGEN_EXTRA_CLANG_ARGS: --sysroot=${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}/toolchains/llvm/prebuilt/linux-x86_64/sysroot
-        run: yarn tauri android build --apk --aab
+        run: |
+          VERSION_CODE=$((1000000 + GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))
+          CONFIG="{\"bundle\":{\"android\":{\"versionCode\":$VERSION_CODE}}}"
+          yarn tauri android build --config "$CONFIG" --apk --aab
 
       # The alignment above rides on an env var through two process hops
       # (CLI -> gradle -> CLI -> cargo), and a dropped var fails silently: the
@@ -461,14 +494,35 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
+      - name: Configure App Store signing
+        if: env.APPLE_CERTIFICATE != '' && env.APPLE_PROVISIONING_PROFILE != ''
+        run: |
+          PBXPROJ=src-tauri/gen/apple/myelin.xcodeproj/project.pbxproj
+          EXPORT_OPTIONS=src-tauri/gen/apple/ExportOptions.plist
+          perl -0pi -e 's/CODE_SIGN_IDENTITY = "iPhone Developer";/CODE_SIGN_IDENTITY = "Apple Distribution";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = "Myelin Notes app store distribution profile";/g' "$PBXPROJ"
+          PATCHED=$(grep -c 'CODE_SIGN_IDENTITY = "Apple Distribution";' "$PBXPROJ" || true)
+          if [ "$PATCHED" -eq 0 ]; then
+            echo "::error::failed to configure App Store signing in $PBXPROJ"
+            exit 1
+          fi
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :teamID string P4Z946QP26' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :signingCertificate string Apple Distribution' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$EXPORT_OPTIONS"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles:com.github.wintersteve25.myelin string Myelin Notes app store distribution profile' "$EXPORT_OPTIONS"
+          plutil -lint "$EXPORT_OPTIONS"
+          echo "Configured App Store signing in $PATCHED pbxproj build configuration(s)"
+
       - name: Build iOS
         env:
           APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
+          IOS_BUNDLE_VERSION: "${{ github.run_number }}.${{ github.run_attempt }}"
         run: |
+          CONFIG="{\"bundle\":{\"iOS\":{\"bundleVersion\":\"$IOS_BUNDLE_VERSION\"}}}"
           if [ -n "$APPLE_DEVELOPMENT_TEAM" ]; then
-            yarn tauri ios build --export-method app-store-connect
+            yarn tauri ios build --config "$CONFIG" --export-method app-store-connect
           else
-            yarn tauri ios build --export-method debugging
+            yarn tauri ios build --config "$CONFIG" --export-method debugging
           fi
 
       - name: Upload to release
@@ -478,7 +532,9 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           shopt -s nullglob
-          files=(src-tauri/gen/apple/build/arm64/*.ipa src-tauri/gen/apple/build/**/*.ipa)
-          if [ ${#files[@]} -gt 0 ]; then
-            gh release upload "$TAG" "${files[@]}" --clobber
+          files=(src-tauri/gen/apple/build/arm64/*.ipa)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no IPA found to upload"
+            exit 1
           fi
+          gh release upload "$TAG" "${files[@]}" --clobber

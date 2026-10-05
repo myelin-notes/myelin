@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-authenticate-web"
+description = "Enables the authenticate_web command without any pre-configured scope."
+commands.allow = ["authenticate_web"]
+
+[[permission]]
+identifier = "deny-authenticate-web"
+description = "Denies the authenticate_web command without any pre-configured scope."
+commands.deny = ["authenticate_web"]

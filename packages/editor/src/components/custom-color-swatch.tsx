@@ -18,6 +18,7 @@ interface CustomColorSwatchProps {
   // The delete menu portals out of its container. Menus that dismiss on an
   // outside pointerdown use this to stay up while it's open.
   onMenuOpenChange?: (open: boolean) => void;
+  size?: 'sm' | 'md';
 }
 
 export function CustomColorSwatch({
@@ -27,6 +28,7 @@ export function CustomColorSwatch({
   onDelete,
   onPointerDown,
   onMenuOpenChange,
+  size = 'sm',
 }: CustomColorSwatchProps) {
   const strings = useMessages();
   const deleteLabel = strings.canvas.toolOptions.deleteColor;
@@ -42,6 +44,7 @@ export function CustomColorSwatch({
           active={active}
           onClick={onClick}
           onPointerDown={onPointerDown}
+          size={size}
           title={color}
         />
         {/* Pointer-only shortcut for the menu item below: Tailwind gates

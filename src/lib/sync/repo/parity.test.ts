@@ -2,14 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createCanvasNoteState,
   createNoteState,
+  getRepositoryTestGitHubApi,
   getRepositoryTestGoogleDriveApi,
   readNoteText,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
 import type { BaseRepository } from './base';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github/git-push';
 import { GoogleDriveRepository } from './google-drive';
 import { LocalRepository } from './local';
+import type { VFSFolderNode } from './types';
+
+vi.mock('./github/git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 const repositoryCases: {
   name: string;
@@ -43,6 +48,13 @@ describe('Repository business logic parity', () => {
   beforeEach(() => {
     resetRepositoryTestDoubles();
     vi.useRealTimers();
+    vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+      getRepositoryTestGitHubApi().applyGitPush(
+        input.additions,
+        input.deletions,
+        input.expectedHeadOid,
+      ),
+    );
   });
 
   for (const { name, createRepository } of repositoryCases) {
@@ -99,6 +111,8 @@ describe('Repository business logic parity', () => {
       await repository.addCustomColor('#ABCDEF', 'pen');
       await repository.addCustomColor('#FACC15', 'highlighter');
       await repository.addCustomColor('#3B82F6', 'text');
+      await repository.addCustomColor('#EC4899', 'folder');
+      await repository.setFolderColor(folderId, '#EC4899');
       await repository.addRegistryTags(['alpha', 'orphan']);
       const [penPreset] = await repository.addPenPreset({
         tool: 'pen',
@@ -158,6 +172,11 @@ describe('Repository business logic parity', () => {
         '#facc15',
       ]);
       expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
+      expect(await repository.getCustomColors('folder')).toEqual(['#ec4899']);
+      expect(await repository.getNode(folderId)).toMatchObject({
+        type: 'folder',
+        color: '#ec4899',
+      });
       expect((await repository.getRegistryTags()).sort()).toEqual([
         'alpha',
         'orphan',
@@ -216,6 +235,12 @@ describe('Repository business logic parity', () => {
       await repository.removeCustomColor('#abcdef', 'pen');
       await repository.removeCustomColor('#facc15', 'highlighter');
       await repository.removeCustomColor('#3b82f6', 'text');
+      await repository.removeCustomColor('#ec4899', 'folder');
+      await repository.setFolderColor(folderId, null);
+      const clearedFolder = (await repository.getNode(
+        folderId,
+      )) as VFSFolderNode;
+      expect(clearedFolder.color).toBeUndefined();
       await repository.removeRegistryTag('orphan');
       await repository.updatePenPreset(penPreset.id, { size: 20 });
       const remainingPresets = await repository.getPenPresets();
@@ -227,6 +252,7 @@ describe('Repository business logic parity', () => {
       expect(await repository.getCustomColors('pen')).toEqual([]);
       expect(await repository.getCustomColors('highlighter')).toEqual([]);
       expect(await repository.getCustomColors('text')).toEqual([]);
+      expect(await repository.getCustomColors('folder')).toEqual([]);
       expect(await repository.getRegistryTags()).toEqual(['alpha']);
       expect(await repository.getPenPresets()).toEqual([
         {

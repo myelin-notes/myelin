@@ -6,7 +6,6 @@
  */
 
 import { Logger } from '@myelin/shared/logger';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import {
   deriveCodeChallenge,
   encodeFormBody,
@@ -110,7 +109,15 @@ export class OAuthClient {
   }
 
   async open(payload: OAuthStartPayload): Promise<void> {
-    await openUrl(payload.authorizeUrl);
+    const normalized = normalizeCredentialId(payload.credentialId);
+    const session = this.pendingSessions.get(normalized);
+    if (!session) {
+      throw new Error(
+        `No active ${this.options.provider} authorization session.`,
+      );
+    }
+
+    await session.listener.open(payload.authorizeUrl);
   }
 
   async wait(

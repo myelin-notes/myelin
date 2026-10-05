@@ -5,6 +5,7 @@ import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
 import { quantizeRasterZoom } from './raster-zoom';
+import type { SelectionController } from './selection-controller';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
@@ -214,6 +215,7 @@ export class CanvasRenderer {
     screenPosition: Vector2,
     placementController: PlacementController,
     domOverlayHost: HTMLElement | null,
+    selection: SelectionController,
   ): void {
     const dpr = window.devicePixelRatio || 1;
     const logicalW = this.canvas.width / dpr;
@@ -234,10 +236,12 @@ export class CanvasRenderer {
 
     const viewRect = viewport.getWorldRect();
     const cullMargin = cullMarginWorld(zoom);
+    const visibleElements: DrawableElement[] = [];
     for (const element of elements) {
       if (!element.intersectsWorldRect(viewRect, cullMargin)) {
         continue;
       }
+      visibleElements.push(element);
       element.draw(this.ctx, deltaTime);
     }
     // Cursor: compute fresh from screen position so it's correct even if
@@ -250,10 +254,8 @@ export class CanvasRenderer {
     }
     this.ctx.restore();
 
-    // Read after the draw loop, which is what advances `selectionT` from zero.
-    const overlayHasContent = elements.some(
-      (element) => element.hasSelectionOverlay,
-    );
+    selection.advanceOverlay(deltaTime);
+    const overlayHasContent = selection.hasOverlay;
     if (
       this.overlayCtx &&
       this.overlayCanvas &&
@@ -266,22 +268,17 @@ export class CanvasRenderer {
       this.overlayCtx.save();
       this.overlayCtx.scale(zoom, zoom);
       this.overlayCtx.translate(offset.x, offset.y);
-      for (const element of elements) {
-        element.drawSelectionOverlay(
-          this.overlayCtx,
-          element === editingElement,
-        );
-      }
+      selection.drawOverlay(this.overlayCtx, editingElement, zoom);
       this.overlayCtx.restore();
       this.overlayHasContent = overlayHasContent;
     }
 
     if (domOverlayHost) {
       for (const element of elements) {
-        element.syncDOM(viewport, domOverlayHost);
+        element.syncDOM(viewport, domOverlayHost, visibleElements);
       }
-      // DOM overlay nodes share one layer and stack by DOM order, not element z-order, and syncDOM
-      // only appends on create — so a reorder never moves them. Only out-of-position nodes move.
+      // DOM roots share canvas order with page-frame chrome, so keep both z-index and sibling order
+      // in sync. `syncDOM` only appends on create, so only out-of-position nodes move.
       reorderDomOverlay(domOverlayHost, elements);
     }
   }
@@ -381,27 +378,30 @@ export class CanvasRenderer {
   }
 }
 
-function reorderDomOverlay(
+export function reorderDomOverlay(
   host: HTMLElement,
-  elements: DrawableElement[],
+  elements: readonly Pick<DrawableElement, 'uuid' | 'setDomZIndex'>[],
 ): void {
-  const nodes = new Map<string, Element>();
+  const nodes = new Map<string, HTMLElement>();
   for (const child of host.children) {
-    const uuid = (child as HTMLElement).dataset.elementUuid;
+    const node = child as HTMLElement;
+    const uuid = node.dataset.elementUuid;
     if (uuid) {
-      nodes.set(uuid, child);
+      nodes.set(uuid, node);
     }
   }
-  if (nodes.size < 2) {
-    return;
-  }
-
-  let prev: Element | null = null;
-  for (const element of elements) {
+  let prev: HTMLElement | null = null;
+  for (let index = 0; index < elements.length; index++) {
+    const element = elements[index];
     const node = nodes.get(element.uuid);
     if (!node) {
       continue;
     }
+    const zIndex = String(index + 1);
+    if (node.style.zIndex !== zIndex) {
+      node.style.zIndex = zIndex;
+    }
+    element.setDomZIndex(zIndex);
     const expected: Element | null = prev
       ? prev.nextElementSibling
       : host.firstElementChild;

@@ -26,9 +26,10 @@ describe('getWaveformCanvasMetrics', () => {
 describe('getAudioPlayerInteractionState', () => {
   it('disables the primary button for non-creators until audio exists', () => {
     const state = getAudioPlayerInteractionState({
-      audioBytes: null,
+      audioBuffer: null,
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'none' },
     });
 
@@ -36,11 +37,25 @@ describe('getAudioPlayerInteractionState', () => {
     expect(state.isWaitingForRemoteAudio).toBe(true);
   });
 
+  it('shows processing feedback and disables the primary button after recording stops', () => {
+    const state = getAudioPlayerInteractionState({
+      audioBuffer: null,
+      hasTranscript: false,
+      isCreator: true,
+      recordingState: 'processing',
+      slot: { kind: 'none' },
+    });
+
+    expect(state.primaryButtonDisabled).toBe(true);
+    expect(state.isProcessingRecording).toBe(true);
+  });
+
   it('shows captions as loading while a valid remote claim is transcribing', () => {
     const state = getAudioPlayerInteractionState({
-      audioBytes: new Uint8Array([1]),
+      audioBuffer: new Uint8Array([1]).buffer,
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'transcribing-remote', peerId: 'peer-b' },
     });
 
@@ -50,9 +65,10 @@ describe('getAudioPlayerInteractionState', () => {
 
   it('disables captions when no capable client can transcribe here', () => {
     const state = getAudioPlayerInteractionState({
-      audioBytes: new Uint8Array([1]),
+      audioBuffer: new Uint8Array([1]).buffer,
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'unavailable' },
     });
 
@@ -62,9 +78,10 @@ describe('getAudioPlayerInteractionState', () => {
 
   it('enables the transcribe affordance for a capable eligible client', () => {
     const state = getAudioPlayerInteractionState({
-      audioBytes: new Uint8Array([1]),
+      audioBuffer: new Uint8Array([1]).buffer,
       hasTranscript: false,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'can-transcribe' },
     });
 
@@ -74,9 +91,10 @@ describe('getAudioPlayerInteractionState', () => {
 
   it('allows captions once the transcript has synced', () => {
     const state = getAudioPlayerInteractionState({
-      audioBytes: new Uint8Array([1]),
+      audioBuffer: new Uint8Array([1]).buffer,
       hasTranscript: true,
       isCreator: false,
+      recordingState: 'idle',
       slot: { kind: 'none' },
     });
 

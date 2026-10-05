@@ -12,11 +12,10 @@ import { trackEvent } from '@myelin/shared/analytics';
 import { getCanvasPalette } from '../canvas-theme';
 import type { ChromeMenuItem } from '../chrome-menu';
 import type { DrawableCanvas } from '../drawable-canvas';
-import {
-  type ExportOptions,
-  type ExportResult,
-  type ExportTarget,
-  openExportDialog,
+import type {
+  ExportOptions,
+  ExportResult,
+  ExportTarget,
 } from '../export/export-controller';
 import { getMessages } from '../i18n';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
@@ -36,6 +35,14 @@ import {
 import { getPlatform } from '../platform';
 import { UserPrefs } from '../user-prefs';
 import type { YDocManager } from '../ydoc-manager';
+import type {
+  CanvasElementContext,
+  CanvasUiServices,
+} from './canvas-element-context';
+import type {
+  CanvasSearchContent,
+  SearchableElement,
+} from './canvas-searchable-element';
 import {
   DrawableElement,
   type ResizeHandle,
@@ -57,6 +64,10 @@ import {
   PAGE_WIDTH,
   type PageLayout,
 } from './page-frame-constants';
+import type {
+  CanvasPdfExportData,
+  PdfExportableElement,
+} from './pdf-exportable-element';
 
 export {
   PAGE_CORNER_RADIUS,
@@ -70,7 +81,10 @@ const MIN_PAGE_WIDTH = 240;
 const EDIT_MODE_WIDTH_RATIO = 0.65;
 const EDIT_MODE_HEIGHT_RATIO = 0.86;
 
-export class PageFrameElement extends DrawableElement {
+export class PageFrameElement
+  extends DrawableElement
+  implements PdfExportableElement, SearchableElement
+{
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
   private _displayName: string;
@@ -84,6 +98,7 @@ export class PageFrameElement extends DrawableElement {
     null;
   private _noteLinkResolver?: NoteLinkResolver;
   private _mediaResolver?: ResolveMediaSrc;
+  private _uiServices?: CanvasUiServices;
   private _onDisplayNameRenamed?: (
     uuid: string,
     newName: string,
@@ -131,6 +146,18 @@ export class PageFrameElement extends DrawableElement {
     callback?: (uuid: string, newName: string, oldName: string) => void,
   ): void {
     this._onDisplayNameRenamed = callback;
+  }
+
+  public override configureCanvas(context: CanvasElementContext): void {
+    this.setNoteLinkResolver(context.resolveNoteLink);
+    this.setMediaResolver(context.resolveMedia);
+    this.setOnDisplayNameRenamed(context.onPageFrameRenamed);
+    this.setExportElementsProvider(context.getElements);
+    this._uiServices = context.uiServices;
+  }
+
+  public get uiServices(): CanvasUiServices | undefined {
+    return this._uiServices;
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -189,6 +216,7 @@ export class PageFrameElement extends DrawableElement {
       yXmlFragment,
       this._noteLinkResolver,
       this._mediaResolver,
+      this._uiServices?.ensureCodeOutputCard,
     );
   }
 
@@ -491,7 +519,8 @@ export class PageFrameElement extends DrawableElement {
         id: 'export',
         label: strings.export,
         icon: DownloadIcon,
-        onSelect: () => openExportDialog(this.buildExportTarget()),
+        onSelect: () =>
+          this._uiServices?.openExportDialog(this.buildExportTarget()),
       },
     ];
   }
@@ -610,6 +639,21 @@ export class PageFrameElement extends DrawableElement {
     };
   }
 
+  public getCanvasPdfExportData(): CanvasPdfExportData {
+    const scaleX = Math.max(Math.abs(this.scale.x), 0.001);
+    const scaleY = Math.max(Math.abs(this.scale.y), 0.001);
+    return {
+      kind: 'page-frame',
+      source: this.getPdfExportSource(),
+      fallbackBounds: new DOMRect(
+        this.offset.x,
+        this.offset.y,
+        this.totalWidth * scaleX,
+        this.totalHeight * scaleY,
+      ),
+    };
+  }
+
   public setExportElementsProvider(
     provider: () => readonly DrawableElement[],
   ): void {
@@ -630,6 +674,11 @@ export class PageFrameElement extends DrawableElement {
       return null;
     }
     return yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  }
+
+  public getCanvasSearchContent(): CanvasSearchContent | null {
+    const doc = this.getCurrentDoc();
+    return doc ? { kind: 'page-frame', doc } : null;
   }
 
   // Runs in element-local coordinates (origin at the top-left of page 0), matching

@@ -13,6 +13,10 @@ import {
 } from '@myelin/editor/events';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
+import {
+  prepareCanvasTabClose,
+  registerAudioRecordingShutdownTask,
+} from '@/lib/audio-recording-lifecycle';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';
@@ -36,11 +40,20 @@ const TabControllerContext = createContext<TabStateController | null>(null);
 const PaneIdContext = createContext<PaneId | null>(null);
 
 export function TabStateProvider({ children }: { children: ReactNode }) {
+  useEffect(() => registerAudioRecordingShutdownTask(), []);
+
+  const beforeCloseTab = useCallback((tab: Tab) => {
+    if (tab.target.type !== 'canvas') {
+      return;
+    }
+    return prepareCanvasTabClose(tab.id);
+  }, []);
+
   const controller = useMemo(() => {
     const closeWindow = () => {
       void getCurrentWebviewWindow().close();
     };
-    const options = { singleTab: IS_PHONE_BUILD };
+    const options = { singleTab: IS_PHONE_BUILD, beforeCloseTab };
     const initTab = readInitTab();
     if (initTab) {
       // Tabs torn off into their own window close that window when emptied.
@@ -53,7 +66,7 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
     // The main window never closes from emptying its tabs; it falls back to an
     // empty home pane (recents + welcome).
     return new TabStateController(undefined, undefined, options);
-  }, []);
+  }, [beforeCloseTab]);
 
   useTabCloseShortcut(controller);
   useAdoptDroppedTabs(controller);
@@ -110,6 +123,10 @@ function useTabCloseShortcut(controller: TabStateController) {
         return;
       }
       e.preventDefault();
+      if (pane.activePage) {
+        controller.togglePanePage(pane.activePage, pane.id);
+        return;
+      }
       controller.closeTab(pane.activeTabId, pane.id);
     },
     [controller],

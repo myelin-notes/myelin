@@ -1,10 +1,11 @@
 import { memo } from 'react';
-import type { Tab } from '@/lib/tabs/types';
+import type { PanePage, Tab } from '@/lib/tabs/types';
 import { CanvasView } from '@/pages/canvas';
 import { CsvViewerPage } from '@/pages/csv-viewer';
 import { GraphPage } from '@/pages/graph';
 import { ImageViewerPage } from '@/pages/image-viewer';
 import { SettingsPage } from '@/pages/settings';
+import { UnsupportedFilePage } from '@/pages/unsupported-file';
 
 interface PaneContentProps {
   tab: Tab;
@@ -22,6 +23,7 @@ export const PaneContent = memo(function PaneContent({
       return (
         <CanvasView
           id={tab.target.id}
+          recordingOwnerId={tab.id}
           initialPageFrameName={tab.target.pageFrameName}
           initialPageFrameId={tab.target.pageFrameId}
         />
@@ -30,5 +32,20 @@ export const PaneContent = memo(function PaneContent({
       return <ImageViewerPage id={tab.target.id} />;
     case 'csv':
       return <CsvViewerPage id={tab.target.id} />;
+    case 'unsupported':
+      return <UnsupportedFilePage fileType={tab.target.fileType} />;
+  }
+});
+
+export const PanePageContent = memo(function PanePageContent({
+  page,
+}: {
+  page: PanePage;
+}) {
+  switch (page) {
+    case 'graph':
+      return <GraphPage />;
+    case 'settings':
+      return <SettingsPage />;
   }
 });

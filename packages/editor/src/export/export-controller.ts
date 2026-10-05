@@ -29,15 +29,3 @@ export interface ExportTarget {
   /** Perform the export. Owns the native save dialog; resolves with the outcome. */
   run(options: ExportOptions): Promise<ExportResult>;
 }
-
-type Opener = (target: ExportTarget) => void;
-
-let opener: Opener | null = null;
-
-export function setExportDialogOpener(fn: Opener | null): void {
-  opener = fn;
-}
-
-export function openExportDialog(target: ExportTarget): void {
-  opener?.(target);
-}

@@ -1,11 +1,14 @@
 import type { NodeViewConstructor } from 'prosemirror-view';
+import type { EnsureCodeOutputCard } from '../../elements/code-output/bridge';
 import { CodeBlockNodeView } from './code-block/node-view';
 import { MathBlockNodeView } from './math/block-node-view';
 import { isMermaidBlock } from './mermaid/detect';
 import { MermaidBlockNodeView } from './mermaid/node-view';
 import { PageFrameTableNodeView } from './table/node-view';
 
-export function buildNodeViews(): Record<string, NodeViewConstructor> {
+export function buildNodeViews(
+  ensureCodeOutputCard?: EnsureCodeOutputCard,
+): Record<string, NodeViewConstructor> {
   return {
     mathBlock(node, view, getPos) {
       if (typeof getPos !== 'function') {
@@ -35,7 +38,7 @@ export function buildNodeViews(): Record<string, NodeViewConstructor> {
       // rebuilds through here with the right class.
       return isMermaidBlock(node.textContent)
         ? new MermaidBlockNodeView(node, view, pos)
-        : new CodeBlockNodeView(node, view, pos);
+        : new CodeBlockNodeView(node, view, pos, ensureCodeOutputCard);
     },
     table(node, view, getPos) {
       if (typeof getPos !== 'function') {

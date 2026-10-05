@@ -2,7 +2,7 @@ name: myelin
 options:
   bundleIdPrefix: com.github.wintersteve25.myelin
   deploymentTarget:
-    iOS: 14.0
+    iOS: 15.0
 fileGroups: [../../src]
 configs:
   debug: debug
@@ -31,6 +31,9 @@ targets:
       - path: Sources
       - path: Assets.xcassets
       - path: Externals
+        excludes:
+          - "**/*.a"
+        buildPhase: none
       - path: myelin_iOS
       - path: assets
         buildPhase: resources
@@ -54,12 +57,8 @@ targets:
         CFBundleShortVersionString: 0.1.0
         CFBundleVersion: "0.1.0"
         CFBundleDisplayName: Myelin Notes
+        NSCameraUsageDescription: Take photos to insert into your notes.
         NSMicrophoneUsageDescription: Record audio notes in Myelin Notes.
-        # OAuth redirect target
-        CFBundleURLTypes:
-          - CFBundleURLName: com.github.wintersteve25.myelin
-            CFBundleTypeRole: Editor
-            CFBundleURLSchemes: [com.github.wintersteve25.myelin]
     entitlements:
       path: myelin_iOS/myelin_iOS.entitlements
     scheme:
@@ -75,7 +74,7 @@ targets:
         # into the Xcode link of libapp.a, so they're declared here.
         # -L uses DT_TOOLCHAIN_DIR: since Xcode 26, TOOLCHAIN_DIR resolves to
         # the Metal toolchain cryptex, which lacks the Swift compat libs.
-        OTHER_LDFLAGS: $(inherited) -framework Accelerate -L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) -lswiftCompatibility56 -lswiftCompatibilityConcurrency
+        OTHER_LDFLAGS: $(inherited) -framework Accelerate -L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) -lswiftCompatibility56 -lswiftCompatibilityConcurrency -lz -liconv
         ARCHS: [arm64]
         VALID_ARCHS: arm64 
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
@@ -83,13 +82,14 @@ targets:
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
         EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
         DEVELOPMENT_TEAM: P4Z946QP26
-        # ios-build.yml's unsigned path rewrites this exact literal to
-        # CODE_SIGNING_ALLOWED = NO and fails the build if it finds no match.
+        # The iOS CI workflows rewrite this exact literal for unsigned or App Store signing
+        # and fail the build if it finds no match.
         CODE_SIGN_IDENTITY: iPhone Developer
       groups: [app]
     dependencies:
       - framework: libapp.a
         embed: false
+      - sdk: AuthenticationServices.framework
       - sdk: CoreGraphics.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework

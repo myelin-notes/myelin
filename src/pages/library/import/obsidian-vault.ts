@@ -1,8 +1,8 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
 import { Logger } from '@myelin/shared/logger';
-import { join } from '@tauri-apps/api/path';
-import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
+import type { PickedFolder } from '@/lib/folder-picker';
+import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
@@ -27,7 +27,7 @@ const MARKDOWN_FRONT_MATTER_RE =
 type VaultImportFile =
   | {
       kind: 'markdown';
-      absolutePath: string;
+      sourcePath: string;
       folderPath: string;
       name: string;
       noteName: string;
@@ -36,13 +36,13 @@ type VaultImportFile =
     }
   | {
       kind: 'pdf';
-      absolutePath: string;
+      sourcePath: string;
       folderPath: string;
       name: string;
     }
   | {
       kind: 'storage';
-      absolutePath: string;
+      sourcePath: string;
       fileType: FileType;
       folderPath: string;
       name: string;
@@ -69,13 +69,18 @@ export interface ObsidianVaultImportResult {
 export interface ImportObsidianVaultOptions {
   repository: Repository;
   parentId: string | null;
-  vaultPath: string;
+  vaultPath: string | PickedFolder;
   vaultName?: string;
   scanned?: ScannedVault;
   onProgress?: (progress: ImportProgress) => void;
 }
 
-export function getPathName(path: string): string {
+export function getPathName(path: string | PickedFolder): string {
+  if (typeof path !== 'string') {
+    return path.kind === 'scoped'
+      ? path.handle.name || 'Obsidian Vault'
+      : getPathName(path.path);
+  }
   return getPathBasename(path, 'Obsidian Vault');
 }
 
@@ -221,7 +226,7 @@ function parseObsidianMarkdown(markdown: string): ParsedObsidianMarkdown {
 }
 
 function getImportFile(
-  absolutePath: string,
+  sourcePath: string,
   folderSegments: readonly string[],
   fileName: string,
 ): VaultImportFile | null {
@@ -231,7 +236,7 @@ function getImportFile(
     const noteName = getMarkdownNoteName(fileName);
     return {
       kind: 'markdown',
-      absolutePath,
+      sourcePath,
       folderPath,
       name: fileName,
       noteName,
@@ -243,7 +248,7 @@ function getImportFile(
   if (isPdfFileName(fileName)) {
     return {
       kind: 'pdf',
-      absolutePath,
+      sourcePath,
       folderPath,
       name: fileName,
     };
@@ -253,7 +258,7 @@ function getImportFile(
   if (fileType && fileType !== 'mcanvas') {
     return {
       kind: 'storage',
-      absolutePath,
+      sourcePath,
       fileType,
       folderPath,
       name: fileName,
@@ -264,11 +269,12 @@ function getImportFile(
 }
 
 async function scanVaultDirectory(
-  absolutePath: string,
+  reader: FolderReader,
+  sourcePath: string,
   relativeSegments: string[],
   scanned: ScannedVault,
 ): Promise<void> {
-  const entries = await readDir(absolutePath);
+  const entries = await reader.readDir(sourcePath);
 
   for (const entry of entries) {
     if (isDotEntryName(entry.name)) {
@@ -280,9 +286,10 @@ async function scanVaultDirectory(
       continue;
     }
 
-    const childPath = await join(absolutePath, entry.name);
+    const childPath = await reader.join(sourcePath, entry.name);
     if (entry.isDirectory) {
       await scanVaultDirectory(
+        reader,
         childPath,
         [...relativeSegments, entry.name],
         scanned,
@@ -306,13 +313,16 @@ async function scanVaultDirectory(
   }
 }
 
-export async function scanVault(vaultPath: string): Promise<ScannedVault> {
+export async function scanVault(
+  vaultPath: string | PickedFolder,
+): Promise<ScannedVault> {
   const scanned: ScannedVault = {
     files: [],
     folderPaths: new Set(),
     skippedFiles: 0,
   };
-  await scanVaultDirectory(vaultPath, [], scanned);
+  const reader = createFolderReader(vaultPath);
+  await scanVaultDirectory(reader, reader.root, [], scanned);
   return scanned;
 }
 
@@ -373,10 +383,12 @@ function createVaultNoteLinkResolver(
 }
 
 async function writeMarkdownFile({
+  reader,
   file,
   repository,
   resolveNoteLinkId,
 }: {
+  reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'markdown' }>;
   repository: Repository;
   resolveNoteLinkId: (target: string) => Promise<VFSNodeId | null>;
@@ -385,7 +397,7 @@ async function writeMarkdownFile({
     throw new Error(`Markdown file was not created: ${file.name}`);
   }
 
-  const markdown = await readTextFile(file.absolutePath);
+  const markdown = await reader.readTextFile(file.sourcePath);
   const parsedMarkdown = parseObsidianMarkdown(markdown);
   if (parsedMarkdown.tags.length > 0) {
     await repository.setTags(file.nodeId, parsedMarkdown.tags);
@@ -403,15 +415,17 @@ async function writeMarkdownFile({
 }
 
 async function importPdfVaultFile({
+  reader,
   file,
   repository,
   parentId,
 }: {
+  reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'pdf' }>;
   repository: Repository;
   parentId: string | null;
 }): Promise<void> {
-  const bytes = await readFile(file.absolutePath);
+  const bytes = await reader.readFile(file.sourcePath);
   const pageSizes = await getPdfPageSizes(bytes);
   const nodeId = await repository.createFile(
     getPdfCanvasName(file.name),
@@ -428,10 +442,12 @@ async function importPdfVaultFile({
 }
 
 async function importStorageVaultFile({
+  reader,
   file,
   repository,
   parentId,
 }: {
+  reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'storage' }>;
   repository: Repository;
   parentId: string | null;
@@ -440,7 +456,7 @@ async function importStorageVaultFile({
     file.name,
     file.fileType,
     parentId,
-    await readFile(file.absolutePath),
+    await reader.readFile(file.sourcePath),
   );
 }
 
@@ -452,6 +468,7 @@ export async function importObsidianVault({
   scanned: preScanned,
   onProgress,
 }: ImportObsidianVaultOptions): Promise<ObsidianVaultImportResult> {
+  const reader = createFolderReader(vaultPath);
   const scanned = preScanned ?? (await scanVault(vaultPath));
   if (scanned.files.length === 0) {
     throw new Error('No supported files found in the selected vault.');
@@ -489,7 +506,12 @@ export async function importObsidianVault({
       const resolveNoteLinkId = createVaultNoteLinkResolver(markdownFiles);
       for (const file of markdownFiles) {
         onProgress?.({ current: ++current, total, fileName: file.name });
-        await writeMarkdownFile({ file, repository, resolveNoteLinkId });
+        await writeMarkdownFile({
+          reader,
+          file,
+          repository,
+          resolveNoteLinkId,
+        });
       }
 
       let mediaImported = 0;
@@ -506,12 +528,14 @@ export async function importObsidianVault({
         );
         if (file.kind === 'pdf') {
           await importPdfVaultFile({
+            reader,
             file,
             repository,
             parentId: importParentId,
           });
         } else {
           await importStorageVaultFile({
+            reader,
             file,
             repository,
             parentId: importParentId,

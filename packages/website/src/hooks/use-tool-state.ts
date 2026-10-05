@@ -38,6 +38,11 @@ function bindToolOption(
         ...option,
         set: (value: string) => applyRef.current(tool, option, value),
       };
+    case 'toggle':
+      return {
+        ...option,
+        set: (value: boolean) => applyRef.current(tool, option, value),
+      };
   }
 }
 

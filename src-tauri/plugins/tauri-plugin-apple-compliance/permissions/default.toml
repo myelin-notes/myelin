@@ -1,0 +1,8 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Allows Apple system authentication APIs."
+permissions = [
+  "allow-authenticate-web",
+  "allow-cancel-web-authentication",
+]

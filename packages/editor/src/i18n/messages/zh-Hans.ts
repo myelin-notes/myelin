@@ -25,8 +25,6 @@ const zhHans: typeof en = {
   },
   sidebar: {
     searchPlaceholder: '搜索你的资料库…',
-    searchModeText: '文本',
-    searchModeSemantic: '语义',
     explorer: '资源管理器',
     tags: '标签',
     collapse: '收起侧边栏',
@@ -95,7 +93,6 @@ const zhHans: typeof en = {
       description: '遇到问题或有想法？填写简短表单告诉我们。',
     },
     searchPlaceholder: '搜索工作室…',
-    semanticSearchLabel: '语义搜索',
     explorer: '资源管理器',
     sortLabel: (label: string) => `排序：${label}`,
     sortModes: {
@@ -137,7 +134,7 @@ const zhHans: typeof en = {
         summary: (count: number) => `已导入 ${count} 个文件`,
       },
       goodnotes_zip: {
-        label: 'Goodnotes ZIP',
+        label: '从 Goodnotes 导入',
         description: '以 PDF 形式导出的 Goodnotes 文件夹。',
         title: '导入 Goodnotes ZIP',
         scanning: '正在读取压缩包…',
@@ -146,7 +143,7 @@ const zhHans: typeof en = {
         summary: (count: number) => `已导入 ${count} 个 PDF`,
       },
       onenote: {
-        label: 'OneNote',
+        label: '从 OneNote 导入',
         description: '从 OneNote 导出的 .onepkg 笔记本或 .one 分区。',
         title: '导入 OneNote',
         scanning: '正在读取笔记本…',
@@ -157,7 +154,7 @@ const zhHans: typeof en = {
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
       },
       obsidian_vault: {
-        label: 'Obsidian 仓库',
+        label: '从 Obsidian 导入',
         description: '仓库文件夹，包含其笔记和附件。',
         title: '导入 Obsidian 仓库',
         scanning: '正在扫描仓库…',
@@ -215,8 +212,13 @@ const zhHans: typeof en = {
       insights: '工作室洞察',
       addTag: '新建标签',
       addChild: (tag: string) => `在 #${tag} 下添加标签`,
+      toggleChildren: (tag: string) => `展开或收起 #${tag} 下的标签`,
       placeholder: '标签名称…',
       deleteTag: (tag: string) => `删除 #${tag}`,
+      deleteUsedTitle: '删除正在使用的标签？',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} 正用于 ${count} 个项目。删除它也会从这些项目中移除匹配的子标签。`,
+      deleteUsedAction: '删除标签',
       stats: {
         totalFiles: '文件总数',
         folders: '文件夹',
@@ -224,14 +226,28 @@ const zhHans: typeof en = {
       },
     },
     explorerTree: {
+      preparingIndex: '正在索引笔记… 可能还会出现更多结果。',
+      indexingUnavailable: '无法索引笔记。稍后将重试已保存内容搜索。',
+      indexingNotes: (indexed: number, total: number) =>
+        `正在索引笔记… ${indexed}/${total}。可能还会出现更多结果。`,
+      indexingFailed: (count: number) => `${count} 篇笔记无法索引。`,
       repositorySetupRequired: '请先在设置中完成仓库配置，才能查看文件',
       emptySearch: '未找到结果',
       emptyFilter: '没有符合所选标签的项目',
       emptyDefault: '还没有文件',
+      selectedCount: (count: number) => `${count} 个项目`,
     },
     itemMenu: {
+      moveTo: '移动到…',
+      moveHere: '移动到此处',
+      workspace: '工作区',
+      back: '返回',
+      loadError: '无法加载文件夹。',
+      moveError: '无法移动项目。',
+
       rename: '重命名',
       manageTags: '管理标签',
+      color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
       remove: '移除',
@@ -285,7 +301,6 @@ const zhHans: typeof en = {
     restoreFailed: '无法恢复版本',
   },
   settings: {
-    title: '偏好设置',
     theme: {
       title: '主题',
       eyebrow: '外观',
@@ -323,12 +338,16 @@ const zhHans: typeof en = {
       mode: {
         label: '绘图输入',
         description:
-          '手指在画布上的作用。自动：在检测到手写笔之前用手指绘图；手写笔：只有手写笔能绘图；触摸：手指始终绘图，双指平移和缩放。',
+          '手指在画布上的作用。手写笔：只有手写笔能绘图，手指平移；触摸：手指绘图，双指平移和缩放。',
         options: {
-          auto: '自动',
           pen: '手写笔',
           touch: '触摸',
         },
+      },
+      penBarrelButtonImmediate: {
+        label: '立即切换到橡皮擦',
+        description:
+          '按下手写笔按钮后立即切换到橡皮擦。关闭后，抬起手写笔时才应用切换。',
       },
     },
     pageFrameEditing: {
@@ -692,6 +711,10 @@ const zhHans: typeof en = {
         title: '引用',
         subtitle: '将此块转换为引用块',
       },
+      callout: {
+        title: '提示框',
+        subtitle: '插入高亮的笔记提示框',
+      },
       bulletList: {
         title: '项目符号列表',
         subtitle: '将此块转换为项目符号列表项',
@@ -711,6 +734,14 @@ const zhHans: typeof en = {
       table: {
         title: '表格',
         subtitle: '插入包含表头和正文行的表格',
+      },
+      codeBlock: {
+        title: '代码块',
+        subtitle: '插入围栏代码块',
+      },
+      mathBlock: {
+        title: '公式块',
+        subtitle: '插入围栏公式块',
       },
       bold: {
         title: '粗体',
@@ -764,19 +795,38 @@ const zhHans: typeof en = {
     },
     selectionToolbar: {
       label: '选区层级',
+      copy: '复制',
+      copied: '已复制到剪贴板',
+      cut: '剪切',
       moveHigher: '前移一层',
       moveLower: '后移一层',
       delete: '删除',
+      lock: '锁定',
+      unlock: '解锁',
       crop: '裁剪',
       applyCrop: '应用裁剪',
       addToPage: '加入页面',
       removeFromPage: '移出页面',
       makeRoom: '腾出空间',
       floatOverText: '浮于文字上方',
+      editPoints: '编辑节点',
+      finishEditingPoints: '完成节点编辑',
+      bold: '粗体',
+      italic: '斜体',
+    },
+    pdfNavigator: {
+      previousPage: '上一页',
+      nextPage: '下一页',
+      goToPage: '跳转到页面',
+      pageNumber: '页码',
     },
     insert: {
       title: '插入',
       soon: '即将推出',
+      paste: {
+        label: '粘贴',
+        description: '从剪贴板粘贴',
+      },
       frame: {
         label: '页面框',
         description: '可书写的新页面',
@@ -784,6 +834,10 @@ const zhHans: typeof en = {
       embed: {
         label: '图片或 PDF',
         description: '拖入文件或粘贴链接',
+      },
+      photo: {
+        label: '拍照',
+        description: '拍摄并插入照片',
       },
       latex: {
         label: 'LaTeX',
@@ -794,6 +848,13 @@ const zhHans: typeof en = {
         description: '录制或导入语音备忘',
       },
     },
+    camera: {
+      requesting: '正在打开相机…',
+      unavailable: '相机不可用',
+      takePhoto: '拍照',
+      cancel: '取消',
+      captureFailed: '无法拍摄照片',
+    },
     audioPlayer: {
       requestingMic: '正在请求麦克风…',
       requestingMicAccess: '正在请求麦克风权限',
@@ -802,6 +863,7 @@ const zhHans: typeof en = {
       waitingForRecording: '正在等待录音',
       startRecording: '开始录音',
       stopRecording: '停止录音',
+      processingRecording: '正在处理录音…',
       tryRecordingAgain: '重新尝试录音',
       playAudio: '播放音频',
       pauseAudio: '暂停音频',
@@ -849,9 +911,12 @@ const zhHans: typeof en = {
       mode: '模式',
       rectangle: '矩形',
       lasso: '套索',
+      precise: '精细',
       fine: (value: number) => `细（${value}）`,
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
+      pressure: '压感',
+      stabilization: '防抖',
       addCustomColor: '添加自定义颜色',
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',
@@ -936,6 +1001,11 @@ const zhHans: typeof en = {
         '一块无限画布，可以手写、输入文字，以及两者之间的一切。回答四个问题即可开始。',
       language: '语言',
       start: '开始使用',
+    },
+    input: {
+      eyebrow: '手写笔与触摸',
+      title: '你打算怎么绘图？',
+      description: '选择手指在画布上的作用。随时可以在设置中更改。',
     },
     privacy: {
       eyebrow: '隐私',

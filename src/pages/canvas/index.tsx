@@ -18,17 +18,13 @@ import {
 import { toast } from 'sonner';
 import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
-import { setChromeMenuOpener } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
-import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
-import {
-  type ExportTarget,
-  setExportDialogOpener,
-} from '@myelin/editor/export/export-controller';
+import type { ExportTarget } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
@@ -57,10 +53,12 @@ import { IS_DEV } from '@/lib/env';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
+import type { TabId } from '@/lib/tabs/types';
 import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
+import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
@@ -75,6 +73,7 @@ import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
+import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useCanvasSearch } from './search/use-canvas-search';
 
@@ -86,30 +85,32 @@ const COMPACT_WHEEL_RADIUS = 52;
 
 interface CanvasViewProps {
   id: VFSNodeId;
+  recordingOwnerId: TabId;
   initialPageFrameName?: string | null;
   initialPageFrameId?: string | null;
 }
 
 export function CanvasView({
   id,
+  recordingOwnerId,
   initialPageFrameName,
   initialPageFrameId,
 }: CanvasViewProps) {
   return (
-    <CustomColorsProvider>
-      <PenPresetsProvider>
-        <CanvasViewInner
-          id={id}
-          initialPageFrameName={initialPageFrameName}
-          initialPageFrameId={initialPageFrameId}
-        />
-      </PenPresetsProvider>
-    </CustomColorsProvider>
+    <PenPresetsProvider>
+      <CanvasViewInner
+        id={id}
+        recordingOwnerId={recordingOwnerId}
+        initialPageFrameName={initialPageFrameName}
+        initialPageFrameId={initialPageFrameId}
+      />
+    </PenPresetsProvider>
   );
 }
 
 function CanvasViewInner({
   id,
+  recordingOwnerId,
   initialPageFrameName: initialPageFrameNameProp,
   initialPageFrameId: initialPageFrameIdProp,
 }: CanvasViewProps) {
@@ -126,7 +127,14 @@ function CanvasViewInner({
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   const toolState = useToolState(drawableCanvasRef);
-  const canvasSearch = useCanvasSearch(drawableCanvasRef, id);
+  usePencilGestures({
+    drawableCanvasRef,
+    wheelRef,
+    canvasTools: toolState.canvasTools,
+    selectedToolIndex: toolState.selectedToolIndex,
+    toggleOptions: toolState.toggleOptions,
+  });
+  const canvasSearch = useCanvasSearch(drawableCanvasRef);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -136,6 +144,13 @@ function CanvasViewInner({
   const [zoomLocked, setZoomLocked] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
+  const canvasUiServices = useMemo<CanvasUiServices>(
+    () => ({
+      openChromeMenu: (anchor, items) => setChromeMenu({ anchor, items }),
+      openExportDialog: (target) => setExportTarget(target),
+    }),
+    [],
+  );
   const onToggleZoomLock = useCallback(() => {
     setZoomLocked((prev) => {
       const next = !prev;
@@ -143,8 +158,8 @@ function CanvasViewInner({
       return next;
     });
   }, []);
-  const onRecenterViewport = useCallback(() => {
-    drawableCanvasRef.current?.viewport.animateRecenter();
+  const onFitContent = useCallback(() => {
+    drawableCanvasRef.current?.viewport.animateFitContent();
   }, []);
   const onUndo = useCallback(() => {
     drawableCanvasRef.current?.undo();
@@ -155,16 +170,6 @@ function CanvasViewInner({
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
   }, [id]);
-
-  useEffect(() => {
-    setChromeMenuOpener((anchor, items) => setChromeMenu({ anchor, items }));
-    return () => setChromeMenuOpener(() => {});
-  }, []);
-
-  useEffect(() => {
-    setExportDialogOpener((target) => setExportTarget(target));
-    return () => setExportDialogOpener(null);
-  }, []);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({
@@ -179,6 +184,7 @@ function CanvasViewInner({
 
   const engine = useCanvasEngine({
     id,
+    recordingOwnerId,
     thumbnailRootRef,
     canvasRef,
     bgHostRef,
@@ -187,11 +193,13 @@ function CanvasViewInner({
     wheelRef,
     drawableCanvasRef,
     canvasTools: toolState.canvasTools,
+    selectedToolIndex: toolState.selectedToolIndex,
     setSelectedToolIndex: toolState.setSelectedToolIndex,
     onCanvasPointerDown: toolState.hideOptions,
     onInsertFrame: inserts.onInsertFrame,
     onInsertEmbed: inserts.onInsertEmbed,
     embedFiles,
+    uiServices: canvasUiServices,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
   const onExportCanvasPdf = useCallback(() => {
@@ -317,10 +325,6 @@ function CanvasViewInner({
     },
   );
   useEffect(() => {
-    if (!activeEditorView) {
-      return;
-    }
-
     const handleOpenRequest = (event: Event) => {
       const { detail } = event as CustomEvent<NoteLinkOpenRequestDetail>;
       void openPageFrameNoteLink(detail).catch((error) => {
@@ -331,17 +335,14 @@ function CanvasViewInner({
       });
     };
 
-    activeEditorView.dom.addEventListener(
-      NOTE_LINK_OPEN_REQUEST_EVENT,
-      handleOpenRequest,
-    );
+    document.addEventListener(NOTE_LINK_OPEN_REQUEST_EVENT, handleOpenRequest);
     return () => {
-      activeEditorView.dom.removeEventListener(
+      document.removeEventListener(
         NOTE_LINK_OPEN_REQUEST_EVENT,
         handleOpenRequest,
       );
     };
-  }, [activeEditorView]);
+  }, []);
   const pageFrameAutocomplete = usePageFrameAutocomplete({
     repository,
     view: activeEditorView,
@@ -365,12 +366,7 @@ function CanvasViewInner({
   );
   const openBacklinkSource = useEffectEvent(async (sourceId: VFSNodeId) => {
     await engine.saveBeforeExit();
-    openNote(
-      tabController,
-      { fileType: 'mcanvas', id: sourceId },
-      undefined,
-      'backlink',
-    );
+    openNote(tabController, { fileType: 'mcanvas', id: sourceId }, undefined);
   });
   const handleOpenBacklinkSource = useCallback((sourceId: VFSNodeId) => {
     void openBacklinkSource(sourceId).catch((error) => {
@@ -524,19 +520,26 @@ function CanvasViewInner({
   const insertPopover = useMemo(
     () => (
       <InsertPopover
+        onPaste={() => {
+          void engine.clipboard.paste();
+          inserts.closeInsert();
+        }}
         onInsertFrame={inserts.onInsertFrame}
         onInsertEmbed={inserts.onInsertEmbed}
         onInsertLatex={inserts.onInsertLatex}
         onInsertAudio={inserts.onInsertAudio}
+        onTakePhoto={inserts.onTakePhoto}
         onClose={inserts.closeInsert}
       />
     ),
     [
       inserts.closeInsert,
+      engine.clipboard,
       inserts.onInsertEmbed,
       inserts.onInsertFrame,
       inserts.onInsertLatex,
       inserts.onInsertAudio,
+      inserts.onTakePhoto,
     ],
   );
   const embedPresence = usePresence(inserts.embedOpen);
@@ -557,9 +560,24 @@ function CanvasViewInner({
   // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
+      data-canvas-root
       className="relative h-full w-full overflow-clip bg-page"
       style={surfaceStyle}
     >
+      <input
+        ref={inserts.cameraFileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={inserts.onCameraFileChange}
+      />
+      {inserts.cameraOpen && (
+        <CameraCapture
+          onCapture={inserts.onCameraCapture}
+          onClose={inserts.closeCamera}
+        />
+      )}
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
@@ -593,14 +611,13 @@ function CanvasViewInner({
           ref={domOverlayRef}
           id="dom-overlay"
           className="pointer-events-none absolute inset-0 overflow-hidden"
-          style={{ zIndex: 5 }}
         />
 
         {/* Foreground canvas: strokes, images, element content */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 block h-full w-full touch-none"
-          onClick={inserts.onCanvasClick}
+          onDoubleClick={inserts.onCanvasDoubleClick}
         />
       </div>
 
@@ -612,12 +629,11 @@ function CanvasViewInner({
         style={{ zIndex: 12 }}
       />
 
-      {/* Frame chrome controls (hamburger buttons). Sits above the foreground
-          canvas so clicks reach the buttons first. Below UI chrome (toolbars,
-          modals at z-100+). Pointer-events-none by default; individual buttons
-          opt in. */}
+      {/* Frame chrome controls (hamburger buttons). Each control shares its
+          frame’s stacking rank, so a higher element can cover a lower element’s
+          controls. Pointer-events-none by default; individual buttons opt in. */}
       <div
-        id="canvas-chrome-controls"
+        data-canvas-chrome-controls
         className="pointer-events-none absolute inset-0 overflow-hidden"
         style={{ zIndex: 20 }}
       />
@@ -627,11 +643,15 @@ function CanvasViewInner({
         fps={engine.fps}
         zoomLocked={zoomLocked}
         onToggleZoomLock={onToggleZoomLock}
-        onRecenter={onRecenterViewport}
+        onFitContent={onFitContent}
         onRegenerateThumbnail={onRegenerateThumbnail}
       />
       {engine.ready && (
-        <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
+        <SelectionToolbar
+          drawableCanvasRef={drawableCanvasRef}
+          onCopy={engine.clipboard.copy}
+          onCut={engine.clipboard.cut}
+        />
       )}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
@@ -648,15 +668,15 @@ function CanvasViewInner({
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         presets={toolState.presets}
-        matchedPresetId={toolState.matchedPresetId}
-        activePenTool={toolState.activePenTool}
+        activePresetId={toolState.activePresetId}
+        editingPresetId={toolState.editingPresetId}
         wheelFull={toolState.wheelFull}
         savePresetDisabledReason={toolState.savePresetDisabledReason}
-        onApplyPreset={toolState.applyPreset}
-        onSavePreset={toolState.saveCurrentAsPreset}
-        onUpdatePresetToCurrent={toolState.updatePresetToCurrent}
-        onTogglePresetInWheel={toolState.togglePresetInWheel}
+        onEditPreset={toolState.editPreset}
         onDeletePreset={toolState.deletePreset}
+        onSavePreset={toolState.saveCurrentAsPreset}
+        onTogglePresetInWheel={toolState.togglePresetInWheel}
+        onReorderPresets={toolState.reorderPresets}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
@@ -676,10 +696,15 @@ function CanvasViewInner({
           }}
         >
           <InsertPopover
+            onPaste={() => {
+              void engine.clipboard.paste();
+              inserts.closeContextInsert();
+            }}
             onInsertFrame={inserts.onContextInsertFrame}
             onInsertEmbed={inserts.onContextInsertEmbed}
             onInsertLatex={inserts.onContextInsertLatex}
             onInsertAudio={inserts.onContextInsertAudio}
+            onTakePhoto={inserts.onContextTakePhoto}
             onClose={inserts.closeContextInsert}
           />
         </div>

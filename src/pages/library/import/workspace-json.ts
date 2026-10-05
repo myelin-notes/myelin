@@ -6,8 +6,8 @@ import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import { join } from '@tauri-apps/api/path';
-import { readDir, readFile, readTextFile } from '@tauri-apps/plugin-fs';
+import type { PickedFolder } from '@/lib/folder-picker';
+import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
@@ -42,8 +42,8 @@ export interface ImportWorkspaceJsonResult {
 export interface ImportWorkspaceJsonOptions {
   repository: Repository;
   parentId: VFSNodeId | null;
-  /** Absolute path to the exported workspace folder the user picked. */
-  dirPath: string;
+  /** Selected workspace folder, or an absolute path on desktop. */
+  dirPath: string | PickedFolder;
   /** Name for the created root folder; defaults to the picked folder's name. */
   rootName?: string;
   /** Pre-scanned result to avoid re-walking the directory. */
@@ -52,12 +52,12 @@ export interface ImportWorkspaceJsonOptions {
 }
 
 interface ScannedNote {
-  absolutePath: string;
+  sourcePath: string;
   folderPath: string;
 }
 
 interface ScannedMedia {
-  absolutePath: string;
+  sourcePath: string;
   folderPath: string;
   name: string;
   fileType: FileType;
@@ -71,7 +71,12 @@ export interface ScannedWorkspace {
   skippedFiles: number;
 }
 
-export function getPathName(path: string): string {
+export function getPathName(path: string | PickedFolder): string {
+  if (typeof path !== 'string') {
+    return path.kind === 'scoped'
+      ? path.handle.name || 'Workspace'
+      : getPathName(path.path);
+  }
   return getPathBasename(path, 'Workspace');
 }
 
@@ -186,11 +191,12 @@ export function rebuildNote(
 }
 
 async function scanDirectory(
-  absolutePath: string,
+  reader: FolderReader,
+  sourcePath: string,
   relativeSegments: string[],
   scanned: ScannedWorkspace,
 ): Promise<void> {
-  const entries = await readDir(absolutePath);
+  const entries = await reader.readDir(sourcePath);
 
   for (const entry of entries) {
     if (entry.name.startsWith('.') || entry.isSymlink) {
@@ -200,12 +206,12 @@ async function scanDirectory(
       continue;
     }
 
-    const childPath = await join(absolutePath, entry.name);
+    const childPath = await reader.join(sourcePath, entry.name);
     const childSegments = [...relativeSegments, entry.name];
 
     if (entry.isDirectory) {
       scanned.folderPaths.add(childSegments.join('/'));
-      await scanDirectory(childPath, childSegments, scanned);
+      await scanDirectory(reader, childPath, childSegments, scanned);
       continue;
     }
 
@@ -216,14 +222,14 @@ async function scanDirectory(
 
     const folderPath = relativeSegments.join('/');
     if (JSON_EXTENSION_RE.test(entry.name)) {
-      scanned.notes.push({ absolutePath: childPath, folderPath });
+      scanned.notes.push({ sourcePath: childPath, folderPath });
       continue;
     }
 
     const fileType = getFileTypeForName(entry.name);
     if (fileType && fileType !== 'mcanvas') {
       scanned.media.push({
-        absolutePath: childPath,
+        sourcePath: childPath,
         folderPath,
         name: entry.name,
         fileType,
@@ -235,15 +241,15 @@ async function scanDirectory(
   }
 }
 
-function parseNote(raw: string, absolutePath: string): NoteJson {
+function parseNote(raw: string, sourcePath: string): NoteJson {
   const note = JSON.parse(raw) as NoteJson;
   if (note.version !== NOTE_JSON_VERSION) {
     throw new Error(
-      `Unsupported note version ${note.version} in ${absolutePath}`,
+      `Unsupported note version ${note.version} in ${sourcePath}`,
     );
   }
   if (!Array.isArray(note.elements)) {
-    throw new Error(`Malformed note (no elements) in ${absolutePath}`);
+    throw new Error(`Malformed note (no elements) in ${sourcePath}`);
   }
   return note;
 }
@@ -334,7 +340,7 @@ function createImportNoteLinkResolver(
 }
 
 export async function scanWorkspaceJson(
-  dirPath: string,
+  dirPath: string | PickedFolder,
 ): Promise<ScannedWorkspace> {
   const scanned: ScannedWorkspace = {
     folderPaths: new Set(),
@@ -342,7 +348,8 @@ export async function scanWorkspaceJson(
     media: [],
     skippedFiles: 0,
   };
-  await scanDirectory(dirPath, [], scanned);
+  const reader = createFolderReader(dirPath);
+  await scanDirectory(reader, reader.root, [], scanned);
   return scanned;
 }
 
@@ -354,6 +361,7 @@ export async function importWorkspaceJson({
   scanned: preScanned,
   onProgress,
 }: ImportWorkspaceJsonOptions): Promise<ImportWorkspaceJsonResult> {
+  const reader = createFolderReader(dirPath);
   const scanned = preScanned ?? (await scanWorkspaceJson(dirPath));
 
   if (scanned.notes.length === 0 && scanned.media.length === 0) {
@@ -384,15 +392,15 @@ export async function importWorkspaceJson({
       const prepared: PreparedNote[] = [];
       for (const file of scanned.notes) {
         const fallbackName =
-          file.absolutePath
+          file.sourcePath
             .replace(/\\/g, '/')
             .split('/')
             .pop()
             ?.replace(JSON_EXTENSION_RE, '') || 'Untitled';
         try {
           const note = parseNote(
-            await readTextFile(file.absolutePath),
-            file.absolutePath,
+            await reader.readTextFile(file.sourcePath),
+            file.sourcePath,
           );
           prepared.push(
             await createImportedNote({
@@ -409,7 +417,7 @@ export async function importWorkspaceJson({
           failedFiles += 1;
           onProgress?.({ current: ++current, total, fileName: fallbackName });
           logger.warn('Skipping note that failed to import', {
-            path: file.absolutePath,
+            path: file.sourcePath,
             error,
           });
         }
@@ -441,13 +449,13 @@ export async function importWorkspaceJson({
             file.name,
             file.fileType,
             getImportParentId(root, folderIds, file.folderPath),
-            await readFile(file.absolutePath),
+            await reader.readFile(file.sourcePath),
           );
           mediaImported += 1;
         } catch (error) {
           failedFiles += 1;
           logger.warn('Skipping media that failed to import', {
-            path: file.absolutePath,
+            path: file.sourcePath,
             error,
           });
         }

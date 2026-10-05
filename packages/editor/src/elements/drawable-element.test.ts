@@ -1,46 +1,68 @@
 import { describe, expect, it } from 'vitest';
+import { YDocManager } from '../ydoc-manager';
 import { HANDLE_TOUCH_HIT_RADIUS } from './drawable-element';
+import { ElementType } from './element-type';
 import { StrokeElement, type StrokeStyle } from './stroke-element';
 
 const STYLE: StrokeStyle = { color: '#191c1e', size: 8 };
-/** Swallows every drawing call — the tests only care about the ramp `draw` advances. */
-const CTX = new Proxy(
-  {},
-  { get: () => () => undefined },
-) as CanvasRenderingContext2D;
 
-// The renderer skips the whole overlay canvas — clear included — on frames where no element would
-// draw into it, so this predicate has to agree with `drawSelectionOverlay`'s own early return.
-describe('hasSelectionOverlay', () => {
-  it('is false until an element is both selected and drawn', () => {
-    const stroke = new StrokeElement('s1', [], false, STYLE);
-    expect(stroke.hasSelectionOverlay).toBe(false);
+describe('element locking', () => {
+  it('loads and syncs locking alongside page anchoring', () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.STROKE, 'anchored-stroke', {
+      points: [0, 0, 0.5, 10, 10, 0.5],
+      locked: true,
+      anchorFrame: 'frame-1',
+      anchorBand: 'band-1',
+    });
+    const stroke = new StrokeElement(
+      'anchored-stroke',
+      [0, 0, 0.5, 10, 10, 0.5],
+      false,
+      STYLE,
+    );
+    stroke.bindToYMap(yMap);
 
-    // Selection starts the outline's ramp at zero; it is the next draw that
-    // advances it, which is why the renderer reads this after drawing.
-    stroke.select();
-    expect(stroke.hasSelectionOverlay).toBe(false);
+    expect(stroke.locked).toBe(true);
+    expect(stroke.anchoredFrameUuid).toBe('frame-1');
+    expect(stroke.anchoredBandId).toBe('band-1');
 
-    stroke.draw(CTX, 0.016);
-    expect(stroke.hasSelectionOverlay).toBe(true);
+    yMap.set('locked', false);
+    yMap.set('anchorBand', 'band-2');
+    stroke.syncFromYMap(['locked', 'anchorBand']);
+
+    expect(stroke.locked).toBe(false);
+    expect(stroke.anchoredBandId).toBe('band-2');
   });
 
-  it('is false again as soon as the element is unselected', () => {
-    const stroke = new StrokeElement('s2', [], false, STYLE);
-    stroke.select();
-    stroke.draw(CTX, 0.016);
+  it('persists the lock and clears it when the Yjs field is removed', () => {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.STROKE, 'locked-stroke', {
+      points: [0, 0, 0.5, 10, 10, 0.5],
+    });
+    const stroke = new StrokeElement(
+      'locked-stroke',
+      [0, 0, 0.5, 10, 10, 0.5],
+      false,
+      STYLE,
+    );
+    stroke.bindToYMap(yMap);
 
-    stroke.unselect();
-    expect(stroke.hasSelectionOverlay).toBe(false);
-  });
+    stroke.setLocked(true);
+    expect(yMap.get('locked')).toBe(true);
 
-  it('is false for a hidden element, even a selected one', () => {
-    const stroke = new StrokeElement('s3', [], false, STYLE);
-    stroke.select();
-    stroke.draw(CTX, 0.016);
+    const reloaded = new StrokeElement(
+      'locked-stroke',
+      [0, 0, 0.5, 10, 10, 0.5],
+      false,
+      STYLE,
+    );
+    reloaded.bindToYMap(yMap);
+    expect(reloaded.locked).toBe(true);
 
-    stroke.hidden = true;
-    expect(stroke.hasSelectionOverlay).toBe(false);
+    yMap.delete('locked');
+    reloaded.syncFromYMap(['locked']);
+    expect(reloaded.locked).toBe(false);
   });
 });
 
@@ -136,4 +158,22 @@ describe('intersectsWorldRect', () => {
     stroke.setOffset(0, 0);
     expect(stroke.intersectsWorldRect(VIEW, 0)).toBe(true);
   });
+});
+
+it('reuses unchanged world bounds and refreshes them for live ink and transforms', () => {
+  const stroke = new StrokeElement('bounds', [], false, STYLE);
+  stroke.addPoint(10, 20, 0.5);
+  const original = stroke.boundingBox;
+  expect(stroke.boundingBox).toBe(original);
+  stroke.addPoint(100, 200, 0.5);
+  const grown = stroke.boundingBox;
+  expect(grown.right).toBeGreaterThan(original.right);
+  expect(stroke.boundingBox).toBe(grown);
+  stroke.offset.x += 30;
+  expect(stroke.boundingBox.x).toBe(grown.x + 30);
+  stroke.scale.x = -2;
+  const local = stroke.localBoundingBox;
+  expect(stroke.boundingBox.x).toBe(local.right * -2 + 30);
+  expect(stroke.boundingBox.width).toBe(local.width * 2);
+  expect(original.right).toBeLessThan(grown.right);
 });

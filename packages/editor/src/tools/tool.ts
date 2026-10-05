@@ -36,7 +36,8 @@ export type ToolOption =
     })
   | (ToolOptionBase<'choice', string> & {
       choices: { value: string; label: string; icon?: LucideIcon }[];
-    });
+    })
+  | ToolOptionBase<'toggle', boolean>;
 
 export interface ITool {
   get id(): ToolId;
@@ -78,6 +79,12 @@ export function setToolOptionValue(
       return true;
     case 'size':
       if (typeof value !== 'number') {
+        return false;
+      }
+      option.set(value);
+      return true;
+    case 'toggle':
+      if (typeof value !== 'boolean') {
         return false;
       }
       option.set(value);

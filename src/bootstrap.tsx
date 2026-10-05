@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import { I18nProvider } from '@myelin/editor/i18n';
 import { setPlatform } from '@myelin/editor/platform';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
@@ -44,13 +45,13 @@ try {
   });
   initRustErrorReporting();
   disableNativePinchZoom();
-  trackEvent('app_opened');
-
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <I18nProvider>
         <RepositoryProvider>
-          <App />
+          <CustomColorsProvider>
+            <App />
+          </CustomColorsProvider>
         </RepositoryProvider>
       </I18nProvider>
     </React.StrictMode>,

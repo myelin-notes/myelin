@@ -1,5 +1,4 @@
 import * as Y from 'yjs';
-import type { ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
@@ -13,6 +12,7 @@ import type { BaseRepository } from '../base';
 import {
   type BatchedCommitTarget,
   BatchHeadConflictError,
+  BatchUnknownError,
   supportsBatchedCommit,
 } from '../batch';
 import type {
@@ -20,26 +20,21 @@ import type {
   RepositoryRuntimeStatus,
   RepositoryStatusSource,
 } from '../config';
+import { GoogleDriveRequestError } from '../google-drive/error';
 import type { LocalRepository } from '../local';
-import { extractStoredNoteLinks } from '../note-link-index';
 import {
   addChild,
   computeRevision,
-  createDocFromBytes,
   createFileNode,
   createNodeId,
   deleteNodeFromManifest,
   ensureVersionHistoryRoot,
-  getStoredFilePath,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
-  MANIFEST_PATH,
   type RepositorySnapshot,
-  setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
   VERSION_HISTORY_MAX_PER_FILE,
-  type VFSManifest,
 } from '../shared';
 import type {
   CreateFileOptions,
@@ -48,6 +43,7 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
   Repository,
@@ -61,6 +57,12 @@ import type {
   VFSNode,
   VFSNodeId,
 } from '../types';
+import {
+  type BatchCanvasOperation,
+  type BatchPlan,
+  type BatchRawOperation,
+  createBatchPlan,
+} from './batch-planner';
 import { withAsyncKeyedMutex } from './lock';
 import {
   CachedRepositoryOutbox,
@@ -82,6 +84,8 @@ import {
 
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
 const COMMIT_BODY_MAX_BYTES = 64 * 1024;
+const MAX_BATCH_FILE_BYTES = 100_000_000;
+const MAX_BATCH_FALLBACK_OPS = 2;
 const logger = new Logger('CachedRepository');
 
 class RemoteNoteCacheMergeError extends Error {
@@ -89,40 +93,6 @@ class RemoteNoteCacheMergeError extends Error {
     super(`Failed to merge remote note ${nodeId} into cache.`);
     this.name = 'RemoteNoteCacheMergeError';
   }
-}
-
-interface BatchPlan {
-  manifest: VFSManifest;
-  manifestChanged: boolean;
-  additions: Map<string, Uint8Array>;
-  deletions: Set<string>;
-  messages: string[];
-  resolvedOps: PendingOp[];
-  expectedHeadOid: string;
-}
-
-async function mapWithConcurrency<T, U>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<U>,
-): Promise<U[]> {
-  const results: U[] = new Array(items.length);
-  let cursor = 0;
-  const workers = Array.from(
-    { length: Math.min(Math.max(1, limit), items.length) },
-    async () => {
-      while (true) {
-        const i = cursor;
-        cursor += 1;
-        if (i >= items.length) {
-          return;
-        }
-        results[i] = await fn(items[i]);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
 }
 
 function buildCommitBody(messages: string[]): string | undefined {
@@ -148,8 +118,10 @@ export class CachedRepository
 
   private readonly emptyDocUpdate = Y.encodeStateAsUpdate(new Y.Doc());
   private readonly outbox: CachedRepositoryOutbox;
-  private flushPromise: Promise<void> | null = null;
   private flushTimer: number | null = null;
+  private bulkWriting = false;
+  private bulkDataChanged = false;
+  private needsRemoteBootstrap = true;
   private runtimeStatus: RepositoryRuntimeStatus = {
     online: true,
     pendingRemoteWrites: 0,
@@ -205,93 +177,71 @@ export class CachedRepository
   }
 
   private async initializeImpl(): Promise<void> {
-    let didBootstrapFromRemote = false;
-
-    await this.withLocalStateLock(async () => {
-      await this.cache.initialize();
-      await this.outbox.load();
-    });
+    const shouldBootstrapFromRemote = await this.withLocalStateLock(
+      async () => {
+        await this.cache.initialize();
+        await this.outbox.load();
+        return !this.outbox.recoveryError && this.outbox.length === 0;
+      },
+    );
     logger.debug('Initialized cached repository cache state', {
       repositoryKind: this.kind,
       outboxPath: this.outboxPath(),
       pendingOps: this.outbox.length,
     });
 
-    try {
-      const remoteSnapshot = await this.remote.exportSnapshot();
+    if (shouldBootstrapFromRemote) {
+      try {
+        const remoteSnapshot = await this.remote.exportSnapshot();
 
-      await this.withLocalStateLock(async () => {
-        await this.outbox.load();
-        if (this.outbox.recoveryError) {
-          logger.error(
-            'Skipped initial remote bootstrap because cached repository outbox requires recovery',
-            this.outbox.recoveryError,
-            {
-              repositoryKind: this.kind,
-              outboxPath: this.outboxPath(),
-            },
-          );
-          return;
-        }
-        if (this.outbox.length !== 0) {
-          return;
-        }
+        await this.withLocalStateLock(async () => {
+          await this.outbox.load();
+          if (this.outbox.recoveryError || this.outbox.length !== 0) {
+            return;
+          }
 
-        await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
-        didBootstrapFromRemote = true;
-      });
-    } catch (error) {
-      this.updateRuntimeStatus({
-        online: false,
-        lastError: error instanceof Error ? error : new Error(String(error)),
-      });
-      logger.error('Initial remote bootstrap failed', error);
+          await this.replaceCacheFromRemoteSnapshot(remoteSnapshot);
+        });
+      } catch (error) {
+        this.updateRuntimeStatus({
+          online: false,
+          lastError: error instanceof Error ? error : new Error(String(error)),
+        });
+        logger.error('Initial remote bootstrap failed', error);
+      }
     }
 
     this.startBackgroundSync();
 
-    if (!didBootstrapFromRemote) {
-      try {
-        await this.syncCacheFromRemote();
-      } catch (error) {
-        logger.error('Initial remote pull failed', error);
-      }
+    if (this.needsRemoteBootstrap) {
+      logger.debug('Remote bootstrap will retry during background sync', {
+        repositoryKind: this.kind,
+      });
     }
   }
 
   async refresh(): Promise<void> {
-    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
-      await this.refreshImpl();
-    });
+    await withAsyncKeyedMutex(this.remoteSyncMutexKey(), () =>
+      this.syncCacheFromRemote(),
+    );
   }
 
   async flushPending(): Promise<void> {
     await withAsyncKeyedMutex(this.remoteSyncMutexKey(), async () => {
-      await this.flushPendingInternal();
-    });
-  }
-
-  private async refreshImpl(): Promise<void> {
-    await this.syncCacheFromRemote();
-  }
-
-  private async flushPendingInternal(): Promise<void> {
-    if (!this.flushPromise) {
-      this.flushPromise = this.flushPendingImpl()
-        .catch((error) => {
-          this.updateRuntimeStatus({
-            online: false,
-            lastError:
-              error instanceof Error ? error : new Error(String(error)),
-          });
-          throw error;
-        })
-        .finally(() => {
-          this.flushPromise = null;
+      try {
+        await this.flushPendingImpl();
+      } catch (error) {
+        this.updateRuntimeStatus({
+          online: false,
+          lastError: error instanceof Error ? error : new Error(String(error)),
         });
-    }
+        throw error;
+      }
 
-    await this.flushPromise;
+      if (this.needsRemoteBootstrap || !this.runtimeStatus.online) {
+        await this.syncCacheFromRemote();
+      }
+    });
   }
 
   async dispose(): Promise<void> {
@@ -337,12 +287,16 @@ export class CachedRepository
     return this.cache.searchNodes(query, options);
   }
 
-  async getNodesByName(name: string): Promise<VFSNode[]> {
-    return this.cache.getNodesByName(name);
+  async listNoteIndexItems() {
+    return this.cache.listNoteIndexItems();
   }
 
-  async listIndexBackfillItems(): Promise<ReindexItem[]> {
-    return this.cache.listIndexBackfillItems();
+  getNoteIndexSource(): object {
+    return this.cache;
+  }
+
+  async getNodesByName(name: string): Promise<VFSNode[]> {
+    return this.cache.getNodesByName(name);
   }
 
   async getNodesByAnyTag(
@@ -388,17 +342,50 @@ export class CachedRepository
       await this.outbox.mutate((ops) => {
         queueRemoteWrite(ops, result);
       });
-      this.updateRuntimeStatus({
-        dataVersion: this.runtimeStatus.dataVersion + 1,
-      });
+      if (this.bulkWriting) {
+        this.bulkDataChanged = true;
+      } else {
+        this.updateRuntimeStatus({
+          dataVersion: this.runtimeStatus.dataVersion + 1,
+        });
+      }
       return result;
     });
   }
 
   async batchManifestWrites<T>(fn: () => Promise<T>): Promise<T> {
-    // Batching collapses the cache's per-node manifest saves into one; the outbox still queues an op
-    // per node as before.
-    return this.cache.batchManifestWrites(fn);
+    if (this.bulkWriting) {
+      return this.cache.batchManifestWrites(fn);
+    }
+
+    const result = await withAsyncKeyedMutex(
+      this.remoteSyncMutexKey(),
+      async () => {
+        this.bulkWriting = true;
+        try {
+          return await this.outbox.batchMutations(() =>
+            this.cache.batchManifestWrites(fn),
+          );
+        } finally {
+          this.bulkWriting = false;
+          if (this.bulkDataChanged) {
+            this.bulkDataChanged = false;
+            this.updateRuntimeStatus({
+              dataVersion: this.runtimeStatus.dataVersion + 1,
+            });
+          }
+        }
+      },
+    );
+
+    if (supportsBatchedCommit(this.remote) && this.outbox.length > 0) {
+      queueMicrotask(() => {
+        void this.flushPending().catch((error) => {
+          logger.error('Post-import flush failed', error);
+        });
+      });
+    }
+    return result;
   }
 
   async createFolder(name: string, parentId: string | null): Promise<string> {
@@ -585,6 +572,15 @@ export class CachedRepository
     );
   }
 
+  async setFolderColor(nodeId: string, color: string | null): Promise<void> {
+    await this.writeLocalAndQueue(
+      () => this.cache.setFolderColor(nodeId, color),
+      (ops) => {
+        enqueueUpsertManifestNode(ops, nodeId);
+      },
+    );
+  }
+
   async addTag(nodeId: string, tag: string): Promise<void> {
     await this.writeLocalAndQueue(
       () => this.cache.addTag(nodeId, tag),
@@ -664,6 +660,15 @@ export class CachedRepository
     );
   }
 
+  async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
+    return this.writeLocalAndQueue(
+      () => this.cache.reorderPenPresets(ids),
+      (ops) => {
+        enqueuePenPresetsSync(ops);
+      },
+    );
+  }
+
   async removePenPreset(id: string): Promise<PenPreset[]> {
     return this.writeLocalAndQueue(
       () => this.cache.removePenPreset(id),
@@ -730,19 +735,24 @@ export class CachedRepository
     }
   }
 
-  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+  async openSession(
+    nodeId: VFSNodeId,
+    options: OpenSessionOptions = {},
+  ): Promise<NoteSession> {
     logger.debug('Opening cached repository local session', {
       repositoryKind: this.kind,
       nodeId,
       pendingOps: this.outbox.length,
     });
     const session = await NoteSession.open(nodeId, this);
-    void this.pullOpenSessionUpdates(session).catch((error) => {
-      logger.error('Failed to pull open cached session updates', error, {
-        repositoryKind: this.kind,
-        nodeId,
+    if (!options.skipRemotePull) {
+      void this.pullOpenSessionUpdates(session).catch((error) => {
+        logger.error('Failed to pull open cached session updates', error, {
+          repositoryKind: this.kind,
+          nodeId,
+        });
       });
-    });
+    }
     return session;
   }
 
@@ -790,6 +800,9 @@ export class CachedRepository
     }
 
     this.flushTimer = window.setInterval(() => {
+      if (this.bulkWriting) {
+        return;
+      }
       void this.flushPending().catch((error) => {
         logger.error('Background flush failed', error);
       });
@@ -803,15 +816,19 @@ export class CachedRepository
       if (ok) {
         return;
       }
-      logger.debug('Falling back to per-op flush after batched flush failed', {
+      logger.debug('Using per-op flush after batched flush could not proceed', {
         repositoryKind: this.kind,
       });
+      await this.flushPerOpImpl(MAX_BATCH_FALLBACK_OPS);
+      return;
     }
 
     await this.flushPerOpImpl();
   }
 
-  private async flushPerOpImpl(): Promise<void> {
+  private async flushPerOpImpl(
+    maxOps = Number.POSITIVE_INFINITY,
+  ): Promise<void> {
     let pendingOps = await this.withLocalStateLock(async () => {
       await this.outbox.load();
       return this.outbox.length;
@@ -822,7 +839,8 @@ export class CachedRepository
       outboxPath: this.outboxPath(),
     });
 
-    while (true) {
+    let appliedOps = 0;
+    while (appliedOps < maxOps) {
       const pending = await this.withLocalStateLock(() =>
         this.outbox.peekHead(),
       );
@@ -840,7 +858,8 @@ export class CachedRepository
       await this.applyPendingOp(pending.op);
 
       const removed = await this.withLocalStateLock(async () => {
-        const didRemove = await this.outbox.removeHeadIfUnchanged(pending.op);
+        const didRemove =
+          (await this.outbox.removePrefixIfUnchanged([pending.op])) === 1;
         if (!didRemove) {
           logger.debug(
             'Leaving applied cached pending op queued because the head op changed during remote sync',
@@ -872,6 +891,7 @@ export class CachedRepository
       if (!removed) {
         break;
       }
+      appliedOps += 1;
     }
 
     pendingOps = await this.withLocalStateLock(async () => {
@@ -887,14 +907,10 @@ export class CachedRepository
   private async tryFlushBatched(
     remote: BaseRepository & BatchedCommitTarget,
   ): Promise<boolean> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      let plan: BatchPlan | null | 'abort-to-rest';
-      try {
-        plan = await this.buildBatchPlan(remote);
-      } catch (error) {
-        logger.error('Failed to build batched flush plan', error);
-        return false;
-      }
+    let headConflictAttempts = 0;
+
+    while (true) {
+      const plan = await this.buildBatchPlan(remote);
 
       if (plan === 'abort-to-rest') {
         return false;
@@ -903,10 +919,22 @@ export class CachedRepository
         return true;
       }
 
+      for (const [path, bytes] of plan.additions) {
+        if (bytes.byteLength > MAX_BATCH_FILE_BYTES) {
+          throw new Error(
+            `Cannot sync ${path}: the file is ${bytes.byteLength} bytes, exceeding GitHub's 100 MB file limit.`,
+          );
+        }
+      }
+
       try {
         await this.commitBatchedPlan(remote, plan);
       } catch (error) {
-        if (error instanceof BatchHeadConflictError && attempt < 1) {
+        if (
+          error instanceof BatchHeadConflictError &&
+          headConflictAttempts < 1
+        ) {
+          headConflictAttempts += 1;
           logger.debug('Batched commit head conflict; retrying once', {
             repositoryKind: this.kind,
             message: error.message,
@@ -918,18 +946,16 @@ export class CachedRepository
             repositoryKind: this.kind,
             message: error.message,
           });
-        } else {
-          logger.error('Batched commit failed; falling back', error);
+          return false;
         }
-        return false;
+        throw error;
       }
 
-      await this.drainResolvedOps(plan.resolvedOps);
-      return true;
+      if (!(await this.drainResolvedOps(plan.resolvedOps))) {
+        return true;
+      }
+      headConflictAttempts = 0;
     }
-    // Unreachable: every path inside the loop returns, and the only `continue` is guarded by
-    // `attempt < 1`. Kept for the compiler's all-paths-return check.
-    return false;
   }
 
   private async buildBatchPlan(
@@ -952,225 +978,73 @@ export class CachedRepository
     // would let us drain an op whose data we never committed.
     const snapshot = await this.withLocalStateLock(async () => {
       await this.outbox.load();
-      const ops = this.outbox.snapshotOps();
-      if (ops.length === 0) {
+      const pendingOps = this.outbox.snapshotOps();
+      if (pendingOps.length === 0) {
         return null;
       }
-      const cacheSnapshot = await this.cache.exportSnapshot();
+      const cacheManifest = await this.cache.exportManifest();
 
-      const canvasOps: Array<{
-        op: Extract<PendingOp, { kind: 'push-note' }>;
-        node: VFSFileNode;
-        snapshot: YjsSyncSnapshot;
-      }> = [];
-      const rawOps: Array<{
-        op: Extract<PendingOp, { kind: 'push-note' }>;
-        node: VFSFileNode;
-        bytes: Uint8Array | null;
-      }> = [];
-
-      for (const op of ops) {
+      const ops: PendingOp[] = [];
+      const canvasOps: BatchCanvasOperation[] = [];
+      const rawOps: BatchRawOperation[] = [];
+      for (const op of pendingOps) {
         if (op.kind !== 'push-note') {
+          ops.push(op);
           continue;
         }
-        const node = cacheSnapshot.manifest.nodes[op.nodeId];
+        const node = cacheManifest.nodes[op.nodeId];
         if (!node || node.type !== 'file') {
+          ops.push(op);
           continue;
         }
-        if (node.fileType === 'mcanvas' && !op.replaceFile) {
-          canvasOps.push({
-            op,
-            node,
-            snapshot: await this.cache.loadDocument(op.nodeId),
-          });
+        const isCanvas = node.fileType === 'mcanvas' && !op.replaceFile;
+        const snapshot = isCanvas
+          ? await this.cache.loadDocument(op.nodeId)
+          : null;
+        const bytes = isCanvas
+          ? null
+          : await this.cache.readFileBytes(op.nodeId);
+        const operationBytes =
+          snapshot?.update?.byteLength ?? bytes?.byteLength ?? 0;
+        if (operationBytes > MAX_BATCH_FILE_BYTES) {
+          throw new Error(
+            `Cannot sync ${node.name}: the file is ${operationBytes} bytes, exceeding GitHub's 100 MB file limit.`,
+          );
+        }
+        ops.push(op);
+        if (snapshot) {
+          canvasOps.push({ op, node, snapshot });
         } else {
-          rawOps.push({
-            op,
-            node,
-            bytes: await this.cache.readFileBytes(op.nodeId),
-          });
+          rawOps.push({ op, node, bytes });
         }
       }
 
-      return { ops, cacheSnapshot, canvasOps, rawOps };
+      return { ops, cacheManifest, canvasOps, rawOps };
     });
 
     if (snapshot === null) {
       return null;
     }
-    const { ops, cacheSnapshot, canvasOps, rawOps } = snapshot;
-
-    const plan: BatchPlan = {
-      manifest: structuredClone(remoteManifest),
-      manifestChanged: false,
-      additions: new Map(),
-      deletions: new Set(),
-      messages: [],
-      resolvedOps: ops,
+    const { ops, cacheManifest, canvasOps, rawOps } = snapshot;
+    return createBatchPlan({
+      repositoryKind: this.kind,
+      remote,
       expectedHeadOid,
-    };
-
-    for (const op of ops) {
-      switch (op.kind) {
-        case 'upsert-manifest-node':
-          applyCachedManifestUpsert(
-            plan.manifest,
-            cacheSnapshot.manifest,
-            op.nodeId,
-          );
-          plan.manifestChanged = true;
-          plan.messages.push(`Upsert node ${op.nodeId}`);
-          break;
-        case 'delete-manifest-node':
-          for (const fileId of op.deletedFileIds) {
-            const node = plan.manifest.nodes[fileId];
-            if (node && node.type === 'file') {
-              plan.deletions.add(getStoredFilePath(node));
-            }
-          }
-          deleteNodeFromManifest(plan.manifest, op.nodeId);
-          plan.manifestChanged = true;
-          plan.messages.push(`Delete node ${op.nodeId}`);
-          break;
-        case 'sync-custom-colors':
-          plan.manifest.colors = structuredClone(cacheSnapshot.manifest.colors);
-          plan.manifestChanged = true;
-          plan.messages.push('Sync custom colors');
-          break;
-        case 'sync-tag-registry':
-          plan.manifest.tagRegistry = [...cacheSnapshot.manifest.tagRegistry];
-          plan.manifestChanged = true;
-          plan.messages.push('Sync tag registry');
-          break;
-        case 'sync-pen-presets':
-          plan.manifest.penPresets = structuredClone(
-            cacheSnapshot.manifest.penPresets,
-          );
-          plan.manifestChanged = true;
-          plan.messages.push('Sync pen presets');
-          break;
-        case 'push-note': {
-          const node = cacheSnapshot.manifest.nodes[op.nodeId];
-          if (!node || node.type !== 'file') {
-            plan.messages.push(`Skip missing node ${op.nodeId}`);
-          }
-          break;
-        }
-      }
-    }
-
-    const fileSavedAt = Date.now();
-
-    if (rawOps.length > 0) {
-      const conflict = await this.checkRawConflicts(remote, rawOps);
-      if (conflict) {
-        return 'abort-to-rest';
-      }
-      for (const entry of rawOps) {
-        if (entry.op.replaceFile && !entry.bytes) {
-          return 'abort-to-rest';
-        }
-        plan.additions.set(
-          getStoredFilePath(entry.node),
-          entry.bytes ?? new Uint8Array(),
-        );
-        if (entry.op.replaceFile && entry.node.fileType === 'mcanvas') {
-          setStoredNoteLinks(
-            plan.manifest,
-            entry.node.id,
-            extractStoredNoteLinks(createDocFromBytes(entry.bytes)),
-          );
-          plan.messages.push(`Replace note ${entry.node.name}`);
-        } else {
-          plan.messages.push(
-            `Update raw ${entry.node.fileType} ${entry.node.name}`,
-          );
-        }
-        const manifestNode = plan.manifest.nodes[entry.node.id];
-        if (manifestNode && manifestNode.type === 'file') {
-          manifestNode.modifiedAt = fileSavedAt;
-          plan.manifestChanged = true;
-        }
-      }
-    }
-
-    if (canvasOps.length > 0) {
-      const merged = await mapWithConcurrency(canvasOps, 4, async (entry) => {
-        const remoteSnapshot = await remote.loadDocument(entry.op.nodeId);
-        const doc = new Y.Doc();
-        if (remoteSnapshot.update && remoteSnapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, remoteSnapshot.update);
-        }
-        if (entry.snapshot.update && entry.snapshot.update.byteLength > 0) {
-          Y.applyUpdate(doc, entry.snapshot.update);
-        }
-        return {
-          nodeId: entry.node.id,
-          path: getStoredFilePath(entry.node),
-          bytes: Y.encodeStateAsUpdate(doc),
-          links: extractStoredNoteLinks(doc),
-          name: entry.node.name,
-        };
-      });
-      for (const m of merged) {
-        plan.additions.set(m.path, m.bytes);
-        plan.messages.push(`Update note ${m.name}`);
-        const manifestNode = plan.manifest.nodes[m.nodeId];
-        if (manifestNode && manifestNode.type === 'file') {
-          manifestNode.modifiedAt = fileSavedAt;
-          setStoredNoteLinks(plan.manifest, m.nodeId, m.links);
-          plan.manifestChanged = true;
-        }
-      }
-    }
-
-    if (plan.manifestChanged) {
-      plan.additions.set(
-        MANIFEST_PATH,
-        new TextEncoder().encode(JSON.stringify(plan.manifest, null, 2)),
-      );
-    }
-
-    // A path can appear in both additions and deletions (e.g. delete then
-    // re-create same path) — the addition wins.
-    for (const path of plan.additions.keys()) {
-      plan.deletions.delete(path);
-    }
-
-    return plan;
-  }
-
-  private async checkRawConflicts(
-    remote: BaseRepository,
-    rawOps: Array<{
-      op: Extract<PendingOp, { kind: 'push-note' }>;
-      node: VFSFileNode;
-      bytes: Uint8Array | null;
-    }>,
-  ): Promise<boolean> {
-    for (const entry of rawOps) {
-      if (entry.op.replaceFile || entry.op.baseFileRevision === undefined) {
-        continue;
-      }
-      const remoteBytes = await remote.readFileBytes(entry.op.nodeId);
-      const remoteRevision = await computeRevision(remoteBytes);
-      if (remoteRevision !== entry.op.baseFileRevision) {
-        logger.debug('Raw file conflict detected; aborting batch', {
-          repositoryKind: this.kind,
-          nodeId: entry.op.nodeId,
-          baseFileRevision: entry.op.baseFileRevision,
-          remoteRevision,
-        });
-        return true;
-      }
-    }
-    return false;
+      remoteManifest,
+      cacheManifest,
+      ops,
+      canvasOps,
+      rawOps,
+    });
   }
 
   private async commitBatchedPlan(
     remote: BatchedCommitTarget,
     plan: BatchPlan,
   ): Promise<void> {
+    if (plan.additions.size === 0 && plan.deletions.size === 0) {
+      return;
+    }
     const opCount = plan.resolvedOps.length;
     const headline =
       opCount === 1 && plan.messages[0]
@@ -1190,22 +1064,20 @@ export class CachedRepository
     });
   }
 
-  private async drainResolvedOps(ops: PendingOp[]): Promise<void> {
-    await this.withLocalStateLock(async () => {
-      for (const op of ops) {
-        const didRemove = await this.outbox.removeHeadIfUnchanged(op);
-        if (!didRemove) {
-          logger.debug(
-            'Stopped draining batched ops because the head op changed',
-            {
-              repositoryKind: this.kind,
-              opKind: op.kind,
-              nodeId: 'nodeId' in op ? op.nodeId : null,
-              pendingOps: this.outbox.length,
-            },
-          );
-          break;
-        }
+  private async drainResolvedOps(ops: PendingOp[]): Promise<boolean> {
+    return this.withLocalStateLock(async () => {
+      const removedOps = await this.outbox.removePrefixIfUnchanged(ops);
+      const removedAll = removedOps === ops.length;
+      if (!removedAll) {
+        logger.debug(
+          'Stopped draining batched ops because the prefix changed',
+          {
+            repositoryKind: this.kind,
+            resolvedOps: ops.length,
+            removedOps,
+            pendingOps: this.outbox.length,
+          },
+        );
       }
 
       this.updateRuntimeStatus({
@@ -1214,6 +1086,7 @@ export class CachedRepository
         lastRemoteSyncAt: Date.now(),
         lastError: null,
       });
+      return removedAll;
     });
   }
 
@@ -1247,6 +1120,7 @@ export class CachedRepository
       pen: await this.cache.getCustomColors('pen'),
       highlighter: await this.cache.getCustomColors('highlighter'),
       text: await this.cache.getCustomColors('text'),
+      folder: await this.cache.getCustomColors('folder'),
     }));
     await this.remote.applyManifestMutation(
       'Sync custom colors',
@@ -1285,23 +1159,19 @@ export class CachedRepository
   }
 
   private async applyManifestUpsert(nodeId: string): Promise<void> {
-    const cacheSnapshot = await this.withLocalStateLock(() =>
-      this.cache.exportSnapshot(),
+    const cacheManifest = await this.withLocalStateLock(() =>
+      this.cache.exportManifest(),
     );
     await this.remote.applyManifestMutation(
       `Sync manifest node ${nodeId}`,
       (remoteManifest) => {
-        applyCachedManifestUpsert(
-          remoteManifest,
-          cacheSnapshot.manifest,
-          nodeId,
-        );
+        applyCachedManifestUpsert(remoteManifest, cacheManifest, nodeId);
       },
     );
     logger.debug('Applied cached manifest upsert to remote', {
       repositoryKind: this.kind,
       nodeId,
-      cacheNodeCount: Object.keys(cacheSnapshot.manifest.nodes).length,
+      cacheNodeCount: Object.keys(cacheManifest.nodes).length,
     });
   }
 
@@ -1417,6 +1287,15 @@ export class CachedRepository
       const remoteBytes = await this.remote.readFileBytes(nodeId);
       const remoteRevision = await computeRevision(remoteBytes);
       if (remoteRevision !== op.baseFileRevision) {
+        const localRevision = await computeRevision(bytes);
+        if (remoteRevision === localRevision) {
+          logger.debug('Raw file push was already applied remotely', {
+            repositoryKind: this.kind,
+            nodeId,
+            remoteRevision,
+          });
+          return;
+        }
         await this.createRawFileConflictCopy(
           node,
           bytes ?? new Uint8Array(),
@@ -1779,6 +1658,7 @@ export class CachedRepository
     remoteSnapshot: RepositorySnapshot,
   ): Promise<void> {
     await this.cache.replaceSnapshot(remoteSnapshot);
+    this.needsRemoteBootstrap = false;
     this.updateRuntimeStatus({
       online: true,
       lastRemoteSyncAt: Date.now(),
@@ -1802,8 +1682,12 @@ export class CachedRepository
           ? 'conflict'
           : 'other';
       trackEvent('sync_failed', {
+        repository_kind: this.kind,
         error_type: errorType,
         error_message: error.message.slice(0, 200),
+        pending_remote_writes: this.outbox.length,
+        ...(error instanceof BatchUnknownError ? error.diagnostics : {}),
+        ...(error instanceof GoogleDriveRequestError ? error.diagnostics : {}),
       });
     }
     this.runtimeStatus = { ...this.runtimeStatus, ...patch };

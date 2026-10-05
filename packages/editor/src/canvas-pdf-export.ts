@@ -1,8 +1,7 @@
 import type { DrawableCanvas } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
 import { PAGE_GAP } from './elements/page-frame-constants';
-import { PageFrameElement } from './elements/page-frame-element';
-import { PdfElement } from './elements/pdf-element';
+import { getCanvasPdfExportData } from './elements/pdf-exportable-element';
 import type { ExportResult, ExportTarget } from './export/export-controller';
 import {
   harvestPageFramePdf,
@@ -93,8 +92,9 @@ export async function harvestCanvasPdf(
   const ctx = createCanvasHarvestContext(page, imagesB64, fontsB64, bounds);
 
   for (const element of visible) {
-    if (element instanceof PageFrameElement) {
-      const source = element.getPdfExportSource();
+    const exportData = getCanvasPdfExportData(element);
+    if (exportData?.kind === 'page-frame') {
+      const { source } = exportData;
       if (!source) {
         warnings.push('A page frame could not be rendered and was omitted.');
         continue;
@@ -112,8 +112,8 @@ export async function harvestCanvasPdf(
       continue;
     }
 
-    if (element instanceof PdfElement) {
-      const source = element.getPdfExportSource();
+    if (exportData?.kind === 'pdf') {
+      const { source } = exportData;
       if (!source) {
         warnings.push('A PDF could not be rendered and was omitted.');
         continue;
@@ -154,32 +154,18 @@ function getElementPdfExportBounds(element: DrawableElement): DOMRect | null {
   if (element.hidden) {
     return null;
   }
-  if (element instanceof PageFrameElement) {
-    const source = element.getPdfExportSource();
-    return source
-      ? getPageFrameContentBounds(source)
-      : scaledContentBounds(element, element.totalWidth, element.totalHeight);
+  const exportData = getCanvasPdfExportData(element);
+  if (exportData?.kind === 'page-frame') {
+    return exportData.source
+      ? getPageFrameContentBounds(exportData.source)
+      : exportData.fallbackBounds;
   }
-  if (element instanceof PdfElement) {
-    const source = element.getPdfExportSource();
-    return source ? getPdfElementContentBounds(source) : null;
+  if (exportData?.kind === 'pdf') {
+    return exportData.source
+      ? getPdfElementContentBounds(exportData.source)
+      : null;
   }
   return element.boundingBox;
-}
-
-function scaledContentBounds(
-  element: DrawableElement,
-  width: number,
-  height: number,
-): DOMRect {
-  const scaleX = getPositiveScale(element.scale.x);
-  const scaleY = getPositiveScale(element.scale.y);
-  return new DOMRect(
-    element.offset.x,
-    element.offset.y,
-    width * scaleX,
-    height * scaleY,
-  );
 }
 
 function getPdfElementContentBounds(source: PdfElementExportSource): DOMRect {

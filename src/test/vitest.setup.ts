@@ -87,18 +87,19 @@ vi.mock('@myelin/editor/thumbnails', () => ({
   subscribeThumbnail: () => () => {},
 }));
 
-vi.mock('@/lib/sync/repo/github-credentials', () => ({
+vi.mock('@/lib/sync/repo/github/credentials', () => ({
   getGitHubToken: vi.fn(async () => 'test-token'),
   hasGitHubToken: vi.fn(async () => true),
 }));
 
-vi.mock('@/lib/sync/repo/google-drive-credentials', () => ({
+vi.mock('@/lib/sync/repo/google-drive/credentials', () => ({
   getGoogleDriveToken: vi.fn(async () => 'test-drive-token'),
   hasGoogleDriveToken: vi.fn(async () => true),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => path,
+  isTauri: () => false,
 }));
 
 vi.mock('@tauri-apps/api/path', async () => {

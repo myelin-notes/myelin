@@ -12,9 +12,10 @@ import {
   PAGE_PADDING,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
-import { PM_UPDATE_EVENT } from '../../events';
+import { NOTE_LINK_OPEN_REQUEST_EVENT, PM_UPDATE_EVENT } from '../../events';
 import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
+import { UserPrefs } from '../../user-prefs';
 import { getDevicePixelRatio } from '../../utils';
 import {
   removeStyleIfPresent,
@@ -35,7 +36,10 @@ import type {
 import { PageFrameAutocompletePopup } from '../pm/autocomplete/popup';
 import { PM_EDITOR_CLASS } from '../pm/constants';
 import { FloatingToolbar } from '../pm/floating-toolbar';
-import { NOTE_LINK_SELECTOR } from '../pm/markdown/note-links';
+import {
+  NOTE_LINK_SELECTOR,
+  type NoteLinkOpenRequestDetail,
+} from '../pm/markdown/note-links';
 import { positionMathBlockSources } from '../pm/math/block-node-view';
 import {
   getPageFramePmScreenRectForNestedCaret,
@@ -77,6 +81,10 @@ interface FrameRefs {
   viewportDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
   pageChromeDivs: HTMLDivElement[];
+}
+
+interface PageFrameNoteLinkHit extends NoteLinkPreviewHit {
+  openRequest: NoteLinkOpenRequestDetail;
 }
 
 const PAGE_CHROME_STYLE: Record<string, string> = {
@@ -123,20 +131,20 @@ function rectsIntersect(a: ScreenRect, b: ScreenRect): boolean {
   );
 }
 
-function isFrameMenuCoveredByHigherFrame(
-  frameIndex: number,
-  frames: PageFrameElement[],
+function isFrameMenuCoveredByHigherElement(
+  elementIndex: number,
+  elements: readonly DrawableElement[],
   menuRect: ScreenRect,
   offset: { x: number; y: number },
   zoom: number,
 ): boolean {
-  for (let i = frameIndex + 1; i < frames.length; i++) {
-    const frame = frames[i];
-    if (frame.hidden) {
+  for (let i = elementIndex + 1; i < elements.length; i++) {
+    const element = elements[i];
+    if (element.hidden) {
       continue;
     }
     if (
-      rectsIntersect(menuRect, getScreenRect(frame.boundingBox, offset, zoom))
+      rectsIntersect(menuRect, getScreenRect(element.boundingBox, offset, zoom))
     ) {
       return true;
     }
@@ -238,14 +246,18 @@ function createFrameRefs(
   frame: PageFrameElement,
   container: HTMLDivElement,
 ): FrameRefs {
-  const chrome = new FrameChrome({
-    kindLabel: getMessages().canvas.frame.noteKind,
-    getMenuItems: () => frame.getMenuItems(),
-    onTitleCommit: (title) => {
-      frame.setDisplayName(title);
-      return frame.displayName;
+  const chrome = new FrameChrome(
+    {
+      kindLabel: getMessages().canvas.frame.noteKind,
+      getMenuItems: () => frame.getMenuItems(),
+      openChromeMenu: frame.uiServices?.openChromeMenu,
+      onTitleCommit: (title) => {
+        frame.setDisplayName(title);
+        return frame.displayName;
+      },
     },
-  });
+    container,
+  );
   chrome.setFileName(frame.displayName);
 
   const frameDiv = document.createElement('div');
@@ -355,7 +367,7 @@ function getNoteLinkPreviewTargetAtPoint(
   frameMap: ReadonlyMap<string, FrameRefs>,
   clientX: number,
   clientY: number,
-): NoteLinkPreviewHit | null {
+): PageFrameNoteLinkHit | null {
   for (const refs of frameMap.values()) {
     const contentRect = getVisualRectForContentRect(
       refs,
@@ -386,7 +398,14 @@ function getNoteLinkPreviewTargetAtPoint(
         title,
         noteId: link.getAttribute('data-note-id') || null,
       };
-      return { target, rect: unionRects(linkRects) };
+      return {
+        target,
+        rect: unionRects(linkRects),
+        openRequest: {
+          ...target,
+          pageFrameId: link.getAttribute('data-page-frame-id') || null,
+        },
+      };
     }
   }
 
@@ -429,6 +448,35 @@ export function PageFrameDomLayer({
   // exists. Read inline rather than tracking in state.
   const activeView = editingElement?.pmEditor?.view ?? null;
 
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (editingElement || !(event.target instanceof HTMLCanvasElement)) {
+        return;
+      }
+
+      const hit = getPreviewTargetAtPoint(event.clientX, event.clientY);
+      if (
+        !hit ||
+        (UserPrefs.get('linkRequireModifier') &&
+          !event.metaKey &&
+          !event.ctrlKey)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      document.dispatchEvent(
+        new CustomEvent<NoteLinkOpenRequestDetail>(
+          NOTE_LINK_OPEN_REQUEST_EVENT,
+          { detail: hit.openRequest },
+        ),
+      );
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [editingElement, getPreviewTargetAtPoint]);
+
   // Sync loop — create/remove/position frame containers each frame
   useEffect(() => {
     let rafId: number;
@@ -444,13 +492,14 @@ export function PageFrameDomLayer({
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
       const viewAnimating = dc.viewport.isAnimatingView;
-      const frames = dc.getElementsByType(
-        ElementType.PAGE_FRAME,
-      ) as PageFrameElement[];
+      const elements = dc.elements;
+      const frames = elements.filter(
+        (element): element is PageFrameElement =>
+          element.type === ElementType.PAGE_FRAME,
+      );
       const activeFrames = new Map<string, PageFrameElement>();
 
-      for (let frameIndex = 0; frameIndex < frames.length; frameIndex++) {
-        const frame = frames[frameIndex];
+      for (const frame of frames) {
         activeFrames.set(frame.uuid, frame);
 
         let refs = frameMap.current.get(frame.uuid);
@@ -471,6 +520,7 @@ export function PageFrameDomLayer({
         const contentWidth = frame.totalWidth;
         const contentHeight = frame.totalHeight;
         const pageLayout = frame.pageLayout;
+        refs.chrome.setZIndex(`${elements.indexOf(frame) + 1}`);
         if (dc.editingElement === frame) {
           dc.syncViewportEditModePan();
         }
@@ -487,9 +537,9 @@ export function PageFrameDomLayer({
           contentWidth,
           contentHeight,
           zoom,
-          controlsVisible: !isFrameMenuCoveredByHigherFrame(
-            frameIndex,
-            frames,
+          controlsVisible: !isFrameMenuCoveredByHigherElement(
+            elements.indexOf(frame),
+            elements,
             menuRect,
             offset,
             zoom,
@@ -511,22 +561,16 @@ export function PageFrameDomLayer({
         );
         removeStyleIfPresent(refs.frameDiv, 'transform');
 
-        // World-sized. A fixed CSS zoom of devicePixelRatio makes WebKit rasterise the compositing
-        // layer at DPR^2, giving crisp text at every canvas zoom. The constant zoom keeps text metrics
-        // and line breaks fixed; variable canvas zoom is handled by transform: scale() (post-layout GPU).
-        // Not cheap in the abstract — on a 2x display one blank page rasterizes ~9.6MP against ~2.8MP
-        // visible — but measured free while panning on iPad (promoted layer moves its texture), and
-        // worth ~5ms/frame only while zooming.
-        const dpr = getDevicePixelRatio();
+        // Rasterize at device resolution; CSS zoom by DPR made one blank page a 9.6MP layer
+        // on a 2x iPad, which is expensive to rescale during a pinch.
         setStyleIfChanged(refs.viewportDiv, 'width', `${contentWidth}px`);
         setStyleIfChanged(refs.viewportDiv, 'height', `${contentHeight}px`);
-        setStyleIfChanged(refs.viewportDiv, 'zoom', `${dpr}`);
         // Quantized like the boxes above: the chrome root supplies the remainder, so between two steps
         // this transform holds still and its subtree is not repainted.
         setStyleIfChanged(
           refs.viewportDiv,
           'transform',
-          `scale(${rasterZoom / dpr})`,
+          `scale(${rasterZoom})`,
         );
 
         if (frame.editing) {
@@ -761,7 +805,6 @@ export function PageFrameDomLayer({
           inset: 0,
           pointerEvents: 'none',
           overflow: 'clip',
-          zIndex: 5,
         }}
       />
       {activeView && <FloatingToolbar view={activeView} />}

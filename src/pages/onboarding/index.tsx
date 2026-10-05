@@ -5,6 +5,7 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
+  isTouchDevice,
   isWindows,
   TAB_BAR_HEIGHT_CLASS,
   TRAFFIC_LIGHT_INSET_CLASS,
@@ -14,6 +15,7 @@ import { WindowControls } from '@/components/layout/window-controls';
 import { trackEvent } from '@/lib/analytics';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
+import { InputStep } from './input-step';
 import { PrivacyStep } from './privacy-step';
 import { SampleCanvasStep } from './sample-canvas-step';
 import { createStarterCanvasFile } from './starter-canvas';
@@ -22,7 +24,12 @@ import { WelcomeStep } from './welcome-step';
 
 const logger = new Logger('Onboarding');
 
-const STEPS = ['welcome', 'privacy', 'sync', 'sample'] as const;
+type Step = 'welcome' | 'input' | 'privacy' | 'sync' | 'sample';
+
+// The input mode only matters where a finger can touch the canvas.
+const STEPS: readonly Step[] = isTouchDevice
+  ? ['welcome', 'input', 'privacy', 'sync', 'sample']
+  : ['welcome', 'privacy', 'sync', 'sample'];
 
 /**
  * First-run setup, shown in place of the app shell until `onboardingCompleted` is set.
@@ -88,6 +95,7 @@ export function OnboardingFlow() {
         <div className="flex min-h-full items-center justify-center py-8">
           <div className="fade-in-0 slide-in-from-bottom-2 w-full max-w-xl animate-in duration-[150ms] ease-out">
             {step === 'welcome' && <WelcomeStep />}
+            {step === 'input' && <InputStep />}
             {step === 'privacy' && <PrivacyStep />}
             {step === 'sync' && (
               <SyncStep

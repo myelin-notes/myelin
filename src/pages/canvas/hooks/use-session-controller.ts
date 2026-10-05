@@ -8,7 +8,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { codeOutputBridge } from '@myelin/editor/elements/code-output/bridge';
+import { hasAudioRecordingsForOwner } from '@myelin/editor/elements/audio/recording';
+import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
+import { ensureCodeOutputCard } from '@myelin/editor/elements/code-output/bridge';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { createMediaPathResolver } from '@myelin/editor/page-frame/media-path/resolution';
 import {
@@ -21,6 +23,10 @@ import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
+import {
+  preserveCanvasSession,
+  takePreservedCanvasSession,
+} from '@/lib/audio-recording-lifecycle';
 import type { NoteBacklink, NoteSession, VFSNodeId } from '@/lib/sync';
 import {
   type ActiveRepository,
@@ -28,6 +34,12 @@ import {
   useRepository,
 } from '@/lib/sync';
 import { renamePageFrameReferences } from '@/lib/sync/repo/rename-page-frame-references';
+import type { TabId } from '@/lib/tabs/types';
+import {
+  flushViewportStates,
+  readViewportState,
+  saveViewportState,
+} from '@/lib/viewport-state-cache';
 import type {
   RenameReferencesChoice,
   RenameReferencesPrompt,
@@ -77,6 +89,7 @@ interface ActiveCanvasSession {
   drawableCanvas: DrawableCanvas;
   unsubscribeStatus: () => void;
   unsubscribePeers: () => void;
+  unsubscribeViewport: () => void;
 }
 
 export class CanvasSessionController {
@@ -97,6 +110,12 @@ export class CanvasSessionController {
     private readonly domOverlayRef: RefObject<HTMLDivElement | null>,
     private readonly drawableCanvasRef: RefObject<DrawableCanvas | null>,
     private readonly canvasToolsRef: RefObject<ITool[]>,
+    private readonly recordingOwnerId: TabId = '',
+    private readonly uiServices: CanvasUiServices = {
+      openChromeMenu: () => {},
+      openExportDialog: () => {},
+    },
+    private readonly selectedToolIndexRef: RefObject<number> = { current: 0 },
   ) {}
 
   subscribe = (listener: () => void): (() => void) => {
@@ -133,8 +152,18 @@ export class CanvasSessionController {
       return;
     }
 
-    let session: NoteSession | null = null;
+    let session: NoteSession | null = takePreservedCanvasSession(
+      this.recordingOwnerId,
+    );
     let drawableCanvas: DrawableCanvas | null = null;
+    const canvasUiServices: CanvasUiServices = {
+      ...this.uiServices,
+      ensureCodeOutputCard: (request) => {
+        if (drawableCanvas) {
+          ensureCodeOutputCard(drawableCanvas, request);
+        }
+      },
+    };
 
     try {
       logger.debug('Opening canvas session', {
@@ -142,7 +171,7 @@ export class CanvasSessionController {
         repositoryKind: this.repository.kind,
       });
 
-      session = await this.repository.openSession(noteId);
+      session ??= await this.repository.openSession(noteId);
       if (this.shouldAbortOpen(token)) {
         await this.cleanupAbandonedSession(session);
         return;
@@ -163,7 +192,20 @@ export class CanvasSessionController {
           resolveNoteLinkRefByTitle(this.repository, title, frameNameCache),
         createMediaPathResolver(this.repository),
         session.localPeerId,
+        this.recordingOwnerId,
+        async () => {
+          await session!.save();
+        },
+        canvasUiServices,
       );
+      // CanvasView keeps its toolbar state across tabs, while each new canvas starts on Select.
+      if (this.selectedToolIndexRef.current !== 0) {
+        drawableCanvas.switchTool(this.selectedToolIndexRef.current);
+      }
+      const viewportState = await readViewportState(noteId);
+      if (viewportState) {
+        drawableCanvas.viewport.setView(viewportState);
+      }
       drawableCanvas.setOnPageFrameRenamed((uuid, newName) => {
         this.handlePageFrameRenamed(noteId, uuid, newName);
       });
@@ -233,7 +275,6 @@ export class CanvasSessionController {
       const activeSession = this.activeSession;
       this.activeSession = null;
       this.drawableCanvasRef.current = null;
-      codeOutputBridge.registerCanvas(null);
 
       this.updateSnapshot({
         ...EMPTY_SNAPSHOT,
@@ -246,7 +287,14 @@ export class CanvasSessionController {
 
       activeSession.unsubscribeStatus();
       activeSession.unsubscribePeers();
+      activeSession.unsubscribeViewport();
+      await flushViewportStates();
       activeSession.drawableCanvas.destroy();
+
+      if (hasAudioRecordingsForOwner(this.recordingOwnerId)) {
+        preserveCanvasSession(this.recordingOwnerId, activeSession.noteSession);
+        return;
+      }
 
       try {
         await activeSession.noteSession.close();
@@ -306,15 +354,21 @@ export class CanvasSessionController {
         peers: snapshot.connectedPeers,
       });
     });
+    const unsubscribeViewport = drawableCanvas.viewport.onViewChange(() => {
+      saveViewportState(noteSession.id, {
+        zoom: drawableCanvas.viewport.zoom,
+        offset: { ...drawableCanvas.viewport.offset },
+      });
+    });
 
     this.activeSession = {
       noteSession,
       drawableCanvas,
       unsubscribeStatus: () => unsubscribeStatus(),
       unsubscribePeers,
+      unsubscribeViewport,
     };
     this.drawableCanvasRef.current = drawableCanvas;
-    codeOutputBridge.registerCanvas(drawableCanvas);
 
     unsubscribeStatus = noteSession.subscribeStatus((status) => {
       if (this.activeSession?.noteSession !== noteSession) {
@@ -358,27 +412,35 @@ export class CanvasSessionController {
 
 interface UseCanvasSessionControllerArgs {
   id: VFSNodeId | undefined;
+  recordingOwnerId: TabId;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   bgHostRef: RefObject<HTMLDivElement | null>;
   overlayCanvasRef: RefObject<HTMLCanvasElement | null>;
   domOverlayRef: RefObject<HTMLDivElement | null>;
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
+  selectedToolIndex: number;
+  uiServices: CanvasUiServices;
 }
 
 export function useCanvasSessionController({
   id,
+  recordingOwnerId,
   canvasRef,
   bgHostRef,
   overlayCanvasRef,
   domOverlayRef,
   drawableCanvasRef,
   canvasTools,
+  selectedToolIndex,
+  uiServices,
 }: UseCanvasSessionControllerArgs) {
   const repository = useRepository();
 
   const canvasToolsRef = useRef(canvasTools);
   canvasToolsRef.current = canvasTools;
+  const selectedToolIndexRef = useRef(selectedToolIndex);
+  selectedToolIndexRef.current = selectedToolIndex;
 
   const controller = useMemo(
     () =>
@@ -390,6 +452,9 @@ export function useCanvasSessionController({
         domOverlayRef,
         drawableCanvasRef,
         canvasToolsRef,
+        recordingOwnerId,
+        uiServices,
+        selectedToolIndexRef,
       ),
     [
       bgHostRef,
@@ -397,7 +462,9 @@ export function useCanvasSessionController({
       domOverlayRef,
       drawableCanvasRef,
       overlayCanvasRef,
+      recordingOwnerId,
       repository,
+      uiServices,
     ],
   );
 

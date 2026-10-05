@@ -9,20 +9,24 @@ import {
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
+import { isApplePlatform } from '@myelin/shared/os';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import {
   type FileType,
-  isRepositoryConfigStructurallyComplete,
-  isRepositoryFullyConfigured,
-  type RepositoryConfig,
-  type SearchNodesOptions,
   useRepository,
   useRepositoryStatus,
   type VFSFolderNode,
   type VFSNode,
 } from '@/lib/sync';
-import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
+import {
+  compareExplorerNodes,
+  ExplorerModel,
+  type ExplorerSortMode,
+  sortExplorerNodes,
+} from '@/pages/library/explorer/explorer-model';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
+import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
 import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
 
@@ -31,48 +35,12 @@ const SEARCH_DEBOUNCE_MS = 150;
 const ROOT_KEY: string | null = null;
 const NO_COLLAPSED_IDS: ReadonlySet<string> = new Set();
 
-export type SortMode = 'name-asc' | 'name-desc' | 'modified' | 'created';
-export type SearchMode = NonNullable<SearchNodesOptions['mode']>;
+export type SortMode = ExplorerSortMode;
 
 export interface SidebarTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
   startNewFile: (title: string, type: FileType) => Promise<void>;
-}
-
-type RepositorySetupState = 'checking' | 'ready' | 'setup-required';
-
-function getInitialRepositorySetupState(
-  config: RepositoryConfig,
-): RepositorySetupState {
-  if (config.kind === 'local') {
-    return 'ready';
-  }
-  return isRepositoryConfigStructurallyComplete(config)
-    ? 'checking'
-    : 'setup-required';
-}
-
-function compareNodes(a: VFSNode, b: VFSNode, sortMode: SortMode): number {
-  if (a.type !== b.type) {
-    return a.type === 'folder' ? -1 : 1;
-  }
-  switch (sortMode) {
-    case 'name-asc':
-      return a.name.localeCompare(b.name);
-    case 'name-desc':
-      return b.name.localeCompare(a.name);
-    case 'modified':
-      return b.modifiedAt - a.modifiedAt;
-    case 'created':
-      return b.createdAt - a.createdAt;
-    default:
-      return 0;
-  }
-}
-
-function sortNodes(nodes: VFSNode[], sortMode: SortMode): VFSNode[] {
-  return [...nodes].sort((a, b) => compareNodes(a, b, sortMode));
 }
 
 interface FlatResults {
@@ -83,12 +51,73 @@ interface FlatResults {
 
 const EMPTY_RESULTS: FlatResults = { nodes: [], ancestors: [] };
 
+interface Selection {
+  ids: ReadonlySet<string>;
+  /** Row a shift-click ranges from; the last plain- or modifier-clicked row. */
+  anchor: string | null;
+}
+
+const EMPTY_SELECTION: Selection = { ids: new Set(), anchor: null };
+
+interface VisibleRow {
+  node: VFSNode;
+  depth: number;
+  expanded: boolean;
+}
+
+function collectRows(
+  nodes: VFSNode[],
+  depth: number,
+  expanded: ReadonlySet<string>,
+  childrenMap: ReadonlyMap<string | null, VFSNode[]>,
+  sortMode: SortMode,
+): VisibleRow[] {
+  return sortExplorerNodes(nodes, sortMode).flatMap((node) => {
+    if (node.type !== 'folder') {
+      return [{ node, depth, expanded: false }];
+    }
+    const isExpanded = expanded.has(node.id);
+    return [
+      { node, depth, expanded: isExpanded },
+      ...(isExpanded
+        ? collectRows(
+            childrenMap.get(node.id) ?? [],
+            depth + 1,
+            expanded,
+            childrenMap,
+            sortMode,
+          )
+        : []),
+    ];
+  });
+}
+
+function collectResultRows(
+  nodes: ResultTreeNode[],
+  depth: number,
+  collapsedIds: ReadonlySet<string>,
+): VisibleRow[] {
+  return nodes.flatMap(({ node, children }) => {
+    if (node.type !== 'folder') {
+      return [{ node, depth, expanded: false }];
+    }
+    const isExpanded = !collapsedIds.has(node.id);
+    return [
+      { node, depth, expanded: isExpanded },
+      ...(isExpanded
+        ? collectResultRows(children, depth + 1, collapsedIds)
+        : []),
+    ];
+  });
+}
+
 interface SidebarTreeProps {
   ref?: React.Ref<SidebarTreeHandle>;
   sortMode: SortMode;
   searchQuery: string;
-  searchMode: SearchMode;
   filterTags: string[];
+  onImport: (parentId: string) => void;
+  importDisabled: boolean;
   /** Notified after a row edit (rename/move/delete) so the sidebar can refresh
    * its tag counts and file total alongside the tree. */
   onChanged?: () => void;
@@ -98,16 +127,23 @@ export function SidebarTree({
   ref,
   sortMode,
   searchQuery,
-  searchMode,
   filterTags,
+  onImport,
+  importDisabled,
   onChanged,
 }: SidebarTreeProps) {
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const [setupState, setSetupState] = useState<RepositorySetupState>(() =>
-    getInitialRepositorySetupState(repositoryStatus.config),
+  const noteIndexStatus = useNoteIndexStatus();
+  const explorer = useMemo(
+    () =>
+      new ExplorerModel(repository, (name, parentId) =>
+        createBlankCanvasFile(repository, name, parentId),
+      ),
+    [repository],
   );
+  const setupState = useExplorerSetupState(repositoryStatus.config);
   const [childrenMap, setChildrenMap] = useState<Map<string | null, VFSNode[]>>(
     () => new Map(),
   );
@@ -115,6 +151,7 @@ export function SidebarTree({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [searchResults, setSearchResults] =
     useState<FlatResults>(EMPTY_RESULTS);
+  const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
 
@@ -136,42 +173,16 @@ export function SidebarTree({
       ? collapsedResults.ids
       : NO_COLLAPSED_IDS;
 
-  useEffect(() => {
-    let cancelled = false;
-    const config = repositoryStatus.config;
-
-    if (config.kind === 'local') {
-      setSetupState('ready');
-      return;
-    }
-    if (!isRepositoryConfigStructurallyComplete(config)) {
-      setSetupState('setup-required');
-      return;
-    }
-
-    setSetupState('checking');
-    void isRepositoryFullyConfigured(config).then((configured) => {
-      if (!cancelled) {
-        setSetupState(configured ? 'ready' : 'setup-required');
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [repositoryStatus.config]);
-
   const loadFolder = useCallback(
     async (folderId: string | null) => {
-      const [dirs, files] = await repository.listDirectory(folderId);
-      const nodes: VFSNode[] = [...dirs, ...files];
+      const nodes = await explorer.loadFolder(folderId);
       setChildrenMap((prev) => {
         const next = new Map(prev);
         next.set(folderId, nodes);
         return next;
       });
     },
-    [repository],
+    [explorer],
   );
 
   const reload = useCallback(async () => {
@@ -190,18 +201,9 @@ export function SidebarTree({
   }, [loadFolder, ready]);
 
   const loadAncestors = useCallback(
-    async (nodes: VFSNode[]): Promise<VFSFolderNode[]> => {
-      const parentIds = new Set(
-        nodes
-          .map((node) => node.parentId)
-          .filter((id): id is string => id !== null),
-      );
-      const chains = await Promise.all(
-        [...parentIds].map((id) => repository.getFolderChain(id)),
-      );
-      return chains.flat();
-    },
-    [repository],
+    (nodes: VFSNode[]): Promise<VFSFolderNode[]> =>
+      explorer.loadAncestors(nodes),
+    [explorer],
   );
 
   const loadFlatResults = useCallback(async () => {
@@ -210,34 +212,26 @@ export function SidebarTree({
       return;
     }
     try {
-      let nodes: VFSNode[];
-      if (isSearching) {
-        let results = await repository.searchNodes(trimmedQuery, {
-          mode: searchMode,
-        });
-        if (isFiltering) {
-          results = results.filter((r) =>
-            nodeMatchesAnyTag(r.node.tags, filterTags),
-          );
-        }
-        nodes = results.map((result) => result.node);
-      } else {
-        nodes = await repository.getNodesByAnyTag(filterTags, ROOT_KEY);
+      const result = await explorer.refresh({
+        folderId: ROOT_KEY,
+        searchQuery: trimmedQuery,
+        filterTags,
+      });
+      if (!result) {
+        return;
       }
-      setSearchResults({ nodes, ancestors: await loadAncestors(nodes) });
+      const ancestors = await loadAncestors(result.nodes);
+      if (!explorer.isCurrent(result)) {
+        return;
+      }
+      setSearchResults({
+        nodes: result.nodes,
+        ancestors,
+      });
     } catch (err) {
       logger.error('Failed to load search results', err);
     }
-  }, [
-    filterTags,
-    isFiltering,
-    isSearching,
-    loadAncestors,
-    ready,
-    repository,
-    searchMode,
-    trimmedQuery,
-  ]);
+  }, [filterTags, explorer, loadAncestors, ready, trimmedQuery]);
 
   // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
@@ -260,19 +254,24 @@ export function SidebarTree({
     }
     if (!isSearching) {
       void loadFlatResults();
-      return;
+      return () => explorer.invalidatePendingRequests();
     }
     const timer = window.setTimeout(
       () => void loadFlatResults(),
       SEARCH_DEBOUNCE_MS,
     );
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      explorer.invalidatePendingRequests();
+    };
   }, [
+    explorer,
     isFlat,
     isSearching,
     loadFlatResults,
     repositoryStatus.lastRemoteSyncAt,
     repositoryStatus.dataVersion,
+    noteIndexStatus.revision,
   ]);
 
   const toggle = useCallback(
@@ -293,29 +292,35 @@ export function SidebarTree({
     [loadFolder],
   );
 
-  const startNewFolder = useCallback(async () => {
-    const name = await repository.getUniqueFileName(
-      strings.library.createNew.unnamedFolder,
-      ROOT_KEY,
-    );
-    const id = await repository.createFolder(name, ROOT_KEY);
-    setRenamingId(id);
-    await loadFolder(ROOT_KEY);
-    requestAnimationFrame(() => setRenamingId(null));
-  }, [loadFolder, repository, strings.library.createNew.unnamedFolder]);
+  const startNewFolder = useCallback(
+    async (parentId: string | null = ROOT_KEY) => {
+      const node = await explorer.createFolder(
+        parentId,
+        strings.library.createNew.unnamedFolder,
+      );
+      setRenamingId(node.id);
+      if (parentId !== null) {
+        setExpanded((prev) => new Set(prev).add(parentId));
+      }
+      await loadFolder(parentId);
+    },
+    [explorer, loadFolder, strings.library.createNew.unnamedFolder],
+  );
 
   const startNewFile = useCallback(
-    async (title: string, type: FileType) => {
-      const name = await repository.getUniqueFileName(title, ROOT_KEY);
-      const id =
-        type === 'mcanvas'
-          ? await createBlankCanvasFile(repository, name, ROOT_KEY)
-          : await repository.createFile(name, type, ROOT_KEY);
-      setRenamingId(id);
-      await loadFolder(ROOT_KEY);
-      requestAnimationFrame(() => setRenamingId(null));
+    async (
+      title: string,
+      type: FileType,
+      parentId: string | null = ROOT_KEY,
+    ) => {
+      const node = await explorer.createFile(parentId, title, type);
+      setRenamingId(node.id);
+      if (parentId !== null) {
+        setExpanded((prev) => new Set(prev).add(parentId));
+      }
+      await loadFolder(parentId);
     },
-    [loadFolder, repository],
+    [explorer, loadFolder],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
@@ -336,39 +341,6 @@ export function SidebarTree({
 
   const { dragOver: rootDragOver, dropTargetProps: rootDropProps } =
     useDropTarget({ targetFolderId: ROOT_KEY, onMoved: notifyNested });
-
-  const renderNodes = useCallback(
-    (nodes: VFSNode[], depth: number): React.ReactNode[] => {
-      return sortNodes(nodes, sortMode).flatMap((node) => {
-        if (node.type === 'folder') {
-          const isExpanded = expanded.has(node.id);
-          const children = childrenMap.get(node.id) ?? [];
-          return [
-            <SidebarFolderRow
-              key={node.id}
-              node={node}
-              depth={depth}
-              expanded={isExpanded}
-              autoRename={node.id === renamingId}
-              onToggle={() => toggle(node.id)}
-              onChanged={notifyNested}
-            />,
-            ...(isExpanded ? renderNodes(children, depth + 1) : []),
-          ];
-        }
-        return [
-          <SidebarFileRow
-            key={node.id}
-            node={node}
-            depth={depth}
-            autoRename={node.id === renamingId}
-            onChanged={notifyNested}
-          />,
-        ];
-      });
-    },
-    [childrenMap, expanded, renamingId, notifyNested, sortMode, toggle],
-  );
 
   const toggleResultFolder = useCallback(
     (folderId: string) => {
@@ -393,50 +365,130 @@ export function SidebarTree({
       (nodes) =>
         isSearching
           ? nodes.sort((a, b) => a.rank - b.rank)
-          : nodes.sort((a, b) => compareNodes(a.node, b.node, sortMode)),
+          : nodes.sort((a, b) =>
+              compareExplorerNodes(a.node, b.node, sortMode),
+            ),
     );
   }, [isFlat, isSearching, searchResults, sortMode]);
 
-  const renderResultNodes = useCallback(
-    (nodes: ResultTreeNode[], depth: number): React.ReactNode[] => {
-      return nodes.flatMap(({ node, children }) => {
-        if (node.type === 'folder') {
-          const isExpanded = !collapsedIds.has(node.id);
-          return [
-            <SidebarFolderRow
-              key={node.id}
-              node={node}
-              depth={depth}
-              expanded={isExpanded}
-              autoRename={false}
-              onToggle={() => toggleResultFolder(node.id)}
-              onChanged={notifyFlat}
-            />,
-            ...(isExpanded ? renderResultNodes(children, depth + 1) : []),
-          ];
-        }
-        return [
-          <SidebarFileRow
-            key={node.id}
-            node={node}
-            depth={depth}
-            autoRename={false}
-            onChanged={notifyFlat}
-          />,
-        ];
-      });
-    },
-    [collapsedIds, notifyFlat, toggleResultFolder],
+  const visibleRows = useMemo(
+    () =>
+      isFlat
+        ? collectResultRows(resultTree ?? [], 0, collapsedIds)
+        : collectRows(
+            childrenMap.get(ROOT_KEY) ?? [],
+            0,
+            expanded,
+            childrenMap,
+            sortMode,
+          ),
+    [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
+
+  useEffect(() => {
+    if (
+      !renamingId ||
+      !visibleRows.some(({ node }) => node.id === renamingId)
+    ) {
+      return;
+    }
+    const frame = requestAnimationFrame(() => setRenamingId(null));
+    return () => cancelAnimationFrame(frame);
+  }, [renamingId, visibleRows]);
+
+  // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
+  // Descendants of a selected folder are dropped too, or moving the set would flatten them.
+  const selectionIds = useMemo(() => {
+    const ids: string[] = [];
+    let selectedDepth = Infinity;
+    for (const { node, depth } of visibleRows) {
+      if (depth > selectedDepth) {
+        continue;
+      }
+      selectedDepth = Infinity;
+      if (selection.ids.has(node.id)) {
+        ids.push(node.id);
+        selectedDepth = depth;
+      }
+    }
+    return ids;
+  }, [selection.ids, visibleRows]);
+
+  // Returns true when a modifier extended the selection, so the row skips its
+  // default click action (open / expand).
+  const selectRow = (nodeId: string, e: React.MouseEvent): boolean => {
+    const toggling = isApplePlatform ? e.metaKey : e.ctrlKey;
+    if (e.shiftKey) {
+      const order = visibleRows.map((row) => row.node.id);
+      const to = order.indexOf(nodeId);
+      const from =
+        selection.anchor === null ? -1 : order.indexOf(selection.anchor);
+      const range =
+        from === -1
+          ? [nodeId]
+          : order.slice(Math.min(from, to), Math.max(from, to) + 1);
+      setSelection({
+        ids: new Set(toggling ? [...selection.ids, ...range] : range),
+        anchor: from === -1 ? nodeId : selection.anchor,
+      });
+      return true;
+    }
+    if (toggling) {
+      const ids = new Set(selection.ids);
+      if (!ids.delete(nodeId)) {
+        ids.add(nodeId);
+      }
+      setSelection({ ids, anchor: nodeId });
+      return true;
+    }
+    setSelection({ ids: new Set([nodeId]), anchor: nodeId });
+    return false;
+  };
 
   if (!ready) {
     return null;
   }
 
-  const rootNodes = childrenMap.get(ROOT_KEY) ?? [];
-  const rows = isFlat
-    ? renderResultNodes(resultTree ?? [], 0)
-    : renderNodes(rootNodes, 0);
+  const notify = isFlat ? notifyFlat : notifyNested;
+  const rows = visibleRows.map(({ node, depth, expanded: isExpanded }) => {
+    const rowProps = {
+      depth,
+      autoRename: !isFlat && node.id === renamingId,
+      selected: selection.ids.has(node.id),
+      selectionIds,
+      onSelect: (e: React.MouseEvent) => selectRow(node.id, e),
+      onChanged: notify,
+    };
+    if (node.type === 'folder') {
+      return (
+        <SidebarFolderRow
+          key={node.id}
+          node={node}
+          expanded={isExpanded}
+          onNewFolder={() => {
+            void startNewFolder(node.id).catch((error) => {
+              logger.error('Failed to create folder', error);
+            });
+          }}
+          onNewFile={(title, type) => {
+            void startNewFile(title, type, node.id).catch((error) => {
+              logger.error('Failed to create canvas', error);
+            });
+          }}
+          importDisabled={importDisabled}
+          onImport={() => {
+            setExpanded((prev) => new Set(prev).add(node.id));
+            onImport(node.id);
+          }}
+          onToggle={() =>
+            isFlat ? toggleResultFolder(node.id) : toggle(node.id)
+          }
+          {...rowProps}
+        />
+      );
+    }
+    return <SidebarFileRow key={node.id} node={node} {...rowProps} />;
+  });
   const emptyMessage = isSearching
     ? strings.library.explorerTree.emptySearch
     : isFiltering

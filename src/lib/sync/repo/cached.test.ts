@@ -3,6 +3,7 @@ import * as Y from 'yjs';
 import {
   createCanvasNoteState,
   createNoteState,
+  getRepositoryTestGitHubApi,
   getRepositoryTestStorage,
   readNoteText,
   resetRepositoryTestDoubles,
@@ -10,6 +11,7 @@ import {
 import { BaseRepository } from './base';
 import { CachedRepository } from './cached';
 import { GitHubRepository } from './github';
+import { pushGitHubBatch } from './github/git-push';
 import { LocalRepository } from './local';
 import {
   computeRevision,
@@ -18,6 +20,8 @@ import {
   type VFSManifest,
 } from './shared';
 import type { RepositoryCapabilities, VFSFileNode, VFSNodeId } from './types';
+
+vi.mock('./github/git-push', () => ({ pushGitHubBatch: vi.fn() }));
 
 class MemoryRemoteRepository extends BaseRepository {
   public readonly kind = 'memory-remote';
@@ -100,6 +104,18 @@ class MemoryRemoteRepository extends BaseRepository {
 
   protected async deleteFileBytes(nodeId: VFSNodeId): Promise<void> {
     this.notes.delete(nodeId);
+  }
+}
+
+class FlakyBootstrapRepository extends MemoryRemoteRepository {
+  private shouldFailBootstrap = true;
+
+  override async exportSnapshot() {
+    if (this.shouldFailBootstrap) {
+      this.shouldFailBootstrap = false;
+      throw new Error('temporary bootstrap failure');
+    }
+    return super.exportSnapshot();
   }
 }
 
@@ -707,6 +723,61 @@ describe('CachedRepository', () => {
     expect(readNoteText(snapshot.update)).toBe('fetched from remote');
   });
 
+  it('retries a failed bootstrap during the next background flush', async () => {
+    const remote = new FlakyBootstrapRepository();
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/bootstrap-retry-test'),
+      'repositories/bootstrap-retry-test/outbox.json',
+    );
+
+    await repository.initialize();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(1);
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: false,
+      lastError: expect.objectContaining({
+        message: 'temporary bootstrap failure',
+      }),
+    });
+
+    await repository.flushPending();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(2);
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: true,
+      lastError: null,
+    });
+  });
+
+  it('retries a failed bootstrap after pending writes flush successfully', async () => {
+    const remote = new FlakyBootstrapRepository();
+    const exportSnapshot = vi.spyOn(remote, 'exportSnapshot');
+    const repository = new CachedRepository(
+      remote,
+      new LocalRepository('repositories/bootstrap-write-retry-test'),
+      'repositories/bootstrap-write-retry-test/outbox.json',
+    );
+
+    await repository.initialize();
+    const fileId = await repository.createFile(
+      'Created while offline',
+      'mcanvas',
+      null,
+    );
+
+    await repository.flushPending();
+
+    expect(exportSnapshot).toHaveBeenCalledTimes(2);
+    expect((await remote.getNode(fileId))?.name).toBe('Created while offline');
+    expect(repository.getRuntimeStatus()).toMatchObject({
+      online: true,
+      pendingRemoteWrites: 0,
+      lastError: null,
+    });
+  });
+
   it('does not immediately resync after a clean remote bootstrap', async () => {
     const remote = new MemoryRemoteRepository();
     const fileId = await remote.createFile('Remote note', 'mcanvas', null);
@@ -871,11 +942,14 @@ describe('CachedRepository', () => {
     await repository.addCustomColor('#ABCDEF', 'pen');
     await repository.addCustomColor('#FACC15', 'highlighter');
     await repository.addCustomColor('#3B82F6', 'text');
+    await repository.addCustomColor('#EC4899', 'folder');
+    await repository.setFolderColor(folderId, '#EC4899');
 
     const [rootFolders, rootFiles] = await repository.listDirectory(null);
     const remoteBeforeFlush = await remote.exportSnapshot();
 
     expect(rootFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(rootFolders[0].color).toBe('#ec4899');
     expect(rootFiles).toHaveLength(1);
     expect(rootFiles[0]).toMatchObject({
       id: fileId,
@@ -891,6 +965,7 @@ describe('CachedRepository', () => {
       '#facc15',
     ]);
     expect(await repository.getCustomColors('text')).toEqual(['#3b82f6']);
+    expect(await repository.getCustomColors('folder')).toEqual(['#ec4899']);
     expect(remoteBeforeFlush.manifest).toEqual(createEmptyManifest());
     expect(remoteBeforeFlush.notes).toEqual({});
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBeGreaterThan(
@@ -901,6 +976,7 @@ describe('CachedRepository', () => {
 
     const [remoteFolders, remoteFiles] = await remote.listDirectory(null);
     expect(remoteFolders.map((folder) => folder.id)).toEqual([folderId]);
+    expect(remoteFolders[0].color).toBe('#ec4899');
     expect(remoteFiles).toHaveLength(1);
     expect(remoteFiles[0]).toMatchObject({
       id: fileId,
@@ -917,6 +993,7 @@ describe('CachedRepository', () => {
     expect(await remote.getCustomColors('pen')).toEqual(['#abcdef']);
     expect(await remote.getCustomColors('highlighter')).toEqual(['#facc15']);
     expect(await remote.getCustomColors('text')).toEqual(['#3b82f6']);
+    expect(await remote.getCustomColors('folder')).toEqual(['#ec4899']);
     expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(0);
   });
 
@@ -937,13 +1014,27 @@ describe('CachedRepository', () => {
       size: 12,
       inWheel: true,
     });
+    const [, second] = await repository.addPenPreset({
+      tool: 'highlighter',
+      color: '#123456',
+      size: 24,
+      inWheel: true,
+    });
     await repository.updatePenPreset(created.id, { size: 20, inWheel: false });
+    await repository.reorderPenPresets([second.id, created.id]);
 
     expect((await remote.exportSnapshot()).manifest.penPresets).toEqual([]);
 
     await repository.flushPending();
 
     expect(await remote.getPenPresets()).toEqual([
+      {
+        id: second.id,
+        tool: 'highlighter',
+        color: '#123456',
+        size: 24,
+        inWheel: true,
+      },
       {
         id: created.id,
         tool: 'pen',
@@ -954,6 +1045,7 @@ describe('CachedRepository', () => {
     ]);
 
     await repository.removePenPreset(created.id);
+    await repository.removePenPreset(second.id);
     await repository.flushPending();
 
     expect(await remote.getPenPresets()).toEqual([]);
@@ -1242,6 +1334,43 @@ describe('CachedRepository', () => {
     );
 
     await session.close();
+  });
+
+  it('does not auto-drain a non-batched remote after a bulk import', async () => {
+    vi.useFakeTimers();
+    const remote = new MemoryRemoteRepository();
+    const cache = new LocalRepository(
+      'repositories/non-batched-bulk-import-test',
+    );
+    const repository = new CachedRepository(
+      remote,
+      cache,
+      'repositories/non-batched-bulk-import-test/outbox.json',
+    );
+    await repository.initialize();
+
+    const importStarted = createDeferred();
+    const releaseImport = createDeferred();
+    let fileId = '';
+    const importPromise = repository.batchManifestWrites(async () => {
+      fileId = await repository.createFile('Imported', 'mcanvas', null);
+      importStarted.resolve();
+      await releaseImport.promise;
+    });
+    await importStarted.promise;
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(await remote.getNode(fileId)).toBeNull();
+
+    releaseImport.resolve();
+    await importPromise;
+    await Promise.resolve();
+
+    expect(await remote.getNode(fileId)).toBeNull();
+    expect(repository.getRuntimeStatus().pendingRemoteWrites).toBe(2);
+
+    await repository.flushPending();
+    expect(await remote.getNode(fileId)).not.toBeNull();
   });
 
   it('pulls cached session updates without fetching from the remote', async () => {
@@ -1706,6 +1835,13 @@ describe('CachedRepository', () => {
   });
 
   it('serializes concurrent initialize calls that target the same outbox', async () => {
+    vi.mocked(pushGitHubBatch).mockImplementation(async (_config, input) =>
+      getRepositoryTestGitHubApi().applyGitPush(
+        input.additions,
+        input.deletions,
+        input.expectedHeadOid,
+      ),
+    );
     const createRemote = () =>
       new GitHubRepository({
         owner: 'myelin',

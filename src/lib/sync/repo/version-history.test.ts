@@ -1,6 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as Y from 'yjs';
-import { getPlatform } from '@myelin/editor/platform';
 import {
   createCanvasNoteState,
   getRepositoryTestStorage,
@@ -62,36 +60,6 @@ describe('repository file version history', () => {
       ) ?? '{}',
     ) as VFSManifest;
     expect(Object.keys(manifest.nodes)).toHaveLength(3);
-  });
-
-  it('does not reindex version-history snapshots of notes', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
-
-    const noteIndex = getPlatform().noteIndex;
-    if (!noteIndex) {
-      throw new Error('fake platform is expected to provide noteIndex');
-    }
-    const reindexSpy = vi.spyOn(noteIndex, 'requestReindex');
-
-    const repository = new LocalRepository('repositories/version-index-test');
-    await repository.initialize();
-
-    const noteId = await repository.createFile(
-      'Note.mcanvas',
-      'mcanvas',
-      null,
-      Y.encodeStateAsUpdate(new Y.Doc()),
-    );
-
-    const version = await repository.createFileVersionIfDue(noteId);
-    expect(version).not.toBeNull();
-
-    const reindexedIds = reindexSpy.mock.calls.map(([id]) => id);
-    expect(reindexedIds).toContain(noteId);
-    expect(reindexedIds).not.toContain(version?.id);
-
-    reindexSpy.mockRestore();
   });
 
   it('creates versions only when the file changed and the interval has passed', async () => {

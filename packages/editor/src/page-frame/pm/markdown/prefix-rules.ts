@@ -1,11 +1,28 @@
-import {
-  InputRule,
-  inputRules,
-  textblockTypeInputRule,
-} from 'prosemirror-inputrules';
-import type { Schema } from 'prosemirror-model';
+import { InputRule, inputRules } from 'prosemirror-inputrules';
+import type { Attrs, NodeType, Schema } from 'prosemirror-model';
 import type { Plugin } from 'prosemirror-state';
 import type { BlockPrefixMatch } from './types';
+
+function paragraphTypeInputRule(
+  pattern: RegExp,
+  type: NodeType,
+  getAttrs?: (match: RegExpMatchArray) => Attrs,
+): InputRule {
+  return new InputRule(pattern, (state, match, start, end) => {
+    const $start = state.doc.resolve(start);
+    if (
+      $start.parent.type !== type.schema.nodes.paragraph ||
+      !$start
+        .node(-1)
+        .canReplaceWith($start.index(-1), $start.indexAfter(-1), type)
+    ) {
+      return null;
+    }
+    return state.tr
+      .delete(start, end)
+      .setBlockType(start, start, type, getAttrs?.(match));
+  });
+}
 
 function getHeadingMatchType(match: RegExpMatchArray): BlockPrefixMatch {
   switch (match[1].length) {
@@ -20,13 +37,18 @@ function getHeadingMatchType(match: RegExpMatchArray): BlockPrefixMatch {
 
 export function buildPrefixMarkdownRules(schema: Schema) {
   return [
-    textblockTypeInputRule(/^(#{1,3})\s$/, schema.nodes.heading, (match) => {
+    paragraphTypeInputRule(/^(#{1,3})\s$/, schema.nodes.heading, (match) => {
       const matchType = getHeadingMatchType(match);
       const level = matchType === 'h1' ? 1 : matchType === 'h2' ? 2 : 3;
       return { level };
     }),
-    textblockTypeInputRule(/^>\s$/, schema.nodes.blockquote),
-    textblockTypeInputRule(/^[-*]\s$/, schema.nodes.bulletListItem),
+    paragraphTypeInputRule(/^>\s$/, schema.nodes.blockquote),
+    paragraphTypeInputRule(/^[-*]\s$/, schema.nodes.bulletListItem),
+    paragraphTypeInputRule(
+      /^(\d+)\.\s$/,
+      schema.nodes.orderedListItem,
+      (match) => ({ order: Number(match[1]) }),
+    ),
     new InputRule(/^\[([ xX]?)\]\s$/, (state, match, start, end) => {
       const { $from } = state.selection;
       const node = $from.parent;
@@ -43,11 +65,6 @@ export function buildPrefixMarkdownRules(schema: Schema) {
           indent: node.attrs.indent ?? 0,
         });
     }),
-    textblockTypeInputRule(
-      /^(\d+)\.\s$/,
-      schema.nodes.orderedListItem,
-      (match) => ({ order: Number(match[1]) }),
-    ),
   ];
 }
 

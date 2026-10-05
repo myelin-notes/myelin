@@ -4,37 +4,29 @@ import {
   ArrowDownZA,
   CalendarPlus,
   Clock,
-  Network,
   RefreshCw,
   Search,
-  Settings,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
-import {
-  isMac,
-  TAB_BAR_HEIGHT_CLASS,
-  TRAFFIC_LIGHT_INSET_CLASS,
-} from '@myelin/shared/os';
+import { TAB_BAR_HEIGHT_CLASS } from '@myelin/shared/os';
 import { errorDescription } from '@/components/command-palette/utils';
-import { trackEvent } from '@/lib/analytics';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
-import { useTabController } from '@/lib/tabs/context';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { useSidebar } from './context';
 import { SidebarTags } from './sidebar-tags';
 import {
-  type SearchMode,
   SidebarTree,
   type SidebarTreeHandle,
   type SortMode,
@@ -47,12 +39,11 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   const strings = useMessages();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
-  const tabController = useTabController();
+  const noteIndexStatus = useNoteIndexStatus();
   const { width } = useSidebar();
   const treeRef = useRef<SidebarTreeHandle>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const filterTags = useMemo(() => [...activeTags], [activeTags]);
@@ -73,8 +64,9 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     refreshMeta();
   }, [refreshMeta]);
 
+  const [importParentId, setImportParentId] = useState<string | null>(null);
   const imports = useImports({
-    parentId: null,
+    parentId: importParentId,
     onChanged: refreshAfterImport,
   });
 
@@ -94,22 +86,10 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     repositoryStatus.dataVersion,
   ]);
 
-  const openGraph = useCallback(() => {
-    tabController.openTab({ type: 'graph' }, strings.graph.title);
-  }, [strings.graph.title, tabController]);
-
-  const openSettings = useCallback(() => {
-    tabController.openTab({ type: 'settings' }, strings.tabBar.settings);
-  }, [strings.tabBar.settings, tabController]);
-
   const cycleSortMode = useCallback(() => {
     setSortMode(
       (prev) => SORT_MODES[(SORT_MODES.indexOf(prev) + 1) % SORT_MODES.length],
     );
-  }, []);
-
-  const toggleSearchMode = useCallback(() => {
-    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
   }, []);
 
   const handleNewFolder = useCallback(() => {
@@ -121,7 +101,6 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
       void treeRef.current
         ?.startNewFile(title, type)
         .then(() => {
-          trackEvent('note_created', { file_type: type });
           refreshMeta();
         })
         .catch((error) => {
@@ -167,36 +146,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     >
       <header
         data-tauri-drag-region
-        className={cn(
-          // Match the pane tab-bar height so the graph/settings buttons line up
-          // vertically with the tabs and the macOS traffic lights.
-          'flex shrink-0 items-center gap-0.5 px-2',
-          TAB_BAR_HEIGHT_CLASS,
-          // Only macOS right-aligns the buttons, since the traffic lights hold the top-left. Every other
-          // platform has no lights there, so center them instead of stranding them in a corner.
-          isMac ? 'justify-end' : 'justify-center',
-          isMac && TRAFFIC_LIGHT_INSET_CLASS,
-        )}
-      >
-        <button
-          type="button"
-          onClick={openGraph}
-          aria-label={strings.sidebar.graph}
-          title={strings.sidebar.graph}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Network className="size-4" />
-        </button>
-        <button
-          type="button"
-          onClick={openSettings}
-          aria-label={strings.tabBar.settings}
-          title={strings.tabBar.settings}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-        >
-          <Settings className="size-4" />
-        </button>
-      </header>
+        className={cn('shrink-0', TAB_BAR_HEIGHT_CLASS)}
+      />
 
       <div className="px-2 pb-2">
         <div className="group flex items-center gap-1 rounded-xl bg-card/75 px-1.5 py-1 ring-1 ring-border-subtle/70 transition-colors duration-150 focus-within:bg-card focus-within:ring-accent-dark/15 hover:bg-card">
@@ -221,24 +172,33 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
               <X className="size-3.5" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={toggleSearchMode}
-            aria-pressed={searchMode === 'semantic'}
-            aria-label={strings.library.semanticSearchLabel}
-            className={cn(
-              'flex shrink-0 cursor-pointer items-center gap-1 rounded-lg px-2 py-1 font-medium text-[11px] transition-colors duration-150',
-              searchMode === 'semantic'
-                ? 'bg-tag-active text-text-on-dark'
-                : 'bg-surface text-text-muted ring-1 ring-border-subtle/70 hover:text-text-primary',
-            )}
-          >
-            <Search className="size-3" />
-            {searchMode === 'semantic'
-              ? strings.sidebar.searchModeSemantic
-              : strings.sidebar.searchModeText}
-          </button>
         </div>
+        {searchQuery.trim() &&
+          noteIndexStatus.active &&
+          (noteIndexStatus.scanning ||
+            noteIndexStatus.indexed + noteIndexStatus.failed <
+              noteIndexStatus.total) && (
+            <div className="px-2 pt-1 text-[11px] text-text-muted">
+              {noteIndexStatus.scanning
+                ? strings.library.explorerTree.preparingIndex
+                : strings.library.explorerTree.indexingNotes(
+                    noteIndexStatus.indexed,
+                    noteIndexStatus.total,
+                  )}
+            </div>
+          )}
+        {searchQuery.trim() && noteIndexStatus.failed > 0 && (
+          <div className="px-2 pt-1 text-[11px] text-text-muted">
+            {strings.library.explorerTree.indexingFailed(
+              noteIndexStatus.failed,
+            )}
+          </div>
+        )}
+        {searchQuery.trim() && noteIndexStatus.loadError && (
+          <div className="px-2 pt-1 text-[11px] text-text-muted">
+            {strings.library.explorerTree.indexingUnavailable}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-1 px-3 py-1">
@@ -284,7 +244,10 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           <CreateNewDropdown
             onNewFolder={handleNewFolder}
             onNewFile={handleNewFile}
-            onImport={imports.openPicker}
+            onImport={() => {
+              setImportParentId(null);
+              imports.openPicker();
+            }}
             importDisabled={imports.importDisabled}
           />
         </div>
@@ -295,8 +258,12 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           ref={treeRef}
           sortMode={sortMode}
           searchQuery={searchQuery}
-          searchMode={searchMode}
           filterTags={filterTags}
+          importDisabled={imports.importDisabled}
+          onImport={(parentId) => {
+            setImportParentId(parentId);
+            imports.openPicker();
+          }}
           onChanged={refreshMeta}
         />
       </div>

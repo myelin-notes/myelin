@@ -1,7 +1,13 @@
 import { getMessages } from '@myelin/editor/i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
-import { IS_MOBILE_BUILD } from '@/lib/env';
+import { openUrl } from '@tauri-apps/plugin-opener';
+import { IS_MOBILE_BUILD, MOBILE_PLATFORM } from '@/lib/env';
+import {
+  authenticateWeb,
+  cancelWebAuthentication,
+} from '@/platform/tauri/apple-compliance';
+import { randomUrlSafeToken } from './pkce';
 
 // A reverse-DNS scheme is what RFC 8252 asks native apps to use, and it matches the bundle
 // identifier so no other app can plausibly claim it. Registered in `tauri.conf.json`,
@@ -22,6 +28,7 @@ export interface OAuthCallbackParams {
 // listening. `redirectUri` is what gets sent to the authorization server.
 export interface OAuthRedirectListener {
   redirectUri: string;
+  open: (authorizeUrl: string) => Promise<void>;
   wait: () => Promise<OAuthCallbackParams>;
   cancel: () => Promise<void>;
 }
@@ -38,16 +45,19 @@ interface LoopbackStart {
   redirectUri: string;
 }
 
-// Desktop captures the redirect with a throwaway loopback server on an ephemeral port; mobile has
-// no such server and captures a deep link back into the app instead.
+// Desktop captures the redirect with a loopback server. Android uses a deep link, while iOS lets
+// ASWebAuthenticationSession capture the callback within its system browser.
 export function startOAuthRedirectListener(
   options: OAuthRedirectOptions,
 ): Promise<OAuthRedirectListener> {
-  return IS_MOBILE_BUILD
-    ? startDeepLinkListener(
-        options.mobileRedirectUri ?? DEFAULT_MOBILE_REDIRECT_URI,
-      )
-    : startLoopbackListener(options.provider);
+  if (!IS_MOBILE_BUILD) {
+    return startLoopbackListener(options.provider);
+  }
+
+  const redirectUri = options.mobileRedirectUri ?? DEFAULT_MOBILE_REDIRECT_URI;
+  return MOBILE_PLATFORM === 'ios'
+    ? startIOSWebAuthenticationListener(redirectUri)
+    : startDeepLinkListener(redirectUri);
 }
 
 async function startLoopbackListener(
@@ -61,8 +71,40 @@ async function startLoopbackListener(
 
   return {
     redirectUri,
+    open: openUrl,
     wait: () => invoke<OAuthCallbackParams>('oauth_loopback_wait'),
     cancel: () => invoke('oauth_loopback_cancel'),
+  };
+}
+
+async function startIOSWebAuthenticationListener(
+  redirectUri: string,
+): Promise<OAuthRedirectListener> {
+  const callbackScheme = new URL(redirectUri).protocol.slice(0, -1);
+  const sessionId = randomUrlSafeToken();
+  let authentication: Promise<OAuthCallbackParams> | null = null;
+
+  return {
+    redirectUri,
+    open: async (authorizeUrl) => {
+      if (authentication) {
+        throw new Error('OAuth sign-in has already started.');
+      }
+      authentication = authenticateWeb(
+        authorizeUrl,
+        callbackScheme,
+        sessionId,
+      ).then(({ callbackUrl }) => parseCallbackUrl(callbackUrl));
+      authentication.catch(() => undefined);
+    },
+    wait: () =>
+      authentication ??
+      Promise.reject(new Error('OAuth sign-in has not started.')),
+    cancel: async () => {
+      if (authentication) {
+        await cancelWebAuthentication(sessionId);
+      }
+    },
   };
 }
 
@@ -88,6 +130,7 @@ async function startDeepLinkListener(
 
   return {
     redirectUri,
+    open: openUrl,
     wait: () => received,
     cancel: async () => {
       unlisten();

@@ -15,6 +15,7 @@ import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
 import { TagManageDialog } from '../../tag-manage-dialog';
 import { ItemContextMenu } from '../item-context-menu';
+import { MoveItemDialog } from '../move-item-dialog';
 import { RenameReferencesDialog } from '../rename-references-dialog';
 import { SearchHighlight } from '../search-highlight';
 import { TagList } from '../tag-list';
@@ -48,6 +49,7 @@ export function GridFileItem({
 }: Props) {
   const repository = useRepository();
   const tabController = useTabController();
+  const [moveOpen, setMoveOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [loadedThumbUrl, setLoadedThumbUrl] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function GridFileItem({
               draggable={!renaming}
               onClick={() => {
                 if (!renaming) {
-                  openNote(tabController, file, file.name, 'explorer');
+                  openNote(tabController, file, file.name);
                 }
               }}
               onDragStart={handleDragStart}
@@ -155,6 +157,7 @@ export function GridFileItem({
           </div>
         </ContextMenuTrigger>
         <ItemContextMenu
+          onMove={() => setMoveOpen(true)}
           onRename={startRenaming}
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
@@ -171,6 +174,12 @@ export function GridFileItem({
           }
         />
       </ContextMenu>
+      <MoveItemDialog
+        open={moveOpen}
+        onOpenChange={setMoveOpen}
+        nodeIds={[file.id]}
+        onChanged={onChanged}
+      />
       <TagManageDialog
         open={tagDialogOpen}
         onOpenChange={setTagDialogOpen}

@@ -10,8 +10,8 @@ import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
-import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { trackEvent } from '@/lib/analytics';
+import { pickFolder } from '@/lib/folder-picker';
 import { useRepository } from '@/lib/sync';
 import { exportObsidianVault } from '@/pages/library/export/obsidian-vault';
 import { exportWorkspaceJson } from '@/pages/library/export/workspace-json';
@@ -34,8 +34,14 @@ export function DataSection() {
       return;
     }
 
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) {
+    const selected = await pickFolder().catch((error: unknown) => {
+      logger.error('Failed to pick export folder', error);
+      toast.error(dataStrings.export.failed, {
+        description: errorDescription(error),
+      });
+      return null;
+    });
+    if (!selected) {
       return;
     }
 
@@ -77,8 +83,14 @@ export function DataSection() {
       return;
     }
 
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (!selected || Array.isArray(selected)) {
+    const selected = await pickFolder().catch((error: unknown) => {
+      logger.error('Failed to pick export folder', error);
+      toast.error(dataStrings.exportJson.failed, {
+        description: errorDescription(error),
+      });
+      return null;
+    });
+    if (!selected) {
       return;
     }
 

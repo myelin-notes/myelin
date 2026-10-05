@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import type { LayoutNode, PaneNode, SplitNode, WindowState } from './types';
 
@@ -152,6 +152,23 @@ describe('TabStateController', () => {
     expectValidWindowState(controller.getSnapshot());
   });
 
+  it('runs the close hook when replacing a single tab', () => {
+    const beforeCloseTab = vi.fn();
+    const controller = new TabStateController(undefined, undefined, {
+      singleTab: true,
+      beforeCloseTab,
+    });
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+
+    openCanvas(controller, 'beta', 'Beta', paneId);
+
+    expect(beforeCloseTab).toHaveBeenCalledOnce();
+    expect(beforeCloseTab).toHaveBeenCalledWith(
+      expect.objectContaining({ id: alphaId }),
+    );
+  });
+
   it('focuses an existing tab in another pane when navigating without a pane', () => {
     const controller = new TabStateController();
     const rootPaneId = focusedPane(controller).id;
@@ -196,6 +213,29 @@ describe('TabStateController', () => {
     expectValidWindowState(controller.getSnapshot());
   });
 
+  it('waits for the close hook before removing a tab', async () => {
+    let allowClose!: () => void;
+    const closeReady = new Promise<void>((resolve) => {
+      allowClose = resolve;
+    });
+    const beforeCloseTab = vi.fn(() => closeReady);
+    const controller = new TabStateController(undefined, undefined, {
+      beforeCloseTab,
+    });
+    const pane = focusedPane(controller);
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha');
+
+    controller.closeTab(alphaId, pane.id);
+    controller.closeTab(alphaId, pane.id);
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha']);
+    expect(beforeCloseTab).toHaveBeenCalledOnce();
+
+    allowClose();
+    await closeReady;
+    await Promise.resolve();
+    expect(tabTitles(focusedPane(controller))).toEqual([]);
+  });
+
   it('keeps active tabs valid while closing tabs', () => {
     const controller = new TabStateController();
     const paneId = focusedPane(controller).id;
@@ -230,6 +270,41 @@ describe('TabStateController', () => {
     // Selecting a tab leaves the home view again.
     controller.activateTab(alphaId, paneId);
     expect(rootPane(controller).activeTabId).toBe(alphaId);
+  });
+
+  it('toggles pane pages without adding tabs', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+
+    controller.togglePanePage('graph', paneId);
+    expect(rootPane(controller).activePage).toBe('graph');
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha']);
+
+    controller.togglePanePage('settings', paneId);
+    expect(rootPane(controller).activePage).toBe('settings');
+    expect(rootPane(controller).activeTabId).toBe(alphaId);
+
+    controller.togglePanePage('settings', paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+    expect(rootPane(controller).activeTabId).toBe(alphaId);
+    expectValidWindowState(controller.getSnapshot());
+  });
+
+  it('leaves a pane page when navigating to a tab or home', () => {
+    const controller = new TabStateController();
+    const paneId = focusedPane(controller).id;
+    const alphaId = openCanvas(controller, 'alpha', 'Alpha', paneId);
+
+    controller.togglePanePage('graph', paneId);
+    controller.activateTab(alphaId, paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+
+    controller.togglePanePage('settings', paneId);
+    controller.showHome(paneId);
+    expect(rootPane(controller).activePage).toBeUndefined();
+    expect(rootPane(controller).activeTabId).toBe('');
+    expect(tabTitles(rootPane(controller))).toEqual(['Alpha']);
   });
 
   it('stays on the home view when a background tab is closed', () => {

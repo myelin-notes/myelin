@@ -30,7 +30,7 @@ export function ToggleRow({
       <span
         className={cn(
           'relative flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors',
-          checked ? 'bg-accent-dark' : 'bg-text-muted/20',
+          checked ? 'bg-primary' : 'bg-text-muted/40',
         )}
       >
         <span

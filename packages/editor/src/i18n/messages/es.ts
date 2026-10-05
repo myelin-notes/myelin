@@ -26,8 +26,6 @@ const es: typeof en = {
   },
   sidebar: {
     searchPlaceholder: 'Busca en tu biblioteca...',
-    searchModeText: 'Texto',
-    searchModeSemantic: 'Semántica',
     explorer: 'Explorador',
     tags: 'Etiquetas',
     collapse: 'Contraer barra lateral',
@@ -98,7 +96,6 @@ const es: typeof en = {
         '¿Encontraste un error o tienes una idea? Cuéntanos en un formulario breve.',
     },
     searchPlaceholder: 'Buscar en el estudio...',
-    semanticSearchLabel: 'Búsqueda semántica',
     explorer: 'Navegador',
     sortLabel: (label: string) => `Ordenar: ${label}`,
     sortModes: {
@@ -142,7 +139,7 @@ const es: typeof en = {
           `Se importaron ${count} archivo${count === 1 ? '' : 's'}`,
       },
       goodnotes_zip: {
-        label: 'ZIP de Goodnotes',
+        label: 'Importar desde Goodnotes',
         description: 'Una carpeta de Goodnotes exportada como PDF.',
         title: 'Importar ZIP de Goodnotes',
         scanning: 'Leyendo el archivo comprimido...',
@@ -151,7 +148,7 @@ const es: typeof en = {
         summary: (count: number) => `Se importaron ${count} PDF`,
       },
       onenote: {
-        label: 'OneNote',
+        label: 'Importar desde OneNote',
         description:
           'Un bloc .onepkg o una sección .one exportados desde OneNote.',
         title: 'Importar desde OneNote',
@@ -166,7 +163,7 @@ const es: typeof en = {
           `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
       },
       obsidian_vault: {
-        label: 'Bóveda de Obsidian',
+        label: 'Importar desde Obsidian',
         description:
           'Una carpeta de bóveda, con sus notas y archivos adjuntos.',
         title: 'Importar bóveda de Obsidian',
@@ -228,8 +225,14 @@ const es: typeof en = {
       insights: 'Análisis del estudio',
       addTag: 'Nueva etiqueta',
       addChild: (tag: string) => `Añadir etiqueta dentro de #${tag}`,
+      toggleChildren: (tag: string) =>
+        `Mostrar u ocultar etiquetas dentro de #${tag}`,
       placeholder: 'Nombre de etiqueta...',
       deleteTag: (tag: string) => `Eliminar #${tag}`,
+      deleteUsedTitle: '¿Eliminar etiqueta en uso?',
+      deleteUsedDescription: (tag: string, count: number) =>
+        `#${tag} se usa en ${count} ${count === 1 ? 'elemento' : 'elementos'}. Al eliminarla, también se quitarán las etiquetas secundarias coincidentes de esos elementos.`,
+      deleteUsedAction: 'Eliminar etiqueta',
       stats: {
         totalFiles: 'Total de archivos',
         folders: 'Carpetas',
@@ -237,15 +240,31 @@ const es: typeof en = {
       },
     },
     explorerTree: {
+      preparingIndex: 'Indexando notas… Pueden aparecer más resultados.',
+      indexingUnavailable:
+        'No se pudieron indexar las notas. La búsqueda de contenido se reintentará más tarde.',
+      indexingNotes: (indexed: number, total: number) =>
+        `Indexando notas… ${indexed}/${total}. Pueden aparecer más resultados.`,
+      indexingFailed: (count: number) =>
+        `No se pudieron indexar ${count} notas.`,
       repositorySetupRequired:
         'Configura el repositorio en Ajustes para ver archivos.',
       emptySearch: 'No se encontraron resultados',
       emptyFilter: 'Ningún elemento coincide con las etiquetas',
       emptyDefault: 'Aún no hay archivos',
+      selectedCount: (count: number) => `${count} elementos`,
     },
     itemMenu: {
+      moveTo: 'Mover a…',
+      moveHere: 'Mover aquí',
+      workspace: 'Espacio de trabajo',
+      back: 'Atrás',
+      loadError: 'No se pudieron cargar las carpetas.',
+      moveError: 'No se pudieron mover los elementos.',
+
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
+      color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
       remove: 'Eliminar',
@@ -299,7 +318,6 @@ const es: typeof en = {
     restoreFailed: 'No se pudo restaurar la versión',
   },
   settings: {
-    title: 'Preferencias',
     theme: {
       title: 'Tema',
       eyebrow: 'Apariencia',
@@ -338,12 +356,16 @@ const es: typeof en = {
       mode: {
         label: 'Entrada de dibujo',
         description:
-          'Qué hace un dedo en el lienzo. Automático dibuja con el dedo hasta que aparece un lápiz; Lápiz deja el dibujo al lápiz; Toque siempre dibuja con el dedo, y desplaza y hace zoom con dos.',
+          'Qué hace un dedo en el lienzo. Lápiz deja el dibujo al lápiz y desplaza con el dedo; Toque dibuja con el dedo, y desplaza y hace zoom con dos.',
         options: {
-          auto: 'Automático',
           pen: 'Lápiz',
           touch: 'Toque',
         },
+      },
+      penBarrelButtonImmediate: {
+        label: 'Cambiar al borrador inmediatamente',
+        description:
+          'Cambia al borrador al pulsar el botón del lápiz. Si está desactivado, aplica el cambio cuando se levanta el lápiz.',
       },
     },
     pageFrameEditing: {
@@ -719,6 +741,10 @@ const es: typeof en = {
         title: 'Cita',
         subtitle: 'Convierte este bloque en una cita',
       },
+      callout: {
+        title: 'Aviso',
+        subtitle: 'Inserta un aviso de nota resaltado',
+      },
       bulletList: {
         title: 'Lista con viñetas',
         subtitle: 'Convierte este bloque en un elemento de lista con viñetas',
@@ -738,6 +764,14 @@ const es: typeof en = {
       table: {
         title: 'Tabla',
         subtitle: 'Inserta una tabla con filas de encabezado y cuerpo',
+      },
+      codeBlock: {
+        title: 'Bloque de código',
+        subtitle: 'Inserta un bloque de código delimitado',
+      },
+      mathBlock: {
+        title: 'Bloque matemático',
+        subtitle: 'Inserta un bloque matemático delimitado',
       },
       bold: {
         title: 'Negrita',
@@ -792,19 +826,38 @@ const es: typeof en = {
     },
     selectionToolbar: {
       label: 'Orden de selección',
+      copy: 'Copiar',
+      copied: 'Copiado al portapapeles',
+      cut: 'Cortar',
       moveHigher: 'Mover hacia delante',
       moveLower: 'Mover hacia atrás',
       delete: 'Eliminar',
+      lock: 'Bloquear',
+      unlock: 'Desbloquear',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
       addToPage: 'Añadir a la página',
       removeFromPage: 'Quitar de la página',
       makeRoom: 'Hacer espacio',
       floatOverText: 'Flotar sobre el texto',
+      editPoints: 'Editar puntos',
+      finishEditingPoints: 'Terminar de editar puntos',
+      bold: 'Negrita',
+      italic: 'Cursiva',
+    },
+    pdfNavigator: {
+      previousPage: 'Página anterior',
+      nextPage: 'Página siguiente',
+      goToPage: 'Ir a la página',
+      pageNumber: 'Número de página',
     },
     insert: {
       title: 'Insertar',
       soon: 'Pronto',
+      paste: {
+        label: 'Pegar',
+        description: 'Pegar desde el portapapeles',
+      },
       frame: {
         label: 'Marco de página',
         description: 'Una nueva página para escribir',
@@ -812,6 +865,10 @@ const es: typeof en = {
       embed: {
         label: 'Imagen o PDF',
         description: 'Arrastra archivos o pega una URL',
+      },
+      photo: {
+        label: 'Tomar foto',
+        description: 'Captura e inserta una foto',
       },
       latex: {
         label: 'LaTeX',
@@ -822,6 +879,13 @@ const es: typeof en = {
         description: 'Graba o importa una nota de voz',
       },
     },
+    camera: {
+      requesting: 'Abriendo la cámara...',
+      unavailable: 'Cámara no disponible',
+      takePhoto: 'Tomar foto',
+      cancel: 'Cancelar',
+      captureFailed: 'No se pudo capturar la foto',
+    },
     audioPlayer: {
       requestingMic: 'Solicitando micrófono...',
       requestingMicAccess: 'Solicitando acceso al micrófono',
@@ -830,6 +894,7 @@ const es: typeof en = {
       waitingForRecording: 'Esperando grabación',
       startRecording: 'Iniciar grabación',
       stopRecording: 'Detener grabación',
+      processingRecording: 'Procesando grabación...',
       tryRecordingAgain: 'Intentar grabar de nuevo',
       playAudio: 'Reproducir audio',
       pauseAudio: 'Pausar audio',
@@ -878,9 +943,12 @@ const es: typeof en = {
       mode: 'Modo',
       rectangle: 'Rectángulo',
       lasso: 'Lazo',
+      precise: 'Preciso',
       fine: (value: number) => `Fino (${value})`,
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
+      pressure: 'Presión',
+      stabilization: 'Estabilización',
       addCustomColor: 'Añadir color personalizado',
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
@@ -967,6 +1035,12 @@ const es: typeof en = {
         'Un lienzo infinito para escritura a mano, texto y todo lo que hay entre medias. Cuatro preguntas rápidas y listo.',
       language: 'Idioma',
       start: 'Empezar',
+    },
+    input: {
+      eyebrow: 'Lápiz y toque',
+      title: '¿Cómo vas a dibujar?',
+      description:
+        'Elige qué hace un dedo en el lienzo. Puedes cambiarlo en cualquier momento en Ajustes.',
     },
     privacy: {
       eyebrow: 'Privacidad',

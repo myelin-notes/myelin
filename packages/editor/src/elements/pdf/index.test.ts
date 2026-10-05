@@ -1,0 +1,672 @@
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from 'vitest';
+import { Logger } from '@myelin/shared/logger';
+import type { CanvasViewport } from '../../canvas-viewport';
+import {
+  getPdfDocumentPageSizes,
+  openPdfDocument,
+  type PdfPageRenderHandle,
+  type PdfPageSize,
+  renderPdfPageToCanvas,
+} from '../../pdf-renderer';
+import { LOCAL_ORIGIN, YDocManager } from '../../ydoc-manager';
+import type { DrawableElement } from '../drawable-element';
+import { ElementType } from '../element-type';
+import { PAGE_GAP } from '../page-frame-constants';
+import { PdfElement } from './index';
+
+vi.mock('../../pdf-renderer', async () => {
+  const actual =
+    await vi.importActual<typeof import('../../pdf-renderer')>(
+      '../../pdf-renderer',
+    );
+  return {
+    ...actual,
+    getPdfDocumentPageSizes: vi.fn(),
+    openPdfDocument: vi.fn(),
+    renderPdfPageToCanvas: vi.fn(),
+  };
+});
+
+function createPdfYMap(
+  ydoc: YDocManager,
+  pageSizes: PdfPageSize[],
+  extraProps: Record<string, unknown> = {},
+) {
+  return ydoc.createElementMap(ElementType.PDF, 'pdf-uuid', {
+    offsetX: 0,
+    offsetY: 0,
+    scaleX: 1,
+    scaleY: 1,
+    pdfData: new Uint8Array([1, 2, 3]),
+    pageSizes,
+    pageOrder: pageSizes.map((_, originalIndex) => ({
+      kind: 'pdf' as const,
+      originalIndex,
+    })),
+    fileName: 'deck.pdf',
+    ...extraProps,
+  });
+}
+
+function mockOpenedPdf(pageCount: number): PDFDocumentProxy {
+  const document = {
+    numPages: pageCount,
+    loadingTask: { destroy: vi.fn(async () => {}) },
+  } as unknown as PDFDocumentProxy;
+  vi.mocked(openPdfDocument).mockResolvedValueOnce(document);
+  return document;
+}
+
+function mockLoadedPdf(pageSizes: PdfPageSize[]): void {
+  mockOpenedPdf(pageSizes.length);
+  vi.mocked(getPdfDocumentPageSizes).mockResolvedValueOnce(pageSizes);
+}
+
+interface TestCanvasContext {
+  drawImage: Mock<(image: HTMLCanvasElement, dx: number, dy: number) => void>;
+}
+
+interface TestCanvas extends HTMLCanvasElement {
+  testContext: TestCanvasContext;
+}
+
+function createTestCanvas(width = 1, height = 1): TestCanvas {
+  const context: TestCanvasContext = { drawImage: vi.fn() };
+  return {
+    width,
+    height,
+    testContext: context,
+    getContext: vi.fn(() => context),
+  } as unknown as TestCanvas;
+}
+
+function stubCanvasDocument(): void {
+  vi.stubGlobal('document', {
+    createElement: vi.fn((tagName: string) => {
+      if (tagName !== 'canvas') {
+        throw new Error(`Unexpected test element: ${tagName}`);
+      }
+      return createTestCanvas();
+    }),
+  });
+}
+
+function mockImmediatePageRender(): void {
+  vi.mocked(renderPdfPageToCanvas).mockImplementation(
+    ({ canvas, renderScale }): PdfPageRenderHandle => {
+      canvas.width = Math.round(1000 * renderScale);
+      canvas.height = Math.round(1200 * renderScale);
+      return { promise: Promise.resolve(), cancel: vi.fn() };
+    },
+  );
+}
+
+async function flushPromises(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+beforeEach(() => {
+  vi.mocked(openPdfDocument).mockReset();
+  vi.mocked(getPdfDocumentPageSizes).mockReset();
+  vi.mocked(renderPdfPageToCanvas).mockReset();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('PdfElement', () => {
+  it('keeps fixed-size chrome visible when the PDF content is scaled down', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    pdf.setScale(0.5, 0.5);
+    const headerView = new DOMRect(0, -50, 20, 10);
+
+    expect(pdf.intersectsWorldRect(headerView, 0)).toBe(true);
+    expect(pdf.boundingBox.top).toBeLessThan(headerView.bottom);
+  });
+
+  it('reads later visible element bounds once for all chrome buttons', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    let reads = 0;
+    const upper = {
+      hidden: false,
+      intersectsWorldRect: () => true,
+      get boundingBox(): DOMRect {
+        reads++;
+        return new DOMRect(10, 10, 20, 20);
+      },
+    } as unknown as DrawableElement;
+    const hidden = {
+      hidden: true,
+      intersectsWorldRect: () => {
+        throw new Error('hidden elements should not be tested');
+      },
+      get boundingBox(): DOMRect {
+        throw new Error('hidden bounds should not be read');
+      },
+    } as unknown as DrawableElement;
+    const offscreen = {
+      hidden: false,
+      intersectsWorldRect: () => false,
+      get boundingBox(): DOMRect {
+        throw new Error('offscreen bounds should not be read');
+      },
+    } as unknown as DrawableElement;
+    pdf.setExportElementsProvider(() => [upper, pdf, upper, offscreen, hidden]);
+
+    const coverage = pdf as unknown as {
+      getCoveringBounds(viewport: CanvasViewport): DOMRect[];
+      isChromeButtonCovered(
+        x: number,
+        y: number,
+        size: number,
+        viewport: CanvasViewport,
+        bounds: readonly DOMRect[],
+      ): boolean;
+    };
+    const viewport = {
+      offset: { x: 0, y: 0 },
+      zoom: 1,
+      getWorldRect: () => new DOMRect(0, 0, 100, 100),
+    } as CanvasViewport;
+    const bounds = coverage.getCoveringBounds(viewport);
+    expect(bounds).toHaveLength(1);
+    expect(reads).toBe(1);
+    expect(coverage.isChromeButtonCovered(20, 20, 10, viewport, bounds)).toBe(
+      true,
+    );
+    expect(coverage.isChromeButtonCovered(100, 100, 10, viewport, bounds)).toBe(
+      false,
+    );
+    expect(reads).toBe(1);
+  });
+
+  it('checks PDF coverage only against visible render candidates', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const offscreen = {
+      hidden: false,
+      intersectsWorldRect: () => {
+        throw new Error('offscreen element should not be scanned again');
+      },
+    } as unknown as DrawableElement;
+    const upper = {
+      hidden: false,
+      intersectsWorldRect: () => true,
+      boundingBox: new DOMRect(10, 10, 20, 20),
+    } as unknown as DrawableElement;
+    pdf.setExportElementsProvider(() => [pdf, offscreen, upper]);
+    const viewport = {
+      getWorldRect: () => new DOMRect(0, 0, 100, 100),
+    } as CanvasViewport;
+
+    const bounds = (
+      pdf as unknown as {
+        getCoveringBounds(
+          viewport: CanvasViewport,
+          visibleElements: readonly DrawableElement[],
+        ): DOMRect[];
+      }
+    ).getCoveringBounds(viewport, [pdf, upper]);
+
+    expect(bounds).toEqual([upper.boundingBox]);
+  });
+
+  it('compares covered buttons in world space after pan and zoom', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const viewport = {
+      offset: { x: 5, y: -5 },
+      zoom: 2,
+    } as CanvasViewport;
+    const isCovered = (
+      pdf as unknown as {
+        isChromeButtonCovered(
+          x: number,
+          y: number,
+          size: number,
+          viewport: CanvasViewport,
+          bounds: readonly DOMRect[],
+        ): boolean;
+      }
+    ).isChromeButtonCovered.bind(pdf);
+    const bounds = [new DOMRect(10, 10, 20, 20)];
+
+    expect(isCovered(50, 30, 10, viewport, bounds)).toBe(true);
+    expect(isCovered(100, 100, 10, viewport, bounds)).toBe(false);
+  });
+
+  it('skips cover elements when the PDF chrome is offscreen', () => {
+    const pdf = new PdfElement('pdf-uuid');
+    const upper = {
+      hidden: false,
+      intersectsWorldRect: () => {
+        throw new Error('offscreen PDF should not scan cover elements');
+      },
+    } as unknown as DrawableElement;
+    pdf.setExportElementsProvider(() => [pdf, upper]);
+    const viewport = {
+      getWorldRect: () => new DOMRect(1000, 1000, 100, 100),
+    } as CanvasViewport;
+
+    const coverage = pdf as unknown as {
+      getCoveringBounds(viewport: CanvasViewport): DOMRect[];
+    };
+    expect(coverage.getCoveringBounds(viewport)).toEqual([]);
+  });
+
+  it('does not dirty stored metadata that matches the opened PDF', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [{ w: 612, h: 792 }];
+    const yMap = createPdfYMap(ydoc, pageSizes);
+    mockOpenedPdf(1);
+    const element = new PdfElement('pdf-uuid');
+    let localUpdates = 0;
+    ydoc.doc.on('update', (_update: Uint8Array, origin: unknown) => {
+      if (origin === LOCAL_ORIGIN) {
+        localUpdates += 1;
+      }
+    });
+
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    expect(localUpdates).toBe(0);
+    expect(getPdfDocumentPageSizes).not.toHaveBeenCalled();
+  });
+
+  it('repairs placeholder metadata after opening the PDF', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 680, h: 880 }]);
+    mockOpenedPdf(2);
+    vi.mocked(getPdfDocumentPageSizes).mockResolvedValueOnce([
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+    ]);
+    const element = new PdfElement('pdf-uuid');
+
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    expect(yMap.get('pageSizes')).toEqual([
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+    ]);
+    expect(yMap.get('pageOrder')).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ]);
+  });
+
+  it('persists a layout change through its Yjs map', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(
+      ydoc,
+      [
+        { w: 612, h: 792 },
+        { w: 300, h: 150 },
+      ],
+      { pageLayout: 'horizontal' },
+    );
+    mockOpenedPdf(2);
+    const element = new PdfElement('pdf-uuid');
+
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    expect(element.pageLayout).toBe('horizontal');
+    expect(yMap.get('pageLayout')).toBe('horizontal');
+    expect(element.totalWidth).toBe(612 + PAGE_GAP + 300);
+    expect(element.totalHeight).toBe(792);
+
+    element.setPageLayout('vertical');
+    expect(yMap.get('pageLayout')).toBe('vertical');
+  });
+
+  it('exposes world bounds for pages in the edited document order', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(
+      ydoc,
+      [
+        { w: 612, h: 792 },
+        { w: 400, h: 200 },
+      ],
+      {
+        pageOrder: [
+          { kind: 'pdf', originalIndex: 0 },
+          { kind: 'blank', size: { w: 300, h: 150 } },
+          { kind: 'pdf', originalIndex: 1 },
+        ],
+        pageOrderCustom: true,
+      },
+    );
+    mockOpenedPdf(2);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    element.setOffset(100, 200);
+    element.setScale(2, 0.5);
+    await flushPromises();
+
+    expect(element.pageCount).toBe(3);
+    expect(element.getPageBounds(1)).toEqual(new DOMRect(412, 616, 600, 75));
+    expect(element.getPageBounds(3)).toBeNull();
+  });
+
+  it('keeps its persisted shape when initialized before binding', () => {
+    const element = new PdfElement('pdf-uuid', 'horizontal');
+
+    expect(element.getYMapProps()).toMatchObject({
+      pageLayout: 'horizontal',
+      pageSizes: [{ w: 680, h: 880 }],
+    });
+  });
+
+  it('repairs same-count placeholder metadata after opening the PDF', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 680, h: 880 }]);
+    mockLoadedPdf([{ w: 612, h: 792 }]);
+
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
+    await flushPromises();
+
+    expect(yMap.get('pageSizes')).toEqual([{ w: 612, h: 792 }]);
+    expect(yMap.get('pageOrder')).toEqual([{ kind: 'pdf', originalIndex: 0 }]);
+  });
+
+  it('refreshes metadata when PDF bytes are replaced', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 612, h: 792 }]);
+    mockOpenedPdf(1);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    mockLoadedPdf([{ w: 360, h: 720 }]);
+    yMap.set('pdfData', new Uint8Array([4, 5, 6]));
+    element.syncFromYMap(['pdfData']);
+    await flushPromises();
+
+    expect(yMap.get('pageSizes')).toEqual([{ w: 360, h: 720 }]);
+  });
+
+  it('destroys the previous document when replacement bytes fail to open', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 612, h: 792 }]);
+    const initialDocument = mockOpenedPdf(1);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    vi.mocked(openPdfDocument).mockRejectedValueOnce(new Error('bad pdf'));
+    yMap.set('pdfData', new Uint8Array([4, 5, 6]));
+    element.syncFromYMap(['pdfData']);
+    await flushPromises();
+
+    expect(initialDocument.loadingTask.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('does not subscribe to Y.Map changes during binding', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 612, h: 792 }]);
+    mockOpenedPdf(1);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    vi.mocked(openPdfDocument).mockClear();
+    yMap.set('pdfData', new Uint8Array([4, 5, 6]));
+    await flushPromises();
+
+    expect(openPdfDocument).not.toHaveBeenCalled();
+  });
+
+  it('preserves a custom page order with a deleted source page', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+      { w: 612, h: 792 },
+    ];
+    const pageOrder = [
+      { kind: 'pdf' as const, originalIndex: 0 },
+      { kind: 'pdf' as const, originalIndex: 2 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes, {
+      pageOrder,
+      pageOrderCustom: true,
+    });
+    mockOpenedPdf(3);
+    let localUpdates = 0;
+    ydoc.doc.on('update', (_update: Uint8Array, origin: unknown) => {
+      if (origin === LOCAL_ORIGIN) {
+        localUpdates++;
+      }
+    });
+
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
+    await flushPromises();
+
+    expect(localUpdates).toBe(0);
+    expect(yMap.get('pageOrder')).toEqual(pageOrder);
+  });
+
+  it('persists blank-page insertion and source-page deletion', async () => {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+      { w: 400, h: 200 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes);
+    mockOpenedPdf(3);
+    const element = new PdfElement('pdf-uuid');
+    const editable = element as unknown as {
+      insertBlankPage(position: number): void;
+      deletePage(position: number): void;
+    };
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    editable.insertBlankPage(1);
+    expect(yMap.get('pageOrder')).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'pdf', originalIndex: 1 },
+      { kind: 'pdf', originalIndex: 2 },
+    ]);
+    expect(yMap.get('pageOrderCustom')).toBe(true);
+
+    editable.deletePage(2);
+    expect(yMap.get('pageOrder')).toEqual([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'pdf', originalIndex: 2 },
+    ]);
+  });
+});
+
+describe('PdfElement thumbnail rendering', () => {
+  async function createLoadedElement(): Promise<PdfElement> {
+    const ydoc = new YDocManager();
+    const pageSizes = [
+      { w: 612, h: 792 },
+      { w: 300, h: 150 },
+    ];
+    const yMap = createPdfYMap(ydoc, pageSizes);
+    mockOpenedPdf(2);
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+    return element;
+  }
+
+  it('renders and draws only the page intersecting the capture region', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 400));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0]).toMatchObject({
+      pageIndex: 0,
+      renderScale: 0.5,
+    });
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).toHaveBeenCalledWith(
+      expect.anything(),
+      0,
+      0,
+      612,
+      792,
+    );
+  });
+
+  it('skips pages before the region and retains their layout position', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 900, 612, 200));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+    expect(vi.mocked(renderPdfPageToCanvas).mock.calls[0][0].pageIndex).toBe(1);
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).toHaveBeenCalledWith(
+      expect.anything(),
+      156,
+      832,
+      300,
+      150,
+    );
+  });
+
+  it('renders every page intersecting the capture region', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 1500));
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledTimes(2);
+    expect(
+      vi
+        .mocked(renderPdfPageToCanvas)
+        .mock.calls.map(([params]) => params.pageIndex),
+    ).toEqual([0, 1]);
+  });
+
+  it.each([
+    'dispose',
+    'replace',
+  ] as const)('stops thumbnail rendering when the PDF is invalidated by %s', async (action) => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+    let finishRender!: () => void;
+    vi.mocked(renderPdfPageToCanvas).mockReturnValueOnce({
+      promise: new Promise<void>((resolve) => {
+        finishRender = resolve;
+      }),
+      cancel: vi.fn(),
+    });
+
+    const prepared = element.prepareThumbnail(
+      0.5,
+      new DOMRect(0, 0, 612, 1500),
+    );
+    await flushPromises();
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+
+    if (action === 'dispose') {
+      element.disposeDOM();
+    } else {
+      mockLoadedPdf([{ w: 400, h: 200 }]);
+      element.setInitialPdfData(new Uint8Array([4, 5, 6]), 'new.pdf');
+      await flushPromises();
+    }
+    finishRender();
+    await prepared;
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).not.toHaveBeenCalled();
+  });
+
+  it('ignores a render rejection after the PDF is disposed', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    let rejectRender!: (error: Error) => void;
+    vi.mocked(renderPdfPageToCanvas).mockReturnValueOnce({
+      promise: new Promise<void>((_resolve, reject) => {
+        rejectRender = reject;
+      }),
+      cancel: vi.fn(),
+    });
+    const logError = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    try {
+      const prepared = element.prepareThumbnail(
+        0.5,
+        new DOMRect(0, 0, 612, 1500),
+      );
+      await flushPromises();
+      element.disposeDOM();
+      rejectRender(new Error('PDF transport destroyed'));
+      await prepared;
+
+      expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+      expect(logError).not.toHaveBeenCalled();
+    } finally {
+      logError.mockRestore();
+    }
+  });
+
+  it('is a no-op before a PDF document is loaded', async () => {
+    const element = new PdfElement('pdf-uuid');
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 792));
+
+    expect(renderPdfPageToCanvas).not.toHaveBeenCalled();
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).not.toHaveBeenCalled();
+  });
+
+  it('waits for an in-flight PDF load before rendering', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(ydoc, [{ w: 612, h: 792 }]);
+    let resolveOpen!: (document: PDFDocumentProxy) => void;
+    vi.mocked(openPdfDocument).mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveOpen = resolve;
+      }),
+    );
+    stubCanvasDocument();
+    mockImmediatePageRender();
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+
+    const prepared = element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 792));
+    expect(renderPdfPageToCanvas).not.toHaveBeenCalled();
+
+    resolveOpen({
+      numPages: 1,
+      loadingTask: { destroy: vi.fn(async () => {}) },
+    } as unknown as PDFDocumentProxy);
+    await prepared;
+
+    expect(renderPdfPageToCanvas).toHaveBeenCalledOnce();
+  });
+});

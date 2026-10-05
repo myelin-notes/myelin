@@ -4,7 +4,7 @@ import {
   harvestCanvasPdf,
 } from './canvas-pdf-export';
 import type { DrawableElement } from './elements/drawable-element';
-import { PdfElement } from './elements/pdf-element';
+import type { CanvasPdfExportData } from './elements/pdf-exportable-element';
 import type { PdfElementExportSource } from './pdf-element-export';
 import { pxToPt } from './pdf-export/coords';
 import type { PdfHarvestContext } from './pdf-export/harvest';
@@ -50,6 +50,7 @@ function drawableElement(options: {
   boundingBox: DOMRect;
   hidden?: boolean;
   drawToPdf?: (ctx: PdfHarvestContext) => void;
+  pdfExportData?: CanvasPdfExportData;
 }): DrawableElement {
   return {
     uuid: `element-${nextUuid++}`,
@@ -59,6 +60,7 @@ function drawableElement(options: {
     boundingBox: options.boundingBox,
     prepareForPdf: () => Promise.resolve(),
     drawToPdf: options.drawToPdf ?? (() => {}),
+    getCanvasPdfExportData: () => options.pdfExportData ?? null,
   } as unknown as DrawableElement;
 }
 
@@ -130,11 +132,11 @@ describe('harvestCanvasPdf', () => {
         },
       ],
     };
-    const pdf = Object.create(PdfElement.prototype) as PdfElement;
-    pdf.getPdfExportSource = () => source;
-
     const { request } = await harvestCanvasPdf([
-      pdf as unknown as DrawableElement,
+      drawableElement({
+        boundingBox: rect(0, 0, 1, 1),
+        pdfExportData: { kind: 'pdf', source },
+      }),
     ]);
 
     expect(request.pdfsB64).toEqual(['AQID']);

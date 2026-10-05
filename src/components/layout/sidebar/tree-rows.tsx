@@ -1,18 +1,17 @@
-import { useState } from 'react';
 import { ChevronRight, Folder } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
-import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
+import type { FileType, VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
 import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
-import { ItemContextMenu } from '@/pages/library/explorer/item-context-menu';
+import { folderIconStyle } from '@/pages/library/explorer/folder-colors';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
-import { useExplorerItem } from '@/pages/library/explorer/use-explorer-item';
 import { useFileItemContextMenu } from '@/pages/library/explorer/use-file-item-context-menu';
-import { TagManageDialog } from '@/pages/library/tag-manage-dialog';
+import { useFolderItemContextMenu } from '@/pages/library/explorer/use-folder-item-context-menu';
+import { FolderCreateSubmenu } from './folder-create-submenu';
 import { TreeIndentGuides, treeRowPadding } from './indent-guides';
 
 const tagListProps = {
@@ -22,13 +21,25 @@ const tagListProps = {
   overflowClassName: 'text-[9px] text-text-muted',
 } as const;
 
-interface FolderRowProps {
-  node: VFSFolderNode;
+interface RowProps {
   depth: number;
-  expanded: boolean;
   autoRename: boolean;
-  onToggle: () => void;
+  selected: boolean;
+  /** Every selected row id; drag and Remove act on all of them when this row is selected. */
+  selectionIds: readonly string[];
+  /** Returns true when a modifier key handled the click, so the row skips its default action. */
+  onSelect: (e: React.MouseEvent) => boolean;
   onChanged: () => void;
+}
+
+interface FolderRowProps extends RowProps {
+  node: VFSFolderNode;
+  expanded: boolean;
+  onToggle: () => void;
+  onNewFolder: () => void;
+  onNewFile: (title: string, type: FileType) => void;
+  onImport: () => void;
+  importDisabled: boolean;
 }
 
 export function SidebarFolderRow({
@@ -36,24 +47,36 @@ export function SidebarFolderRow({
   depth,
   expanded,
   autoRename,
+  selected,
+  selectionIds,
+  onSelect,
   onToggle,
+  onNewFolder,
+  onNewFile,
+  onImport,
+  importDisabled,
   onChanged,
 }: FolderRowProps) {
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const {
+    contextMenuProps,
     renaming,
     dragging,
-    startRenaming,
-    handleRemove,
     handleDragStart,
     handleDragEnd,
     renameInputProps,
-  } = useExplorerItem({
-    nodeId: node.id,
-    name: node.name,
-    dragKind: 'folder',
-    onChanged,
+    menu,
+    dialogs,
+  } = useFolderItemContextMenu(node, onChanged, {
+    nodeIds: selected ? selectionIds : undefined,
     initialRenaming: autoRename,
+    createSubmenu: (
+      <FolderCreateSubmenu
+        onNewFolder={onNewFolder}
+        onNewFile={onNewFile}
+        onImport={onImport}
+        importDisabled={importDisabled}
+      />
+    ),
   });
   const { dragOver, dropTargetProps } = useDropTarget({
     targetFolderId: node.id,
@@ -62,14 +85,14 @@ export function SidebarFolderRow({
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu {...contextMenuProps}>
         <ContextMenuTrigger
           render={
             <button
               type="button"
               draggable={!renaming}
-              onClick={() => {
-                if (!renaming) {
+              onClick={(e) => {
+                if (!renaming && !onSelect(e)) {
                   onToggle();
                 }
               }}
@@ -85,6 +108,7 @@ export function SidebarFolderRow({
               }
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
+                selected && 'bg-hover-tint',
                 dragOver
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint',
@@ -100,7 +124,10 @@ export function SidebarFolderRow({
               expanded && 'rotate-90',
             )}
           />
-          <Folder className="size-4 shrink-0 fill-accent-amber text-accent-amber transition-colors duration-150 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
+          <Folder
+            className="size-4 shrink-0"
+            style={folderIconStyle(node.color)}
+          />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -115,34 +142,24 @@ export function SidebarFolderRow({
             </div>
           )}
         </ContextMenuTrigger>
-        <ItemContextMenu
-          onRename={startRenaming}
-          onRemove={handleRemove}
-          onManageTags={() => setTagDialogOpen(true)}
-        />
+        {menu}
       </ContextMenu>
-      <TagManageDialog
-        open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        nodeId={node.id}
-        nodeName={node.name}
-        onChanged={onChanged}
-      />
+      {dialogs}
     </>
   );
 }
 
-interface FileRowProps {
+interface FileRowProps extends RowProps {
   node: VFSFileNode;
-  depth: number;
-  autoRename: boolean;
-  onChanged: () => void;
 }
 
 export function SidebarFileRow({
   node,
   depth,
   autoRename,
+  selected,
+  selectionIds,
+  onSelect,
   onChanged,
 }: FileRowProps) {
   const tabController = useTabController();
@@ -154,7 +171,10 @@ export function SidebarFileRow({
     renameInputProps,
     menu,
     dialogs,
-  } = useFileItemContextMenu(node, onChanged, { initialRenaming: autoRename });
+  } = useFileItemContextMenu(node, onChanged, {
+    initialRenaming: autoRename,
+    nodeIds: selected ? selectionIds : undefined,
+  });
   const FileIcon = getFileTypeIcon(node.fileType);
 
   return (
@@ -165,9 +185,9 @@ export function SidebarFileRow({
             <button
               type="button"
               draggable={!renaming}
-              onClick={() => {
-                if (!renaming) {
-                  openNote(tabController, node, node.name, 'explorer');
+              onClick={(e) => {
+                if (!renaming && !onSelect(e)) {
+                  openNote(tabController, node, node.name);
                 }
               }}
               onDragStart={handleDragStart}
@@ -180,6 +200,7 @@ export function SidebarFileRow({
               }
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150 hover:bg-hover-tint',
+                selected && 'bg-hover-tint',
                 dragging && 'opacity-40',
               )}
             />

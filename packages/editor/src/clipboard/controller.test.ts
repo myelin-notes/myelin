@@ -88,6 +88,7 @@ function createPort(
       viewportCenter: { x: 400, y: 300 },
     }),
     deleteSelection: vi.fn(),
+    pasteText: vi.fn(() => true),
     pasteSnapshot: vi.fn(() => ({ pastedElementUuids: ['paste-1'] })),
     ...overrides,
   };
@@ -162,6 +163,37 @@ describe('CanvasClipboardController', () => {
     expect(controller.handlePaste(event, port, onMediaPaste)).toBe(true);
     expect(onMediaPaste).toHaveBeenCalledOnce();
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('pastes plain text after the media fallback declines it', () => {
+    const controller = new CanvasClipboardController();
+    const event = createClipboardEvent('paste');
+    event.clipboardData.setData('text/plain', 'Hello from the clipboard');
+    const onMediaPaste = vi.fn(() => false);
+    const pasteText = vi.fn(() => true);
+    const port = createPort({ pasteText });
+
+    expect(controller.handlePaste(event, port, onMediaPaste)).toBe(true);
+    expect(onMediaPaste).toHaveBeenCalledOnce();
+    expect(pasteText).toHaveBeenCalledWith('Hello from the clipboard');
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('does not create text for empty text or the Myelin sentinel', () => {
+    const controller = new CanvasClipboardController();
+    const pasteText = vi.fn(() => true);
+    const port = createPort({ pasteText });
+    const emptyEvent = createClipboardEvent('paste');
+    emptyEvent.clipboardData.setData('text/plain', '   ');
+    const sentinelEvent = createClipboardEvent('paste');
+    sentinelEvent.clipboardData.setData(
+      'text/plain',
+      '[Myelin canvas selection]',
+    );
+
+    expect(controller.handlePaste(emptyEvent, port)).toBe(false);
+    expect(controller.handlePaste(sentinelEvent, port)).toBe(false);
+    expect(pasteText).not.toHaveBeenCalled();
   });
 
   it('does not intercept editable targets', () => {

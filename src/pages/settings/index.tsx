@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
 import { useMessages } from '@myelin/editor/i18n';
-import { isTouchDevice } from '@myelin/shared/os';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { KeybindsSection } from './keybinds-section';
 import { AboutSection } from './sections/about-section';
@@ -43,7 +42,7 @@ export function SettingsPage() {
   return (
     <div className="relative flex h-full w-full bg-page">
       <a href="#settings-main" data-skip-link className="skip-link">
-        {strings.settings.title}
+        {strings.tabBar.settings}
       </a>
 
       <main
@@ -60,17 +59,17 @@ export function SettingsPage() {
                 className="font-extralight font-heading text-text-primary tracking-tight"
                 style={{ fontSize: 'var(--fluid-display)' }}
               >
-                {strings.settings.title}
+                {strings.tabBar.settings}
               </h1>
             </header>
 
             <div className="space-y-12 md:space-y-16">
               <AppearanceSection />
               <LanguageSection />
-              {isTouchDevice && <InputSection />}
+              <InputSection />
               <EditingSection />
               <SyncSection />
-              {!IS_MOBILE_BUILD && <DataSection />}
+              <DataSection />
               <PrivacySection />
               {!IS_MOBILE_BUILD && <McpSection />}
               {!IS_MOBILE_BUILD && <KeybindsSection />}

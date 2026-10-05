@@ -3,6 +3,7 @@ import { redo, undo } from 'prosemirror-history';
 import type { Node as PMNode } from 'prosemirror-model';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView, NodeView } from 'prosemirror-view';
+import type { EnsureCodeOutputCard } from '../../../elements/code-output/bridge';
 import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   CODE_BLOCK_EXTERNAL_SELECTION_EVENT,
@@ -98,6 +99,7 @@ export class CodeBlockNodeView implements NodeView {
     private node: PMNode,
     private view: EditorView,
     private getPos: () => number,
+    ensureCodeOutputCard?: EnsureCodeOutputCard,
   ) {
     this.dom = document.createElement('div');
     this.dom.className = 'pm-code-block';
@@ -122,6 +124,7 @@ export class CodeBlockNodeView implements NodeView {
       blockDom: this.dom,
       getPos: this.getPos,
       collectSource: () => collectRunSource(this.view.state.doc, this.getPos()),
+      ensureCodeOutputCard,
     });
     this.dom.appendChild(this.runView.button);
     this.runView.setLanguage(parseBlockLanguage(this.node.textContent));

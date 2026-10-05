@@ -7,10 +7,16 @@ import { I18nProvider } from '../../i18n';
 import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, LivePeersSnapshot } from '../../sync/live/peers';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
+import type { CanvasElementContext } from '../canvas-element-context';
+import type {
+  CanvasSearchContent,
+  SearchableElement,
+} from '../canvas-searchable-element';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
 import { AudioPlayerView } from './player-view';
+import { discardAudioRecording } from './recording';
 import { segmentsToText, toSegments } from './segments';
 import { decodeAudio, drawWaveform } from './waveform';
 
@@ -27,14 +33,16 @@ function recordingFileName(mimeType: string): string {
   return ext ? `recording.${ext}` : 'recording';
 }
 
-export class AudioElement extends DrawableElement {
-  private _audioData: Uint8Array | null = null;
+export class AudioElement extends DrawableElement implements SearchableElement {
+  private _audioData: Uint8Array<ArrayBuffer> | null = null;
   private _fileName: string = '';
   private _duration: number = 0;
   private _mimeType: string = '';
   private _segments: TranscriptSegment[] = [];
   private _creatorPeerId: string;
   private _localPeerId: string;
+  private _recordingOwnerId: string = '';
+  private _onRecordingSaved: (() => void | Promise<void>) | undefined;
   private _transcribingPeerId: string = '';
   private _livePeers: LivePeersSnapshot | null = null;
 
@@ -79,6 +87,18 @@ export class AudioElement extends DrawableElement {
     super(uuid, ElementType.AUDIO);
     this._localPeerId = localPeerId;
     this._creatorPeerId = creatorPeerId;
+  }
+
+  public override configureCanvas(context: CanvasElementContext): void {
+    this.setLocalPeerId(context.localPeerId);
+    this.setRecordingOwnerId(context.audioRecordingOwnerId);
+    this.setOnRecordingSaved(context.onAudioRecordingSaved);
+    this.setLivePeers(context.livePeers);
+  }
+
+  public override disposeCanvas(): void {
+    this.discardRecording();
+    super.disposeCanvas();
   }
 
   public override getYMapProps(): Record<string, unknown> {
@@ -142,6 +162,11 @@ export class AudioElement extends DrawableElement {
   public get transcript(): string {
     return segmentsToText(this._segments);
   }
+
+  public getCanvasSearchContent(): CanvasSearchContent | null {
+    const text = this.transcript.trim();
+    return text ? { kind: 'transcript', text } : null;
+  }
   public get transcriptSegments(): readonly TranscriptSegment[] {
     return this._segments;
   }
@@ -154,6 +179,28 @@ export class AudioElement extends DrawableElement {
       return;
     }
     this._localPeerId = peerId;
+    this.render();
+  }
+
+  public setRecordingOwnerId(ownerId: string): void {
+    if (this._recordingOwnerId === ownerId) {
+      return;
+    }
+    this._recordingOwnerId = ownerId;
+    this.render();
+  }
+
+  public discardRecording(): void {
+    void discardAudioRecording(this.uuid);
+  }
+
+  public setOnRecordingSaved(
+    callback: (() => void | Promise<void>) | undefined,
+  ): void {
+    if (this._onRecordingSaved === callback) {
+      return;
+    }
+    this._onRecordingSaved = callback;
     this.render();
   }
 
@@ -337,7 +384,7 @@ export class AudioElement extends DrawableElement {
     const root = document.createElement('div');
     root.className = 'canvas-audio-block';
     root.dataset.elementUuid = this.uuid;
-    (getFrameChromeControlsLayer() ?? host).appendChild(root);
+    (getFrameChromeControlsLayer(host) ?? host).appendChild(root);
     this._root = root;
 
     this._reactRoot = createRoot(root);
@@ -351,12 +398,15 @@ export class AudioElement extends DrawableElement {
     if (!this._reactRoot) {
       return;
     }
+    // React dev timing enumerates typed-array props byte by byte; pass the opaque buffer.
     flushSync(() => {
       this._reactRoot!.render(
         <I18nProvider>
           <AudioPlayerView
             elementId={this.uuid}
-            audioBytes={this._audioData}
+            recordingOwnerId={this._recordingOwnerId}
+            onRecordingSaved={this._onRecordingSaved}
+            audioBuffer={this._audioData?.buffer ?? null}
             duration={this._duration}
             mimeType={this._mimeType}
             waveform={this._waveform}

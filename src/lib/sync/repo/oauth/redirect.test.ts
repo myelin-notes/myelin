@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/lib/env', () => ({ IS_MOBILE_BUILD: true }));
+vi.mock('@/lib/env', () => ({
+  IS_MOBILE_BUILD: true,
+  MOBILE_PLATFORM: 'android',
+}));
 
 let deliver: ((urls: string[]) => void) | undefined;
 const unlisten = vi.fn();

@@ -10,7 +10,7 @@ interface StatusBarProps {
   fps: number;
   zoomLocked: boolean;
   onToggleZoomLock: () => void;
-  onRecenter: () => void;
+  onFitContent: () => void;
   onRegenerateThumbnail: () => void;
 }
 
@@ -19,7 +19,7 @@ export const StatusBar = memo(function StatusBar({
   fps,
   zoomLocked,
   onToggleZoomLock,
-  onRecenter,
+  onFitContent,
   onRegenerateThumbnail,
 }: StatusBarProps) {
   const strings = useMessages();
@@ -38,9 +38,9 @@ export const StatusBar = memo(function StatusBar({
     >
       <button
         type="button"
-        onClick={onRecenter}
-        aria-label="Center viewport on origin"
-        title="Center viewport on origin"
+        onClick={onFitContent}
+        aria-label="Fit content in viewport"
+        title="Fit content in viewport"
         className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
       >
         <Crosshair className="h-3.5 w-3.5" />

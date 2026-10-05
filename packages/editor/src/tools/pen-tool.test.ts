@@ -105,7 +105,9 @@ function squiggleStroke(): Pt[] {
  *
  * `bind: false` reproduces the unbound-stroke case for the yMap-null guard test.
  */
-function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
+function makeCanvas(
+  opts: { bind?: boolean; realTransact?: boolean; zoom?: number } = {},
+) {
   const bind = opts.bind ?? true;
   const ydoc = new YDocManager();
   const created: DrawableElement[] = [];
@@ -149,6 +151,7 @@ function makeCanvas(opts: { bind?: boolean; realTransact?: boolean } = {}) {
     transact,
     // No page frames, so a finished stroke never anchors into one.
     getElementsByType: () => [],
+    viewport: { zoom: opts.zoom ?? 1 },
   } as unknown as DrawableCanvas;
 
   return {
@@ -176,6 +179,15 @@ function feed(
   for (const [x, y] of pts) {
     tool.update(canvas, PRESSURE_EVENT, pos(x, y));
   }
+}
+
+function worldVertices(shape: ShapeElement): Pt[] {
+  const geom = shape.yMap?.get('geom') as number[];
+  const out: Pt[] = [];
+  for (let i = 0; i + 1 < geom.length; i += 2) {
+    out.push([geom[i] + shape.offset.x, geom[i + 1] + shape.offset.y]);
+  }
+  return out;
 }
 
 function makeTool(): PenTool {
@@ -231,6 +243,38 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(penStroke.pressureEnabled).toBe(true);
   });
 
+  it('drops stylus pressure once the pressure option is off', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'pressure');
+    if (option?.type !== 'toggle') {
+      throw new Error('pen has no pressure toggle');
+    }
+    option.set(false);
+
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+    tool.update(canvas, { pressure: 0.5 } as PointerEvent, pos(0, 0));
+    tool.update(canvas, { pressure: 0.74 } as PointerEvent, pos(5, 5));
+    expect(stroke.pressureEnabled).toBe(false);
+  });
+
+  it('stamps the stabilization slider onto each new stroke as a 0–1 streamline', () => {
+    const { canvas, created } = makeCanvas();
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'stabilization');
+    if (option?.type !== 'size') {
+      throw new Error('pen has no stabilization slider');
+    }
+    expect(option.min).toBe(0);
+    option.set(0);
+
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+    expect(stroke.strokeStyle.stabilization).toBe(0);
+    expect(stroke.getYMapProps().stabilization).toBe(0);
+  });
+
   it('snaps a clean rectangle to a rect ShapeElement after dwell', () => {
     const { canvas, created, removeElement } = makeCanvas();
     const tool = makeTool();
@@ -262,10 +306,105 @@ describe('PenTool draw-and-hold recognition', () => {
 
     const callsAfterSnap = addElement.mock.calls.length;
     const ptsAfterSnap = stroke.xyPoints.length;
-    // Move far away after snap — must be ignored.
+    // Post-snap moves steer the shape; they must not extend the stroke or add elements.
     tool.update(canvas, PRESSURE_EVENT, pos(900, 900));
     expect(stroke.xyPoints).toHaveLength(ptsAfterSnap);
     expect(addElement.mock.calls.length).toBe(callsAfterSnap);
+  });
+
+  describe('dragging after the snap without releasing', () => {
+    it('line: the endpoint under the pen follows it, the start stays put', () => {
+      const { canvas, created } = makeCanvas();
+      const tool = makeTool();
+      tool.start(canvas, {} as PointerEvent);
+      feed(tool, canvas, lineStroke(20, 30, 220, 80));
+      vi.advanceTimersByTime(600);
+      const shape = created[1] as ShapeElement;
+      expect(shape.shapeType).toBe('line');
+
+      tool.update(canvas, PRESSURE_EVENT, pos(300, 100));
+      const bbox = shape.boundingBox;
+      expect(bbox.x).toBeCloseTo(20, 0);
+      expect(bbox.y).toBeCloseTo(30, 0);
+      expect(bbox.width).toBeCloseTo(280, 0);
+      expect(bbox.height).toBeCloseTo(70, 0);
+      expect(created).toHaveLength(2);
+    });
+
+    it('triangle: only the vertex nearest the pen moves', () => {
+      const { canvas, created } = makeCanvas();
+      const tool = makeTool();
+      tool.start(canvas, {} as PointerEvent);
+      feed(tool, canvas, triangleStroke()); // ends on the (100, 0) apex
+      vi.advanceTimersByTime(600);
+      const shape = created[1] as ShapeElement;
+      expect(shape.shapeType).toBe('triangle');
+
+      const before = worldVertices(shape);
+      tool.update(canvas, PRESSURE_EVENT, pos(100, -50));
+      const after = worldVertices(shape);
+      const apex = before.findIndex(([, y]) => y < 10);
+      expect(after[apex]).toEqual([100, -50]);
+      for (let i = 0; i < 3; i++) {
+        if (i !== apex) {
+          expect(after[i][0]).toBeCloseTo(before[i][0], 6);
+          expect(after[i][1]).toBeCloseTo(before[i][1], 6);
+        }
+      }
+    });
+
+    it('rect: the corner under the pen follows it, the opposite corner is pinned', () => {
+      const { canvas, created } = makeCanvas();
+      const tool = makeTool();
+      tool.start(canvas, {} as PointerEvent);
+      feed(tool, canvas, rectStroke(10, 20, 200, 120)); // ends on the (10, 20) corner
+      vi.advanceTimersByTime(600);
+      const shape = created[1] as ShapeElement;
+      expect(shape.shapeType).toBe('rect');
+
+      tool.update(canvas, PRESSURE_EVENT, pos(0, 0));
+      expect(shape.offset.x).toBeCloseTo(0, 0);
+      expect(shape.offset.y).toBeCloseTo(0, 0);
+      expect(shape.localBoundingBox.width).toBeCloseTo(210, 0);
+      expect(shape.localBoundingBox.height).toBeCloseTo(140, 0);
+
+      // Crossing the pinned corner flips the box instead of going negative.
+      tool.update(canvas, PRESSURE_EVENT, pos(260, 200));
+      expect(shape.offset.x).toBeCloseTo(210, 0);
+      expect(shape.offset.y).toBeCloseTo(140, 0);
+      expect(shape.localBoundingBox.width).toBeCloseTo(50, 0);
+      expect(shape.localBoundingBox.height).toBeCloseTo(60, 0);
+    });
+
+    it('ellipse: resizes from the bbox corner nearest the pen', () => {
+      const { canvas, created } = makeCanvas();
+      const tool = makeTool();
+      tool.start(canvas, {} as PointerEvent);
+      // bbox [40,60,120,80]; finish nearer the top-right corner than the bottom-right.
+      feed(tool, canvas, [...ellipseStroke(100, 100, 60, 40), [158, 96]]);
+      vi.advanceTimersByTime(600);
+      const shape = created[1] as ShapeElement;
+      expect(shape.shapeType).toBe('ellipse');
+
+      tool.update(canvas, PRESSURE_EVENT, pos(200, 20));
+      expect(shape.offset.x).toBeCloseTo(40, 0);
+      expect(shape.offset.y).toBeCloseTo(20, 0);
+      expect(shape.localBoundingBox.width).toBeCloseTo(160, 0);
+      expect(shape.localBoundingBox.height).toBeCloseTo(120, 0);
+    });
+
+    it('finish() keeps the dragged geometry', () => {
+      const { canvas, created } = makeCanvas();
+      const tool = makeTool();
+      tool.start(canvas, {} as PointerEvent);
+      feed(tool, canvas, lineStroke(20, 30, 220, 80));
+      vi.advanceTimersByTime(600);
+      const shape = created[1] as ShapeElement;
+      tool.update(canvas, PRESSURE_EVENT, pos(300, 100));
+      tool.finish(canvas, {} as PointerEvent);
+      expect(shape.boundingBox.width).toBeCloseTo(280, 0);
+      expect(shape.yMap?.get('geom')).toEqual([0, 0, 280, 70]);
+    });
   });
 
   it('snaps an ellipse', () => {
@@ -343,6 +482,64 @@ describe('PenTool draw-and-hold recognition', () => {
     expect(created).toHaveLength(1);
   });
 
+  it('keeps one pending dwell timer while the pen moves', () => {
+    const { canvas } = makeCanvas();
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    const setTimer = vi.spyOn(globalThis, 'setTimeout');
+
+    feed(
+      tool,
+      canvas,
+      Array.from({ length: 40 }, (_, i) => [i * 5, 0]),
+    );
+
+    expect(
+      setTimer.mock.calls.filter(([, delay]) => delay === 600),
+    ).toHaveLength(1);
+    tool.finish(canvas, {} as PointerEvent);
+    setTimer.mockRestore();
+  });
+
+  it('uses screen-space movement for the dwell slop when zoomed', () => {
+    const { canvas, created, removeElement } = makeCanvas({ zoom: 5 });
+    const tool = makeTool();
+    tool.start(canvas, {} as PointerEvent);
+    feed(tool, canvas, rectStroke(10, 20, 200, 120));
+
+    vi.advanceTimersByTime(400);
+    tool.update(canvas, PRESSURE_EVENT, pos(213, 23));
+    vi.advanceTimersByTime(400);
+    expect(removeElement).not.toHaveBeenCalled();
+    expect(created).toHaveLength(1);
+  });
+
+  it('waits for a true dwell before snapping a smallest-size pen stroke', () => {
+    const { canvas, created, removeElement } = makeCanvas();
+    const tool = makeTool();
+    const option = tool.getOptions().find((o) => o.key === 'size');
+    if (option?.type !== 'size') {
+      throw new Error('pen has no stroke size option');
+    }
+    option.set(1);
+
+    tool.start(canvas, {} as PointerEvent);
+    const stroke = created[0] as StrokeElement;
+    expect(stroke.strokeStyle.size).toBe(1);
+    feed(tool, canvas, lineStroke(0, 0, 40, 0));
+
+    vi.advanceTimersByTime(599);
+    tool.update(canvas, PRESSURE_EVENT, pos(44, 0));
+    vi.advanceTimersByTime(1);
+
+    expect(removeElement).not.toHaveBeenCalled();
+    expect(created).toHaveLength(1);
+
+    vi.advanceTimersByTime(600);
+    expect(removeElement).toHaveBeenCalledWith(stroke);
+    expect((created[1] as ShapeElement).shapeType).toBe('line');
+  });
+
   it('fires recognition exactly once per anchor even with a late tiny move', () => {
     const { canvas, created, addElement } = makeCanvas();
     const tool = makeTool();
@@ -354,7 +551,7 @@ describe('PenTool draw-and-hold recognition', () => {
     vi.advanceTimersByTime(599);
     const rectPts = rectStroke(10, 20, 200, 120);
     const last = rectPts[rectPts.length - 1];
-    tool.update(canvas, PRESSURE_EVENT, pos(last[0] + 3, last[1] + 3)); // < 12px
+    tool.update(canvas, PRESSURE_EVENT, pos(last[0] + 2, last[1])); // < 3px
     vi.advanceTimersByTime(1); // original timer fires
 
     // Exactly one swap happened (stroke add + one shape add).

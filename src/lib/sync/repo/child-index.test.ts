@@ -110,6 +110,7 @@ describe('child index', () => {
       pen: ['#111111'],
       highlighter: [],
       text: [],
+      folder: [],
     });
     expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty(
       'customColors',
@@ -140,7 +141,7 @@ describe('child index', () => {
       version: CURRENT_MANIFEST_VERSION,
       nodes: {},
       linksBySource: {},
-      colors: { pen: [], highlighter: [], text: [] },
+      colors: { pen: [], highlighter: [], text: [], folder: [] },
       tagRegistry: [],
     } as unknown as VFSManifest;
 

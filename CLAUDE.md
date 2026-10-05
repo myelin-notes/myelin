@@ -2,6 +2,7 @@
 - This repo uses `yarn` not npm.
 - Avoid `// ------ CATEGORY -------` style comments in the code. 3+ of these in a single file may indicate that the file should be split up further — but use critical thinking, sometimes keeping them together is still the right call.
 - This is a tauri app, you must test using tauri mcp or computer use, not playwright mcp in browser.
+- Do not drive the Tauri application for testing unless the user explicitly asks you to.
 - Prefer named concrete types over derived helper types like `Awaited<ReturnType<typeof fn>>` when a clear exported/interface type exists. Use derived types only when tying the type to the function signature is intentionally clearer.
 
 # Guidelines

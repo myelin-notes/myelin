@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { type Ref, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon, Plus as PlusIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
@@ -9,14 +9,17 @@ import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FontSizeField } from '@/components/font-size-field';
+import { Switch } from '@/components/ui/switch';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
+  containerRef?: Ref<HTMLDivElement>;
   /** Null when the live tool can be saved as a preset; otherwise why it can't. */
   savePresetDisabledReason: string | null;
   onSavePreset: () => void;
+  editingPreset?: boolean;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -67,7 +70,7 @@ function FontPicker({
             preloadAllFonts(fonts);
           }
         }}
-        className="flex min-w-[120px] cursor-pointer items-center gap-2 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-card-active"
+        className="flex pointer-coarse:min-h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-card-active"
         style={{ fontFamily: `"${value}", sans-serif` }}
       >
         <span className="flex-1 truncate text-left">{value}</span>
@@ -119,8 +122,10 @@ function FontPicker({
 export function ToolOptionsPanel({
   options,
   customColorTool,
+  containerRef,
   savePresetDisabledReason,
   onSavePreset,
+  editingPreset = false,
 }: ToolOptionsPanelProps) {
   const strings = useMessages();
   const {
@@ -135,21 +140,25 @@ export function ToolOptionsPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
+    <div
+      ref={containerRef}
+      className="flex max-h-[min(44rem,var(--tool-options-available-height,calc(100dvh-6rem)))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md"
+    >
       {options.map((option) => {
         if (option.type === 'color') {
           return (
             <div key={option.key} className="flex flex-col gap-1.5">
-              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+              <span className="select-none font-medium text-text-muted text-xs">
                 {option.label}
               </span>
-              <div className="flex max-w-[120px] flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {option.palette.map((color) => (
                   <ColorSwatch
                     key={color}
                     color={color}
                     active={option.value === color}
                     onClick={() => option.set(color)}
+                    size="md"
                   />
                 ))}
                 {customColorTool &&
@@ -159,6 +168,7 @@ export function ToolOptionsPanel({
                       color={color}
                       active={option.value === color}
                       onClick={() => option.set(color)}
+                      size="md"
                       onDelete={() => {
                         if (
                           option.value === color &&
@@ -171,7 +181,7 @@ export function ToolOptionsPanel({
                     />
                   ))}
                 {customColorTool && canAddColor && (
-                  <AddColorSwatch onClick={promptAddColor} />
+                  <AddColorSwatch onClick={promptAddColor} size="md" />
                 )}
               </div>
             </div>
@@ -181,33 +191,30 @@ export function ToolOptionsPanel({
         if (option.type === 'size') {
           return (
             <div key={option.key} className="flex flex-col gap-1.5">
-              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+              <span className="select-none font-medium text-text-muted text-xs">
                 {option.label}
               </span>
-              {option.control === 'stepper' ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  type="range"
+                  min={option.min}
+                  max={option.max}
+                  step={option.step}
+                  value={option.value}
+                  onChange={(e) => option.set(Number(e.target.value))}
+                  aria-label={option.label}
+                  className="tool-slider min-w-0 flex-1"
+                />
                 <FontSizeField
                   value={option.value}
                   min={option.min}
                   max={option.max}
                   step={option.step}
                   onChange={option.set}
+                  ariaLabel={option.label}
+                  touchTargets
                 />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min={option.min}
-                    max={option.max}
-                    step={option.step}
-                    value={option.value}
-                    onChange={(e) => option.set(Number(e.target.value))}
-                    className="tool-slider w-20"
-                  />
-                  <span className="w-5 select-none text-right font-medium text-[10px] text-text-secondary tabular-nums">
-                    {option.value}
-                  </span>
-                </div>
-              )}
+              </div>
             </div>
           );
         }
@@ -215,10 +222,10 @@ export function ToolOptionsPanel({
         if (option.type === 'choice') {
           return (
             <div key={option.key} className="flex flex-col gap-1.5">
-              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+              <span className="select-none font-medium text-text-muted text-xs">
                 {option.label}
               </span>
-              <div className="flex items-center gap-0.5 rounded-lg bg-surface p-0.5">
+              <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-surface p-0.5">
                 {option.choices.map((choice) => {
                   const active = option.value === choice.value;
                   const Icon = choice.icon;
@@ -226,13 +233,13 @@ export function ToolOptionsPanel({
                     <button
                       key={choice.value}
                       onClick={() => option.set(choice.value)}
-                      className={`flex cursor-pointer items-center gap-1.5 rounded-md border-none px-2 py-1 font-medium text-xs transition-all duration-150 ${
+                      className={`flex pointer-coarse:min-h-9 min-w-0 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border-none px-2 py-1 font-medium text-xs transition-all duration-150 ${
                         active
                           ? 'bg-card text-text-primary shadow-sm'
                           : 'bg-transparent text-text-muted hover:text-text-secondary'
                       }`}
                     >
-                      {Icon && <Icon className="size-3.5" />}
+                      {Icon && <Icon className="size-3.5 shrink-0" />}
                       {choice.label}
                     </button>
                   );
@@ -245,16 +252,34 @@ export function ToolOptionsPanel({
         if (option.type === 'font') {
           return (
             <div key={option.key} className="flex flex-col gap-1.5">
-              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+              <span className="select-none font-medium text-text-muted text-xs">
                 {option.label}
               </span>
-              <FontPicker
-                value={option.value}
-                fonts={option.fonts}
-                onChange={(family) => {
-                  ensureDisplayFont(family);
-                  option.set(family);
-                }}
+              <div className="w-full">
+                <FontPicker
+                  value={option.value}
+                  fonts={option.fonts}
+                  onChange={(family) => {
+                    ensureDisplayFont(family);
+                    option.set(family);
+                  }}
+                />
+              </div>
+            </div>
+          );
+        }
+
+        if (option.type === 'toggle') {
+          return (
+            <div key={option.key} className="flex flex-col gap-1.5">
+              <span className="select-none font-medium text-text-muted text-xs">
+                {option.label}
+              </span>
+              <Switch
+                checked={option.value}
+                onCheckedChange={option.set}
+                aria-label={option.label}
+                className="relative pointer-coarse:my-2 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2"
               />
             </div>
           );
@@ -263,12 +288,12 @@ export function ToolOptionsPanel({
         return null;
       })}
 
-      {savePresetDisabledReason === null && (
+      {!editingPreset && savePresetDisabledReason === null && (
         <button
           onClick={onSavePreset}
-          className="flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
+          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-normal rounded-lg border-none bg-surface px-2.5 py-1.5 text-center font-medium text-text-secondary text-xs leading-snug transition-colors hover:bg-card-active hover:text-text-primary"
         >
-          <PlusIcon className="size-3.5" />
+          <PlusIcon className="size-3.5 shrink-0" />
           {strings.canvas.toolPresets.saveShort}
         </button>
       )}

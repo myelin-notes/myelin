@@ -1,10 +1,7 @@
-import * as Y from 'yjs';
 import {
   NODES_DELETED_EVENT,
   type NodesDeletedDetail,
 } from '@myelin/editor/events';
-import { summarizeYDoc } from '@myelin/editor/note/state-summary';
-import { getPlatform, type ReindexItem } from '@myelin/editor/platform';
 import type {
   YjsSyncPushOptions,
   YjsSyncPushResult,
@@ -21,6 +18,8 @@ import type {
   RepositoryStatusSource,
 } from './config';
 import { MAX_PEN_PRESETS } from './config';
+import { processDocumentAsync } from './document-worker';
+import { noteContentIndex } from './note-content-index';
 import { extractStoredNoteLinks } from './note-link-index';
 import {
   addChild,
@@ -36,7 +35,6 @@ import {
   getChildrenIds,
   getFileVersionNodes,
   getFolderChain,
-  getIndexCandidateFileNodes,
   getNodesByAnyTag,
   getNodesByExactName,
   getNoteGraph,
@@ -44,7 +42,6 @@ import {
   getStats,
   getUniqueFileName,
   isFileVersionNode as isConcreteFileVersionNode,
-  isIndexCandidateFileNode,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -52,7 +49,6 @@ import {
   normalizeCustomColor,
   type RepositorySnapshot,
   searchNodeResults,
-  searchNodeResultsSemantically,
   setStoredNoteLinks,
   toFileVersion,
   VERSION_HISTORY_INTERVAL_MS,
@@ -67,6 +63,8 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  NoteIndexItem,
+  OpenSessionOptions,
   PenPreset,
   PenPresetChanges,
   Repository,
@@ -83,8 +81,6 @@ import type {
 } from './types';
 
 const logger = new Logger('BaseRepository');
-const DEFAULT_SEMANTIC_SEARCH_LIMIT = 50;
-const EMPTY_CONTENT: ReadonlyMap<VFSNodeId, string> = new Map();
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
 // for non-DOM contexts (tests, background workers) where `window` is absent.
@@ -94,20 +90,6 @@ function emitNodesDeleted(ids: VFSNodeId[]): void {
   }
   const detail: NodesDeletedDetail = { ids };
   window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
-}
-
-function byteArraysEqual(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.byteLength !== right.byteLength) {
-    return false;
-  }
-
-  for (let index = 0; index < left.byteLength; index += 1) {
-    if (left[index] !== right[index]) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 export abstract class BaseRepository
@@ -131,15 +113,13 @@ export abstract class BaseRepository
     (status: RepositoryRuntimeStatus) => void
   >();
 
-  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index over
-  // the whole corpus each time. Keyed on the manifest reference, the mutation counter, and the
-  // note-index content revision, so it rebuilds exactly when the searchable corpus changes.
+  // Reused across search-as-you-type so a keystroke burst doesn't rebuild a MiniSearch index.
   private nodeSearchCache: {
     manifest: VFSManifest;
     dataVersion: number;
-    contentRevision: number;
     index: SearchIndex<VFSNode>;
   } | null = null;
+  private searchMetadataRevision = 0;
 
   // While positive, manifest mutations accumulate on one held manifest and defer their save to the
   // outermost close.
@@ -193,32 +173,29 @@ export abstract class BaseRepository
     nodeId: VFSNodeId,
     links?: readonly StoredNoteLink[],
   ): Promise<void> {
-    let candidateFileType: FileType | null = null;
+    let indexable = false;
     await this.mutateManifest('Touch file', (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
-        // Offer non-system files to the engine; it decides by type what to index.
-        // Version-history snapshots are system nodes and are never offered.
-        if (isIndexCandidateFileNode(node)) {
-          candidateFileType = node.fileType;
-        }
+        indexable = node.fileType === 'mcanvas' && !node.system;
         // Snapshots are system nodes; their links must not enter the graph.
         if (node.fileType === 'mcanvas' && !node.system && links) {
           setStoredNoteLinks(manifest, nodeId, links);
         }
       }
     });
-
-    if (candidateFileType !== null) {
-      const { noteIndex, handwriting } = getPlatform();
-      if (noteIndex || handwriting) {
-        const path = await this.getStoredAbsolutePath(nodeId);
-        if (path) {
-          noteIndex?.requestReindex(nodeId, path, candidateFileType);
-          handwriting?.requestRecognize(nodeId, path, candidateFileType);
-        }
-      }
+    if (indexable) {
+      noteContentIndex.invalidate(this, nodeId);
+      void this.getStoredAbsolutePath(nodeId)
+        .then((path) => {
+          if (path) {
+            noteContentIndex.queueSaved(this, nodeId, path);
+          }
+        })
+        .catch((error) => {
+          logger.error('Could not queue note for indexing', error, { nodeId });
+        });
     }
   }
 
@@ -254,6 +231,11 @@ export abstract class BaseRepository
       manifest: snapshotManifest,
       notes: Object.fromEntries(noteEntries),
     };
+  }
+
+  async exportManifest(): Promise<VFSManifest> {
+    const { manifest } = await this.loadManifest();
+    return structuredClone(manifest);
   }
 
   // Reads inside `fn` observe the pending writes. For additive bulk work like imports: the batch
@@ -341,7 +323,9 @@ export abstract class BaseRepository
     action: string,
     mutator: (manifest: VFSManifest) => T,
   ): Promise<T> {
-    return this.mutateManifest(action, mutator);
+    const result = await this.mutateManifest(action, mutator);
+    this.searchMetadataRevision++;
+    return result;
   }
 
   async removeNoteData(nodeId: VFSNodeId, fileType?: FileType): Promise<void> {
@@ -394,51 +378,39 @@ export abstract class BaseRepository
     options: SearchNodesOptions = {},
   ): Promise<NodeSearchResult[]> {
     const { manifest } = await this.loadManifest();
-    const noteIndex = getPlatform().noteIndex;
-    // Semantic search needs the index capability; fall back to name search.
-    if (options.mode === 'semantic' && query.trim() && noteIndex) {
-      const queryEmbedding = await noteIndex.embedSearchQuery(query);
-      const limit = options.limit ?? DEFAULT_SEMANTIC_SEARCH_LIMIT;
-      return searchNodeResultsSemantically(
-        manifest,
-        query,
-        queryEmbedding,
-        noteIndex.getContent(),
-        noteIndex.getEmbeddings(),
-      ).slice(0, limit);
+    if (noteContentIndex.isSource(this)) {
+      try {
+        return await noteContentIndex.search(
+          manifest,
+          this.searchMetadataRevision,
+          query,
+          options.limit,
+        );
+      } catch (error) {
+        logger.error(
+          'Search worker unavailable; using title and tag search',
+          error,
+        );
+      }
     }
-    const content = noteIndex?.getContent() ?? EMPTY_CONTENT;
-    const index = this.getNodeSearchIndex(
-      manifest,
-      content,
-      noteIndex ? noteIndex.contentRevision() : 0,
-    );
-    return searchNodeResults(manifest, query, content, index).slice(
-      0,
-      options.limit,
-    );
+    const index = this.getNodeSearchIndex(manifest);
+    return searchNodeResults(manifest, query, index).slice(0, options.limit);
   }
 
-  // Rebuilt only when the searchable corpus (manifest nodes or indexed content) has changed.
-  private getNodeSearchIndex(
-    manifest: VFSManifest,
-    content: ReadonlyMap<VFSNodeId, string>,
-    contentRevision: number,
-  ): SearchIndex<VFSNode> {
+  // Rebuilt only when the manifest changes.
+  private getNodeSearchIndex(manifest: VFSManifest): SearchIndex<VFSNode> {
     const cache = this.nodeSearchCache;
     if (
       cache &&
       cache.manifest === manifest &&
-      cache.dataVersion === this.runtimeStatus.dataVersion &&
-      cache.contentRevision === contentRevision
+      cache.dataVersion === this.runtimeStatus.dataVersion
     ) {
       return cache.index;
     }
-    const index = createNodeSearchIndex(manifest, content);
+    const index = createNodeSearchIndex(manifest);
     this.nodeSearchCache = {
       manifest,
       dataVersion: this.runtimeStatus.dataVersion,
-      contentRevision,
       index,
     };
     return index;
@@ -447,18 +419,6 @@ export abstract class BaseRepository
   async getNodesByName(name: string): Promise<VFSNode[]> {
     const { manifest } = await this.loadManifest();
     return getNodesByExactName(manifest, name);
-  }
-
-  async listIndexBackfillItems(): Promise<ReindexItem[]> {
-    const { manifest } = await this.loadManifest();
-    const items: ReindexItem[] = [];
-    for (const node of getIndexCandidateFileNodes(manifest)) {
-      const path = await this.getStoredAbsolutePath(node.id);
-      if (path) {
-        items.push({ nodeId: node.id, path, fileType: node.fileType });
-      }
-    }
-    return items;
   }
 
   async getNodesByAnyTag(
@@ -513,6 +473,7 @@ export abstract class BaseRepository
       manifest.nodes[id] = createFolderNode(id, name, parentId, now);
       addChild(manifest, parentId, id);
     });
+    this.searchMetadataRevision++;
     return id;
   }
 
@@ -538,6 +499,7 @@ export abstract class BaseRepository
       );
       addChild(manifest, parentId, id);
     });
+    this.searchMetadataRevision++;
     if (bytes !== undefined) {
       await this.writeFileBytes(id, bytes);
     }
@@ -661,6 +623,7 @@ export abstract class BaseRepository
       node.name = newName;
       node.modifiedAt = Date.now();
     });
+    this.searchMetadataRevision++;
   }
 
   async deleteNode(nodeId: string): Promise<void> {
@@ -672,10 +635,12 @@ export abstract class BaseRepository
       deletedFiles.map(async (file) => {
         await this.deleteFileBytes(file.id, file.fileType);
         await removeThumbnail(file.id);
-        await getPlatform().noteIndex?.removeIndex(file.id);
-        await getPlatform().handwriting?.removeRecognition(file.id);
+        if (file.fileType === 'mcanvas' && !file.system) {
+          noteContentIndex.remove(this, file.id);
+        }
       }),
     );
+    this.searchMetadataRevision++;
 
     emitNodesDeleted(deletedFiles.map((file) => file.id));
   }
@@ -695,6 +660,22 @@ export abstract class BaseRepository
       node.tags = tags;
       node.modifiedAt = Date.now();
     });
+    this.searchMetadataRevision++;
+  }
+
+  async setFolderColor(nodeId: string, color: string | null): Promise<void> {
+    const normalized = color === null ? null : normalizeCustomColor(color);
+    if (color !== null && !normalized) {
+      throw new Error(`Invalid color: ${color}`);
+    }
+    await this.mutateManifest('Set folder color', (manifest) => {
+      const node = manifest.nodes[nodeId];
+      if (node?.type !== 'folder') {
+        return;
+      }
+      node.color = normalized ?? undefined;
+      node.modifiedAt = Date.now();
+    });
   }
 
   async addTag(nodeId: string, tag: string): Promise<void> {
@@ -709,6 +690,7 @@ export abstract class BaseRepository
         modifiedAt: Date.now(),
       };
     });
+    this.searchMetadataRevision++;
   }
 
   async removeTag(nodeId: string, tag: string): Promise<void> {
@@ -723,6 +705,7 @@ export abstract class BaseRepository
         modifiedAt: Date.now(),
       };
     });
+    this.searchMetadataRevision++;
   }
 
   async getRevealPath(_nodeId: VFSNodeId): Promise<string | null> {
@@ -731,6 +714,30 @@ export abstract class BaseRepository
 
   async getStoredAbsolutePath(_nodeId: VFSNodeId): Promise<string | null> {
     return null;
+  }
+
+  getNoteIndexSource(): object {
+    return this;
+  }
+
+  async listNoteIndexItems(): Promise<NoteIndexItem[]> {
+    const { manifest } = await this.loadManifest();
+    const items: NoteIndexItem[] = [];
+    let inspected = 0;
+    for (const id in manifest.nodes) {
+      const node = manifest.nodes[id];
+      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
+        continue;
+      }
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        items.push({ nodeId: node.id, path });
+      }
+      if (++inspected % 100 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+    return items;
   }
 
   async getCustomColors(tool: CustomColorTool): Promise<string[]> {
@@ -830,6 +837,23 @@ export abstract class BaseRepository
     });
   }
 
+  async reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]> {
+    return this.mutateManifest('Reorder pen presets', (manifest) => {
+      const presetsById = new Map(
+        manifest.penPresets.map((preset) => [preset.id, preset]),
+      );
+      if (
+        ids.length !== presetsById.size ||
+        new Set(ids).size !== ids.length ||
+        ids.some((id) => !presetsById.has(id))
+      ) {
+        throw new Error('Preset order must contain every preset exactly once.');
+      }
+      manifest.penPresets = ids.map((id) => presetsById.get(id)!);
+      return manifest.penPresets.map((preset) => ({ ...preset }));
+    });
+  }
+
   async removePenPreset(id: string): Promise<PenPreset[]> {
     return this.mutateManifest('Remove pen preset', (manifest) => {
       manifest.penPresets = manifest.penPresets.filter(
@@ -868,7 +892,10 @@ export abstract class BaseRepository
     });
   }
 
-  async openSession(nodeId: VFSNodeId): Promise<NoteSession> {
+  async openSession(
+    nodeId: VFSNodeId,
+    _options: OpenSessionOptions = {},
+  ): Promise<NoteSession> {
     logger.debug('Opening repository-backed note session', {
       repositoryKind: this.kind,
       nodeId,
@@ -877,43 +904,18 @@ export abstract class BaseRepository
   }
 
   async loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Loaded repository document snapshot', {
-      repositoryKind: this.kind,
-      nodeId,
-      revision: remote.revision,
-      byteLength: remote.bytes?.byteLength ?? 0,
-      stateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-    return {
-      update: remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
+    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
+    const result = await processDocumentAsync({ bytes });
+    return { update: result.update, stateVector: result.stateVector, revision };
   }
 
   async pullUpdates(
     nodeId: VFSNodeId,
     stateVector?: Uint8Array | null,
   ): Promise<YjsSyncSnapshot> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Pulled repository document snapshot', {
-      repositoryKind: this.kind,
-      nodeId,
-      revision: remote.revision,
-      requestedStateVectorByteLength: stateVector?.byteLength ?? 0,
-      byteLength: remote.bytes?.byteLength ?? 0,
-      stateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-    return {
-      update: stateVector
-        ? Y.encodeStateAsUpdate(remote.doc, stateVector)
-        : remote.bytes,
-      stateVector: remote.stateVector,
-      revision: remote.revision,
-    };
+    const { bytes, revision } = await this.readYjsSyncBytes(nodeId);
+    const result = await processDocumentAsync({ bytes, stateVector });
+    return { update: result.update, stateVector: result.stateVector, revision };
   }
 
   async pushUpdates(
@@ -921,93 +923,49 @@ export abstract class BaseRepository
     update: Uint8Array,
     options: YjsSyncPushOptions,
   ): Promise<YjsSyncPushResult> {
-    const remote = await this.readYjsSyncState(nodeId);
-    logger.debug('Pushing repository document updates', {
-      repositoryKind: this.kind,
-      nodeId,
-      baseRevision: options.baseRevision,
-      remoteRevision: remote.revision,
-      updateByteLength: update.byteLength,
-      localStateVectorByteLength: options.localStateVector?.byteLength ?? 0,
-      remoteStateVectorByteLength: remote.stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
-    });
-
+    const remote = await this.readYjsSyncBytes(nodeId);
     if (options.baseRevision !== remote.revision) {
-      logger.debug(
-        'Rejected repository document push because revision changed',
-        {
-          repositoryKind: this.kind,
-          nodeId,
-          baseRevision: options.baseRevision,
-          remoteRevision: remote.revision,
-          remoteStateVectorByteLength: remote.stateVector.byteLength,
-          ...summarizeYDoc(remote.doc),
-        },
-      );
+      const result = await processDocumentAsync({
+        bytes: remote.bytes,
+        stateVector: options.localStateVector,
+      });
       return {
         accepted: false,
         changed: false,
-        remoteUpdate: options.localStateVector
-          ? Y.encodeStateAsUpdate(remote.doc, options.localStateVector)
-          : remote.bytes,
-        stateVector: remote.stateVector,
+        remoteUpdate: result.update,
+        stateVector: result.stateVector,
         revision: remote.revision,
         update: remote.bytes,
       };
     }
 
-    const previousBytes = Y.encodeStateAsUpdate(remote.doc);
-    if (update.byteLength > 0) {
-      Y.applyUpdate(remote.doc, update);
-    }
-    const mergedBytes = Y.encodeStateAsUpdate(remote.doc);
-    const stateVector = Y.encodeStateVector(remote.doc);
-
-    if (byteArraysEqual(previousBytes, mergedBytes)) {
-      logger.debug('Accepted no-op repository document push', {
-        repositoryKind: this.kind,
+    const result = await processDocumentAsync({ bytes: remote.bytes, update });
+    let revision = remote.revision;
+    if (result.changed) {
+      revision = await this.saveFileBytes(
         nodeId,
-        revision: remote.revision,
-        stateVectorByteLength: stateVector.byteLength,
-        ...summarizeYDoc(remote.doc),
-      });
-      return {
-        accepted: true,
-        changed: false,
-        remoteUpdate: null,
-        stateVector,
-        revision: remote.revision,
-        update: remote.bytes,
-      };
+        result.update!,
+        remote.revision,
+        `Update note ${nodeId}`,
+      );
+      if (revision !== null) {
+        await this.onFileSaved(nodeId, result.links);
+      }
     }
-
-    const links = extractStoredNoteLinks(remote.doc);
-    const revision = await this.saveFileBytes(
-      nodeId,
-      mergedBytes,
-      remote.revision,
-      `Update note ${nodeId}`,
-    );
-    if (revision !== null) {
-      await this.onFileSaved(nodeId, links);
-    }
-
     logger.debug('Accepted repository document push', {
       repositoryKind: this.kind,
       nodeId,
       revision,
-      stateVectorByteLength: stateVector.byteLength,
-      ...summarizeYDoc(remote.doc),
+      changed: result.changed,
+      updateByteLength: result.update?.byteLength ?? 0,
     });
-
     return {
       accepted: true,
-      changed: true,
+      changed: result.changed,
       remoteUpdate: null,
-      stateVector,
+      stateVector: result.stateVector,
       revision,
-      update: mergedBytes,
+      update: result.update,
     };
   }
 
@@ -1048,10 +1006,8 @@ export abstract class BaseRepository
     );
   }
 
-  private async readYjsSyncState(nodeId: VFSNodeId): Promise<{
+  private async readYjsSyncBytes(nodeId: VFSNodeId): Promise<{
     bytes: Uint8Array | null;
-    doc: Y.Doc;
-    stateVector: Uint8Array;
     revision: string | null;
   }> {
     const node = await this.getNode(nodeId);
@@ -1059,14 +1015,7 @@ export abstract class BaseRepository
       throw new Error(`Cannot open ${node.fileType} files as canvas sessions.`);
     }
 
-    const { bytes, revision } = await this.loadFileBytes(nodeId);
-    const doc = createDocFromBytes(bytes);
-    return {
-      bytes,
-      doc,
-      stateVector: Y.encodeStateVector(doc),
-      revision,
-    };
+    return this.loadFileBytes(nodeId);
   }
 
   private async extractStoredNoteLinksForBytes(

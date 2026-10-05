@@ -5,7 +5,7 @@ import type {
   RunnableLanguage,
   RunPollResponse,
 } from '../../../code-runner/contract';
-import { codeOutputBridge } from '../../../elements/code-output/bridge';
+import type { EnsureCodeOutputCard } from '../../../elements/code-output/bridge';
 import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
@@ -28,6 +28,7 @@ interface CodeBlockRunViewOptions {
   getPos: () => number;
   /** Builds the concatenated run payload for this block at click time. */
   collectSource: () => RunSource | null;
+  ensureCodeOutputCard?: EnsureCodeOutputCard;
 }
 
 /**
@@ -128,7 +129,7 @@ export class CodeBlockRunView {
     codeRunStore.start(blockId, payload.language, () => this.cancelRun());
     const frameUuid = this.frameUuid();
     if (frameUuid) {
-      codeOutputBridge.ensureCard({
+      this.options.ensureCodeOutputCard?.({
         frameUuid,
         blockId,
         blockScreenRect: getPageFramePmScreenRectForElement(

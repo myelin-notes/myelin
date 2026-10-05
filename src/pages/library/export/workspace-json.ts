@@ -4,7 +4,7 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
-import { invoke } from '@tauri-apps/api/core';
+import type { PickedFolder } from '@/lib/folder-picker';
 import type { ReadableRepository, VFSFileNode } from '@/lib/sync';
 import {
   BYTES_MARKER,
@@ -20,6 +20,7 @@ import {
   sanitizeName,
   type VaultFileEntry,
 } from './workspace-plan';
+import { writeVault } from './write-vault';
 
 const logger = new Logger('WorkspaceJsonExport');
 
@@ -31,8 +32,8 @@ export interface ExportWorkspaceJsonResult {
 
 export interface ExportWorkspaceJsonOptions {
   repository: ReadableRepository;
-  /** Absolute directory the user picked; the export is created as a subfolder. */
-  destDir: string;
+  /** Selected destination; the export is created as a subfolder. */
+  destDir: PickedFolder;
   /** Name of the root folder created under {@link destDir}. */
   exportName: string;
   onProgress?: (progress: ExportProgress) => void;
@@ -177,13 +178,11 @@ export async function exportWorkspaceJson({
 
   // Reuses the Obsidian vault writer: it creates the folders, writes `text`
   // files and copies `copyFrom` media into the user-picked destination.
-  const vaultPath = await invoke<string>('export_obsidian_vault', {
-    request: {
-      destDir,
-      vaultName: sanitizeName(exportName) || 'Workspace',
-      folders: plan.folders,
-      files: entries,
-    },
+  const vaultPath = await writeVault({
+    destDir,
+    vaultName: sanitizeName(exportName) || 'Workspace',
+    folders: plan.folders,
+    files: entries,
   });
 
   return { vaultPath, notesExported, filesCopied };

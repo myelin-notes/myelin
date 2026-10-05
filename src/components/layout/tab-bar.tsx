@@ -1,20 +1,17 @@
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Columns2,
   Home,
   MoreHorizontal,
   Network,
   PanelLeft,
-  Plus,
   Rows2,
   Settings,
   X,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { type Messages, useMessages } from '@myelin/editor/i18n';
 import { keybindings } from '@myelin/editor/keybinds';
 import { cn } from '@myelin/editor/utils';
-import { Logger } from '@myelin/shared/logger';
 import {
   isMac,
   isWindows,
@@ -27,11 +24,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from '@myelin/ui/context-menu';
-import { errorDescription } from '@/components/command-palette/utils';
 import { useSidebar } from '@/components/layout/sidebar/context';
-import { trackEvent } from '@/lib/analytics';
-import { createBlankCanvasFile } from '@/lib/note/create';
-import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import {
   computeTabDropIndex,
@@ -49,7 +42,10 @@ import type { PaneNode, Tab, TabId, TabTarget } from '@/lib/tabs/types';
 import { UpdateButton } from './update-button';
 import { WindowControls } from './window-controls';
 
-const logger = new Logger('TabBar');
+const TOUCH_TAB_DRAG_HOLD_MS = 300;
+const TOUCH_TAB_DRAG_SLOP_PX = 10;
+const TOUCH_TAB_EDGE_SCROLL_PX = 44;
+const TOUCH_TAB_MAX_SCROLL_PX = 12;
 
 // Built-in tabs store a title captured at creation time, so they don't follow language changes.
 // Content tabs (canvas/image file names) fall back to the stored title.
@@ -100,7 +96,6 @@ export const TabBar = memo(function TabBar({
 }: TabBarProps) {
   const strings = useMessages();
   const controller = useTabController();
-  const repository = useRepository();
   const {
     collapsed,
     isCompact,
@@ -125,35 +120,146 @@ export const TabBar = memo(function TabBar({
   const openCommandPalette = useCallback(() => {
     keybindings.runAction('app:command-palette');
   }, []);
+  const toggleGraph = useCallback(() => {
+    controller.togglePanePage('graph', pane.id);
+  }, [controller, pane.id]);
+  const toggleSettings = useCallback(() => {
+    controller.togglePanePage('settings', pane.id);
+  }, [controller, pane.id]);
   const [dropIndex, setDropIndex] = useState<number | null>(null);
   const [dragTabId, setDragTabId] = useState<TabId | null>(null);
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  const touchHoldTimerRef = useRef<number | null>(null);
+  const touchPointerIdRef = useRef<number | null>(null);
+  const touchPointerStartRef = useRef({ x: 0, y: 0 });
+  const touchScrollStartRef = useRef(0);
+  const touchDragIdRef = useRef<TabId | null>(null);
+  const suppressTouchClickRef = useRef(false);
 
-  // The "+" button creates a fresh canvas note in the library root and opens it
-  // in this pane. Closing every tab returns the pane to the home view.
-  const handleNewTab = useCallback(() => {
-    void (async () => {
-      try {
-        const name = await repository.getUniqueFileName(
-          strings.library.createNew.untitledCanvas,
-          null,
-        );
-        const id = await createBlankCanvasFile(repository, name, null);
-        controller.openTab({ type: 'canvas', id }, name, pane.id);
-        trackEvent('note_created', { file_type: 'mcanvas' });
-      } catch (error) {
-        logger.error('Failed to create note from tab bar', error);
-        toast.error(strings.commandPalette.errors.createNote, {
-          description: errorDescription(error),
-        });
+  const clearTouchHold = useCallback(() => {
+    if (touchHoldTimerRef.current !== null) {
+      window.clearTimeout(touchHoldTimerRef.current);
+      touchHoldTimerRef.current = null;
+    }
+  }, []);
+
+  const beginTouchDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>, tabId: TabId) => {
+      if (
+        !mobileLayout ||
+        event.pointerType === 'mouse' ||
+        !event.isPrimary ||
+        event.button !== 0 ||
+        (event.target instanceof Element && event.target.closest('button'))
+      ) {
+        return;
       }
-    })();
-  }, [
-    controller,
-    pane.id,
-    repository,
-    strings.commandPalette.errors.createNote,
-    strings.library.createNew.untitledCanvas,
-  ]);
+
+      clearTouchHold();
+      touchPointerIdRef.current = event.pointerId;
+      touchPointerStartRef.current = { x: event.clientX, y: event.clientY };
+      touchScrollStartRef.current = tabStripRef.current?.scrollLeft ?? 0;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      touchHoldTimerRef.current = window.setTimeout(() => {
+        touchHoldTimerRef.current = null;
+        touchDragIdRef.current = tabId;
+        suppressTouchClickRef.current = true;
+        setDragTabId(tabId);
+      }, TOUCH_TAB_DRAG_HOLD_MS);
+    },
+    [clearTouchHold, mobileLayout],
+  );
+
+  const moveTouchDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerId !== touchPointerIdRef.current) {
+        return;
+      }
+      const draggedTabId = touchDragIdRef.current;
+      if (!draggedTabId) {
+        const deltaX = event.clientX - touchPointerStartRef.current.x;
+        const deltaY = event.clientY - touchPointerStartRef.current.y;
+        const distance = Math.hypot(deltaX, deltaY);
+        if (distance > TOUCH_TAB_DRAG_SLOP_PX) {
+          clearTouchHold();
+          if (Math.abs(deltaX) > Math.abs(deltaY) && tabStripRef.current) {
+            suppressTouchClickRef.current = true;
+            tabStripRef.current.scrollLeft =
+              touchScrollStartRef.current - deltaX;
+          }
+        }
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const strip = tabStripRef.current;
+      if (!strip) {
+        return;
+      }
+      const bounds = strip.getBoundingClientRect();
+      if (event.clientX < bounds.left + TOUCH_TAB_EDGE_SCROLL_PX) {
+        strip.scrollLeft -= TOUCH_TAB_MAX_SCROLL_PX;
+      } else if (event.clientX > bounds.right - TOUCH_TAB_EDGE_SCROLL_PX) {
+        strip.scrollLeft += TOUCH_TAB_MAX_SCROLL_PX;
+      }
+      controller.moveTab(
+        draggedTabId,
+        pane.id,
+        pane.id,
+        computeTabDropIndex(strip, pane.tabs.length, event.clientX),
+      );
+    },
+    [clearTouchHold, controller, pane.id, pane.tabs.length],
+  );
+
+  const resetTouchDrag = useCallback(() => {
+    clearTouchHold();
+    touchPointerIdRef.current = null;
+    touchDragIdRef.current = null;
+    setDragTabId(null);
+  }, [clearTouchHold]);
+
+  const endTouchDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerId !== touchPointerIdRef.current) {
+        return;
+      }
+
+      const draggedTabId = touchDragIdRef.current;
+      resetTouchDrag();
+      if (!draggedTabId) {
+        if (suppressTouchClickRef.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.setTimeout(() => {
+            suppressTouchClickRef.current = false;
+          });
+        }
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      window.setTimeout(() => {
+        suppressTouchClickRef.current = false;
+      });
+    },
+    [resetTouchDrag],
+  );
+
+  const cancelTouchDrag = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (event.pointerId !== touchPointerIdRef.current) {
+        return;
+      }
+      suppressTouchClickRef.current = false;
+      resetTouchDrag();
+    },
+    [resetTouchDrag],
+  );
+
+  useEffect(() => () => clearTouchHold(), [clearTouchHold]);
 
   const handleDragOver = useCallback(
     (e: React.DragEvent) => {
@@ -273,44 +379,70 @@ export const TabBar = memo(function TabBar({
         </div>
       ) : (
         <div
-          className="flex min-w-0 items-end gap-px overflow-x-auto overflow-y-hidden pl-2"
+          ref={tabStripRef}
+          className={cn(
+            'flex min-w-0 items-end gap-px overflow-x-auto overflow-y-hidden pl-2',
+            mobileLayout && 'touch-none',
+          )}
           style={{ scrollbarWidth: 'none' }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
+          onClickCapture={(event) => {
+            if (suppressTouchClickRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
         >
           {pane.tabs.map((tab, i) => (
             <TabItem
               key={tab.id}
               tab={tab}
-              isActive={tab.id === pane.activeTabId}
+              isActive={
+                pane.activePage === undefined && tab.id === pane.activeTabId
+              }
               isDragging={tab.id === dragTabId}
               paneId={pane.id}
+              nativeDraggable={!mobileLayout}
               showDropIndicator={dropIndex === i}
               onDragStateChange={setDragTabId}
+              onPointerDown={beginTouchDrag}
+              onPointerMove={moveTouchDrag}
+              onPointerUp={endTouchDrag}
+              onPointerCancel={cancelTouchDrag}
             />
           ))}
           {dropIndex === pane.tabs.length && <DropIndicator key="drop-end" />}
         </div>
       )}
 
-      {/* Kept outside the scroll strip so it stays beside the tabs and never
-          scrolls off when they overflow. */}
-      <button
-        type="button"
-        onClick={handleNewTab}
-        aria-label="New tab"
-        className={cn(
-          'mb-1 ml-1 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary',
-          // Nothing follows the button on phones, so it needs its own inset to
-          // match the home button's on the left edge.
-          phoneLayout && 'mr-2',
-        )}
-      >
-        <Plus className="size-3.5" />
-      </button>
-
       {!phoneLayout && <div className="flex-1 self-stretch" {...dragRegion} />}
+
+      {isTopRight && !phoneLayout && (
+        <div className="flex shrink-0 items-center gap-0.5 self-stretch px-2">
+          <button
+            type="button"
+            onClick={toggleGraph}
+            aria-label={strings.sidebar.graph}
+            title={strings.sidebar.graph}
+            aria-pressed={pane.activePage === 'graph'}
+            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
+          >
+            <Network className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleSettings}
+            aria-label={strings.tabBar.settings}
+            title={strings.tabBar.settings}
+            aria-pressed={pane.activePage === 'settings'}
+            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
+          >
+            <Settings className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* Only the top-right bar, so split views don't repeat it. */}
       {isTopRight && <UpdateButton />}
@@ -327,15 +459,25 @@ const TabItem = memo(function TabItem({
   isActive,
   isDragging,
   paneId,
+  nativeDraggable,
   showDropIndicator,
   onDragStateChange,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onPointerCancel,
 }: {
   tab: Tab;
   isActive: boolean;
   isDragging: boolean;
   paneId: string;
+  nativeDraggable: boolean;
   showDropIndicator?: boolean;
   onDragStateChange: (tabId: TabId | null) => void;
+  onPointerDown: (event: React.PointerEvent<HTMLElement>, tabId: TabId) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLElement>) => void;
+  onPointerCancel: (event: React.PointerEvent<HTMLElement>) => void;
 }) {
   const controller = useTabController();
   const strings = useMessages();
@@ -394,7 +536,6 @@ const TabItem = memo(function TabItem({
           const adopted = await dropTabOntoWindow(tab, screenX, screenY);
           if (!adopted) {
             await spawnWindow(tab);
-            trackEvent('window_spawned', { target_type: tab.target.type });
           }
           controller.closeTab(tab.id, paneId);
         } catch {
@@ -436,19 +577,29 @@ const TabItem = memo(function TabItem({
               role="tab"
               tabIndex={0}
               aria-selected={isActive}
-              draggable
+              draggable={nativeDraggable}
               data-tab-id={tab.id}
               onClick={handleClick}
               onKeyDown={handleKeyDown}
               onMouseDown={handleMiddleClick}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              onPointerDown={(event) => onPointerDown(event, tab.id)}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerCancel}
+              onContextMenu={(event) => {
+                if (isDragging) {
+                  event.preventDefault();
+                }
+              }}
               className={cn(
-                'group relative flex h-8 min-w-[100px] max-w-[200px] items-center gap-2 px-3 transition-[colors,opacity] duration-150',
+                'group relative flex h-8 min-w-[100px] max-w-[200px] items-center gap-2 px-3 transition-[colors,opacity,transform] duration-150',
+                !nativeDraggable && 'touch-none',
                 isActive
                   ? '-mb-px rounded-t-lg border border-border-subtle border-b-0 bg-page text-text-primary'
                   : 'mb-0 text-text-muted hover:text-text-secondary',
-                isDragging && 'opacity-30',
+                isDragging && 'scale-[1.03] opacity-60 shadow-sm',
               )}
             />
           }

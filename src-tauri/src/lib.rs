@@ -1,11 +1,13 @@
 use tauri::Manager;
 
 mod code_runner;
+mod clipboard;
 mod error_report;
-mod handwriting;
+mod github_push;
 mod iroh_transport;
+mod local_file_write;
+mod note_text_index;
 mod mcp_server;
-mod note_index;
 mod oauth_loopback;
 mod onenote_import;
 mod pdf_export;
@@ -32,7 +34,7 @@ pub fn run() {
                 .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
             // WebKitGTK denies getUserMedia by default; enable media streams
-            // and allow microphone permission requests so audio recording works.
+            // and allow microphone or camera permission requests.
             #[cfg(target_os = "linux")]
             app.get_webview_window("main")
                 .expect("main window missing")
@@ -49,7 +51,7 @@ pub fn run() {
                     webview.connect_permission_request(|_, request| {
                         if let Some(request) = request.downcast_ref::<UserMediaPermissionRequest>()
                         {
-                            if request.is_for_audio_device() && !request.is_for_video_device() {
+                            if request.is_for_audio_device() || request.is_for_video_device() {
                                 request.allow();
                             } else {
                                 request.deny();
@@ -63,16 +65,14 @@ pub fn run() {
 
             Ok(())
         })
-        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_ocr::init())
+        .plugin(tauri_plugin_pencil::init())
         .manage(iroh_transport::IrohState::new())
         .manage(mcp_server::McpServerState::new())
-        .manage(note_index::IndexEngineState::new())
-        .manage(handwriting::HandwritingState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
         .manage(oauth_loopback::OAuthLoopbackState::new())
@@ -81,19 +81,16 @@ pub fn run() {
             iroh_transport::iroh_join,
             iroh_transport::iroh_send,
             iroh_transport::iroh_leave,
+            local_file_write::write_local_file_chunk,
+            note_text_index::index_note_text,
+            note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
+            pdf_export::export_pdf_ios,
             workspace_export::export_obsidian_vault,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
             mcp_server::mcp_respond,
-            note_index::reindex_note,
-            note_index::reindex_batch,
-            note_index::remove_index,
-            note_index::embed_search_query,
-            handwriting::recognize_handwriting,
-            handwriting::recognize_handwriting_batch,
-            handwriting::remove_handwriting,
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,
@@ -102,11 +99,28 @@ pub fn run() {
             code_runner::cancel_run,
             code_runner::poll_output,
             code_runner::release_run,
+            clipboard::read_clipboard_image_png,
             oauth_loopback::oauth_loopback_start,
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::parse_onenote,
+            github_push::github_push_batch,
         ]);
+
+    #[cfg(not(target_os = "ios"))]
+    {
+        builder = builder.plugin(tauri_plugin_deep_link::init());
+    }
+
+    #[cfg(target_os = "ios")]
+    {
+        builder = builder.plugin(tauri_plugin_apple_compliance::init());
+    }
+
+    #[cfg(mobile)]
+    {
+        builder = builder.plugin(tauri_plugin_scoped_storage::init());
+    }
 
     #[cfg(debug_assertions)]
     {

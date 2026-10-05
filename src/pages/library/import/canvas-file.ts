@@ -33,7 +33,7 @@ export async function createCanvasFile({
   try {
     const name = await repository.getUniqueFileName(title, parentId);
     createdId = await repository.createFile(name, 'mcanvas', parentId);
-    session = await repository.openSession(createdId);
+    session = await repository.openSession(createdId, { skipRemotePull: true });
     await build(session.ydoc);
     await session.save();
     await session.close();

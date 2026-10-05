@@ -1,8 +1,4 @@
-import {
-  getStroke,
-  getStrokeOutlinePoints,
-  getStrokePoints,
-} from 'perfect-freehand';
+import { getStrokeOutlinePoints, getStrokePoints } from 'perfect-freehand';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
 import { parseCssColor } from '../pdf-export/color';
@@ -14,7 +10,17 @@ import { ElementType } from './element-type';
 export interface StrokeStyle {
   color: string;
   size: number;
+  /** perfect-freehand `streamline`, 0 = raw input. Absent on strokes saved before it existed. */
+  stabilization?: number;
+  /** False for pressure-disabled, uniform-width strokes; absent enables sensor or velocity pressure. */
+  simulatePressure?: boolean;
 }
+
+export const DEFAULT_STABILIZATION = 0.5;
+
+// perfect-freehand uses fixed 3-unit end filtering and a 1-unit dot offset. Normalize to its
+// default size so those thresholds don't swallow bends or inflate caps on thin strokes.
+const OUTLINE_SIZE = 16;
 
 // One write within the UndoManager's capture window keeps the whole stroke (creation → points)
 // in a single undo step without paying a transaction per pointer sample.
@@ -52,10 +58,56 @@ export class StrokeElement extends DrawableElement {
     return this.hasPressure;
   }
 
+  /** Surviving contiguous point buffers, or `null` when the eraser touches no sampled point. */
+  public getPointRunsOutsideCircle(
+    x: number,
+    y: number,
+    radius: number,
+  ): number[][] | null {
+    const localX = (x - this.offset.x) / this.scale.x;
+    const localY = (y - this.offset.y) / this.scale.y;
+    const localRadius =
+      radius / Math.min(Math.abs(this.scale.x), Math.abs(this.scale.y));
+    const tolerance = localRadius + this.style.size / 2;
+    const toleranceSquared = tolerance * tolerance;
+    const runs: number[][] = [];
+    let currentRun: number[] | null = null;
+    let erased = false;
+
+    for (let i = 0; i + 2 < this.points.length; i += 3) {
+      const dx = this.points[i] - localX;
+      const dy = this.points[i + 1] - localY;
+      if (dx * dx + dy * dy <= toleranceSquared) {
+        erased = true;
+        currentRun = null;
+        continue;
+      }
+      if (!currentRun) {
+        currentRun = [];
+        runs.push(currentRun);
+      }
+      currentRun.push(this.points[i], this.points[i + 1], this.points[i + 2]);
+    }
+
+    return erased ? runs : null;
+  }
+
+  /** Replace the recorded samples and persist the new buffer. */
+  public replacePoints(points: number[]): void {
+    this.points = points.slice();
+    this.dirty = true;
+    this.updateBounds();
+    this.flushPoints();
+  }
+
   public override getYMapProps(): Record<string, unknown> {
     return {
       color: this.style.color,
       size: this.style.size,
+      stabilization: this.style.stabilization ?? DEFAULT_STABILIZATION,
+      ...(this.style.simulatePressure === undefined
+        ? {}
+        : { simulatePressure: this.style.simulatePressure }),
       hasPressure: this.hasPressure,
       // Flat [x,y,p, ...] stored as a single Y.Map value rather than a
       // Y.Array<number>: one CRDT item instead of one per coordinate.
@@ -83,6 +135,14 @@ export class StrokeElement extends DrawableElement {
       },
       size: (v) => {
         this.style.size = v as number;
+        this.dirty = true;
+      },
+      stabilization: (v) => {
+        this.style.stabilization = v as number;
+        this.dirty = true;
+      },
+      simulatePressure: (v) => {
+        this.style.simulatePressure = v as boolean;
         this.dirty = true;
       },
       hasPressure: (v) => {
@@ -156,16 +216,118 @@ export class StrokeElement extends DrawableElement {
     }
   }
 
-  /** Materialize the flat buffer as perfect-freehand input tuples (transient). */
-  private toTuples(): [number, number, number][] {
+  private strokeOutline(): number[][] {
+    if (this.points.length < 3 || this.style.size <= 0) {
+      return [];
+    }
+
+    const scale = OUTLINE_SIZE / this.style.size;
     const pts = this.points;
+    const originX = pts[0];
+    const originY = pts[1];
     const n = (pts.length / 3) | 0;
-    const out = new Array<[number, number, number]>(n);
+    const input = new Array<[number, number, number]>(n);
     for (let i = 0; i < n; i++) {
       const j = i * 3;
-      out[i] = [pts[j], pts[j + 1], pts[j + 2]];
+      input[i] = [
+        (pts[j] - originX) * scale,
+        (pts[j + 1] - originY) * scale,
+        pts[j + 2],
+      ];
     }
-    return out;
+
+    // perfect-freehand adds synthetic motion for 1–2 inputs and drops pressure in its two-point
+    // expansion. Three explicit samples keep tap caps at the stroke's recorded width.
+    if (input.length === 1) {
+      input.push([...input[0]], [...input[0]]);
+    } else if (input.length === 2) {
+      const [a, b] = input;
+      input.splice(1, 0, [
+        (a[0] + b[0]) / 2,
+        (a[1] + b[1]) / 2,
+        (a[2] + b[2]) / 2,
+      ]);
+    }
+
+    const options = {
+      simulatePressure: this.style.simulatePressure ?? !this.hasPressure,
+      size: OUTLINE_SIZE,
+      ...(this.style.simulatePressure === false ? { thinning: 0 } : {}),
+      // The default edge spacing makes the live cap jump when a new point survives a turn.
+      smoothing: 0.1,
+      streamline: this.style.stabilization ?? DEFAULT_STABILIZATION,
+      last: true,
+    };
+    const strokePoints = getStrokePoints(input, options);
+    if (strokePoints.length > 1) {
+      // Opposing vectors cancel at a hairpin; averaging their unwrapped angles keeps the turn
+      // continuous while still filtering reversals too short to rotate a full-width edge.
+      const angles = new Array<number>(strokePoints.length);
+      const angleIntegrals = new Array<number>(strokePoints.length).fill(0);
+      angles[0] = Math.atan2(
+        strokePoints[0].vector[1],
+        strokePoints[0].vector[0],
+      );
+      for (let i = 1; i < strokePoints.length; i++) {
+        const rawAngle = Math.atan2(
+          strokePoints[i].vector[1],
+          strokePoints[i].vector[0],
+        );
+        const delta = Math.atan2(
+          Math.sin(rawAngle - angles[i - 1]),
+          Math.cos(rawAngle - angles[i - 1]),
+        );
+        angles[i] = angles[i - 1] + delta;
+        angleIntegrals[i] =
+          angleIntegrals[i - 1] +
+          angles[i] *
+            (strokePoints[i].runningLength - strokePoints[i - 1].runningLength);
+      }
+
+      let lowerSegment = 1;
+      let upperSegment = 1;
+      const tangentDistance = OUTLINE_SIZE / 2;
+      const totalLength = strokePoints[strokePoints.length - 1].runningLength;
+      for (const point of strokePoints) {
+        const lowerLength = Math.max(
+          strokePoints[0].runningLength,
+          point.runningLength - tangentDistance,
+        );
+        const upperLength = Math.min(
+          totalLength,
+          point.runningLength + tangentDistance,
+        );
+        while (
+          lowerSegment < strokePoints.length - 1 &&
+          strokePoints[lowerSegment].runningLength < lowerLength
+        ) {
+          lowerSegment++;
+        }
+        while (
+          upperSegment < strokePoints.length - 1 &&
+          strokePoints[upperSegment].runningLength < upperLength
+        ) {
+          upperSegment++;
+        }
+        const lowerIntegral =
+          angleIntegrals[lowerSegment - 1] +
+          angles[lowerSegment] *
+            (lowerLength - strokePoints[lowerSegment - 1].runningLength);
+        const upperIntegral =
+          angleIntegrals[upperSegment - 1] +
+          angles[upperSegment] *
+            (upperLength - strokePoints[upperSegment - 1].runningLength);
+        const angle =
+          (upperIntegral - lowerIntegral) / (upperLength - lowerLength);
+        point.vector = [Math.cos(angle), Math.sin(angle)];
+      }
+    }
+    const outline = getStrokeOutlinePoints(strokePoints, options);
+    for (const point of outline) {
+      point[0] = point[0] / scale + originX;
+      point[1] = point[1] / scale + originY;
+    }
+    return outline;
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -174,10 +336,7 @@ export class StrokeElement extends DrawableElement {
     }
     if (this.dirty) {
       // The outline is only needed to build the Path2D; it is not retained.
-      const outline = getStroke(this.toTuples(), {
-        simulatePressure: !this.hasPressure,
-        size: this.style.size,
-      });
+      const outline = this.strokeOutline();
       const path = new Path2D();
       appendStrokeOutline(path, outline);
       this.cachedPath = path;
@@ -193,16 +352,17 @@ export class StrokeElement extends DrawableElement {
       return;
     }
     // Same outline perfect-freehand produces on screen, as a filled vector path.
-    const outline = getStroke(this.toTuples(), {
-      simulatePressure: !this.hasPressure,
-      size: this.style.size,
-    });
+    const outline = this.strokeOutline();
     if (outline.length < 3) {
       return;
     }
     const pts: number[] = [];
+    const { offset, scale } = this;
     for (const [x, y] of outline) {
-      const p = ctx.worldToPagePt(x, y);
+      const p = ctx.worldToPagePt(
+        x * scale.x + offset.x,
+        y * scale.y + offset.y,
+      );
       pts.push(p.x, p.y);
     }
     const { rgb, opacity } = parseCssColor(this.style.color);
@@ -252,9 +412,7 @@ export class StrokeElement extends DrawableElement {
       return;
     }
 
-    const outlinePoints = getStrokeOutlinePoints(
-      getStrokePoints(this.toTuples()),
-    );
+    const outlinePoints = this.strokeOutline();
 
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;

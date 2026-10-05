@@ -15,6 +15,7 @@ import {
 import { COLLAB_CURSORS, SCENE_PAD, sceneById } from './scenes';
 import {
   AudioCardMock,
+  ImportSourceIcons,
   LiveCursor,
   SearchPaletteMock,
   WorldLayer,
@@ -156,6 +157,7 @@ export function SceneUnderlay({ canvas }: { canvas: DrawableCanvas }) {
         color="#ec4899"
         name={copy.sync.cursorPeer}
       />
+      <ImportSourceIcons scene={sceneById('import').rect} />
     </WorldLayer>
   );
 }

@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react';
 import type { Messages } from '@myelin/editor/i18n';
 import type { DialogFilter } from '@tauri-apps/plugin-dialog';
+import type { PickedFolder } from '@/lib/folder-picker';
 import type { Repository, VFSNodeId } from '@/lib/sync';
 import type { ImportJob } from '../dialog';
 
@@ -27,7 +28,7 @@ export type ImportPicker =
 export type ImportSelection =
   | { kind: 'files'; files: File[] }
   | { kind: 'file'; path: string }
-  | { kind: 'directory'; path: string };
+  | { kind: 'directory'; folder: PickedFolder };
 
 export interface ImportJobContext {
   selection: ImportSelection;
@@ -59,9 +60,9 @@ export function expectFilePath(selection: ImportSelection): string {
   return selection.path;
 }
 
-export function expectDirectory(selection: ImportSelection): string {
+export function expectDirectory(selection: ImportSelection): PickedFolder {
   if (selection.kind !== 'directory') {
     throw new Error('Expected a directory selection');
   }
-  return selection.path;
+  return selection.folder;
 }

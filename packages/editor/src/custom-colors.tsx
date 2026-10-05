@@ -51,6 +51,7 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
     pen: [],
     highlighter: [],
     text: [],
+    folder: [],
   });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerTool, setPickerTool] = useState<CustomColorTool>('pen');
@@ -61,10 +62,11 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
       repository.getCustomColors('pen'),
       repository.getCustomColors('highlighter'),
       repository.getCustomColors('text'),
+      repository.getCustomColors('folder'),
     ])
-      .then(([pen, highlighter, text]) => {
+      .then(([pen, highlighter, text, folder]) => {
         if (!cancelled) {
-          setColors({ pen, highlighter, text });
+          setColors({ pen, highlighter, text, folder });
         }
       })
       .catch((error) => {

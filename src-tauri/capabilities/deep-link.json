@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "deep-link",
+  "description": "Deep-link callbacks on Android and desktop",
+  "platforms": ["macOS", "windows", "linux", "android"],
+  "windows": ["*"],
+  "permissions": ["deep-link:default"]
+}

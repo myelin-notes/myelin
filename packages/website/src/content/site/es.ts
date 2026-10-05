@@ -30,6 +30,7 @@ const es: SiteCopy = {
     linked: 'Notas enlazadas',
     sync: 'Sincronización',
     'local-first': 'Todo en local',
+    import: 'Importar',
     download: 'Descargar',
   },
   faqKicker: 'Preguntas',
@@ -56,7 +57,7 @@ const es: SiteCopy = {
 
   pages: {
     heading: 'Documentos de verdad,\nsobre el lienzo.',
-    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar en nueve lenguajes, dentro de la propia nota. Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C y C++.',
+    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar.',
     annotation: 'una página real y editable. haz clic.',
     pageTitle: 'Clase 12 · Potenciales de acción',
     pageMarkdown: `# Potenciales de acción
@@ -89,11 +90,11 @@ for step in range(3):
   },
 
   audioSearch: {
-    heading: 'Grábalo. Encuéntralo.\nHasta tu letra a mano.',
+    heading: 'Grábalo. Transcríbelo.\nEncuéntralo en el lienzo.',
     audioBody:
-      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo, así que cada grabación se puede buscar y ningún audio sale de tu equipo.',
+      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera.',
     searchBody:
-      'La búsqueda por texto y la semántica funcionan en local, con un modelo all-MiniLM-L6-v2 incluido. La escritura a mano se reconoce en macOS mediante el framework Vision de Apple, y las transcripciones de audio también se pueden buscar.',
+      'Busca en la biblioteca por título, etiquetas, texto guardado y transcripciones de audio. También puedes buscar dentro de un lienzo abierto.',
     audioMock: {
       title: 'Clase 12 · Potenciales de acción',
       duration: '48:12',
@@ -103,22 +104,17 @@ for step in range(3):
       match: 'vaina de mielina',
     },
     searchMock: {
-      query: 'nódulo de ranvier',
+      query: 'Clase 12',
       results: [
         {
           kind: 'page',
           title: 'Clase 12 · Potenciales de acción',
-          snippet: '…la señal salta entre nódulos de Ranvier…',
-        },
-        {
-          kind: 'ink',
-          title: 'Pizarra · esquema de mielinización',
-          snippet: 'Coincidencia manuscrita, OCR en el dispositivo',
+          snippet: 'Nota del lienzo',
         },
         {
           kind: 'audio',
           title: 'Grabación · Clase 12',
-          snippet: 'Coincidencia en la transcripción, minuto 31:42',
+          snippet: 'Nota del lienzo',
         },
       ],
     },
@@ -129,13 +125,44 @@ for step in range(3):
     body: 'Los [[enlaces entre notas]], los retroenlaces y las tarjetas de vista previa mantienen las ideas relacionadas a un solo salto. La paleta de comandos te lleva a cualquier parte, y el historial de versiones por archivo restaura cualquier estado anterior de una nota.',
   },
 
+  importing: {
+    heading: 'Trae contigo\ntus notas de siempre.',
+    body: 'Importa tus notas desde otras apps',
+    annotation: 'nada de copiar y pegar.',
+    sources: [
+      {
+        id: 'goodnotes',
+        label: 'Importar desde Goodnotes',
+        detail:
+          'Importa tu contenido de Goodnotes exportándolo como un ZIP de PDF.',
+      },
+      {
+        id: 'onenote',
+        label: 'Importar desde OneNote',
+        detail:
+          'Importa tu contenido de OneNote desde un cuaderno .onepkg o una sección .one.',
+      },
+      {
+        id: 'obsidian',
+        label: 'Importar desde Obsidian',
+        detail:
+          'Importa tu contenido de Obsidian directamente desde la carpeta del vault.',
+      },
+      {
+        id: 'notion',
+        label: 'Importar desde Notion',
+        detail:
+          'Importa tu contenido de Notion exportándolo como Markdown y CSV.',
+      },
+    ],
+  },
+
   localFirst: {
     heading: 'Todo vive\nen tu ordenador.',
     lede: 'Ninguna nube por medio. Tus notas son archivos normales en tu propio disco, y Myelin funciona completamente sin conexión.',
     bullets: [
       'Tus notas son archivos normales en tu disco, en un formato abierto y sin conflictos (Yjs). Nada queda nunca atrapado.',
       'Todo funciona sin conexión, sin cuenta y sin ningún servidor por medio.',
-      'La búsqueda, los vectores semánticos y el OCR de escritura a mano (macOS) se ejecutan en tu propio equipo.',
       'Usa la IA que quieras: los modelos se conectan a través de un servidor MCP local, nunca de una nube que hayamos elegido por ti.',
       'Importa desde Obsidian o GoodNotes, exporta a PDF, imágenes o JSON, y lee cada línea del código en GitHub.',
     ],
@@ -172,7 +199,7 @@ for step in range(3):
 
   download: {
     heading: 'Descargar',
-    body: 'Disponible en español, inglés y chino simplificado.',
+    body: 'Disponible en español, inglés, francés y chino simplificado.',
     cta: 'Descargar Myelin Notes',
     autoUpdates: 'con actualizaciones\nautomáticas',
     platforms: [
@@ -234,9 +261,9 @@ No del todo. El código es público, así que cualquiera puede leerlo y comproba
 
 Sí, en directo y de igual a igual, ya hoy. No hay cuenta de Myelin ni nada en medio. Los dispositivos se encuentran a través de la sincronización con GitHub, así que ambos extremos necesitan acceso al mismo repositorio. Los cuadernos compartidos con permisos llegan en la v1.0.
 
-## ¿Puedo importar desde Obsidian o GoodNotes?
+## ¿Puedo importar desde otra app?
 
-Sí, desde ambos. Un importador de Notion está en la hoja de ruta.
+Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Notion entra a través de su propia exportación en Markdown y CSV, que lee el importador de archivos; un importador de Notion dedicado, que conserve la jerarquía de páginas, está en la hoja de ruta.
 
 ## ¿Funciona sin conexión?
 
@@ -250,6 +277,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
 
   linkLabels: {
     privacy: 'Privacidad',
+    support: 'Ayuda',
   },
 
   footer: {

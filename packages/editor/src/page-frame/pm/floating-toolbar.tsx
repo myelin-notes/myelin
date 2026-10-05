@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { toggleMark } from 'prosemirror-commands';
 import type { MarkType } from 'prosemirror-model';
-import type { EditorState } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
 import { AddColorSwatch } from '../../components/add-color-swatch';
@@ -24,6 +23,10 @@ import { ColorSwatch } from '../../components/color-swatch';
 import { CustomColorSwatch } from '../../components/custom-color-swatch';
 import { useCustomColors } from '../../custom-colors';
 import { PM_UPDATE_EVENT } from '../../events';
+import {
+  selectionHasMark,
+  uniformSelectionMarkAttrs,
+} from '../../prosemirror/selection-marks';
 import { PEN_COLORS } from '../../tools/pen-tool';
 import { schema } from './schema';
 import { getPageFramePmScreenRectForPos } from './screen-rect';
@@ -67,45 +70,6 @@ const FONTS: { label: string; value: string | null }[] = [
 
 const EDGE_MARGIN = 8;
 const SELECTION_GAP = 8;
-
-function isToggleActive(state: EditorState, markType: MarkType): boolean {
-  const { from, $from, to, empty } = state.selection;
-  if (empty) {
-    return !!markType.isInSet(state.storedMarks ?? $from.marks());
-  }
-  return state.doc.rangeHasMark(from, to, markType);
-}
-
-// Returns the attrs of `markType` applied uniformly across the selection,
-// or null if the selection spans unmarked text or mixed attr values.
-function uniformMarkAttrs(
-  state: EditorState,
-  markType: MarkType,
-): Record<string, unknown> | null {
-  const { from, to, empty, $from } = state.selection;
-  if (empty) {
-    const m = markType.isInSet(state.storedMarks ?? $from.marks());
-    return m ? (m.attrs as Record<string, unknown>) : null;
-  }
-  let result: Record<string, unknown> | null = null;
-  let consistent = true;
-  state.doc.nodesBetween(from, to, (node) => {
-    if (!node.isText) {
-      return;
-    }
-    const m = node.marks.find((mm) => mm.type === markType);
-    if (!m) {
-      consistent = false;
-      return;
-    }
-    if (result && JSON.stringify(result) !== JSON.stringify(m.attrs)) {
-      consistent = false;
-      return;
-    }
-    result = m.attrs as Record<string, unknown>;
-  });
-  return consistent ? result : null;
-}
 
 // Clear + optionally re-apply an attributed mark over the current selection.
 function setAttributedMark(
@@ -206,15 +170,21 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     }
     const nextActive = new Set<string>();
     for (const t of TOGGLE_MARKS) {
-      if (isToggleActive(view.state, t.mark)) {
+      if (selectionHasMark(view.state, t.mark)) {
         nextActive.add(t.key);
       }
     }
     setActive((current) =>
       setsEqual(current, nextActive) ? current : nextActive,
     );
-    const nextFontAttrs = uniformMarkAttrs(view.state, schema.marks.fontFamily);
-    const nextColorAttrs = uniformMarkAttrs(view.state, schema.marks.textColor);
+    const nextFontAttrs = uniformSelectionMarkAttrs(
+      view.state,
+      schema.marks.fontFamily,
+    );
+    const nextColorAttrs = uniformSelectionMarkAttrs(
+      view.state,
+      schema.marks.textColor,
+    );
     setFontAttrs((current) =>
       attrsEqual(current, nextFontAttrs) ? current : nextFontAttrs,
     );

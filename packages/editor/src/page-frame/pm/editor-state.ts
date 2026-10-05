@@ -1,6 +1,7 @@
 import { EditorState, Selection, type Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
+import type { EnsureCodeOutputCard } from '../../elements/code-output/bridge';
 import {
   CODE_BLOCK_CLEAR_SELECTION_EVENT,
   PM_UPDATE_EVENT,
@@ -25,6 +26,7 @@ export class PageFrameEditorState {
     private readonly _yXmlFragment: Y.XmlFragment,
     private readonly _resolveNoteLink?: ResolveNoteLink,
     private readonly _resolveMedia?: ResolveMediaSrc,
+    private readonly _ensureCodeOutputCard?: EnsureCodeOutputCard,
   ) {}
 
   get view(): EditorView | null {
@@ -72,7 +74,7 @@ export class PageFrameEditorState {
     this._view = new EditorView(container, {
       state,
       editable: (_state) => editable(),
-      nodeViews: buildNodeViews(),
+      nodeViews: buildNodeViews(this._ensureCodeOutputCard),
       // Page frames never scroll internally — the canvas follow-cursor pan keeps the caret on screen.
       // PM's default ancestor scroll-walk would scroll the frame's clip boxes and desync the DOM from
       // the canvas-drawn chrome. Nested CodeMirror editors manage their own caret visibility.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ELEMENT_DESCRIPTORS } from '@myelin/editor/elements/element-descriptors';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -89,6 +90,9 @@ async function createRepositoryNote() {
     offsetY: 110,
     custom: 'value',
   });
+  ydoc.createElementMap(ElementType.SHAPE, 'shape-1', {});
+  ydoc.createElementMap(ElementType.AUDIO, 'audio-1', {});
+  ydoc.createElementMap(ElementType.CODE_OUTPUT, 'code-output-1', {});
 
   const noteId = await repository.createFile(
     'MCP Note',
@@ -104,12 +108,9 @@ describe('MCP read model', () => {
   it('extracts staged note inventory from a canvas note', async () => {
     const { repository, noteId } = await createRepositoryNote();
 
-    const note = await buildMcpNoteReadModel(repository, noteId, {
-      indexedText: 'Indexed note text',
-    });
+    const note = await buildMcpNoteReadModel(repository, noteId);
 
     expect(note.note.title).toBe('MCP Note');
-    expect(note.indexedText).toBe('Indexed note text');
     expect(note.elements.map((element) => element.kind)).toEqual([
       'page-frame',
       'text',
@@ -117,6 +118,9 @@ describe('MCP read model', () => {
       'pdf',
       'latex',
       'stroke-group',
+      'unknown',
+      'unknown',
+      'unknown',
       'unknown',
     ]);
     expect(note.elements[0]).toMatchObject({
@@ -134,6 +138,30 @@ describe('MCP read model', () => {
       pageCount: 2,
       textAvailable: false,
     });
+    expect(
+      note.elements
+        .filter((element) => element.kind === 'unknown')
+        .map((element) => element.id),
+    ).toEqual(['unknown-1', 'shape-1', 'audio-1', 'code-output-1']);
+  });
+
+  it('summarizes every element declared externally supported', async () => {
+    const { repository, noteId } = await createRepositoryNote();
+    const note = await buildMcpNoteReadModel(repository, noteId);
+    const supportedNames = ELEMENT_DESCRIPTORS.filter(
+      (descriptor) => descriptor.externalSummary === 'supported',
+    )
+      .map((descriptor) => descriptor.name)
+      .sort();
+    const summarizedKinds = [
+      ...new Set(
+        note.elements
+          .map((element) => element.kind)
+          .filter((kind) => kind !== 'unknown' && kind !== 'stroke-group'),
+      ),
+    ].sort();
+
+    expect(summarizedKinds).toEqual(supportedNames);
   });
 
   // A note can hold hundreds of strokes, so anything the model cannot act on is
@@ -146,7 +174,7 @@ describe('MCP read model', () => {
 
     expect(note.elements[5]).toEqual({
       kind: 'stroke-group',
-      reader: 'read_handwriting',
+      reader: 'screenshot_canvas',
       count: 2,
       bounds: { x: 9.8, y: 43.2, width: 112.7, height: 169.3 },
       boxes: [
@@ -190,11 +218,8 @@ describe('MCP read model', () => {
   it('reads the full note model in one pass', async () => {
     const { repository, noteId, pageFrameId } = await createRepositoryNote();
 
-    const full = await readMcpNoteFull(repository, noteId, {
-      indexedText: 'Indexed note text',
-    });
+    const full = await readMcpNoteFull(repository, noteId);
 
-    expect(full.indexedText).toBe('Indexed note text');
     expect(full.pageFrames).toEqual([
       expect.objectContaining({
         pageFrameId,

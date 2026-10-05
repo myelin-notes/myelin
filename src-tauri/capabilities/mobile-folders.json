@@ -1,0 +1,23 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile-folders",
+  "description": "User-selected folders on iOS and Android",
+  "platforms": [
+    "iOS",
+    "android"
+  ],
+  "windows": [
+    "*"
+  ],
+  "permissions": [
+    "scoped-storage:allow-pick-folder",
+    "scoped-storage:allow-read-dir",
+    "scoped-storage:allow-read-file",
+    "scoped-storage:allow-read-text-file",
+    "scoped-storage:allow-write-file",
+    "scoped-storage:allow-write-text-file",
+    "scoped-storage:allow-exists",
+    "scoped-storage:allow-mkdir",
+    "scoped-storage:allow-remove-dir"
+  ]
+}

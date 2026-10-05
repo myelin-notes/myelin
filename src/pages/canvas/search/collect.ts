@@ -1,16 +1,9 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import { AudioElement } from '@myelin/editor/elements/audio/element';
-import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
-import { TextElement } from '@myelin/editor/elements/text/element';
+import type { SearchableElement } from '@myelin/editor/elements/canvas-searchable-element';
 import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
-import type { RecognizedPage } from '@myelin/editor/platform';
 
-export type CanvasSearchKind =
-  | 'text'
-  | 'page-frame'
-  | 'transcript'
-  | 'handwriting';
+export type CanvasSearchKind = 'text' | 'page-frame' | 'transcript';
 
 export interface CanvasSearchRect {
   x: number;
@@ -46,66 +39,33 @@ function rectOf(box: DOMRect): CanvasSearchRect {
   return { x: box.x, y: box.y, width: box.width, height: box.height };
 }
 
-// Text, page frames and audio transcripts come live from the in-memory doc (always fresh);
-// handwriting comes from the recognized artifact.
 export function collectCanvasSearchSources(
   dc: DrawableCanvas,
-  recognized: RecognizedPage | null,
 ): CanvasSearchSource[] {
   const sources: CanvasSearchSource[] = [];
 
   for (const element of dc.elements) {
-    if (element instanceof TextElement) {
-      const text = element.text.trim();
-      if (text) {
-        sources.push({
-          kind: 'text',
-          rect: rectOf(element.boundingBox),
-          selectUuids: [element.uuid],
-          text,
-        });
-      }
-    } else if (element instanceof PageFrameElement) {
-      // The frame's live editor doc is already in memory (views stay mounted), so read it instead of
-      // rebuilding the PM tree from Yjs. Falls back to fragment reconstruction for a not-yet-mounted
-      // frame, and returns null when the frame is empty.
-      const doc = element.getCurrentDoc();
-      if (doc) {
-        sources.push({
-          kind: 'page-frame',
-          rect: rectOf(element.boundingBox),
-          selectUuids: [element.uuid],
-          frameUuid: element.uuid,
-          doc,
-        });
-      }
-    } else if (element instanceof AudioElement) {
-      const text = element.transcript.trim();
-      if (text) {
-        sources.push({
-          kind: 'transcript',
-          rect: rectOf(element.boundingBox),
-          selectUuids: [element.uuid],
-          text,
-        });
-      }
+    const searchable = element as typeof element & Partial<SearchableElement>;
+    const content = searchable.getCanvasSearchContent?.();
+    if (!content) {
+      continue;
     }
-  }
-
-  if (recognized) {
-    for (const line of recognized.lines) {
-      const text = line.text.trim();
-      if (!text) {
-        continue;
-      }
-      const [x, y, width, height] = line.bbox;
+    if (content.kind === 'page-frame') {
       sources.push({
-        kind: 'handwriting',
-        rect: { x, y, width, height },
-        selectUuids: line.strokeIds,
-        text,
+        kind: content.kind,
+        rect: rectOf(element.boundingBox),
+        selectUuids: [element.uuid],
+        frameUuid: element.uuid,
+        doc: content.doc,
       });
+      continue;
     }
+    sources.push({
+      kind: content.kind,
+      rect: rectOf(element.boundingBox),
+      selectUuids: [element.uuid],
+      text: content.text,
+    });
   }
 
   return sources;

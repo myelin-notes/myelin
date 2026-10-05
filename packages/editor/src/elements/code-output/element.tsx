@@ -416,7 +416,7 @@ export class CodeOutputElement extends DrawableElement {
     const root = document.createElement('div');
     root.className = 'canvas-code-output';
     root.dataset.elementUuid = this.uuid;
-    (getFrameChromeControlsLayer() ?? host).appendChild(root);
+    (getFrameChromeControlsLayer(host) ?? host).appendChild(root);
     this._root = root;
     return root;
   }

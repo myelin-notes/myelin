@@ -139,8 +139,7 @@ export class YDocManager {
   // by the UndoManager (orphan content has no element to restore onto). Returns fragments cleared.
   sweepOrphanPageFrameFragments(): number {
     const liveUuids = new Set<string>();
-    for (let i = 0; i < this.elements.length; i++) {
-      const yMap = this.elements.get(i);
+    for (const yMap of this.elements) {
       if (yMap.get('type') === ElementType.PAGE_FRAME) {
         const uuid = yMap.get('uuid');
         if (typeof uuid === 'string') {

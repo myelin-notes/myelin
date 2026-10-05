@@ -1,11 +1,10 @@
-import type { ReindexItem } from '../../platform';
 import type { VFSNodeId } from '../types';
 import type { FileType } from './file-types';
 
 export type { VFSNodeId } from '../types';
 export type { FileType } from './file-types';
 
-export type CustomColorTool = 'pen' | 'highlighter' | 'text';
+export type CustomColorTool = 'pen' | 'highlighter' | 'text' | 'folder';
 
 export type PenPresetTool = 'pen' | 'highlighter';
 
@@ -48,6 +47,8 @@ export interface VFSFolderNode {
   createdAt: number;
   modifiedAt: number;
   system?: VFSSystemMetadata;
+  /** Normalized hex icon color. Absent = the default folder color. */
+  color?: string;
 }
 
 export type VFSNode = VFSFileNode | VFSFolderNode;
@@ -123,11 +124,9 @@ export interface NodeSearchResult {
   contentSnippet: string | null;
   /** Lowercased document terms that matched the query, for highlighting. */
   matchedTerms: string[];
-  searchMode?: 'lexical' | 'semantic';
 }
 
 export interface SearchNodesOptions {
-  mode?: 'lexical' | 'semantic';
   limit?: number;
 }
 
@@ -155,8 +154,6 @@ export interface Repository {
    * search, so it must not pay to rebuild a MiniSearch index on every document change.
    */
   getNodesByName(name: string): Promise<VFSNode[]>;
-  /** Candidate notes for the content-index startup backfill. */
-  listIndexBackfillItems(): Promise<ReindexItem[]>;
   getNodesByAnyTag(
     tags: string[],
     folderId?: VFSNodeId | null,
@@ -199,6 +196,8 @@ export interface Repository {
   setTags(nodeId: VFSNodeId, tags: string[]): Promise<void>;
   addTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
+  /** `null` clears back to the default color. */
+  setFolderColor(nodeId: VFSNodeId, color: string | null): Promise<void>;
   getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
@@ -211,6 +210,7 @@ export interface Repository {
   /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size}` duplicate is a no-op. */
   addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]>;
   updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
+  reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]>;
   removePenPreset(id: string): Promise<PenPreset[]>;
 
   getRegistryTags(): Promise<string[]>;

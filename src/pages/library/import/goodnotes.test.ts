@@ -151,9 +151,9 @@ describe('Goodnotes ZIP import', () => {
       'Goodnotes Export.zip',
       { type: 'application/zip' },
     );
-
+    const scanned = await readGoodnotesZipEntries(zipFile);
     const result = await importGoodnotesZip({
-      scanned: await readGoodnotesZipEntries(zipFile),
+      scanned,
       repository,
       parentId: null,
       fallbackTitle: 'Untitled Canvas',
@@ -161,6 +161,9 @@ describe('Goodnotes ZIP import', () => {
 
     expect(result.pdfsImported).toBe(2);
     expect(result.skippedFiles).toBe(1);
+    expect(scanned.pdfEntries.every((entry) => entry.bytes.length === 0)).toBe(
+      true,
+    );
 
     const [rootFolders] = await repository.listDirectory(null);
     expect(rootFolders.map((folder) => folder.name)).toEqual(['Math']);

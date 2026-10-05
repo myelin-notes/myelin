@@ -50,7 +50,7 @@ const CHECK_RE = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
 const BULLET_RE = /^(\s*)[-*+]\s+(.*)$/;
 const ORDERED_RE = /^(\s*)(\d+)\.\s+(.*)$/;
 const QUOTE_RE = /^>\s?(.*)$/;
-const HR_RE = /^(?:-{3,}|\*{3,}|_{3,})$/;
+const HR_RE = /^(?:-{3,}|\*{3,})$/;
 const FENCE_RE = /^```/;
 const TABLE_DIVIDER_RE = /^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*:?-{3,}:?\s*\|?\s*$/;
 
@@ -483,13 +483,9 @@ function scanInline(
       }
     }
 
-    // Bold: **...** or __...__
-    if (
-      (ch === '*' && text[i + 1] === '*') ||
-      (ch === '_' && text[i + 1] === '_')
-    ) {
-      const delim = text.slice(i, i + 2);
-      const end = text.indexOf(delim, i + 2);
+    // Bold: **...**
+    if (ch === '*' && text[i + 1] === '*') {
+      const end = text.indexOf('**', i + 2);
       if (end !== -1) {
         pushText();
         const inner = text.slice(i + 2, end);
@@ -504,8 +500,8 @@ function scanInline(
       }
     }
 
-    // Italic: *...* or _..._
-    if (ch === '*' || ch === '_') {
+    // Italic: *...*
+    if (ch === '*') {
       // Match up to the next unescaped delimiter of the same kind that
       // isn't part of a bold (**) pair.
       let j = i + 1;

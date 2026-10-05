@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KeybindingHandler } from './handler';
 import { KeybindingRegistry } from './registry';
 
@@ -11,6 +11,10 @@ function createHandler() {
 
   return new KeybindingHandler(registry);
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('KeybindingHandler', () => {
   it('exposes only one-shot actions for command palette items', () => {
@@ -56,6 +60,40 @@ describe('KeybindingHandler', () => {
       key: 'z',
       metaKey: true,
     });
+  });
+
+  it('runs an action for each of its default key combinations', () => {
+    const listeners = new Map<string, (event: KeyboardEvent) => void>();
+    vi.stubGlobal('window', {
+      addEventListener: (
+        type: string,
+        listener: (event: KeyboardEvent) => void,
+      ) => listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+    });
+
+    const registry = new KeybindingRegistry();
+    registry.defineDefaults({
+      'canvas:delete': [{ key: 'Backspace' }, { key: 'Delete' }],
+    });
+    const handler = new KeybindingHandler(registry);
+    const onDown = vi.fn();
+    const dispose = handler.register([{ action: 'canvas:delete', onDown }]);
+    const keyDown = listeners.get('keydown');
+    const event = {
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      target: null,
+    };
+
+    keyDown?.({ ...event, key: 'Backspace' } as KeyboardEvent);
+    keyDown?.({ ...event, key: 'Delete' } as KeyboardEvent);
+
+    expect(onDown).toHaveBeenCalledTimes(2);
+
+    dispose();
   });
 
   it('notifies subscribers when bindings change', () => {

@@ -85,7 +85,7 @@ describe('findActiveSlashInsertAutocomplete', () => {
 });
 
 describe('searchSlashInsertAutocompleteItems', () => {
-  it('matches aliases like h2, links, and inline code', () => {
+  it('matches aliases like h2, links, code, and math', () => {
     expect(searchSlashInsertAutocompleteItems('h2', labels)[0]?.id).toBe(
       'slash-heading-2',
     );
@@ -95,8 +95,16 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(searchSlashInsertAutocompleteItems('table', labels)[0]?.id).toBe(
       'slash-table',
     );
-    expect(searchSlashInsertAutocompleteItems('code', labels)[0]?.id).toBe(
-      'slash-inline-code',
+    expect(searchSlashInsertAutocompleteItems('callout', labels)[0]?.id).toBe(
+      'slash-callout',
+    );
+    const codeIds = searchSlashInsertAutocompleteItems('code', labels).map(
+      (item) => item.id,
+    );
+    expect(codeIds).toContain('slash-inline-code');
+    expect(codeIds).toContain('slash-code-block');
+    expect(searchSlashInsertAutocompleteItems('latex', labels)[0]?.id).toBe(
+      'slash-math-block',
     );
   });
 
@@ -114,7 +122,10 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(ids).not.toContain('slash-heading-1');
     expect(ids).not.toContain('slash-bullet-list');
     expect(ids).not.toContain('slash-table');
+    expect(ids).not.toContain('slash-callout');
     expect(ids).not.toContain('slash-paragraph');
+    expect(ids).not.toContain('slash-code-block');
+    expect(ids).not.toContain('slash-math-block');
     expect(ids).toContain('slash-link');
     expect(ids).toContain('slash-date-today');
   });
@@ -125,6 +136,9 @@ describe('searchSlashInsertAutocompleteItems', () => {
     );
     expect(ids).toContain('slash-heading-1');
     expect(ids).toContain('slash-table');
+    expect(ids).toContain('slash-callout');
+    expect(ids).toContain('slash-code-block');
+    expect(ids).toContain('slash-math-block');
   });
 });
 
@@ -159,6 +173,38 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     });
     expect(selectedState.selection.from).toBe(1);
     expect(selectedState.selection.to).toBe(1);
+  });
+
+  it('turns the current block into a note callout and places the caret after the marker', () => {
+    const markdown = '/callout';
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem('slash-callout'),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+
+    expect(selectedState.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: [{ type: 'text', text: '[!note] ' }],
+        },
+      ],
+    });
+    expect(selectedState.selection.from).toBe(9);
+    expect(selectedState.selection.to).toBe(9);
   });
 
   it('inserts paired markdown delimiters and places the caret inside them', () => {
@@ -285,5 +331,32 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     expect(table?.child(0).child(0).type.name).toBe('table_header');
     expect(table?.child(1).child(0).type.name).toBe('table_cell');
     expect(selectedState.selection.$from.parent.type.name).toBe('paragraph');
+  });
+
+  it.each([
+    ['slash-code-block', 'codeBlock', '```\n\n```', 5],
+    ['slash-math-block', 'mathBlock', '$$\n\n$$', 4],
+  ])('replaces the current block with a fenced %s', (id, nodeType, text, selection) => {
+    const markdown = `/${id}`;
+    const head = 1 + markdown.length;
+    const state = createState(markdown, head);
+    const activeRequest = findActiveSlashInsertAutocomplete(state);
+
+    expect(activeRequest).not.toBeNull();
+
+    const tr = buildSelectSlashInsertAutocompleteTransaction(
+      state,
+      schema,
+      activeRequest!,
+      findItem(id),
+    );
+
+    expect(tr).not.toBeNull();
+
+    const selectedState = state.apply(tr!);
+    expect(selectedState.doc.firstChild?.type.name).toBe(nodeType);
+    expect(selectedState.doc.firstChild?.textContent).toBe(text);
+    expect(selectedState.selection.from).toBe(selection);
+    expect(selectedState.selection.to).toBe(selection);
   });
 });

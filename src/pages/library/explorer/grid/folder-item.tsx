@@ -1,13 +1,12 @@
-import { useState } from 'react';
 import { Folder } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
+import type { VFSFolderNode } from '@/lib/sync';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
-import { TagManageDialog } from '../../tag-manage-dialog';
-import { ItemContextMenu } from '../item-context-menu';
+import { folderIconStyle } from '../folder-colors';
 import { TagList } from '../tag-list';
 import { useDropTarget } from '../use-drop-target';
-import { useExplorerItem } from '../use-explorer-item';
+import { useFolderItemContextMenu } from '../use-folder-item-context-menu';
 import {
   explorerGridBodyClass,
   explorerGridCardClass,
@@ -23,48 +22,39 @@ import {
 } from './item-styles';
 
 interface Props {
-  id: string;
-  name: string;
-  tags: string[];
+  folder: VFSFolderNode;
   autoRename?: boolean;
   onNavigate: () => void;
   onMoved: () => void;
 }
 
 export function GridFolderItem({
-  id,
-  name,
-  tags,
+  folder,
   autoRename,
   onNavigate,
   onMoved,
 }: Props) {
-  const [tagDialogOpen, setTagDialogOpen] = useState(false);
-
   const {
+    contextMenuProps,
     renaming,
     dragging,
-    startRenaming,
-    handleRemove,
     handleDragStart,
     handleDragEnd,
     renameInputProps,
-  } = useExplorerItem({
-    nodeId: id,
-    name,
-    dragKind: 'folder',
-    onChanged: onMoved,
+    menu,
+    dialogs,
+  } = useFolderItemContextMenu(folder, onMoved, {
     initialRenaming: autoRename,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({
-    targetFolderId: id,
+    targetFolderId: folder.id,
     onMoved,
   });
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu {...contextMenuProps}>
         <ContextMenuTrigger
           render={
             <button
@@ -80,7 +70,7 @@ export function GridFolderItem({
               aria-label={
                 renaming
                   ? undefined
-                  : formatExplorerItemAccessibleName(name, tags)
+                  : formatExplorerItemAccessibleName(folder.name, folder.tags)
               }
               className={cn(
                 explorerGridCardClass,
@@ -97,7 +87,10 @@ export function GridFolderItem({
             />
             <div className="relative flex h-full items-center justify-center">
               <div className="flex size-[4.75rem] items-center justify-center rounded-2xl bg-card/80 shadow-elevated backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
-                <Folder className="size-12 shrink-0 fill-accent-amber text-accent-amber transition-colors duration-200 group-hover:fill-accent-amber-strong group-hover:text-accent-amber-strong" />
+                <Folder
+                  className="size-12 shrink-0"
+                  style={folderIconStyle(folder.color)}
+                />
               </div>
             </div>
           </div>
@@ -112,12 +105,12 @@ export function GridFolderItem({
               <>
                 <span
                   className={cn('block', explorerGridTitleClass)}
-                  title={name}
+                  title={folder.name}
                 >
-                  {name}
+                  {folder.name}
                 </span>
                 <TagList
-                  tags={tags}
+                  tags={folder.tags}
                   className={explorerGridTagsClass}
                   tagClassName={explorerGridTagClass}
                   overflowClassName={explorerGridTagOverflowClass}
@@ -126,19 +119,9 @@ export function GridFolderItem({
             )}
           </div>
         </ContextMenuTrigger>
-        <ItemContextMenu
-          onRename={startRenaming}
-          onRemove={handleRemove}
-          onManageTags={() => setTagDialogOpen(true)}
-        />
+        {menu}
       </ContextMenu>
-      <TagManageDialog
-        open={tagDialogOpen}
-        onOpenChange={setTagDialogOpen}
-        nodeId={id}
-        nodeName={name}
-        onChanged={onMoved}
-      />
+      {dialogs}
     </>
   );
 }

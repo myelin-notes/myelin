@@ -1,6 +1,7 @@
 import posthog from 'posthog-js';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { MODE, POSTHOG_HOST, POSTHOG_KEY } from '@/lib/env';
+import { version } from '../../package.json';
 
 let initialized = false;
 
@@ -31,7 +32,7 @@ function ensureInitialized(): boolean {
     capture_exceptions: true,
     opt_out_capturing_by_default: true,
   });
-  posthog.register({ environment: MODE, source: 'app' });
+  posthog.register({ environment: MODE, source: 'app', app_version: version });
   initialized = true;
   return true;
 }

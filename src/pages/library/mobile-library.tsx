@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownAZ,
   ArrowDownZA,
-  BrainCircuit,
   CalendarPlus,
   ChevronRight,
   Clock,
@@ -21,13 +20,6 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { errorDescription } from '@/components/command-palette/utils';
 import { SidebarTags } from '@/components/layout/sidebar/sidebar-tags';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { trackEvent } from '@/lib/analytics';
 import { openNote } from '@/lib/note/navigation';
 import {
   type FileType,
@@ -41,16 +33,17 @@ import {
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import { useTabController } from '@/lib/tabs/context';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { BetaFeedbackBanner } from './beta-feedback-banner';
 import { CreateNewDropdown } from './create-new-dropdown';
+import type { ExplorerSortMode as SortMode } from './explorer/explorer-model';
 import {
   ExplorerTree,
   type ExplorerTreeHandle,
-  type SearchMode,
-  type SortMode,
   type ViewMode,
 } from './explorer/explorer-tree';
 import { useDropTarget } from './explorer/use-drop-target';
@@ -76,7 +69,7 @@ export function MobileLibrary() {
   const scrollRef = useRef<HTMLElement | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<SearchMode>('lexical');
+  const noteIndexStatus = useNoteIndexStatus();
   const [sortMode, setSortMode] = useState<SortMode>('name-asc');
   const [viewMode, setViewMode] = useState<ViewMode>('tree');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
@@ -191,10 +184,6 @@ export function MobileLibrary() {
     setViewMode((mode) => (mode === 'tree' ? 'grid' : 'tree'));
   }, []);
 
-  const toggleSearchMode = useCallback(() => {
-    setSearchMode((mode) => (mode === 'semantic' ? 'lexical' : 'semantic'));
-  }, []);
-
   // ExplorerTree.startNewFolder/startNewFile fire their onChanged (bound to
   // refreshMeta) internally after the write, so there's no need to refresh again.
   const handleNewFolder = useCallback(() => {
@@ -203,17 +192,12 @@ export function MobileLibrary() {
 
   const handleNewFile = useCallback(
     (title: string, type: FileType) => {
-      void explorerRef.current
-        ?.startNewFile(title, type)
-        .then(() => {
-          trackEvent('note_created', { file_type: type });
-        })
-        .catch((error) => {
-          logger.error('Failed to create file', error, { fileType: type });
-          toast.error(strings.commandPalette.errors.createNote, {
-            description: errorDescription(error),
-          });
+      void explorerRef.current?.startNewFile(title, type).catch((error) => {
+        logger.error('Failed to create file', error, { fileType: type });
+        toast.error(strings.commandPalette.errors.createNote, {
+          description: errorDescription(error),
         });
+      });
     },
     [strings.commandPalette.errors.createNote],
   );
@@ -255,26 +239,28 @@ export function MobileLibrary() {
               {strings.library.title}
             </h1>
 
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={openGraph}
-                aria-label={strings.sidebar.graph}
-                title={strings.sidebar.graph}
-                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-              >
-                <Network className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={openSettings}
-                aria-label={strings.tabBar.settings}
-                title={strings.tabBar.settings}
-                className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
-              >
-                <Settings className="size-4" />
-              </button>
-            </div>
+            {IS_PHONE_BUILD && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={openGraph}
+                  aria-label={strings.sidebar.graph}
+                  title={strings.sidebar.graph}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+                >
+                  <Network className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  aria-label={strings.tabBar.settings}
+                  title={strings.tabBar.settings}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-secondary transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
+                >
+                  <Settings className="size-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 max-w-xl">
@@ -305,32 +291,33 @@ export function MobileLibrary() {
                     <X className="size-3.5" />
                   </button>
                 )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          onClick={toggleSearchMode}
-                          aria-label={strings.library.semanticSearchLabel}
-                          aria-pressed={searchMode === 'semantic'}
-                          className={cn(
-                            'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors duration-150',
-                            searchMode === 'semantic'
-                              ? 'bg-tag-active text-text-on-dark'
-                              : 'text-text-muted hover:bg-surface hover:text-text-primary',
-                          )}
-                        >
-                          <BrainCircuit className="size-3.5" />
-                        </button>
-                      }
-                    />
-                    <TooltipContent side="top">
-                      {strings.library.semanticSearchLabel}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
               </div>
+              {searchQuery.trim() &&
+                noteIndexStatus.active &&
+                (noteIndexStatus.scanning ||
+                  noteIndexStatus.indexed + noteIndexStatus.failed <
+                    noteIndexStatus.total) && (
+                  <div className="pt-2 text-text-muted text-xs">
+                    {noteIndexStatus.scanning
+                      ? strings.library.explorerTree.preparingIndex
+                      : strings.library.explorerTree.indexingNotes(
+                          noteIndexStatus.indexed,
+                          noteIndexStatus.total,
+                        )}
+                  </div>
+                )}
+              {searchQuery.trim() && noteIndexStatus.failed > 0 && (
+                <div className="pt-2 text-text-muted text-xs">
+                  {strings.library.explorerTree.indexingFailed(
+                    noteIndexStatus.failed,
+                  )}
+                </div>
+              )}
+              {searchQuery.trim() && noteIndexStatus.loadError && (
+                <div className="pt-2 text-text-muted text-xs">
+                  {strings.library.explorerTree.indexingUnavailable}
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <div className="flex min-w-0 items-center gap-2">
@@ -437,6 +424,7 @@ export function MobileLibrary() {
                     onNewFile={handleNewFile}
                     onImport={imports.openPicker}
                     importDisabled={imports.importDisabled}
+                    labeled
                   />
                 </div>
               </div>
@@ -450,8 +438,13 @@ export function MobileLibrary() {
                 sortMode={sortMode}
                 viewMode={viewMode}
                 searchQuery={searchQuery}
-                searchMode={searchMode}
                 filterTags={filterTags}
+                onCreateCanvas={() =>
+                  handleNewFile(
+                    strings.library.createNew.untitledCanvas,
+                    'mcanvas',
+                  )
+                }
               />
             </div>
 
@@ -491,12 +484,7 @@ export function MobileLibrary() {
                             style: 'short',
                           })}
                           onClick={() =>
-                            openNote(
-                              tabController,
-                              file,
-                              file.name,
-                              'recent_files',
-                            )
+                            openNote(tabController, file, file.name)
                           }
                           onChanged={refreshLibraryData}
                         />

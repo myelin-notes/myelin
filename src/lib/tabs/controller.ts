@@ -1,9 +1,9 @@
-import { trackEvent } from '@/lib/analytics';
 import type { VFSNodeId } from '@/lib/sync';
 import type {
   LayoutNode,
   PaneId,
   PaneNode,
+  PanePage,
   SplitDirection,
   SplitNode,
   Tab,
@@ -59,6 +59,8 @@ function targetsEqual(a: TabTarget, b: TabTarget): boolean {
       return a.id === (b as Extract<TabTarget, { type: 'image' }>).id;
     case 'csv':
       return a.id === (b as Extract<TabTarget, { type: 'csv' }>).id;
+    case 'unsupported':
+      return a.id === (b as Extract<TabTarget, { type: 'unsupported' }>).id;
   }
 }
 
@@ -349,6 +351,7 @@ export interface TabControllerOptions {
   // Opening a document replaces the pane's current tab instead of stacking beside it. Set on phone
   // layouts, which have no tab strip to switch or close with.
   singleTab?: boolean;
+  beforeCloseTab?: (tab: Tab) => Promise<void> | void;
 }
 
 export class TabStateController {
@@ -356,6 +359,8 @@ export class TabStateController {
   private readonly listeners = new Set<() => void>();
   private readonly onEmpty?: () => void;
   private readonly singleTab: boolean;
+  private readonly beforeCloseTab?: TabControllerOptions['beforeCloseTab'];
+  private readonly pendingTabCloses = new Set<TabId>();
 
   // `onEmpty` runs when the last pane is closed. The window layer uses it to close the native
   // window; without it the window falls back to a fresh default state (used by tests).
@@ -369,6 +374,7 @@ export class TabStateController {
       : createDefaultWindowState();
     this.onEmpty = onEmpty;
     this.singleTab = options?.singleTab ?? false;
+    this.beforeCloseTab = options?.beforeCloseTab;
   }
 
   subscribe = (listener: () => void): (() => void) => {
@@ -422,12 +428,9 @@ export class TabStateController {
             tab.id === match.tab.id ? { ...tab, target, title } : tab,
           ),
           activeTabId: match.tab.id,
+          activePage: undefined,
         }),
         focusedPaneId: matchPane.id,
-      });
-      trackEvent('tab_opened', {
-        target_type: target.type,
-        is_new_document: false,
       });
       return match.tab.id;
     }
@@ -447,17 +450,26 @@ export class TabStateController {
       ...pane,
       tabs: this.singleTab ? [tab] : insertAt(pane.tabs, tab, insertIndex),
       activeTabId: tab.id,
+      activePage: undefined,
     };
+
+    if (this.singleTab) {
+      for (const replacedTab of pane.tabs) {
+        if (this.pendingTabCloses.has(replacedTab.id)) {
+          continue;
+        }
+        const beforeClose = this.beforeCloseTab?.(replacedTab);
+        if (beforeClose) {
+          void Promise.resolve(beforeClose).catch(() => {});
+        }
+      }
+    }
 
     this.commit({
       layout: replacePane(state.layout, nextPane),
       focusedPaneId: pane.id,
     });
 
-    trackEvent('tab_opened', {
-      target_type: target.type,
-      is_new_document: true,
-    });
     return tab.id;
   }
 
@@ -477,7 +489,8 @@ export class TabStateController {
           if (
             (target.type === 'canvas' ||
               target.type === 'image' ||
-              target.type === 'csv') &&
+              target.type === 'csv' ||
+              target.type === 'unsupported') &&
             ids.has(target.id)
           ) {
             matches.push({ tabId: tab.id, paneId: node.id });
@@ -495,12 +508,46 @@ export class TabStateController {
   }
 
   closeTab(tabId: TabId, paneId: PaneId): void {
+    if (this.pendingTabCloses.has(tabId)) {
+      return;
+    }
+
     const state = this.state;
     const pane = findPane(state.layout, paneId);
     if (!pane) {
       return;
     }
 
+    const removedIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
+    if (removedIndex === -1) {
+      return;
+    }
+
+    const removedTab = pane.tabs[removedIndex]!;
+    const beforeClose = this.beforeCloseTab?.(removedTab);
+    if (beforeClose) {
+      this.pendingTabCloses.add(tabId);
+      void Promise.resolve(beforeClose).then(
+        () => {
+          this.pendingTabCloses.delete(tabId);
+          this.finishCloseTab(tabId, paneId);
+        },
+        () => {
+          this.pendingTabCloses.delete(tabId);
+        },
+      );
+      return;
+    }
+
+    this.finishCloseTab(tabId, paneId);
+  }
+
+  private finishCloseTab(tabId: TabId, paneId: PaneId): void {
+    const state = this.state;
+    const pane = findPane(state.layout, paneId);
+    if (!pane) {
+      return;
+    }
     const removedIndex = pane.tabs.findIndex((tab) => tab.id === tabId);
     if (removedIndex === -1) {
       return;
@@ -531,7 +578,11 @@ export class TabStateController {
       return;
     }
 
-    if (pane.activeTabId === tabId && state.focusedPaneId === paneId) {
+    if (
+      pane.activeTabId === tabId &&
+      state.focusedPaneId === paneId &&
+      pane.activePage === undefined
+    ) {
       return;
     }
 
@@ -539,8 +590,25 @@ export class TabStateController {
       layout: replacePane(state.layout, {
         ...pane,
         activeTabId: tabId,
+        activePage: undefined,
       }),
       focusedPaneId: paneId,
+    });
+  }
+
+  togglePanePage(page: PanePage, paneId?: PaneId): void {
+    const state = this.state;
+    const pane = findPane(state.layout, paneId ?? state.focusedPaneId);
+    if (!pane) {
+      return;
+    }
+
+    this.commit({
+      layout: replacePane(state.layout, {
+        ...pane,
+        activePage: pane.activePage === page ? undefined : page,
+      }),
+      focusedPaneId: pane.id,
     });
   }
 
@@ -549,12 +617,16 @@ export class TabStateController {
   showHome(paneId: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId);
-    if (!pane || pane.activeTabId === '') {
+    if (!pane || (pane.activeTabId === '' && pane.activePage === undefined)) {
       return;
     }
 
     this.commit({
-      layout: replacePane(state.layout, { ...pane, activeTabId: '' }),
+      layout: replacePane(state.layout, {
+        ...pane,
+        activeTabId: '',
+        activePage: undefined,
+      }),
       focusedPaneId: paneId,
     });
   }
@@ -616,6 +688,7 @@ export class TabStateController {
       ...targetPane,
       tabs: insertAt(targetPane.tabs, tab, index),
       activeTabId: tabId,
+      activePage: undefined,
     };
 
     this.commit({
@@ -678,8 +751,6 @@ export class TabStateController {
       ...state,
       layout: replaceNode(state.layout, pane.id, split),
     });
-
-    trackEvent('pane_split', { direction });
 
     return newPane.id;
   }

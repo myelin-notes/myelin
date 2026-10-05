@@ -1,4 +1,5 @@
 import { Logger } from '@myelin/shared/logger';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 import { join } from '@tauri-apps/api/path';
 import {
   BaseDirectory,
@@ -13,6 +14,7 @@ import {
 } from '@tauri-apps/plugin-fs';
 import { ensureDirOnce, getAppDataDir } from '@/platform/tauri/fs-cache';
 import { BaseRepository } from './base';
+import { noteContentIndex } from './note-content-index';
 import {
   computeRevision,
   createEmptyManifest,
@@ -26,6 +28,15 @@ import {
 import type { FileType, RepositoryCapabilities, VFSNodeId } from './types';
 
 const logger = new Logger('LocalRepository');
+const MAX_IPC_WRITE_BYTES = 8 * 1024;
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
 
 // Deliberately just the byte count. This used to run canvas bytes through `summarizeNoteBytes`,
 // which decodes the whole note into a throwaway Y.Doc — on both the read and the write of every
@@ -99,7 +110,7 @@ export class LocalRepository extends BaseRepository {
       );
       const bytes = snapshot.notes[node.id] ?? null;
       if (bytes && bytes.byteLength > 0) {
-        await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+        await this.writeBytesToDisk(filePath, bytes);
         continue;
       }
 
@@ -115,6 +126,7 @@ export class LocalRepository extends BaseRepository {
     const manifest = structuredClone(snapshot.manifest);
     await this.writeManifestToDisk(manifest);
     this.manifest = manifest;
+    noteContentIndex.reconcile(this);
     logger.debug('Replaced local repository snapshot', {
       storageRoot: this.storageRoot,
       nodeCount: Object.keys(snapshot.manifest.nodes).length,
@@ -211,7 +223,7 @@ export class LocalRepository extends BaseRepository {
         FILES_DIR,
         getStoredFileName(node),
       );
-      await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+      await this.writeBytesToDisk(filePath, bytes);
       const revision = await computeRevision(bytes);
       logger.debug('Saved local note bytes to disk', {
         nodeId,
@@ -271,13 +283,68 @@ export class LocalRepository extends BaseRepository {
   }
 
   private async writeManifestToDisk(manifest: VFSManifest): Promise<void> {
-    await writeTextFile(
-      this.resolveStoragePath(MANIFEST_PATH),
-      JSON.stringify(manifest, null, 2),
-      {
+    const filePath = this.resolveStoragePath(MANIFEST_PATH);
+    const text = JSON.stringify(manifest, null, 2);
+    if (isTauri() && text.length > MAX_IPC_WRITE_BYTES) {
+      await this.writeBytesToDisk(filePath, new TextEncoder().encode(text));
+    } else {
+      await writeTextFile(filePath, text, { baseDir: BaseDirectory.AppData });
+    }
+  }
+
+  private async writeBytesToDisk(
+    filePath: string,
+    bytes: Uint8Array,
+  ): Promise<void> {
+    if (!isTauri() && bytes.byteLength <= MAX_IPC_WRITE_BYTES) {
+      await writeFile(filePath, bytes, { baseDir: BaseDirectory.AppData });
+    } else if (isTauri()) {
+      const writeId = crypto.randomUUID();
+      for (
+        let offset = 0;
+        offset < Math.max(bytes.byteLength, 1);
+        offset += MAX_IPC_WRITE_BYTES
+      ) {
+        await invoke('write_local_file_chunk', {
+          relativePath: filePath,
+          writeId,
+          offset,
+          bytesBase64: encodeBase64(
+            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+          ),
+          finalChunk: offset + MAX_IPC_WRITE_BYTES >= bytes.byteLength,
+        });
+        if (offset + MAX_IPC_WRITE_BYTES < bytes.byteLength) {
+          await new Promise<void>((resolve) => {
+            if (document.visibilityState === 'visible') {
+              requestAnimationFrame(() => setTimeout(resolve, 0));
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+        }
+      }
+    } else {
+      const file = await open(filePath, {
+        write: true,
+        create: true,
+        truncate: true,
         baseDir: BaseDirectory.AppData,
-      },
-    );
+      });
+      try {
+        for (let offset = 0; offset < bytes.byteLength; ) {
+          const written = await file.write(
+            bytes.subarray(offset, offset + MAX_IPC_WRITE_BYTES),
+          );
+          if (written === 0) {
+            throw new Error('Could not write local file bytes');
+          }
+          offset += written;
+        }
+      } finally {
+        await file.close();
+      }
+    }
   }
 
   /**
