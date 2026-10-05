@@ -22,18 +22,17 @@ export function useCreateNewOptions({
 
   return [
     {
-      id: 'folder',
-      label: strings.library.createNew.folder,
-      icon: FolderPlus,
-      onClick: onNewFolder,
-      separatorAfter: true,
-    },
-    {
       id: 'canvas',
       label: strings.library.createNew.canvas,
       icon: LayoutGrid,
       onClick: () =>
         onNewFile?.(strings.library.createNew.untitledCanvas, 'mcanvas'),
+    },
+    {
+      id: 'folder',
+      label: strings.library.createNew.folder,
+      icon: FolderPlus,
+      onClick: onNewFolder,
     },
     {
       id: 'import',

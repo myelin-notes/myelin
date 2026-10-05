@@ -73,8 +73,8 @@ export function useFolderItemContextMenu(
       onRename={startRenaming}
       onRemove={handleRemove}
       onManageTags={() => setTagDialogOpen(true)}
+      createSubmenu={options?.createSubmenu}
     >
-      {options?.createSubmenu}
       <FolderColorSubmenu
         color={node.color}
         onSelect={(color) => void applyColor(color)}

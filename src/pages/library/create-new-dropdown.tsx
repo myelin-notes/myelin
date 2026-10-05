@@ -6,7 +6,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -59,21 +58,18 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
         sideOffset={8}
         className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient"
       >
-        {options.map(
-          ({ id, label, icon: Icon, onClick, disabled, separatorAfter }) => (
-            <Fragment key={id}>
-              <DropdownMenuItem
-                className={createNewItemClass}
-                onClick={onClick}
-                disabled={disabled}
-              >
-                <Icon className="size-4" />
-                {label}
-              </DropdownMenuItem>
-              {separatorAfter && <DropdownMenuSeparator />}
-            </Fragment>
-          ),
-        )}
+        {options.map(({ id, label, icon: Icon, onClick, disabled }) => (
+          <Fragment key={id}>
+            <DropdownMenuItem
+              className={createNewItemClass}
+              onClick={onClick}
+              disabled={disabled}
+            >
+              <Icon className="size-4" />
+              {label}
+            </DropdownMenuItem>
+          </Fragment>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
