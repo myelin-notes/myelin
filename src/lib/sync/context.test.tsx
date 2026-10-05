@@ -1,6 +1,12 @@
 import { act, StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import {
+  CustomColorsProvider,
+  useCustomColors,
+} from '@myelin/editor/custom-colors';
+import { PenPresetsProvider, usePenPresets } from '@myelin/editor/pen-presets';
+import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { RepositoryProvider } from './context';
 import type { RepositoryConfig } from './repo/config';
@@ -155,4 +161,107 @@ it('loads the saved repository after Strict Mode replay and releases it on switc
     ['repository_release', { handle: 'handle-1' }],
     ['repository_release', { handle: 'handle-2' }],
   ]);
+});
+
+it('discards preference loads from a repository replaced while opening and reports active failures', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('window', {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  });
+  const ownerDocument = {
+    nodeType: 9,
+    addEventListener: () => {},
+    defaultView: { document: {}, HTMLIFrameElement: class {} },
+  };
+  const root = createRoot({
+    nodeType: 1,
+    tagName: 'DIV',
+    ownerDocument,
+    addEventListener: () => {},
+  } as unknown as HTMLElement);
+  const errors = vi
+    .spyOn(Logger.prototype, 'error')
+    .mockImplementation(() => {});
+  let finishOpening!: () => void;
+  const opening = new Promise<void>((resolve) => {
+    finishOpening = resolve;
+  });
+  let opens = 0;
+  const manifest = createEmptyManifest();
+  manifest.colors.pen = ['#123456'];
+  let fail = false;
+  vi.mocked(invoke).mockImplementation(async (command) => {
+    if (command === 'repository_open') {
+      const handle = `handle-${++opens}`;
+      if (opens === 1) {
+        await opening;
+      }
+      return {
+        handle,
+        status: {
+          repositoryId: 'local',
+          online: true,
+          pendingRemoteWrites: 0,
+          lastRemoteSyncAt: null,
+          lastError: null,
+          dataVersion: 0,
+        },
+      };
+    }
+    if (command === 'repository_release') {
+      return;
+    }
+    if (fail) {
+      throw new Error('Metadata unavailable');
+    }
+    return { manifest, revision: '1' };
+  });
+  let colors: string[] = [];
+  function Consumer() {
+    colors = useCustomColors('pen').colors;
+    usePenPresets();
+    return null;
+  }
+  const render = (config: RepositoryConfig) =>
+    root.render(
+      <RepositoryProvider config={config}>
+        <CustomColorsProvider>
+          <PenPresetsProvider>
+            <Consumer />
+          </PenPresetsProvider>
+        </CustomColorsProvider>
+      </RepositoryProvider>,
+    );
+  try {
+    await act(async () => render({ kind: 'local' }));
+    expect(opens).toBe(1);
+    const config: RepositoryConfig = {
+      kind: 'github',
+      owner: 'myelin',
+      repo: 'notes',
+      branch: 'main',
+      credentialId: 'work',
+    };
+    await act(async () => render(config));
+    expect(opens).toBe(2);
+    expect(colors).toEqual(['#123456']);
+    await act(async () => finishOpening());
+    expect(errors).not.toHaveBeenCalled();
+    expect(colors).toEqual(['#123456']);
+    fail = true;
+    await act(async () => render({ kind: 'local' }));
+    expect(errors).toHaveBeenCalledWith(
+      'Failed to load custom colors',
+      expect.any(Error),
+    );
+    expect(errors).toHaveBeenCalledWith(
+      'Failed to load pen presets',
+      expect.any(Error),
+    );
+  } finally {
+    await act(async () => root.unmount());
+    errors.mockRestore();
+    vi.unstubAllGlobals();
+  }
 });
