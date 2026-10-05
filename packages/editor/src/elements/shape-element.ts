@@ -6,8 +6,8 @@ import type { Messages } from '../i18n/messages';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { ShapeType } from '../shape-recognizer';
+import { AnchorableElement } from './anchorable-element';
 import {
-  DrawableElement,
   MIN_SCALE,
   type ResizeHandle,
   ResizeHandles,
@@ -26,7 +26,7 @@ const MIN_PDF_WORLD_SIZE = 1;
  * normalized local frame, so world placement, resize, translate and undo are inherited from the
  * base class transform machinery.
  */
-export class ShapeElement extends DrawableElement {
+export class ShapeElement extends AnchorableElement {
   protected box: DOMRect = new DOMRect(0, 0, 0, 0);
 
   /** Pre-drag geometry snapshot; resize ratios are cumulative from drag start. */

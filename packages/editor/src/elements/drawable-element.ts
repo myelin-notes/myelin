@@ -344,10 +344,7 @@ export abstract class DrawableElement {
     if (dx === 0 && dy === 0) {
       return;
     }
-    this._offset.x += dx;
-    this._offset.y += dy;
-    this.syncToYMap({ offsetX: this._offset.x, offsetY: this._offset.y });
-    this.onTransformChanged?.();
+    this.setOffset(this.offset.x + dx, this.offset.y + dy);
   }
 
   public setOffset(x: number, y: number) {
@@ -389,7 +386,7 @@ export abstract class DrawableElement {
       return;
     }
     ctx.save();
-    ctx.translate(this._offset.x, this._offset.y);
+    ctx.translate(this.offset.x, this.offset.y);
     ctx.scale(this._scale.x, this._scale.y);
     this.draw2D(ctx, deltaTime);
     ctx.restore();
@@ -498,10 +495,10 @@ export abstract class DrawableElement {
   /** Read-only world-space bounds; reused until the geometry changes. */
   public get boundingBox(): DOMRect {
     const raw = this.localBoundingBox;
-    const x1 = raw.x * this._scale.x + this._offset.x;
-    const y1 = raw.y * this._scale.y + this._offset.y;
-    const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
-    const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
+    const x1 = raw.x * this._scale.x + this.offset.x;
+    const y1 = raw.y * this._scale.y + this.offset.y;
+    const x2 = (raw.x + raw.width) * this._scale.x + this.offset.x;
+    const y2 = (raw.y + raw.height) * this._scale.y + this.offset.y;
     const x = Math.min(x1, x2);
     const y = Math.min(y1, y2);
     const width = Math.abs(x2 - x1);
@@ -523,10 +520,10 @@ export abstract class DrawableElement {
   // renderer asks this of every element, every frame.
   public intersectsWorldRect(rect: DOMRect, margin: number): boolean {
     const raw = this.localBoundingBox;
-    const x1 = raw.x * this._scale.x + this._offset.x;
-    const y1 = raw.y * this._scale.y + this._offset.y;
-    const x2 = (raw.x + raw.width) * this._scale.x + this._offset.x;
-    const y2 = (raw.y + raw.height) * this._scale.y + this._offset.y;
+    const x1 = raw.x * this._scale.x + this.offset.x;
+    const y1 = raw.y * this._scale.y + this.offset.y;
+    const x2 = (raw.x + raw.width) * this._scale.x + this.offset.x;
+    const y2 = (raw.y + raw.height) * this._scale.y + this.offset.y;
     return (
       Math.max(x1, x2) >= rect.x - margin &&
       Math.min(x1, x2) <= rect.right + margin &&
@@ -542,8 +539,8 @@ export abstract class DrawableElement {
     radius: number,
     ctx: CanvasRenderingContext2D,
   ): boolean {
-    const localX = (x - this._offset.x) / this._scale.x;
-    const localY = (y - this._offset.y) / this._scale.y;
+    const localX = (x - this.offset.x) / this._scale.x;
+    const localY = (y - this.offset.y) / this._scale.y;
     const localRadius =
       radius / Math.min(Math.abs(this._scale.x), Math.abs(this._scale.y));
     return this.isOverLocal(localX, localY, localRadius, ctx);

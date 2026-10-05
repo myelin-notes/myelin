@@ -183,12 +183,13 @@ export class PenTool implements ITool {
     this.interrupt(canvas);
   }
 
-  public interrupt(_canvas: DrawableCanvas): void {
+  public interrupt(canvas: DrawableCanvas): void {
     this.clearDwellTimer();
     if (this.currentStroke) {
       this.currentStroke.updateBounds();
       // Persist the buffered points once, now that the stroke is finished.
       this.currentStroke.commit();
+      canvas.anchoring?.autoAnchorStroke(this.currentStroke);
     } else {
       this.currentShape?.updateBounds();
     }

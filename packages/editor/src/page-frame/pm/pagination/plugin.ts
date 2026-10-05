@@ -1,6 +1,7 @@
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { DecorationSet, type EditorView } from 'prosemirror-view';
 import type { PageLayout } from '../../../elements/page-frame-constants';
+import { anchorGapsKey } from '../anchoring';
 import { PM_ADD_TO_HISTORY } from '../constants';
 import { type Break, PAGE_BREAK_GAP } from './core';
 import {
@@ -359,7 +360,11 @@ export function paginationPlugin(
         update(view, prevState) {
           // Skip selection-only state changes — they don't affect layout
           // and the previous pagination is still valid.
-          if (view.state.doc !== prevState.doc) {
+          if (
+            view.state.doc !== prevState.doc ||
+            anchorGapsKey.getState(view.state) !==
+              anchorGapsKey.getState(prevState)
+          ) {
             schedule(SETTLE_PASS_COUNT);
           }
         },

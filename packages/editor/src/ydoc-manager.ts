@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import type { PageFrameAnchor } from './elements/anchorable-element';
 import { ElementType } from './elements/element-type';
 
 /** Origins used to label Yjs updates flowing through the canvas sync layer. */
@@ -104,6 +105,19 @@ export class YDocManager {
   // undo of the deletion restores both the element and its content.
   removeElementMap(yMap: Y.Map<unknown>): void {
     this.doc.transact(() => {
+      if (yMap.get('type') === ElementType.PAGE_FRAME) {
+        const uuid = yMap.get('uuid');
+        for (let index = this.elements.length - 1; index >= 0; index--) {
+          const child = this.elements.get(index);
+          const anchor = child.get('pageAnchor') as
+            | PageFrameAnchor
+            | null
+            | undefined;
+          if (anchor && anchor.frameId === uuid) {
+            this.elements.delete(index, 1);
+          }
+        }
+      }
       for (let i = 0; i < this.elements.length; i++) {
         if (this.elements.get(i) === yMap) {
           if (yMap.get('type') === ElementType.PAGE_FRAME) {

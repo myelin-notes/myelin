@@ -187,3 +187,23 @@ describe('YDocManager.sweepOrphanPageFrameFragments', () => {
     expect(ydoc.sweepOrphanPageFrameFragments()).toBe(0);
   });
 });
+
+it('deletes anchored elements through the document API and undoes the cascade atomically', () => {
+  const ydoc = new YDocManager();
+  const frame = ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame', {});
+  ydoc.createElementMap(ElementType.STROKE, 'anchored', {
+    pageAnchor: { frameId: 'frame' },
+  });
+  ydoc.createElementMap(ElementType.STROKE, 'free', {});
+  ydoc.undoManager.stopCapturing();
+  ydoc.removeElementMap(frame);
+  expect(ydoc.elements.toArray().map((map) => map.get('uuid'))).toEqual([
+    'free',
+  ]);
+  ydoc.undoManager.undo();
+  expect(ydoc.elements.toArray().map((map) => map.get('uuid'))).toEqual([
+    'frame',
+    'anchored',
+    'free',
+  ]);
+});

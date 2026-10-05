@@ -835,6 +835,10 @@ const fr: typeof en = {
       insert: 'Insérer',
     },
     selectionToolbar: {
+      anchor: 'Ancrer à la page',
+      unanchor: 'Détacher de la page',
+      makeSpace: 'Réserver de l’espace dans la page',
+
       label: 'Ordre de la sélection',
       copy: 'Copier',
       copied: 'Copié dans le presse-papiers',

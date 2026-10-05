@@ -7,11 +7,8 @@ import type { Vector2 } from '../../drawable-canvas';
 import { codeRunStore } from '../../page-frame/pm/code-block/run-store';
 import { PM_EDITOR_CLASS } from '../../page-frame/pm/constants';
 import { mapPmRectToScreen } from '../../page-frame/pm/screen-rect';
-import {
-  DrawableElement,
-  type ResizeHandle,
-  ResizeHandles,
-} from '../drawable-element';
+import { AnchorableElement } from '../anchorable-element';
+import { type ResizeHandle, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
 import { CodeOutputCardView } from './card-view';
@@ -42,7 +39,7 @@ interface WorldRect {
  * frame (in-memory only — Yjs offset is written on drag), so it follows document edits and frame
  * moves; the first user drag detaches it for good.
  */
-export class CodeOutputElement extends DrawableElement {
+export class CodeOutputElement extends AnchorableElement {
   private _frameUuid: string;
   private _blockId: string;
   private _detached = false;

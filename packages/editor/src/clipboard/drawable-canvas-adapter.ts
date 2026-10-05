@@ -81,6 +81,7 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
           type: element.type,
           bounds: rectFromDomRect(element.boundingBox),
           yMap: element.yMap,
+          offset: { ...element.offset },
           pageFrameFragment:
             element instanceof PageFrameElement ? element.yXmlFragment : null,
         },
@@ -166,6 +167,7 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
         const newUuid = crypto.randomUUID();
 
         nextMap.set('uuid', newUuid);
+        nextMap.set('pageAnchor', null);
         nextMap.set(
           'offsetX',
           asNumber(sourceMap.get('offsetX')) + placement.translate.x,

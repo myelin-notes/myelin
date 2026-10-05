@@ -127,7 +127,12 @@ export function buildCanvasClipboardSnapshot(
 
   clipboardDoc.transact(() => {
     for (const item of selection.items) {
-      clipboardDoc.elements.push([cloneYMap(item.yMap)]);
+      const map = cloneYMap(item.yMap);
+      if (item.offset) {
+        map.set('offsetX', item.offset.x);
+        map.set('offsetY', item.offset.y);
+      }
+      clipboardDoc.elements.push([map]);
       if (item.pageFrameFragment) {
         copyXmlFragmentInto(
           clipboardDoc.getXmlFragment(item.uuid),
