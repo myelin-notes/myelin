@@ -31,6 +31,7 @@ interface UseExplorerItemOptions {
   nodeIds?: readonly string[];
   onChanged: () => void | Promise<void>;
   initialRenaming?: boolean;
+  onRenameEnd?: (nodeId: string) => void;
   renameReferencesOnRename?: boolean;
 }
 
@@ -41,17 +42,28 @@ export function useExplorerItem({
   nodeIds = [nodeId],
   onChanged,
   initialRenaming,
+  onRenameEnd,
   renameReferencesOnRename,
 }: UseExplorerItemOptions) {
   const strings = useMessages();
   const repository = useRepository();
   const [renaming, setRenaming] = useState(initialRenaming ?? false);
+  const [previousInitialRenaming, setPreviousInitialRenaming] =
+    useState(initialRenaming);
   const [dragging, setDragging] = useState(false);
   const [renameValue, setRenameValue] = useState(name);
   const [pendingReferencesPrompt, setPendingReferencesPrompt] =
     useState<PendingRenameReferencesPrompt | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const renameInFlightRef = useRef(false);
+
+  if (initialRenaming !== previousInitialRenaming) {
+    setPreviousInitialRenaming(initialRenaming);
+    if (initialRenaming) {
+      setRenameValue(name);
+      setRenaming(true);
+    }
+  }
 
   useEffect(() => {
     if (renaming) {
@@ -67,6 +79,7 @@ export function useExplorerItem({
 
   const cancelRenaming = () => {
     setRenaming(false);
+    onRenameEnd?.(nodeId);
     setRenameValue(name);
   };
 
@@ -91,6 +104,7 @@ export function useExplorerItem({
       logger.error('Failed to rename node', err, { nodeId, trimmed });
     }
     setRenaming(false);
+    onRenameEnd?.(nodeId);
     await onChanged();
   };
 
@@ -140,6 +154,7 @@ export function useExplorerItem({
           backlinks,
         });
         setRenaming(false);
+        onRenameEnd?.(nodeId);
       }
     } finally {
       renameInFlightRef.current = false;

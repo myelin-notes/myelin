@@ -25,6 +25,7 @@ interface FileItemProps {
   file: VFSFileNode;
   searchMatch?: NodeSearchResult;
   autoRename?: boolean;
+  onRenameEnd?: (nodeId: string) => void;
   onChanged: () => Promise<void>;
 }
 
@@ -32,6 +33,7 @@ export function FileItem({
   file,
   searchMatch,
   autoRename,
+  onRenameEnd,
   onChanged,
 }: FileItemProps) {
   const repository = useRepository();
@@ -56,6 +58,7 @@ export function FileItem({
     dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
+    onRenameEnd,
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
