@@ -6,6 +6,7 @@ import { removeThumbnail } from '@myelin/editor/thumbnails';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { trackEvent } from '@/lib/analytics';
 import type { SearchIndex } from '@/lib/search';
 import type {
   NativeDocumentChange,
@@ -188,6 +189,16 @@ export class NativeRepository implements Repository {
         await listen<NativeStatus>('repository-status', ({ payload }) => {
           if (payload.repositoryId === this.repositoryId && !this.disposed) {
             this.applyStatus(payload);
+          }
+        }),
+      );
+      this.unlisteners.push(
+        await listen<{
+          repositoryId: string;
+          properties: Record<string, string | number | boolean>;
+        }>('repository-sync-diagnostics', ({ payload }) => {
+          if (payload.repositoryId === this.repositoryId && !this.disposed) {
+            trackEvent('sync_diagnostics', payload.properties);
           }
         }),
       );

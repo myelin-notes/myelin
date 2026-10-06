@@ -1,7 +1,7 @@
 use super::{
     document,
     store::{file_name, now, FileWrite, Store, SyncState},
-    Changes, RepositoryEngine, RepositoryManager,
+    telemetry, Changes, RepositoryEngine, RepositoryManager,
 };
 use crate::repository_metadata as metadata;
 use crate::{
@@ -919,12 +919,66 @@ impl RepositoryEngine {
         app: &AppHandle,
         refresh_auth: bool,
     ) -> Result<(), String> {
+        let trace = telemetry::SyncTrace::new();
+        let started = std::time::Instant::now();
+        let result = trace
+            .scope(self.synchronize_traced(app, refresh_auth))
+            .await;
+        let status = self.status().await;
+        trace.set("duration_ms", started.elapsed().as_millis() as u64);
+        trace.set("pending_writes_end", status.pending_remote_writes as u64);
+        trace.set(
+            "outcome",
+            if result.is_err() {
+                "error"
+            } else if status.last_error.is_some() {
+                "recovery_required"
+            } else {
+                "success"
+            },
+        );
+        let fields = trace.fields();
+        if fields
+            .get("pending_writes_start")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            > 0
+            || fields.contains_key("plan_ms")
+            || result.is_err()
+            || status.last_error.is_some()
+            || started.elapsed().as_secs() >= 5
+        {
+            trace.set("sync_id", uuid::Uuid::new_v4().to_string());
+            trace.set("repository_key", super::store::revision(self.id.as_bytes()));
+            let _ = app.emit(
+                "repository-sync-diagnostics",
+                json!({
+                    "repositoryId": self.id,
+                    "properties": trace.fields(),
+                }),
+            );
+        }
+        result
+    }
+
+    async fn synchronize_traced(&self, app: &AppHandle, refresh_auth: bool) -> Result<(), String> {
+        let trace = telemetry::current();
+        let waiting = trace.phase("network_lock_wait");
         let _network = self.network_lock.lock().await;
+        drop(waiting);
         let Some(mut source) = self.source.lock().await.clone() else {
             return Ok(());
         };
+        trace.set(
+            "repository_kind",
+            match &source {
+                RepositorySource::Github { .. } => "github",
+                RepositorySource::GoogleDrive { .. } => "google-drive",
+            },
+        );
         let result = async {
             if refresh_auth {
+                let _auth = trace.phase("auth");
                 let token = app
                     .state::<RepositoryManager>()
                     .token(app, self, false)
@@ -935,11 +989,14 @@ impl RepositoryEngine {
                 .cycle(source.clone(), &RemoteEndpoints::default())
                 .await;
             if outcome.as_ref().is_err_and(|error| error.contains("(401)")) {
+                trace.add("auth_retry_count", 1);
+                let auth = trace.phase("auth");
                 let token = app
                     .state::<RepositoryManager>()
                     .token(app, self, true)
                     .await?;
                 set_token(&mut source, token);
+                drop(auth);
                 outcome = self
                     .cycle(source.clone(), &RemoteEndpoints::default())
                     .await;
@@ -948,6 +1005,9 @@ impl RepositoryEngine {
             outcome
         }
         .await;
+        if result.is_err() && !trace.fields().contains_key("last_failed_stage") {
+            trace.record_failure();
+        }
         self.online.store(result.is_ok(), Ordering::Relaxed);
         *self.error.lock().unwrap() = result.as_ref().err().cloned();
         match result {
@@ -984,7 +1044,24 @@ impl RepositoryEngine {
         source: RepositorySource,
         endpoints: &RemoteEndpoints,
     ) -> Result<Changes, String> {
+        let trace = telemetry::current();
+        trace.add("cycle_count", 1);
+        let capture_phase = trace.phase("capture");
         let captured = self.with_store(capture).await?;
+        drop(capture_phase);
+        if !trace.fields().contains_key("pending_writes_start") {
+            trace.set("pending_writes_start", captured.operations.len() as u64);
+        }
+        trace.set(
+            "document_count",
+            captured.snapshot.manifest["nodes"]
+                .as_object()
+                .unwrap()
+                .values()
+                .filter(|node| node["type"] == "file")
+                .count() as u64,
+        );
+        let head_check = trace.phase("remote_check");
         let mut unchanged_head = false;
         let mut pending_drive_deletions = false;
         if let RepositorySource::Github {
@@ -1014,6 +1091,8 @@ impl RepositoryEngine {
                 return Ok(Changes::default());
             }
         }
+        drop(head_check);
+        trace.set("remote_unchanged", unchanged_head);
         let stage = self
             .cache_dir
             .join("repository-sync")
@@ -1022,6 +1101,7 @@ impl RepositoryEngine {
             .await
             .map_err(|error| error.to_string())?;
         let result = async {
+            let basis_read = trace.phase("read_basis");
             let cache = self.basis_dir();
             let sync = captured.snapshot.sync.clone();
             let basis =
@@ -1033,16 +1113,23 @@ impl RepositoryEngine {
                 .map(|basis| basis.cached_files(&self.basis_dir()))
                 .transpose()?
                 .unwrap_or_default();
+            drop(basis_read);
+            trace.set("basis_reused", basis.as_ref().is_some_and(|basis| unchanged_head && basis.sync.sidecars));
             let mut remote = match basis {
                 Some(basis) if unchanged_head && basis.sync.sidecars => basis,
                 _ => {
-                    download::download_repository_cached(
+                    let download_phase = trace.phase("download");
+                    let (files, bytes) = download::download_repository_cached(
                         &stage,
                         source.clone(),
                         endpoints,
                         &cached,
                     )
                     .await?;
+                    trace.add("download_snapshot_file_count", files as u64);
+                    trace.add("download_bytes", bytes);
+                    drop(download_phase);
+                    let _read = trace.phase("read_remote_snapshot");
                     let path = stage.clone();
                     tauri::async_runtime::spawn_blocking(move || Snapshot::read(&path))
                         .await
@@ -1078,15 +1165,22 @@ impl RepositoryEngine {
                     Ok(changes)
                 }).await;
             }
+            let planning = trace.phase("plan");
             let (captured, mut plan) = tauri::async_runtime::spawn_blocking(move || {
                 let planned = plan(&captured, remote)?;
                 Ok::<_, String>((captured, planned))
             })
             .await
             .map_err(|error| error.to_string())??;
+            drop(planning);
+            trace.add("upload_file_count", plan.additions.len() as u64);
+            trace.add("upload_bytes", plan.additions.values().map(|bytes| bytes.len() as u64).sum());
+            trace.add("delete_file_count", plan.deletions.len() as u64);
             if !plan.additions.is_empty() || !plan.deletions.is_empty() || pending_drive_deletions {
+                let _upload = trace.phase("upload");
                 upload(&self.cache_dir, &source, endpoints, &mut plan).await?;
             }
+            let save_basis = trace.phase("save_basis");
             let cache = self.basis_dir();
             let mut plan = tauri::async_runtime::spawn_blocking(move || {
                 plan.snapshot.save_basis(&cache, &cached)?;
@@ -1094,11 +1188,17 @@ impl RepositoryEngine {
             })
             .await
             .map_err(|error| error.to_string())??;
+            drop(save_basis);
+            let _publish = trace.phase("publish");
             plan.snapshot.sync.last_remote_sync_at = Some(now());
             self.with_store(move |store| publish(store, captured, plan))
                 .await
         }
         .await;
+        if result.is_err() {
+            trace.record_failure();
+        }
+        let _cleanup = trace.phase("cleanup");
         let _ = tokio::fs::remove_dir_all(stage).await;
         let _ = self.clean_bases().await;
         result
@@ -1224,11 +1324,27 @@ async fn upload(
                     deletions: plan.deletions.clone(),
                 };
                 let cache_dir = cache_dir.to_owned();
+                let trace = telemetry::current();
+                let native_phase = trace.phase("git_native");
                 let native = tauri::async_runtime::spawn_blocking(move || {
-                    crate::github_push::push_batch(&cache_dir, request)
+                    trace.sync_scope(|| crate::github_push::push_batch(&cache_dir, request))
                 })
                 .await
                 .map_err(|error| error.to_string())?;
+                drop(native_phase);
+                if !native
+                    .as_ref()
+                    .is_ok_and(|response| response.status == "pushed")
+                {
+                    telemetry::current().record_failure();
+                }
+                telemetry::current().set(
+                    "git_native_outcome",
+                    match &native {
+                        Ok(response) => response.status,
+                        Err(_) => "error",
+                    },
+                );
                 let _ = tokio::fs::remove_dir_all(stage).await;
                 match native {
                     Ok(response) if response.status == "head-conflict" => {
@@ -1250,6 +1366,12 @@ async fn upload(
             let commit = match pushed {
                 Some(commit) => commit,
                 None => {
+                    let trace = telemetry::current();
+                    trace.add("git_rest_count", 1);
+                    if endpoints.github == RemoteEndpoints::default().github {
+                        trace.add("git_rest_fallback_count", 1);
+                    }
+                    let _rest = trace.phase("git_rest");
                     github_rest_push(
                         &client,
                         endpoints,
@@ -1807,6 +1929,7 @@ async fn drive_write(
     url.query_pairs_mut()
         .append_pair("uploadType", "media")
         .append_pair("fields", "id,name,headRevisionId,appProperties");
+    telemetry::current().add("http_request_count", 1);
     let response = client
         .client
         .patch(url)
@@ -1873,6 +1996,7 @@ async fn drive_metadata_write(
     url.query_pairs_mut()
         .append_pair("uploadType", "multipart")
         .append_pair("fields", "id,name,headRevisionId,appProperties");
+    telemetry::current().add("http_request_count", 1);
     let response = client
         .client
         .post(url)

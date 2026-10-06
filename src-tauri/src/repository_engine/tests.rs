@@ -1829,19 +1829,44 @@ async fn native_github_upload_retains_newer_deltas_retries_and_reuses_a_single_r
     );
     let first_basis = engine.store.lock().unwrap().sync.basis_id.clone().unwrap();
     state.lock().unwrap().fail_blob = true;
-    assert!(engine
-        .cycle(github_source(), &server.endpoints)
+    let failed_trace = telemetry::SyncTrace::new();
+    assert!(failed_trace
+        .scope(engine.cycle(github_source(), &server.endpoints))
         .await
         .is_err());
+    let failed = failed_trace.fields();
+    assert_eq!(failed["last_failed_stage"], "git_rest");
+    assert!(failed["upload_ms"].is_number());
+    assert!(!failed.contains_key("save_basis_ms"));
     assert_eq!(
         engine.store.lock().unwrap().sync.basis_id.as_deref(),
         Some(first_basis.as_str())
     );
     assert!(!engine.store.lock().unwrap().outbox.is_empty());
-    engine
-        .cycle(github_source(), &server.endpoints)
+    let trace = telemetry::SyncTrace::new();
+    trace
+        .scope(engine.cycle(github_source(), &server.endpoints))
         .await
         .unwrap();
+    let fields = trace.fields();
+    for phase in [
+        "capture_ms",
+        "remote_check_ms",
+        "read_basis_ms",
+        "plan_ms",
+        "upload_ms",
+        "git_rest_ms",
+        "save_basis_ms",
+        "publish_ms",
+        "cleanup_ms",
+    ] {
+        assert!(fields[phase].is_number(), "{phase}");
+    }
+    assert_eq!(fields["basis_reused"], true);
+    assert_eq!(fields["document_count"], 1);
+    assert!(fields["upload_bytes"].as_u64().unwrap() > 0);
+    assert!(fields["http_request_count"].as_u64().unwrap() > 0);
+    assert!(!fields.contains_key("last_failed_stage"));
     assert!(engine.store.lock().unwrap().outbox.is_empty());
     assert_document(&state.lock().unwrap().files["canvas"]);
     let basis_root = engine
@@ -2913,4 +2938,41 @@ async fn native_github_sync_does_not_read_unchanged_document_contents() {
     fs::set_permissions(&path, permissions).unwrap();
     assert_eq!(fs::read(path).unwrap(), picture);
     assert_eq!(read(&engine, "picture").await, picture);
+}
+
+#[tokio::test]
+async fn sync_diagnostics_include_recovered_http_retries() {
+    let requests = Arc::new(AtomicUsize::new(0));
+    let seen = requests.clone();
+    let server = TestServer::new(move |_| {
+        if seen.fetch_add(1, Ordering::SeqCst) == 0 {
+            (500, Vec::new())
+        } else {
+            (200, b"{}".to_vec())
+        }
+    })
+    .await;
+    let client =
+        crate::repository_bootstrap::download::RemoteClient::new("secret-token".into(), false)
+            .unwrap();
+    let trace = telemetry::SyncTrace::new();
+    trace
+        .scope(client.json(
+            "Test request",
+            tauri_plugin_http::reqwest::Method::GET,
+            server.endpoints.drive.parse().unwrap(),
+            None,
+        ))
+        .await
+        .unwrap();
+    let fields = trace.fields();
+    assert_eq!(fields["http_request_count"], 2);
+    assert_eq!(fields["http_retry_count"], 1);
+    assert_eq!(fields["http_last_retry_status"], 500);
+    assert_eq!(fields["http_error_count"], 1);
+    assert_eq!(fields["http_last_error_status"], 500);
+    assert!(fields["http_retry_wait_ms"].as_u64().unwrap() >= 500);
+    assert!(!serde_json::to_string(&fields)
+        .unwrap()
+        .contains("secret-token"));
 }

@@ -90,6 +90,7 @@ impl RemoteClient {
         url: Url,
         body: Option<Value>,
     ) -> Result<Response, String> {
+        let trace = crate::repository_engine::telemetry::current();
         let mut slept = Duration::ZERO;
         let attempts = if self.github { 2 } else { 4 };
         for attempt in 0..attempts {
@@ -108,18 +109,30 @@ impl RemoteClient {
                     .header("Content-Type", "application/json")
                     .body(serde_json::to_vec(body).map_err(|_| "Invalid repository request")?);
             }
+            trace.add("http_request_count", 1);
             let response = request
                 .send()
                 .await
-                .map_err(|_| format!("{label} before receiving a response"))?;
+                .map_err(|_| {
+                    trace.add("http_transport_error_count", 1);
+                    format!("{label} before receiving a response")
+                })?;
             let status = response.status().as_u16();
+            if status >= 400 && status != 404 {
+                trace.add("http_error_count", 1);
+                trace.set("http_last_error_status", u64::from(status));
+            }
             let retryable = matches!(status, 403 | 429) || (!self.github && status >= 500);
             let delay = retry_delay(&response, attempt, self.github);
             if retryable && attempt + 1 < attempts {
                 if let Some(delay) = delay.filter(|delay| slept + *delay <= Duration::from_secs(60))
                 {
                     slept += delay;
+                    trace.add("http_retry_count", 1);
+                    trace.set("http_last_retry_status", u64::from(status));
+                    let waiting = std::time::Instant::now();
                     tokio::time::sleep(delay).await;
+                    trace.add("http_retry_wait_ms", waiting.elapsed().as_millis() as u64);
                     continue;
                 }
             }
@@ -331,6 +344,7 @@ async fn download_github(
         if url.scheme() != "https" || url.host_str() != Some("codeload.github.com") {
             return Err("Invalid GitHub tarball redirect".into());
         }
+        crate::repository_engine::telemetry::current().add("http_request_count", 1);
         response = client
             .client
             .get(url)
@@ -827,8 +841,16 @@ async fn download_drive(
                 drive: endpoints.drive.clone(),
                 drive_upload: endpoints.drive_upload.clone(),
             };
+            let trace = crate::repository_engine::telemetry::current();
             tasks.spawn(async move {
-                download_drive_entry(&client, &endpoints, &entry, &destination).await
+                trace
+                    .scope(download_drive_entry(
+                        &client,
+                        &endpoints,
+                        &entry,
+                        &destination,
+                    ))
+                    .await
             });
         }
         while let Some(result) = tasks.join_next().await {

@@ -2,6 +2,7 @@ mod document;
 mod onenote;
 mod references;
 mod remote;
+pub(crate) mod telemetry;
 pub(crate) mod store;
 #[cfg(test)]
 mod tests;

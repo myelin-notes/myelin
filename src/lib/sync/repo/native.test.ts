@@ -7,6 +7,7 @@ import en from '@myelin/editor/i18n/messages/en';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { invoke } from '@tauri-apps/api/core';
+import { trackEvent } from '@/lib/analytics';
 import { createCanvasFile } from '@/pages/library/import/canvas-file';
 import { importGoodnotesZip } from '@/pages/library/import/goodnotes';
 import { importObsidianVault } from '@/pages/library/import/obsidian-vault';
@@ -25,6 +26,7 @@ import { createEmptyManifest } from './shared';
 const { listeners } = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }));
+vi.mock('@/lib/analytics', () => ({ trackEvent: vi.fn() }));
 vi.mock('@myelin/editor/pdf-renderer', () => ({
   createDefaultPdfPageOrder: (pageCount: number) =>
     Array.from({ length: pageCount }, (_, originalIndex) => ({
@@ -1042,4 +1044,28 @@ it('imports a Goodnotes ZIP canvas while its manifest is unpublished', async () 
   expect(doc.elements.get(0).get('pdfData')).toEqual(new Uint8Array([4, 5, 6]));
   expect(native.operations.some((op) => op.kind === 'document')).toBe(false);
   await repository.dispose();
+});
+
+it('reports sync diagnostics only for the active repository and releases the listener', async () => {
+  nativeBoundary();
+  vi.mocked(trackEvent).mockClear();
+  const repository = await createRepositoryFromConfig({ kind: 'local' });
+  await repository.initialize();
+  const report = listeners.get('repository-sync-diagnostics')!;
+  const properties = {
+    sync_id: 'sync-1',
+    duration_ms: 93000,
+    git_fetch_ms: 90000,
+  };
+  report({ payload: { repositoryId: 'another-repository', properties } });
+  expect(trackEvent).not.toHaveBeenCalled();
+  report({ payload: { repositoryId: 'local', properties } });
+  expect(trackEvent).toHaveBeenCalledExactlyOnceWith(
+    'sync_diagnostics',
+    properties,
+  );
+  await repository.dispose();
+  expect(listeners.has('repository-sync-diagnostics')).toBe(false);
+  report({ payload: { repositoryId: 'local', properties } });
+  expect(trackEvent).toHaveBeenCalledTimes(1);
 });

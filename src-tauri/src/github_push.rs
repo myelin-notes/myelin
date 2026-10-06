@@ -112,9 +112,12 @@ fn push_batch_to_url(
 ) -> Result<GitPushResponse, String> {
     static GIT_PUSH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     // ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
+    let trace = crate::repository_engine::telemetry::current();
+    let waiting = trace.phase("git_lock_wait");
     let _lock = GIT_PUSH_LOCK
         .lock()
         .map_err(|_| "Git push lock unavailable")?;
+    drop(waiting);
     #[cfg(any(target_os = "android", test))]
     {
         let cert_path = stage.with_file_name("cacert.pem");
@@ -141,6 +144,8 @@ fn push_batch_to_url(
     if !was_cached && repo_path.exists() {
         std::fs::remove_dir_all(repo_path).map_err(|_| "Git cache unavailable")?;
     }
+    trace.set("git_cache_hit", was_cached);
+    let fetching = trace.phase("git_fetch");
     let repo = if let Some(repo) = cached {
         let refspec = format!(
             "+refs/heads/{}:refs/remotes/origin/{}",
@@ -164,6 +169,8 @@ fn push_batch_to_url(
         Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
     };
 
+    drop(fetching);
+    let building = trace.phase("git_build_commit");
     let refname = format!("refs/heads/{}", request.branch);
     let parent = find_parent(&repo, &request.branch, was_cached)?;
     if parent.id().to_string() != request.expected_head_oid {
@@ -215,6 +222,8 @@ fn push_batch_to_url(
         )
         .map_err(|error| git_failure("Git commit failed", error))?;
 
+    drop(building);
+    let _pushing = trace.phase("git_push");
     let mut push_callbacks = RemoteCallbacks::new();
     push_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
     let rejected = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
