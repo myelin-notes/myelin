@@ -330,7 +330,23 @@ export class PageFrameAnchoring {
             element.boundingBox.height / frame.scale.y +
             element.pageAnchor!.spaceBefore,
         }));
-      setAnchorGaps(view, gaps);
+      const previousEnd = view.state.doc.content.size;
+      if (setAnchorGaps(view, gaps, positions.values())) {
+        for (const element of children) {
+          const pos = positions.get(element.uuid)!;
+          if (pos >= previousEnd - 1) {
+            const resolved = view.state.doc.resolve(pos);
+            element.setPageAnchor({
+              ...element.pageAnchor!,
+              position: encodeAnchorPosition(view.state, pos),
+              blockPosition: encodeAnchorPosition(
+                view.state,
+                resolved.depth > 0 ? resolved.before(1) : pos,
+              ),
+            });
+          }
+        }
+      }
       const widgets = new Map(
         Array.from(
           view.dom.querySelectorAll<HTMLElement>('[data-page-anchor]'),

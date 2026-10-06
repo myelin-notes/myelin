@@ -52,12 +52,19 @@ export function resolveAnchorPosition(
   return Math.max(0, Math.min(state.doc.content.size, resolved ?? 0));
 }
 
+/** Returns true when a trailing paragraph was inserted; callers must rebind end anchors before it. */
 export function setAnchorGaps(
   view: EditorView,
   gaps: readonly AnchorGap[],
-): void {
+  anchorPositions: Iterable<number>,
+): boolean {
+  const end = view.state.doc.content.size;
+  const needsParagraph = Array.from(anchorPositions).some(
+    (pos) => pos >= end - 1,
+  );
   const previous = anchorGapsKey.getState(view.state) ?? [];
   if (
+    !needsParagraph &&
     previous.length === gaps.length &&
     previous.every(
       (gap, i) =>
@@ -66,11 +73,16 @@ export function setAnchorGaps(
         gap.height === gaps[i].height,
     )
   ) {
-    return;
+    return false;
   }
-  view.dispatch(
-    view.state.tr.setMeta(anchorGapsKey, gaps).setMeta('addToHistory', false),
-  );
+  const tr = view.state.tr
+    .setMeta(anchorGapsKey, gaps)
+    .setMeta('addToHistory', false);
+  if (needsParagraph) {
+    tr.insert(end, view.state.schema.nodes.paragraph.create());
+  }
+  view.dispatch(tr);
+  return needsParagraph;
 }
 
 export function anchorGapsPlugin(): Plugin {
