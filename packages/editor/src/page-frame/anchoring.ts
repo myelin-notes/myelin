@@ -348,17 +348,23 @@ export class PageFrameAnchoring {
           ),
         ]),
       );
-      const gaps: AnchorGap[] = children
-        .filter((element) => element.makesSpace)
-        .map((element) => ({
-          id: element.uuid,
+      const gaps = new Map<string, AnchorGap>();
+      for (const element of children) {
+        if (!element.makesSpace) {
+          continue;
+        }
+        const anchor = element.pageAnchor!;
+        const id = anchor.sharedGap?.id ?? element.uuid;
+        gaps.set(id, {
+          id,
           pos: positions.get(element.uuid)!,
           height:
-            element.boundingBox.height / frame.scale.y +
-            element.pageAnchor!.spaceBefore,
-        }));
+            anchor.sharedGap?.height ??
+            element.boundingBox.height / frame.scale.y + anchor.spaceBefore,
+        });
+      }
       const previousEnd = view.state.doc.content.size;
-      if (setAnchorGaps(view, gaps, positions.values())) {
+      if (setAnchorGaps(view, [...gaps.values()], positions.values())) {
         for (const element of children) {
           const pos = positions.get(element.uuid)!;
           if (pos >= previousEnd - 1) {
@@ -384,7 +390,7 @@ export class PageFrameAnchoring {
         const origin = this.origin(
           frame,
           positions.get(element.uuid)!,
-          widgets.get(element.uuid),
+          widgets.get(element.pageAnchor!.sharedGap?.id ?? element.uuid),
         );
         if (origin) {
           const previous = this.origins.get(element.uuid);

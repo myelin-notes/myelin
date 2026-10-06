@@ -1,9 +1,24 @@
+import { EditorState, type Transaction } from 'prosemirror-state';
+import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it, vi } from 'vitest';
+import {
+  initProseMirrorDoc,
+  prosemirrorToYXmlFragment,
+  ySyncPlugin,
+} from 'y-prosemirror';
+import * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import { PAGE_GAP, PageFrameElement } from '../elements/page-frame-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { PageFrameAnchoring, pageContainsPoint } from './anchoring';
+import {
+  anchorGapsKey,
+  anchorGapsPlugin,
+  encodeAnchorPosition,
+} from './pm/anchoring';
+import type { PageFrameEditorState } from './pm/editor-state';
+import { schema } from './pm/schema';
 
 function stroke(points: number[]) {
   const element = new StrokeElement('stroke', points, false, {
@@ -56,6 +71,93 @@ describe('page frame anchoring', () => {
     frame.setPageLayout('continuous');
     frame.setMeasuredContentHeight(2000);
     expect(pageContainsPoint(frame, { x: 20, y: 1500 })).toBe(true);
+  });
+
+  it('keeps fragments at one gap through refresh and deletion of a fragment', () => {
+    const doc = new Y.Doc();
+    const fragment = doc.getXmlFragment('page');
+    prosemirrorToYXmlFragment(
+      schema.node('doc', null, [
+        schema.node('paragraph', null, schema.text('above')),
+        schema.node('paragraph', null, schema.text('below')),
+      ]),
+      fragment,
+    );
+    const initial = initProseMirrorDoc(fragment, schema);
+    const view = {
+      state: EditorState.create({
+        doc: initial.doc,
+        plugins: [
+          ySyncPlugin(fragment, { mapping: initial.mapping }),
+          anchorGapsPlugin(),
+        ],
+      }),
+      dispatch(tr: Transaction) {
+        this.state = this.state.apply(tr);
+      },
+      coordsAtPos: () => ({ left: 48, top: 250 }),
+      dom: {
+        querySelectorAll: () =>
+          (anchorGapsKey.getState(view.state) ?? []).map((gap, index) => ({
+            dataset: { pageAnchor: gap.id },
+            getBoundingClientRect: () =>
+              new DOMRect(48, 100 + index * gap.height, 100, gap.height),
+          })),
+      },
+    };
+    const frame = new PageFrameElement('frame');
+    frame.pmEditor = {
+      view: view as unknown as EditorView,
+    } as PageFrameEditorState;
+    frame.mountDOM(
+      {} as HTMLDivElement,
+      {
+        offsetWidth: 640,
+        getBoundingClientRect: () => new DOMRect(0, 0, 640, 880),
+      } as HTMLDivElement,
+    );
+    const first = stroke([0, 0, 0.5, 10, 0, 0.5]);
+    const second = new StrokeElement(
+      'second',
+      [20, 0, 0.5, 30, 0, 0.5],
+      false,
+      { color: 'black', size: 2 },
+    );
+    second.updateBounds();
+    for (const element of [first, second]) {
+      element.setMakesSpace(true);
+      element.setPageAnchor({
+        frameId: frame.uuid,
+        position: encodeAnchorPosition(view.state, 3),
+        blockPosition: encodeAnchorPosition(view.state, 0),
+        spaceBefore: 0,
+        x: 20,
+        y: 10,
+        sharedGap: { id: 'erased-group', height: 80 },
+      });
+    }
+    const elements: DrawableElement[] = [frame, first, second];
+    const anchors = controller(elements);
+    anchors.refresh();
+    expect(anchorGapsKey.getState(view.state)).toEqual([
+      { id: 'erased-group', pos: 3, height: 80 },
+    ]);
+    expect(first.offset).toEqual({ x: 20, y: 110 });
+    expect(second.offset).toEqual(first.offset);
+    expect(anchors.attachAtPosition(first, frame, 3)).toBe(true);
+    expect(anchorGapsKey.getState(view.state)?.map((gap) => gap.id)).toEqual([
+      first.uuid,
+      'erased-group',
+    ]);
+    elements.splice(1, 1);
+    anchors.refresh();
+    expect(anchorGapsKey.getState(view.state)).toEqual([
+      { id: 'erased-group', pos: 3, height: 80 },
+    ]);
+    expect(second.offset).toEqual({ x: 20, y: 110 });
+    elements.splice(1, 1);
+    anchors.refresh();
+    expect(anchorGapsKey.getState(view.state)).toEqual([]);
   });
 
   it('keeps partial overlap, unanchors after leaving, and does not reanchor children moving with their frame', () => {

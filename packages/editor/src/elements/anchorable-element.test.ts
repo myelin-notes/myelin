@@ -7,6 +7,7 @@ import { StrokeElement } from './stroke-element';
 
 const anchor: PageFrameAnchor = {
   frameId: 'page',
+  sharedGap: { id: 'original', height: 80 },
   spaceBefore: 0,
   position: [],
   blockPosition: [],

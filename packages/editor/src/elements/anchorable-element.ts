@@ -5,6 +5,8 @@ import { ElementType } from './element-type';
 
 export interface PageFrameAnchor {
   frameId: string;
+  /** Erased fragments share the original reservation until individually reanchored. */
+  sharedGap?: { id: string; height: number };
   /** Encoded Yjs relative position; survives edits and deletion of adjacent text. */
   position: number[];
   /** Falls back to the block boundary if the containing paragraph is deleted. */
@@ -16,17 +18,7 @@ export interface PageFrameAnchor {
   y: number;
 }
 
-export interface PageFrameAnchorable {
-  readonly pageAnchor: PageFrameAnchor | null;
-  readonly makesSpace: boolean;
-  setPageAnchor(anchor: PageFrameAnchor | null): void;
-  setMakesSpace(value: boolean): void;
-}
-
-export abstract class AnchorableElement
-  extends DrawableElement
-  implements PageFrameAnchorable
-{
+export abstract class AnchorableElement extends DrawableElement {
   private _pageAnchor: PageFrameAnchor | null = null;
   private _makesSpace: boolean | undefined;
   public anchorOrigin: (() => Vector2 | null) | null = null;
