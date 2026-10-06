@@ -825,6 +825,10 @@ const es: typeof en = {
       insert: 'Insertar',
     },
     selectionToolbar: {
+      anchor: 'Anclar a la página',
+      unanchor: 'Desanclar de la página',
+      makeSpace: 'Dejar espacio en la página',
+
       label: 'Orden de selección',
       copy: 'Copiar',
       copied: 'Copiado al portapapeles',

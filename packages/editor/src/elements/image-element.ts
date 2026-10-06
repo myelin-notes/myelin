@@ -4,11 +4,8 @@ import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { YDocManager } from '../ydoc-manager';
-import {
-  DrawableElement,
-  type ResizeHandle,
-  type SelectionToolbarItem,
-} from './drawable-element';
+import { AnchorableElement } from './anchorable-element';
+import type { ResizeHandle, SelectionToolbarItem } from './drawable-element';
 import { ElementType } from './element-type';
 
 const MIN_CROP_NATURAL = 1;
@@ -30,7 +27,7 @@ interface CropEntrySnapshot {
   offsetY: number;
 }
 
-export class ImageElement extends DrawableElement {
+export class ImageElement extends AnchorableElement {
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _bitmap: ImageBitmap | null = null;
   // So a render that starts before the bitmap lands can await it instead of drawing nothing.

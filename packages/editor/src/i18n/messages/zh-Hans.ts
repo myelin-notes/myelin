@@ -794,6 +794,10 @@ const zhHans: typeof en = {
       insert: '插入',
     },
     selectionToolbar: {
+      anchor: '锚定到页面',
+      unanchor: '取消页面锚定',
+      makeSpace: '在页面中留出空间',
+
       label: '选区层级',
       copy: '复制',
       copied: '已复制到剪贴板',

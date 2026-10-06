@@ -418,3 +418,20 @@ describe('paginateTableRows', () => {
     expect(result.pageAdvances).toBe(2);
   });
 });
+
+it('moves a full-width anchored gap and its following text together to the next page', () => {
+  const result = paginateParagraph(
+    [
+      line(740, 760, () => 11),
+      { ...line(760, 840, () => 15), isAnchorGap: true },
+      line(840, 860, () => 15),
+    ],
+    10,
+    30,
+    0,
+    CONTENT_HEIGHT,
+    0,
+  );
+  expect(result.breaks).toEqual([{ pos: 15, spacer: 160, kind: 'inline' }]);
+  expect(result.pageAdvances).toBe(1);
+});

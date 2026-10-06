@@ -400,16 +400,9 @@ export function SidebarTree({
     [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
 
-  useEffect(() => {
-    if (
-      !renamingId ||
-      !visibleRows.some(({ node }) => node.id === renamingId)
-    ) {
-      return;
-    }
-    const frame = requestAnimationFrame(() => setRenamingId(null));
-    return () => cancelAnimationFrame(frame);
-  }, [renamingId, visibleRows]);
+  const finishNewRename = useCallback((nodeId: string) => {
+    setRenamingId((current) => (current === nodeId ? null : current));
+  }, []);
 
   // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
   // Descendants of a selected folder are dropped too, or moving the set would flatten them.
@@ -469,6 +462,7 @@ export function SidebarTree({
     const rowProps = {
       depth,
       autoRename: !isFlat && node.id === renamingId,
+      onRenameEnd: finishNewRename,
       selected: selection.ids.has(node.id),
       selectionIds,
       onSelect: (e: React.MouseEvent) => selectRow(node.id, e),

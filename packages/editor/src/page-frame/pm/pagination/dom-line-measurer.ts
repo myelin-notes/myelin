@@ -719,6 +719,53 @@ function measureLinesWithDom(
   return lines;
 }
 
+function measureAnchoredParagraph(
+  measurement: ParagraphLineMeasurement,
+): ParagraphLine[] {
+  const { block, view, editorScreenTop, invScale, blockShift, metrics } =
+    measurement;
+  const breaks = Array.from(
+    block.dom.querySelectorAll<HTMLElement>('[data-page-break]'),
+    (dom) => ({
+      rect: dom.getBoundingClientRect(),
+      height: dom.offsetHeight,
+    }),
+  );
+  const naturalRect = (rect: { top: number; bottom: number }) => {
+    const shift =
+      blockShift +
+      breaks.reduce(
+        (sum, entry) =>
+          sum + (entry.rect.bottom <= rect.top + 0.5 ? entry.height : 0),
+        0,
+      );
+    return {
+      naturalTop: (rect.top - editorScreenTop) * invScale - shift,
+      naturalBottom: (rect.bottom - editorScreenTop) * invScale - shift,
+    };
+  };
+  const lines: ParagraphLine[] = [];
+  for (const entry of collectVisibleTextNodeRects(block.dom, metrics)) {
+    const offsets = computeVisibleTextLineStartOffsets(entry, metrics);
+    entry.rects.forEach((rect, index) => {
+      lines.push({
+        ...naturalRect(rect),
+        getPos: () => view.posAtDOM(entry.textNode, offsets[index], 1),
+      });
+    });
+  }
+  for (const dom of block.dom.querySelectorAll<HTMLElement>(
+    '[data-page-anchor]',
+  )) {
+    lines.push({
+      ...naturalRect(dom.getBoundingClientRect()),
+      getPos: () => view.posAtDOM(dom, 0),
+      isAnchorGap: true,
+    });
+  }
+  return lines.sort((a, b) => a.naturalTop - b.naturalTop);
+}
+
 export class DomParagraphLineMeasurer implements ParagraphLineMeasurer {
   private readonly caches: DomParagraphLineCaches = {
     domLineFragments: new WeakMap(),
@@ -727,6 +774,8 @@ export class DomParagraphLineMeasurer implements ParagraphLineMeasurer {
   };
 
   public measure(measurement: ParagraphLineMeasurement): ParagraphLine[] {
-    return measureLinesWithDom(measurement, this.caches);
+    return measurement.block.dom.querySelector('[data-page-anchor]')
+      ? measureAnchoredParagraph(measurement)
+      : measureLinesWithDom(measurement, this.caches);
   }
 }

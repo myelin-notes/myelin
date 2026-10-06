@@ -7,12 +7,13 @@ import { I18nProvider } from '../../i18n';
 import type { TranscriptSegment } from '../../platform/types';
 import type { LivePeer, LivePeersSnapshot } from '../../sync/live/peers';
 import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
+import { AnchorableElement } from '../anchorable-element';
 import type { CanvasElementContext } from '../canvas-element-context';
 import type {
   CanvasSearchContent,
   SearchableElement,
 } from '../canvas-searchable-element';
-import { DrawableElement, ResizeHandles } from '../drawable-element';
+import { ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
 import { AudioPlayerView } from './player-view';
@@ -33,7 +34,10 @@ function recordingFileName(mimeType: string): string {
   return ext ? `recording.${ext}` : 'recording';
 }
 
-export class AudioElement extends DrawableElement implements SearchableElement {
+export class AudioElement
+  extends AnchorableElement
+  implements SearchableElement
+{
   private _audioData: Uint8Array<ArrayBuffer> | null = null;
   private _fileName: string = '';
   private _duration: number = 0;

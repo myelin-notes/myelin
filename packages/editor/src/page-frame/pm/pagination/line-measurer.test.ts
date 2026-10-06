@@ -116,7 +116,10 @@ describe('DomParagraphLineMeasurer', () => {
     const measurement: ParagraphLineMeasurement = {
       block: {
         pos: 10,
-        dom: { clientWidth: 100 } as HTMLElement,
+        dom: {
+          clientWidth: 100,
+          querySelector: () => null,
+        } as unknown as HTMLElement,
         height: 40,
         measuredTop: 0,
         nodeSize: 7,
@@ -158,4 +161,52 @@ describe('DomParagraphLineMeasurer', () => {
       rangeCallsAfterFirstMeasurement,
     );
   });
+});
+
+it('keeps reserved anchor height while removing only pagination spacer height from line measurements', () => {
+  const anchor = {
+    offsetHeight: 80,
+    getBoundingClientRect: () => new DOMRect(0, 170, 100, 80),
+  };
+  const pageBreak = {
+    offsetHeight: 150,
+    getBoundingClientRect: () => new DOMRect(0, 20, 100, 150),
+  };
+  vi.stubGlobal('document', {
+    createRange: () => ({}),
+    createTreeWalker: () => ({ nextNode: () => null }),
+  });
+  vi.stubGlobal('NodeFilter', { SHOW_TEXT: 4 });
+  const blockDom = {
+    querySelector: () => anchor,
+    querySelectorAll: (selector: string) =>
+      selector === '[data-page-break]' ? [pageBreak] : [anchor],
+  };
+  const measurement: ParagraphLineMeasurement = {
+    block: {
+      pos: 10,
+      dom: blockDom as unknown as HTMLElement,
+      height: 250,
+      measuredTop: 0,
+      nodeSize: 20,
+      isBreakableTextBlock: true,
+      isBreakableTableBlock: false,
+      isPageHeightConstrained: false,
+    },
+    view: { posAtDOM: () => 15 } as unknown as EditorView,
+    editorScreenTop: 0,
+    invScale: 1,
+    blockNaturalTop: 0,
+    blockShift: 0,
+    metrics: null,
+    measurementCacheGeneration: 1,
+  };
+  const lines = new DomParagraphLineMeasurer().measure(measurement);
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toMatchObject({
+    naturalTop: 20,
+    naturalBottom: 100,
+    isAnchorGap: true,
+  });
+  expect(lines[0].getPos()).toBe(15);
 });

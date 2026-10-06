@@ -67,7 +67,21 @@ export function collectPaginationBlocks(
     });
   });
 
-  return result;
+  for (const dom of view.dom.querySelectorAll<HTMLElement>(
+    ':scope > [data-page-anchor]',
+  )) {
+    result.push({
+      pos: view.posAtDOM(dom, 0),
+      dom,
+      height: dom.offsetHeight,
+      measuredTop: dom.offsetTop - editorOffsetTop,
+      nodeSize: 0,
+      isBreakableTextBlock: false,
+      isBreakableTableBlock: false,
+      isPageHeightConstrained: false,
+    });
+  }
+  return result.sort((a, b) => a.pos - b.pos || a.measuredTop - b.measuredTop);
 }
 
 export { BrowserParagraphLineMeasurer } from './browser-line-measurer';

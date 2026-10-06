@@ -140,15 +140,19 @@ export function ExplorerTree({
     void reload();
   });
 
+  const finishNewRename = useCallback((nodeId: string) => {
+    setRenamingNewId((current) => (current === nodeId ? null : current));
+  }, []);
+
   const startNewFolder = useCallback(async () => {
     const node = await explorer.createFolder(
       currentFolderId,
       strings.library.createNew.unnamedFolder,
     );
     setRenamingNewId(node.id);
-    setNodes((prev) => [node, ...prev]);
+    setNodes((prev) => [node, ...prev.filter((item) => item.id !== node.id)]);
+    setLoading(false);
     onChanged?.();
-    requestAnimationFrame(() => setRenamingNewId(null));
   }, [
     currentFolderId,
     explorer,
@@ -160,9 +164,9 @@ export function ExplorerTree({
     async (title: string, type: FileType) => {
       const node = await explorer.createFile(currentFolderId, title, type);
       setRenamingNewId(node.id);
-      setNodes((prev) => [...prev, node]);
+      setNodes((prev) => [...prev.filter((item) => item.id !== node.id), node]);
+      setLoading(false);
       onChanged?.();
-      requestAnimationFrame(() => setRenamingNewId(null));
     },
     [currentFolderId, explorer, onChanged],
   );
@@ -268,6 +272,7 @@ export function ExplorerTree({
           <GridFolderItem
             folder={node}
             autoRename={node.id === renamingNewId}
+            onRenameEnd={finishNewRename}
             onNavigate={() => onNavigate(node.id)}
             onMoved={reloadAndNotify}
           />
@@ -276,6 +281,7 @@ export function ExplorerTree({
             file={node}
             searchMatch={searchMatches.get(node.id)}
             autoRename={node.id === renamingNewId}
+            onRenameEnd={finishNewRename}
             onChanged={reloadAndNotify}
           />
         );
@@ -284,6 +290,7 @@ export function ExplorerTree({
         <FolderItem
           folder={node}
           autoRename={node.id === renamingNewId}
+          onRenameEnd={finishNewRename}
           onNavigate={() => onNavigate(node.id)}
           onMoved={reloadAndNotify}
         />
@@ -292,6 +299,7 @@ export function ExplorerTree({
           file={node}
           searchMatch={searchMatches.get(node.id)}
           autoRename={node.id === renamingNewId}
+          onRenameEnd={finishNewRename}
           onChanged={reloadAndNotify}
         />
       );
@@ -300,6 +308,7 @@ export function ExplorerTree({
       sortedNodes,
       viewMode,
       renamingNewId,
+      finishNewRename,
       onNavigate,
       reloadAndNotify,
       searchMatches,

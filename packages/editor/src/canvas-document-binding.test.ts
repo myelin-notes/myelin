@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type * as Y from 'yjs';
 import { CanvasDocumentBinding } from './canvas-document-binding';
+import { ElementType } from './elements/element-type';
+import { PageFrameElement } from './elements/page-frame-element';
 import { StrokeElement } from './elements/stroke-element';
 import { YDocManager } from './ydoc-manager';
 
@@ -16,7 +18,10 @@ function createBinding(ydoc: YDocManager) {
     if (typeof uuid !== 'string') {
       return null;
     }
-    const element = createStroke(uuid);
+    const element =
+      yMap.get('type') === ElementType.PAGE_FRAME
+        ? new PageFrameElement(uuid)
+        : createStroke(uuid);
     element.bindToYMap(yMap);
     return element;
   };
@@ -57,4 +62,32 @@ describe('CanvasDocumentBinding', () => {
     expect(removed).toHaveBeenCalledWith(element);
     binding.destroy();
   });
+});
+
+it('deletes anchored children with a frame and restores them in one undo', () => {
+  const ydoc = new YDocManager();
+  const { binding } = createBinding(ydoc);
+  const frame = binding.addElement(
+    (uuid) => new PageFrameElement(uuid),
+    undefined,
+  );
+  const child = binding.addElement(createStroke, undefined);
+  const free = binding.addElement(createStroke, undefined);
+  child.setPageAnchor({
+    frameId: frame.uuid,
+    position: [],
+    blockPosition: [],
+    spaceBefore: 0,
+    x: 0,
+    y: 0,
+  });
+  ydoc.undoManager.stopCapturing();
+  binding.removeElement(frame);
+  expect(binding.elements.map((element) => element.uuid)).toEqual([free.uuid]);
+  ydoc.undoManager.undo();
+  expect(new Set(binding.elements.map((element) => element.uuid))).toEqual(
+    new Set([frame.uuid, child.uuid, free.uuid]),
+  );
+  ydoc.undoManager.redo();
+  expect(binding.elements.map((element) => element.uuid)).toEqual([free.uuid]);
 });

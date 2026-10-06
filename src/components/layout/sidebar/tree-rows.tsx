@@ -24,6 +24,7 @@ const tagListProps = {
 interface RowProps {
   depth: number;
   autoRename: boolean;
+  onRenameEnd: (nodeId: string) => void;
   selected: boolean;
   /** Every selected row id; drag and Remove act on all of them when this row is selected. */
   selectionIds: readonly string[];
@@ -47,6 +48,7 @@ export function SidebarFolderRow({
   depth,
   expanded,
   autoRename,
+  onRenameEnd,
   selected,
   selectionIds,
   onSelect,
@@ -69,6 +71,7 @@ export function SidebarFolderRow({
   } = useFolderItemContextMenu(node, onChanged, {
     nodeIds: selected ? selectionIds : undefined,
     initialRenaming: autoRename,
+    onRenameEnd,
     createSubmenu: (
       <FolderCreateSubmenu
         onNewFolder={onNewFolder}
@@ -157,6 +160,7 @@ export function SidebarFileRow({
   node,
   depth,
   autoRename,
+  onRenameEnd,
   selected,
   selectionIds,
   onSelect,
@@ -173,6 +177,7 @@ export function SidebarFileRow({
     dialogs,
   } = useFileItemContextMenu(node, onChanged, {
     initialRenaming: autoRename,
+    onRenameEnd,
     nodeIds: selected ? selectionIds : undefined,
   });
   const FileIcon = getFileTypeIcon(node.fileType);

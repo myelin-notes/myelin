@@ -4,6 +4,10 @@ import {
 } from 'lucide-react';
 import { getCanvasPalette, withCanvasAlpha } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import type {
+  AnchorableElement,
+  PageFrameAnchor,
+} from '../elements/anchorable-element';
 import { ElementType } from '../elements/element-type';
 import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
@@ -72,6 +76,7 @@ export class EraserTool implements ITool {
     const offset = { ...shape.offset };
     const scale = { ...shape.scale };
     const strokes: StrokeElement[] = [];
+    const anchor = this.fragmentAnchor(canvas, shape);
 
     canvas.transact(() => {
       canvas.removeElement(shape);
@@ -83,6 +88,9 @@ export class EraserTool implements ITool {
         }, originalIndex + strokes.length);
         stroke.setOffset(offset.x, offset.y);
         stroke.setScale(scale.x, scale.y);
+        stroke.setMakesSpace(shape.makesSpace);
+        stroke.setPageAnchor(anchor);
+        stroke.anchorOrigin = shape.anchorOrigin;
         strokes.push(stroke);
       }
       for (const stroke of strokes) {
@@ -115,7 +123,12 @@ export class EraserTool implements ITool {
     const offset = { ...stroke.offset };
     const scale = { ...stroke.scale };
 
+    const anchor =
+      runs.length > 1 ? this.fragmentAnchor(canvas, stroke) : stroke.pageAnchor;
     canvas.transact(() => {
+      if (anchor !== stroke.pageAnchor) {
+        stroke.setPageAnchor(anchor);
+      }
       stroke.replacePoints(runs[0]);
       for (let i = 1; i < runs.length; i++) {
         const fragment = canvas.addElement((uuid) => {
@@ -127,8 +140,31 @@ export class EraserTool implements ITool {
         }, originalIndex + i);
         fragment.setOffset(offset.x, offset.y);
         fragment.setScale(scale.x, scale.y);
+        fragment.setMakesSpace(stroke.makesSpace);
+        fragment.setPageAnchor(anchor);
+        fragment.anchorOrigin = stroke.anchorOrigin;
       }
     });
+  }
+
+  private fragmentAnchor(
+    canvas: DrawableCanvas,
+    element: AnchorableElement,
+  ): PageFrameAnchor | null {
+    const anchor = element.pageAnchor;
+    if (!anchor || !element.makesSpace || anchor.sharedGap) {
+      return anchor;
+    }
+    const frame = canvas.elements.find((item) => item.uuid === anchor.frameId);
+    return {
+      ...anchor,
+      sharedGap: {
+        id: crypto.randomUUID(),
+        height:
+          element.boundingBox.height / (frame?.scale.y ?? 1) +
+          anchor.spaceBefore,
+      },
+    };
   }
 
   public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {

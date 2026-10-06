@@ -21,6 +21,7 @@ interface ItemContextMenuProps {
   onReveal?: () => void;
   onManageTags?: () => void;
   onVersionHistory?: () => void;
+  createSubmenu?: ReactNode;
   /** Extra items rendered after Manage Tags. */
   children?: ReactNode;
 }
@@ -32,12 +33,14 @@ export function ItemContextMenu({
   onReveal,
   onManageTags,
   onVersionHistory,
+  createSubmenu,
   children,
 }: ItemContextMenuProps) {
   const strings = useMessages();
 
   return (
     <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
+      {createSubmenu}
       <ContextMenuItem
         className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
         onClick={onRename}

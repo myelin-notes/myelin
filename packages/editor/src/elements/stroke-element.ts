@@ -4,7 +4,7 @@ import { resolveInkColor } from '../canvas-theme';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import { CollisionHelper } from '../utils/collision-helper';
-import { DrawableElement } from './drawable-element';
+import { AnchorableElement } from './anchorable-element';
 import { ElementType } from './element-type';
 
 export interface StrokeStyle {
@@ -31,7 +31,7 @@ const POINT_FLUSH_INTERVAL_MS = 300;
 // stroke keeps perfect-freehand's velocity simulation, which is what a mouse wants.
 const NO_SENSOR_PRESSURE = 0.5;
 
-export class StrokeElement extends DrawableElement {
+export class StrokeElement extends AnchorableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
   protected cachedPath: Path2D;

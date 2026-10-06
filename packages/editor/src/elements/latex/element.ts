@@ -4,7 +4,8 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import { mountLatexProbe } from '../../page-frame/pm/math/latex-probe';
 import { renderKatex } from '../../page-frame/pm/math/render';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
-import { DrawableElement, ResizeHandles } from '../drawable-element';
+import { AnchorableElement } from '../anchorable-element';
+import { ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import {
   createLatexEditOverlay,
@@ -64,7 +65,7 @@ function measureLatex(latex: string): Size {
  * canvas-specific. KaTeX is HTML, so this paints as a DOM overlay: draw2D is a no-op and the
  * visual lives in syncDOM. Resize scales uniformly (no reflow), hence locked-aspect corner handles.
  */
-export class LatexElement extends DrawableElement {
+export class LatexElement extends AnchorableElement {
   private _latex: string;
   private _natural: Size = { width: EMPTY_WIDTH, height: EMPTY_HEIGHT };
   private _editing = false;

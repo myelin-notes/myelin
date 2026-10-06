@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import { ElementType } from '../elements/element-type';
+import { PageFrameElement } from '../elements/page-frame-element';
 import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { catalogs } from '../i18n/messages';
@@ -140,6 +141,64 @@ describe('EraserTool', () => {
     expect(addElement).toHaveBeenCalledWith(expect.any(Function), 1);
     expect(removeElement).not.toHaveBeenCalled();
     expect(transact).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    'stroke',
+    'shape',
+  ])('shares one reservation when splitting an anchored %s', (kind) => {
+    const frame = new PageFrameElement('frame');
+    frame.setScale(2, 2);
+    const style = { color: '#123456', size: 2 };
+    const element =
+      kind === 'stroke'
+        ? new StrokeElement(
+            'original',
+            [0, 0, 0.5, 10, 0, 0.5, 20, 0, 0.5, 30, 0, 0.5, 40, 0, 0.5],
+            false,
+            style,
+          )
+        : new ShapeElement('original', 'rect', [0, 0, 100, 60], style);
+    element.updateBounds();
+    element.setScale(2, 2);
+    element.setMakesSpace(true);
+    element.anchorOrigin = () => ({ x: 100, y: 200 });
+    element.setPageAnchor({
+      frameId: frame.uuid,
+      position: [],
+      blockPosition: [],
+      spaceBefore: 8,
+      x: 20,
+      y: 30,
+    });
+    const offset = { ...element.offset };
+    const height = element.boundingBox.height / frame.scale.y + 8;
+    const elements: DrawableElement[] = [frame, element];
+    const { canvas } = makeCanvas(elements);
+    const tool = new EraserTool(() => catalogs.en);
+    usePreciseMode(tool);
+
+    tool.update(canvas, {} as PointerEvent, {
+      x: offset.x + (kind === 'stroke' ? 20 : 100),
+      y: offset.y,
+    });
+
+    const fragments = elements.filter((item) => item instanceof StrokeElement);
+    expect(fragments.length).toBeGreaterThan(1);
+    const gap = fragments[0].pageAnchor!.sharedGap;
+    expect(gap).toEqual({ id: expect.any(String), height });
+    expect(gap!.id).not.toBe(element.uuid);
+    for (const fragment of fragments) {
+      expect(fragment.pageAnchor?.sharedGap).toEqual(gap);
+      expect(fragment.makesSpace).toBe(true);
+      expect(fragment.offset).toEqual(offset);
+    }
+    tool.update(canvas, {} as PointerEvent, { x: offset.x, y: offset.y });
+    for (const fragment of elements.filter(
+      (item) => item instanceof StrokeElement,
+    )) {
+      expect(fragment.pageAnchor?.sharedGap).toEqual(gap);
+    }
   });
 
   it('keeps the only surviving run on the original stroke', () => {

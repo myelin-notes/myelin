@@ -24,6 +24,7 @@ import type {
 import type { ElementType } from './elements/element-type';
 import type { Vector2 } from './geometry';
 import { catalogs, type MessageGetter } from './i18n/messages';
+import { PageFrameAnchoring } from './page-frame/anchoring';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
@@ -288,7 +289,12 @@ export class DrawableCanvas {
     this.viewport.destroy();
   }
 
+  public readonly anchoring = new PageFrameAnchoring(this, () =>
+    this.notifyChange(),
+  );
+
   public redraw(deltaTime: number): void {
+    this.anchoring.refresh();
     this.renderer.redraw(
       deltaTime,
       this.viewport,

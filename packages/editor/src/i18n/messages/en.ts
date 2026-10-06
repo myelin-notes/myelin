@@ -817,6 +817,10 @@ const en = {
       insert: 'Insert',
     },
     selectionToolbar: {
+      anchor: 'Anchor to page',
+      unanchor: 'Unanchor from page',
+      makeSpace: 'Make space in page',
+
       label: 'Selection order',
       copy: 'Copy',
       copied: 'Copied to clipboard',

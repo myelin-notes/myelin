@@ -24,6 +24,7 @@ import {
 interface Props {
   folder: VFSFolderNode;
   autoRename?: boolean;
+  onRenameEnd?: (nodeId: string) => void;
   onNavigate: () => void;
   onMoved: () => void;
 }
@@ -31,6 +32,7 @@ interface Props {
 export function GridFolderItem({
   folder,
   autoRename,
+  onRenameEnd,
   onNavigate,
   onMoved,
 }: Props) {
@@ -45,6 +47,7 @@ export function GridFolderItem({
     dialogs,
   } = useFolderItemContextMenu(folder, onMoved, {
     initialRenaming: autoRename,
+    onRenameEnd,
   });
 
   const { dragOver, dropTargetProps } = useDropTarget({

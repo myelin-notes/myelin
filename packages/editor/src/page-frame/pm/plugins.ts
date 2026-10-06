@@ -4,6 +4,7 @@ import { Plugin as ProseMirrorPlugin } from 'prosemirror-state';
 import { tableEditing } from 'prosemirror-tables';
 import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
+import { anchorGapsPlugin } from './anchoring';
 import type { ResolveMediaSrc } from './embed/renderer';
 import { buildKeymap, calloutCaretAnchorCleanupPlugin } from './keymap';
 import { embedPreviewPlugin } from './markdown/embeds';
@@ -102,6 +103,7 @@ export function buildPlugins(
     checkListPlugin(schema),
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
+    anchorGapsPlugin(),
     paginationPlugin(onLayout),
     selectionHighlightPlugin(),
     searchHighlightPlugin(),

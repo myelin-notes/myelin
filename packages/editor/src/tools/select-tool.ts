@@ -6,6 +6,7 @@ import {
 import { isApplePlatform } from '@myelin/shared/os';
 import { getCanvasPalette } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { AnchorableElement } from '../elements/anchorable-element';
 import {
   type DrawableElement,
   MIN_SCALE,
@@ -356,7 +357,17 @@ export class SelectTool implements ITool {
         const dy = position.y - this.lastPoint.y;
         this.totalDelta.x += dx;
         this.totalDelta.y += dy;
+        const movingIds = new Set(
+          this.movingElements.map((element) => element.uuid),
+        );
         for (const e of this.movingElements) {
+          if (
+            e instanceof AnchorableElement &&
+            e.pageAnchor &&
+            movingIds.has(e.pageAnchor.frameId)
+          ) {
+            continue;
+          }
           e.translate(dx, dy);
         }
         this.lastPoint = position;
@@ -472,13 +483,22 @@ export class SelectTool implements ITool {
             canvas.enterElementEdit(this.clickToEditCandidate, event);
           }
         }
+        if (this.totalDelta.x !== 0 || this.totalDelta.y !== 0) {
+          canvas.anchoring?.finishTransform(this.movingElements);
+        }
         // Yjs captures translate() mutations automatically — no command needed
         break;
       }
       case SelectMode.Scaling: {
+        if (this.scaleInteraction?.kind === 'group') {
+          canvas.anchoring?.finishTransform(
+            this.scaleInteraction.transforms.map((item) => item.element),
+          );
+        }
         // Yjs captures mutations automatically — no command needed
         if (this.scaleInteraction?.kind === 'element') {
           this.scaleInteraction.element.endResize();
+          canvas.anchoring?.finishTransform([this.scaleInteraction.element]);
         }
         break;
       }
