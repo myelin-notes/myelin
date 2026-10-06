@@ -20,6 +20,12 @@ import {
   setAnchorGaps,
 } from './pm/anchoring';
 
+export interface PageFramePasteTarget {
+  frameId: string;
+  position: number[];
+  blockPosition: number[];
+}
+
 function pageBounds(frame: PageFrameElement): DOMRect[] {
   return Array.from(
     { length: frame.pageLayout === 'continuous' ? 1 : frame.numPages },
@@ -183,7 +189,21 @@ export class PageFrameAnchoring {
         bounds.left +
         (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
     }
-    let pos = view.posAtCoords(coords)?.pos ?? view.state.doc.content.size;
+    const pos = view.posAtCoords(coords)?.pos ?? view.state.doc.content.size;
+    return this.attachAtPosition(element, frame, pos);
+  }
+
+  public attachAtPosition(
+    element: AnchorableElement,
+    frame: PageFrameElement,
+    position: number,
+    placeAtCursor = false,
+  ): boolean {
+    const view = frame.pmEditor?.view;
+    if (!view) {
+      return false;
+    }
+    let pos = position;
     const resolved = view.state.doc.resolve(pos);
     // Gaps inside tables, lists, and source editors would reserve only a cell or nested block.
     if (
@@ -198,6 +218,13 @@ export class PageFrameAnchoring {
     if (!origin) {
       return false;
     }
+    if (placeAtCursor) {
+      element.setOffset(
+        frame.offset.x + (origin.x + PAGE_PADDING) * frame.scale.x,
+        frame.offset.y + origin.y * frame.scale.y,
+      );
+    }
+    const box = element.boundingBox;
     const offset = element.offset;
     this.origins.set(element.uuid, origin);
     element.anchorOrigin = () => this.worldOrigin(element, frame);

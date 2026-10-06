@@ -12,6 +12,7 @@ import {
   MYELIN_CANVAS_CLIPBOARD_LABEL,
   MYELIN_CANVAS_CLIPBOARD_MIME,
 } from '@myelin/editor/clipboard/formats';
+import { handlePageFrameImagePaste } from '@myelin/editor/clipboard/page-frame-image-paste';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useMessages } from '@myelin/editor/i18n';
 import { invoke } from '@tauri-apps/api/core';
@@ -113,6 +114,15 @@ export function useCanvasClipboard({
     if (!id) {
       return;
     }
+    const canvas = drawableCanvasRef.current;
+    if (
+      canvas &&
+      handlePageFrameImagePaste(event, canvas, (files, target) => {
+        embedFiles(files, undefined, undefined, target);
+      })
+    ) {
+      return;
+    }
     const adapter = new DrawableCanvasClipboardAdapter(drawableCanvasRef, id);
     controller.handlePaste(event, adapter, handleMediaPaste);
   });
@@ -174,11 +184,11 @@ export function useCanvasClipboard({
 
     document.addEventListener('copy', handleCopy);
     document.addEventListener('cut', handleCut);
-    document.addEventListener('paste', handlePaste);
+    document.addEventListener('paste', handlePaste, true);
     return () => {
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('cut', handleCut);
-      document.removeEventListener('paste', handlePaste);
+      document.removeEventListener('paste', handlePaste, true);
     };
   }, [
     controller,

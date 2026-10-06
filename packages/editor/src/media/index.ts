@@ -1,4 +1,5 @@
 import type { DrawableCanvas } from '../drawable-canvas';
+import type { PageFramePasteTarget } from '../page-frame/anchoring';
 import type { NoteLinkResolveSource } from '../page-frame/note-link/resolution';
 import { audioImportHandler } from './audio';
 import { imageImportHandler } from './images';
@@ -9,6 +10,7 @@ export interface MediaImportOptions {
   repository?: NoteLinkResolveSource;
   screenX?: number;
   screenY?: number;
+  pageFramePaste?: PageFramePasteTarget;
 }
 
 export type MediaImportHandler = (
@@ -33,6 +35,10 @@ export function getMediaImportHandler(
 ): MediaImportHandler | undefined {
   return (
     EXACT_HANDLERS[type] ??
-    (type.startsWith('audio/') ? audioImportHandler : undefined)
+    (type.startsWith('image/')
+      ? imageImportHandler
+      : type.startsWith('audio/')
+        ? audioImportHandler
+        : undefined)
   );
 }
