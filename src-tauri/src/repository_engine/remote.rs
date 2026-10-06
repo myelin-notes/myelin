@@ -15,8 +15,9 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
     sync::atomic::Ordering,
 };
 use tauri::{AppHandle, Emitter, Manager};
@@ -29,8 +30,25 @@ struct Snapshot {
     legacy: Option<Vec<u8>>,
     corrupt: Vec<String>,
     marker: bool,
-    files: HashMap<String, Vec<u8>>,
+    files: HashMap<String, SnapshotFile>,
     sync: SyncState,
+}
+
+#[derive(Clone)]
+enum SnapshotFile {
+    Cached(PathBuf),
+    Loaded(Vec<u8>),
+}
+
+impl SnapshotFile {
+    fn read(&self) -> Result<Cow<'_, [u8]>, String> {
+        match self {
+            Self::Cached(path) => std::fs::read(path)
+                .map(Cow::Owned)
+                .map_err(|error| error.to_string()),
+            Self::Loaded(bytes) => Ok(Cow::Borrowed(bytes)),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -69,6 +87,13 @@ impl Snapshot {
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
                 Err(error) => return Err(error.to_string()),
             };
+        let github_revisions: HashMap<String, String> =
+            match std::fs::read(root.join(".remote-file-revisions.json")) {
+                Ok(bytes) => serde_json::from_slice(&bytes)
+                    .map_err(|_| "Unreadable GitHub file revisions")?,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => HashMap::new(),
+                Err(error) => return Err(error.to_string()),
+            };
         for (id, node) in manifest["nodes"]
             .as_object()
             .ok_or("Invalid repository manifest")?
@@ -77,10 +102,12 @@ impl Snapshot {
                 continue;
             }
             let name = file_name(node)?;
-            let bytes =
-                std::fs::read(root.join("files").join(&name)).map_err(|error| error.to_string())?;
+            let file = SnapshotFile::Cached(root.join("files").join(&name));
             let revision = if head.is_some() {
-                Some(blob_sha(&bytes)?)
+                Some(match github_revisions.get(&name) {
+                    Some(revision) => revision.clone(),
+                    None => blob_sha(&file.read()?)?,
+                })
             } else {
                 drive
                     .get(&name)
@@ -89,7 +116,7 @@ impl Snapshot {
             if let Some(entry) = drive.get(&name) {
                 file_ids.insert(id.clone(), entry.id.clone());
             }
-            files.insert(id.clone(), bytes);
+            files.insert(id.clone(), file);
             revisions.insert(id.clone(), revision);
         }
         let sidecars = loaded.legacy.is_none();
@@ -225,7 +252,13 @@ impl Snapshot {
                     })
                 });
             if !linked {
-                super::store::atomic_write(&destination, bytes)?;
+                let linked = match bytes {
+                    SnapshotFile::Cached(path) => std::fs::hard_link(path, &destination).is_ok(),
+                    SnapshotFile::Loaded(_) => false,
+                };
+                if !linked {
+                    super::store::atomic_write(&destination, &bytes.read()?)?;
+                }
             }
         }
         crate::repository_bootstrap::sync_directory(&root.join("files"))?;
@@ -286,12 +319,13 @@ impl Snapshot {
         let mut files = HashMap::new();
         for (id, node) in manifest["nodes"].as_object().unwrap() {
             if node["type"] == "file" {
-                let bytes = match std::fs::read(root.join("files").join(file_name(node)?)) {
-                    Ok(bytes) => bytes,
+                let path = root.join("files").join(file_name(node)?);
+                match std::fs::metadata(&path) {
+                    Ok(_) => {}
                     Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
                     Err(error) => return Err(error.to_string()),
                 };
-                files.insert(id.clone(), bytes);
+                files.insert(id.clone(), SnapshotFile::Cached(path));
             }
         }
         Ok(Some(Self {
@@ -326,7 +360,7 @@ fn capture(store: &mut Store) -> Result<Captured, String> {
             .ok_or("Invalid queued repository file")?;
         let node = &store.manifest["nodes"][id];
         if node["type"] == "file" {
-            files.insert(id.into(), store.read_file(node)?);
+            files.insert(id.into(), SnapshotFile::Loaded(store.read_file(node)?));
         }
     }
     Ok(Captured {
@@ -493,21 +527,27 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
             .snapshot
             .files
             .get(source_id)
-            .ok_or("Queued repository file is missing")?;
-        let old = remote.files.get(&id).map(Vec::as_slice).unwrap_or_default();
+            .ok_or("Queued repository file is missing")?
+            .read()?;
+        let old = remote
+            .files
+            .get(&id)
+            .map(SnapshotFile::read)
+            .transpose()?
+            .unwrap_or_default();
         let replacement = recovered || op["replaceFile"] == true;
         let bytes = if node["fileType"] == "mcanvas" {
             if replacement {
-                local.clone()
+                local.to_vec()
             } else {
-                document::merge(old, local)?
+                document::merge(&old, &local)?
             }
         } else {
             let base = op.get("baseFileRevision").cloned().unwrap_or(Value::Null);
             let current = if old.is_empty() {
                 Value::Null
             } else {
-                json!(super::store::revision(old))
+                json!(super::store::revision(&old))
             };
             if !replacement && base != current && old != local {
                 let conflict_id = format!(
@@ -541,16 +581,20 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
                         .remove(&id);
                 }
                 remote.manifest["nodes"][&conflict_id] = conflict.clone();
-                additions.insert(format!("files/{}", file_name(&conflict)?), local.clone());
-                remote.files.insert(conflict_id, local.clone());
+                additions.insert(format!("files/{}", file_name(&conflict)?), local.to_vec());
+                remote
+                    .files
+                    .insert(conflict_id, SnapshotFile::Loaded(local.to_vec()));
                 continue;
             }
-            local.clone()
+            local.to_vec()
         };
         if old != bytes {
             additions.insert(format!("files/{}", file_name(&node)?), bytes.clone());
         }
-        remote.files.insert(id.clone(), bytes.clone());
+        remote
+            .files
+            .insert(id.clone(), SnapshotFile::Loaded(bytes.clone()));
         if node["fileType"] == "mcanvas" && node["system"].is_null() {
             let links = document::links(&document::decode(&bytes)?);
             if links.is_empty() {
@@ -651,12 +695,18 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         );
         let mut node = store.manifest["nodes"][id].clone();
         let local = store.read_file(&node)?;
-        let base = plan.snapshot.files.get(&recovery_id);
+        let base = plan
+            .snapshot
+            .files
+            .get(&recovery_id)
+            .map(SnapshotFile::read)
+            .transpose()?;
         let base_revision = base
+            .as_ref()
             .map(|bytes| json!(super::store::revision(bytes)))
             .unwrap_or(Value::Null);
         let bytes = if node["fileType"] == "mcanvas" {
-            document::merge(base.map(Vec::as_slice).unwrap_or_default(), &local)?
+            document::merge(base.as_deref().unwrap_or_default(), &local)?
         } else {
             local
         };
@@ -672,7 +722,9 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             node["parentId"] = Value::Null;
         }
         plan.snapshot.manifest["nodes"][&recovery_id] = node;
-        plan.snapshot.files.insert(recovery_id.clone(), bytes);
+        plan.snapshot
+            .files
+            .insert(recovery_id.clone(), SnapshotFile::Loaded(bytes));
         store.outbox.retain(|pending| pending["nodeId"] != id);
         recovered_updates.push((recovery_id, base_revision));
     }
@@ -686,10 +738,11 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 .any(|old| old["kind"] == "push-note" && old["nodeId"] == id)
         {
             if let Some(bytes) = plan.snapshot.files.get(id) {
+                let bytes = bytes.read()?;
                 op["baseFileRevision"] = if bytes.is_empty() {
                     Value::Null
                 } else {
-                    json!(super::store::revision(bytes))
+                    json!(super::store::revision(&bytes))
                 };
             }
         }
@@ -727,6 +780,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         let Some(downloaded) = plan.snapshot.files.get(id) else {
             continue;
         };
+        let downloaded = downloaded.read()?;
         let mut canvas_doc = None;
         let mut canvas_update = Vec::new();
         let bytes = if node["fileType"] == "mcanvas" {
@@ -743,9 +797,9 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             let doc = if new_replacement {
                 doc
             } else if replaced && !remaining.contains(id) {
-                document::decode(downloaded)?
+                document::decode(&downloaded)?
             } else {
-                document::apply(&doc, downloaded)?;
+                document::apply(&doc, &downloaded)?;
                 doc
             };
             canvas_update = document::diff(&doc, Some(&before))?.0;
@@ -755,7 +809,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         } else if remaining.contains(id) {
             current.clone()
         } else {
-            downloaded.clone()
+            downloaded.to_vec()
         };
         if bytes != current {
             writes.push(FileWrite {
@@ -1211,11 +1265,16 @@ async fn upload(
             };
             plan.snapshot.sync.head_revision = Some(commit);
             plan.snapshot.sync.sidecars = true;
-            for (id, bytes) in &plan.snapshot.files {
-                plan.snapshot
-                    .sync
-                    .file_revisions
-                    .insert(id.clone(), Some(blob_sha(bytes)?));
+            for (id, node) in plan.snapshot.manifest["nodes"].as_object().unwrap() {
+                if node["type"] != "file" {
+                    continue;
+                }
+                if let Some(bytes) = plan.additions.get(&format!("files/{}", file_name(node)?)) {
+                    plan.snapshot
+                        .sync
+                        .file_revisions
+                        .insert(id.clone(), Some(blob_sha(bytes)?));
+                }
             }
         }
         RepositorySource::GoogleDrive { folder_id, token } => {

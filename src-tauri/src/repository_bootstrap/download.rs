@@ -481,6 +481,19 @@ async fn download_github_cached(
         write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
     }
     write_durable(&stage.join(".remote-revision"), revision.as_bytes())?;
+    let revisions = files
+        .iter()
+        .map(|name| {
+            Ok((
+                name.clone(),
+                blob_revision(&format!("files/{name}"))?.to_owned(),
+            ))
+        })
+        .collect::<Result<HashMap<_, _>, String>>()?;
+    write_durable(
+        &stage.join(".remote-file-revisions.json"),
+        &serde_json::to_vec(&revisions).map_err(|error| error.to_string())?,
+    )?;
     super::sync_directory(&stage.join("files"))?;
     super::sync_directory(stage)?;
     Ok(Some((files.len(), size)))

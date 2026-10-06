@@ -2846,3 +2846,71 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
 
 #[path = "metadata_tests.rs"]
 mod metadata_tests;
+
+#[cfg(unix)]
+#[tokio::test]
+async fn native_github_sync_does_not_read_unchanged_document_contents() {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["picture"] = node("picture", "png");
+    let picture = vec![42; 1024 * 1024];
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), fixture_bytes("baseUpdate")),
+            ("picture".into(), picture.clone()),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let basis_root = engine
+        .cache_dir
+        .join("repository-bases")
+        .join(store::revision(engine.id.as_bytes()));
+    let basis = basis_root.join(engine.store.lock().unwrap().sync.basis_id.as_ref().unwrap());
+    let path = basis.join("files/picture.png");
+    let inode = fs::metadata(&path).unwrap().ino();
+    let permissions = fs::metadata(&path).unwrap().permissions();
+    // An unchanged document must survive sync without opening its contents.
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o000)).unwrap();
+    assert!(fs::read(&path).is_err());
+
+    update(&engine, "localUpdate", "local").await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+    {
+        let mut remote = state.lock().unwrap();
+        let bytes =
+            document::merge(&remote.files["canvas"], &fixture_bytes("remoteUpdate")).unwrap();
+        remote.files.insert("canvas".into(), bytes);
+        remote.head = "d".repeat(40);
+    }
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let doc = document::decode(&read(&engine, "canvas").await).unwrap();
+    assert_eq!(
+        doc.transact()
+            .get_text("content")
+            .unwrap()
+            .get_string(&doc.transact()),
+        fixture()["expected"]["content"].as_str().unwrap()
+    );
+    let basis = basis_root.join(engine.store.lock().unwrap().sync.basis_id.as_ref().unwrap());
+    let path = basis.join("files/picture.png");
+    assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
+    fs::set_permissions(&path, permissions).unwrap();
+    assert_eq!(fs::read(path).unwrap(), picture);
+    assert_eq!(read(&engine, "picture").await, picture);
+}
