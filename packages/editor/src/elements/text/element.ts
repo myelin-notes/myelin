@@ -21,11 +21,11 @@ import { parseCssColor } from '../../pdf-export/color';
 import type { FontKey } from '../../pdf-export/contract';
 import { familyToKey } from '../../pdf-export/fonts';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
+import { AnchorableElement } from '../anchorable-element';
 import type {
   CanvasSearchContent,
   SearchableElement,
 } from '../canvas-searchable-element';
-import { DrawableElement } from '../drawable-element';
 import { ElementType } from '../element-type';
 import {
   applyDocumentStyle,
@@ -63,7 +63,10 @@ const DEFAULT_BOX_HEIGHT = 80;
  * swapping render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source
  * for PDF export, thumbnails, and the headless bounding-box fallback.
  */
-export class TextElement extends DrawableElement implements SearchableElement {
+export class TextElement
+  extends AnchorableElement
+  implements SearchableElement
+{
   private box: DOMRect = new DOMRect(0, 0, 0, 0);
   private _text: string = '';
   private _style: TextStyle;

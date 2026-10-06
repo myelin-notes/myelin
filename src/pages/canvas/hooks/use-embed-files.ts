@@ -3,12 +3,14 @@ import { toast } from 'sonner';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useMessages } from '@myelin/editor/i18n';
 import { getMediaImportHandler } from '@myelin/editor/media';
+import type { PageFramePasteTarget } from '@myelin/editor/page-frame/anchoring';
 import { useRepository } from '@/lib/sync';
 
 export type EmbedFilesFn = (
   files: FileList | File[],
   screenX?: number,
   screenY?: number,
+  pageFramePaste?: PageFramePasteTarget,
 ) => void;
 
 export function useEmbedFiles(
@@ -18,7 +20,7 @@ export function useEmbedFiles(
   const repository = useRepository();
 
   return useCallback(
-    (files, screenX, screenY) => {
+    (files, screenX, screenY, pageFramePaste) => {
       const dc = drawableCanvasRef.current;
       if (!dc) {
         return;
@@ -33,7 +35,7 @@ export function useEmbedFiles(
           });
         } else {
           void Promise.resolve(
-            handler(file, dc, { repository, screenX, screenY }),
+            handler(file, dc, { repository, screenX, screenY, pageFramePaste }),
           ).catch((error) => {
             toast.error(messages.canvas.embedComposer.errors.embedFailed, {
               description:

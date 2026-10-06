@@ -5,6 +5,7 @@ import {
   moveElementOrderForSelection,
 } from './element-ordering';
 import { ElementStore } from './element-store';
+import { AnchorableElement } from './elements/anchorable-element';
 import type { DrawableElement } from './elements/drawable-element';
 import { isBackgroundElement } from './elements/element-type';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
@@ -108,6 +109,12 @@ export class CanvasDocumentBinding {
       scaleY: element.scale.y,
       [ELEMENT_Z_ORDER_KEY]: this.getZOrderForInsertion(position, background),
       ...element.getYMapProps(),
+      ...(element instanceof AnchorableElement
+        ? {
+            pageAnchor: element.pageAnchor,
+            makesSpace: element.makesSpace,
+          }
+        : {}),
     };
     const yMap = background
       ? this.ydoc.insertElementMap(0, element.type, uuid, props)
@@ -149,12 +156,7 @@ export class CanvasDocumentBinding {
   }
 
   public removeElement(element: DrawableElement): void {
-    const yMap = element.yMap;
-    if (yMap) {
-      this.ydoc.removeElementMap(yMap);
-    }
-    this.store.remove(element.uuid);
-    this.onElementRemoved(element);
+    this.deleteElements([element]);
   }
 
   public deleteElements(elements: readonly DrawableElement[]): void {
@@ -163,16 +165,20 @@ export class CanvasDocumentBinding {
     }
     this.ydoc.transact(() => {
       for (const element of elements) {
-        element.unselect();
         if (element.yMap) {
           this.ydoc.removeElementMap(element.yMap);
         }
       }
     });
-    for (const element of elements) {
+    const remaining = new Set(this.ydoc.elements.toArray());
+    const removed = this.elements.filter(
+      (element) => element.yMap && !remaining.has(element.yMap),
+    );
+    for (const element of removed) {
+      element.unselect();
       this.onElementRemoved(element);
     }
-    this.store.removeMany(new Set(elements.map((element) => element.uuid)));
+    this.store.removeMany(new Set(removed.map((element) => element.uuid)));
   }
 
   public canReorder(

@@ -28,6 +28,7 @@ export interface ParagraphPaginationResult {
  * break at this line, so measurers can defer expensive DOM lookups.
  */
 export interface ParagraphLine {
+  isAnchorGap?: boolean;
   naturalTop: number;
   naturalBottom: number;
   getPos: () => number | null;
@@ -120,7 +121,10 @@ export function paginateParagraph(
         } else {
           const pos = line.getPos();
           if (pos !== null) {
-            const clamped = Math.max(blockPos + 2, Math.min(pos, blockEnd - 1));
+            const clamped = Math.max(
+              blockPos + (line.isAnchorGap ? 1 : 2),
+              Math.min(pos, blockEnd - 1),
+            );
             breaks.push({ pos: clamped, spacer, kind: 'inline' });
             cumulativeShift += spacer;
           }
