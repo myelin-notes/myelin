@@ -20,7 +20,11 @@ import {
   getGitHubToken,
   requireGitHubSignIn,
 } from './github/credentials';
-import { getGoogleDriveToken } from './google-drive/credentials';
+import {
+  GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+  getGoogleDriveToken,
+  requireGoogleDriveSignIn,
+} from './google-drive/credentials';
 import { NativeRepository } from './native';
 import type { MetadataPatch } from './native-operations';
 import { renameNoteReferences } from './rename-note-references';
@@ -376,10 +380,14 @@ it('forwards GitHub refresh requests and turns a final 401 into a sign-in prompt
 
 it('refreshes Drive authentication only for its repository and credential', async () => {
   nativeBoundary();
+  vi.mocked(requireGoogleDriveSignIn).mockClear();
   const implementation = vi.mocked(invoke).getMockImplementation()!;
   vi.mocked(invoke).mockImplementation(async (command, args) => {
     if (command === 'repository_auth_response') {
       return;
+    }
+    if (command === 'repository_sync') {
+      throw 'Google Drive request failed (401): Unauthorized';
     }
     return implementation(command, args);
   });
@@ -426,6 +434,23 @@ it('refreshes Drive authentication only for its repository and credential', asyn
   expect(token).toHaveBeenLastCalledWith('drive-account', {
     forceRefresh: true,
   });
+  listeners.get('repository-status')!({
+    payload: {
+      repositoryId: 'repositories/google-drive/drive-folder',
+      online: false,
+      pendingRemoteWrites: 1,
+      lastRemoteSyncAt: null,
+      dataVersion: 0,
+      lastError: 'Google Drive request failed (401): Unauthorized',
+    },
+  });
+  expect(repository.getRuntimeStatus().lastError?.message).toBe(
+    GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+  );
+  expect(requireGoogleDriveSignIn).toHaveBeenCalledWith('drive-account');
+  await expect(repository.refresh()).rejects.toThrow(
+    GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+  );
   await repository.dispose();
 });
 

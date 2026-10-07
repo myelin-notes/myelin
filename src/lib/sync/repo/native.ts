@@ -19,6 +19,10 @@ import {
   GITHUB_SIGN_IN_REQUIRED,
   requireGitHubSignIn,
 } from './github/credentials';
+import {
+  GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+  requireGoogleDriveSignIn,
+} from './google-drive/credentials';
 import type {
   MetadataPatch,
   NativeDocumentWrite,
@@ -270,13 +274,19 @@ export class NativeRepository implements Repository {
   }
 
   private syncError(message: string, invalidateAuth = true): Error {
-    if (this.backend.kind === 'github' && message.includes('(401)')) {
+    if (this.backend.source && message.includes('(401)')) {
+      const isGitHub = this.backend.kind === 'github';
+      const requireSignIn = isGitHub
+        ? requireGitHubSignIn
+        : requireGoogleDriveSignIn;
       if (invalidateAuth) {
-        void requireGitHubSignIn(this.backend.credentialId).catch((error) =>
-          logger.error('Could not clear rejected GitHub credentials', error),
+        void requireSignIn(this.backend.credentialId).catch((error) =>
+          logger.error('Could not clear rejected sync credentials', error),
         );
       }
-      return new Error(GITHUB_SIGN_IN_REQUIRED);
+      return new Error(
+        isGitHub ? GITHUB_SIGN_IN_REQUIRED : GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+      );
     }
     return new Error(message);
   }
