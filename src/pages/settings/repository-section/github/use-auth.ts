@@ -17,6 +17,7 @@ import {
 
 const PROVIDER: RemoteOAuthProvider<GitHubOAuthStartPayload> = {
   name: 'GitHub',
+  credentialClientName: 'github',
   analyticsPrefix: 'github',
   isAuthAvailable: isGitHubOAuthAvailable,
   hasToken: hasGitHubToken,

@@ -1,8 +1,7 @@
 /**
  * The provider-neutral half of an authorization code + PKCE sign-in: one pending session per
  * credential, the redirect listener's lifetime, and the checks that must pass before a code is
- * worth redeeming. Providers supply their endpoints and their own token exchange — GitHub stores
- * a bare access token, Google a refresh token and expiry.
+ * worth redeeming. Providers supply their endpoints and their own token exchange.
  */
 
 import { Logger } from '@myelin/shared/logger';

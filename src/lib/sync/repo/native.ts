@@ -15,6 +15,10 @@ import type {
 } from '../native-document-target';
 import { NoteSession } from '../session';
 import { MAX_PEN_PRESETS, type RepositoryRuntimeStatus } from './config';
+import {
+  GITHUB_SIGN_IN_REQUIRED,
+  requireGitHubSignIn,
+} from './github/credentials';
 import type {
   MetadataPatch,
   NativeDocumentWrite,
@@ -255,7 +259,7 @@ export class NativeRepository implements Repository {
         await invoke('repository_release', { handle: this.handle });
         return;
       }
-      this.applyStatus(opened.status);
+      this.applyStatus(opened.status, false);
       noteContentIndex.reconcile(this);
     } catch (error) {
       for (const unlisten of this.unlisteners.splice(0)) {
@@ -265,7 +269,19 @@ export class NativeRepository implements Repository {
     }
   }
 
-  private applyStatus(status: NativeStatus): void {
+  private syncError(message: string, invalidateAuth = true): Error {
+    if (this.backend.kind === 'github' && message.includes('(401)')) {
+      if (invalidateAuth) {
+        void requireGitHubSignIn(this.backend.credentialId).catch((error) =>
+          logger.error('Could not clear rejected GitHub credentials', error),
+        );
+      }
+      return new Error(GITHUB_SIGN_IN_REQUIRED);
+    }
+    return new Error(message);
+  }
+
+  private applyStatus(status: NativeStatus, invalidateAuth = true): void {
     const dataVersion =
       this.getRuntimeStatus().dataVersion +
       (status.dataVersion !== this.nativeVersion ? 1 : 0);
@@ -275,7 +291,9 @@ export class NativeRepository implements Repository {
       pendingRemoteWrites: status.pendingRemoteWrites,
       lastRemoteSyncAt: status.lastRemoteSyncAt,
       dataVersion,
-      lastError: status.lastError ? new Error(status.lastError) : null,
+      lastError: status.lastError
+        ? this.syncError(status.lastError, invalidateAuth)
+        : null,
     });
   }
 
@@ -515,7 +533,11 @@ export class NativeRepository implements Repository {
   }
   async refresh(): Promise<void> {
     await this.initialize();
-    await invoke('repository_sync', { handle: this.handle });
+    try {
+      await invoke('repository_sync', { handle: this.handle });
+    } catch (error) {
+      throw this.syncError(String(error));
+    }
   }
   flushPending(): Promise<void> {
     return this.refresh();

@@ -115,7 +115,8 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
           repo: config.repo,
           branch: config.branch ?? 'main',
         },
-        getToken: () => getGitHubToken(config.credentialId),
+        getToken: (forceRefresh) =>
+          getGitHubToken(config.credentialId, { forceRefresh }),
       });
     },
     normalizeConfig: (config) => ({

@@ -15,6 +15,11 @@ import { filesProvider } from '@/pages/library/import/providers/files';
 import { onenoteProvider } from '@/pages/library/import/providers/onenote';
 import { importWorkspaceJson } from '@/pages/library/import/workspace-json';
 import type { NativeDocumentChange } from '../native-document-target';
+import {
+  GITHUB_SIGN_IN_REQUIRED,
+  getGitHubToken,
+  requireGitHubSignIn,
+} from './github/credentials';
 import { getGoogleDriveToken } from './google-drive/credentials';
 import { NativeRepository } from './native';
 import type { MetadataPatch } from './native-operations';
@@ -65,7 +70,9 @@ vi.mock('@tauri-apps/api/event', () => ({
   ),
 }));
 vi.mock('./github/credentials', () => ({
-  getGitHubToken: async () => 'token',
+  getGitHubToken: vi.fn(async () => 'token'),
+  requireGitHubSignIn: vi.fn(async () => {}),
+  GITHUB_SIGN_IN_REQUIRED: 'Sign in again from Settings',
   hasGitHubToken: async () => true,
 }));
 
@@ -310,6 +317,61 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   ).toBe(true);
   await repository.dispose();
   expect(listeners.size).toBe(0);
+});
+
+it('forwards GitHub refresh requests and turns a final 401 into a sign-in prompt', async () => {
+  nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'repository_auth_response') {
+      return;
+    }
+    if (command === 'repository_sync') {
+      throw 'GitHub request failed (401): Bad credentials';
+    }
+    return implementation(command, args);
+  });
+  const repository = createRepositoryFromConfig({
+    kind: 'github',
+    owner: 'me',
+    repo: 'notes',
+    branch: 'main',
+    credentialId: 'account',
+  });
+  await repository.initialize();
+  listeners.get('repository-auth-request')!({
+    payload: {
+      repositoryId: 'repositories/github/me__notes__main',
+      credentialId: 'account',
+      requestId: 'auth',
+      forceRefresh: true,
+    },
+  });
+  await vi.waitFor(() =>
+    expect(invoke).toHaveBeenCalledWith('repository_auth_response', {
+      requestId: 'auth',
+      token: 'token',
+    }),
+  );
+  expect(getGitHubToken).toHaveBeenLastCalledWith('account', {
+    forceRefresh: true,
+  });
+  listeners.get('repository-status')!({
+    payload: {
+      repositoryId: 'repositories/github/me__notes__main',
+      online: false,
+      pendingRemoteWrites: 1,
+      lastRemoteSyncAt: null,
+      dataVersion: 0,
+      lastError: 'GitHub request failed (401): Bad credentials',
+    },
+  });
+  expect(repository.getRuntimeStatus().lastError?.message).toBe(
+    GITHUB_SIGN_IN_REQUIRED,
+  );
+  await expect(repository.refresh()).rejects.toThrow(GITHUB_SIGN_IN_REQUIRED);
+  expect(requireGitHubSignIn).toHaveBeenCalledWith('account');
+  await repository.dispose();
 });
 
 it('refreshes Drive authentication only for its repository and credential', async () => {

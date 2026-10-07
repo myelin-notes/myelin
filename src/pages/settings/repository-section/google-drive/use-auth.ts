@@ -18,6 +18,7 @@ import {
 
 const PROVIDER: RemoteOAuthProvider<GoogleDriveOAuthStartPayload> = {
   name: GOOGLE_DRIVE_PROVIDER_NAME,
+  credentialClientName: 'google-drive',
   analyticsPrefix: 'google_drive',
   isAuthAvailable: isGoogleDriveAuthAvailable,
   hasToken: hasGoogleDriveToken,

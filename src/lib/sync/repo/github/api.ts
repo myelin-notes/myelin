@@ -1,13 +1,18 @@
 import { fetch } from '@tauri-apps/plugin-http';
-import { getGitHubToken } from './credentials';
+import {
+  GITHUB_SIGN_IN_REQUIRED,
+  getGitHubToken,
+  requireGitHubSignIn,
+} from './credentials';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_API_VERSION = '2022-11-28';
 
 async function authHeaders(
   credentialId: string,
+  forceRefresh = false,
 ): Promise<Record<string, string>> {
-  const token = await getGitHubToken(credentialId);
+  const token = await getGitHubToken(credentialId, { forceRefresh });
   return {
     Accept: 'application/vnd.github+json',
     Authorization: `Bearer ${token}`,
@@ -21,11 +26,21 @@ async function githubGet<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`${GITHUB_API_BASE}${path}`, {
-    method: 'GET',
-    headers: await authHeaders(credentialId),
-    signal,
-  });
+  const request = async (forceRefresh: boolean) =>
+    fetch(`${GITHUB_API_BASE}${path}`, {
+      method: 'GET',
+      headers: await authHeaders(credentialId, forceRefresh),
+      signal,
+    });
+
+  let response = await request(false);
+  if (response.status === 401) {
+    response = await request(true);
+  }
+  if (response.status === 401) {
+    await requireGitHubSignIn(credentialId);
+    throw new Error(GITHUB_SIGN_IN_REQUIRED);
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => '<no response body>');
