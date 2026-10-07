@@ -754,6 +754,12 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         .filter_map(|op| op["nodeId"].as_str().map(str::to_owned))
         .collect();
     let previous = store.manifest.clone();
+    let initial_import = previous["nodes"].as_object().unwrap().is_empty()
+        && captured.operations.is_empty()
+        && store.outbox.is_empty()
+        && store.documents.is_empty()
+        && store.sync.last_remote_sync_at.is_none()
+        && !store.root.join(".native-updates").exists();
     let mut changes = Changes::default();
     let mut writes = Vec::new();
     let mut canvas_links = Vec::new();
@@ -770,6 +776,40 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                 .iter()
                 .any(|op| op["kind"] == "push-note" && op["nodeId"] == *id)
         {
+            continue;
+        }
+        if initial_import {
+            let Some(downloaded) = plan.snapshot.files.get(id) else {
+                continue;
+            };
+            if node["fileType"] == "mcanvas" {
+                let bytes = downloaded.read()?;
+                let doc = document::decode(&bytes)?;
+                if node["system"].is_null() {
+                    canvas_links.push((id.clone(), document::links(&doc)));
+                }
+                let generation = store
+                    .sync
+                    .document_generations
+                    .entry(id.clone())
+                    .or_insert_with(|| uuid::Uuid::new_v4().to_string())
+                    .clone();
+                changes.documents.push(super::DocumentNotification {
+                    node_id: id.clone(),
+                    bytes: bytes.into_owned(),
+                    source_session: None,
+                    origin: "repository".into(),
+                    generation,
+                    replacement: false,
+                });
+            }
+            // A crash before the metadata journal leaves only unreferenced, retryable files.
+            let destination = store.root.join("files").join(file_name(node)?);
+            match downloaded {
+                SnapshotFile::Cached(path) => super::store::install_download(&destination, path)?,
+                SnapshotFile::Loaded(bytes) => super::store::atomic_write(&destination, bytes)?,
+            }
+            changes.changed.push(id.clone());
             continue;
         }
         let current = if previous["nodes"][id]["type"] == "file" {

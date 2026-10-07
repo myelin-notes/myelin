@@ -2976,3 +2976,70 @@ async fn sync_diagnostics_include_recovered_http_retries() {
         .unwrap()
         .contains("secret-token"));
 }
+
+#[tokio::test]
+async fn initial_sync_installs_files_before_a_metadata_only_recovery_journal() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["picture"] = node("picture", "png");
+    let canvas = fixture_bytes("baseUpdate");
+    let picture = vec![42; 1024 * 1024];
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), canvas.clone()),
+            ("picture".into(), picture.clone()),
+        ]),
+    )));
+    let server = TestServer::new(move |request| state.lock().unwrap().handle(request)).await;
+    let root = directory.0.join("data");
+    let blocked_file = root.join("files/picture.png");
+    fs::create_dir(&blocked_file).unwrap();
+    assert!(engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .is_err());
+    assert!(engine.store.lock().unwrap().manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .is_empty());
+    assert!(!root.join(".native-journal.json").exists());
+    fs::remove_dir(blocked_file).unwrap();
+    let blocked = root.join(".repository.json.native.tmp");
+    fs::create_dir(&blocked).unwrap();
+    assert!(engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .is_err());
+    let journal = fs::read(root.join(".native-journal.json")).unwrap();
+    let saved: Value = serde_json::from_slice(&journal).unwrap();
+    assert_eq!(saved["files"], json!([]));
+    assert!(journal.len() < 16 * 1024);
+    assert_eq!(fs::read(root.join("files/picture.png")).unwrap(), picture);
+    assert_eq!(fs::read(root.join("files/canvas.myelin")).unwrap(), canvas);
+    let basis = engine
+        .cache_dir
+        .join("repository-bases")
+        .join(store::revision(engine.id.as_bytes()));
+    let cached = fs::read_dir(basis).unwrap().next().unwrap().unwrap().path();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(
+            fs::metadata(root.join("files/picture.png")).unwrap().ino(),
+            fs::metadata(cached.join("files/picture.png"))
+                .unwrap()
+                .ino()
+        );
+    }
+    fs::remove_dir(blocked).unwrap();
+    drop(engine);
+    let reopened = directory.engine(true);
+    assert_eq!(read(&reopened, "picture").await, picture);
+    assert_eq!(read(&reopened, "canvas").await, canvas);
+    assert!(!root.join(".native-journal.json").exists());
+    assert!(reopened.store.lock().unwrap().outbox.is_empty());
+    seed(&reopened, "picture", "png", b"edited".to_vec()).await;
+    assert_eq!(fs::read(cached.join("files/picture.png")).unwrap(), picture);
+}

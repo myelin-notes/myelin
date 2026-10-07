@@ -133,6 +133,31 @@ pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     sync_directory(path.parent().ok_or("Invalid repository storage path")?)
 }
 
+// Source is durable and the destination is not yet exposed by metadata.
+pub(super) fn install_download(path: &Path, source: &Path) -> Result<(), String> {
+    reject_symlink(source)?;
+    reject_symlink(path)?;
+    let temporary = path.with_file_name(format!(
+        ".{}.import.tmp",
+        path.file_name()
+            .ok_or("Invalid repository storage path")?
+            .to_string_lossy()
+    ));
+    reject_symlink(&temporary)?;
+    if temporary.exists() {
+        fs::remove_file(&temporary).map_err(io)?;
+    }
+    if fs::hard_link(source, &temporary).is_err() {
+        fs::copy(source, &temporary).map_err(io)?;
+        fs::File::open(&temporary)
+            .map_err(io)?
+            .sync_all()
+            .map_err(io)?;
+    }
+    fs::rename(&temporary, path).map_err(io)?;
+    sync_directory(path.parent().ok_or("Invalid repository storage path")?)
+}
+
 fn apply_journal(root: &Path, journal: &Journal) -> Result<(), String> {
     for write in &journal.files {
         if !valid_component(&write.name) {
