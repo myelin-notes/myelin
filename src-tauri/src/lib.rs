@@ -101,6 +101,7 @@ pub fn run() {
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
             pdf_export::export_pdf_ios,
+            pdf_export::export_file_ios,
             workspace_export::export_obsidian_vault,
             mcp_server::mcp_start,
             mcp_server::mcp_stop,
