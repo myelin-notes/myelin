@@ -1,4 +1,4 @@
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type { ConflictResolution } from './dialog';
 
 /** Drop the last '/'-separated segment, yielding the parent folder path. */
@@ -23,7 +23,7 @@ export async function resolveImportRootName({
   conflictNodeId,
   conflictResolution,
 }: {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   name: string;
   conflictNodeId: VFSNodeId | null;
@@ -42,7 +42,7 @@ export async function resolveImportRootName({
 // Parents before children. Returns a map from relative folder path to created node id;
 // `rootParentId` may be null to create top-level folders at the library root.
 export async function createImportedFolders(
-  repository: Repository,
+  repository: NativeRepository,
   rootParentId: VFSNodeId | null,
   folderPaths: Set<string>,
 ): Promise<Map<string, VFSNodeId>> {

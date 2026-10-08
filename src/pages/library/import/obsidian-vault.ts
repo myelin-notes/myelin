@@ -1,15 +1,18 @@
+import * as Y from 'yjs';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { getPdfPageSizes } from '@myelin/editor/pdf-renderer';
+import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
 import type { PickedFolder } from '@/lib/folder-picker';
 import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
-  type Repository,
+  type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
+import { importStoragePath } from './files';
 import {
   addFolderAncestors,
   createImportedFolders,
@@ -67,7 +70,7 @@ export interface ObsidianVaultImportResult {
 }
 
 export interface ImportObsidianVaultOptions {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   vaultPath: string | PickedFolder;
   vaultName?: string;
@@ -390,7 +393,7 @@ async function writeMarkdownFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'markdown' }>;
-  repository: Repository;
+  repository: NativeRepository;
   resolveNoteLinkId: (target: string) => Promise<VFSNodeId | null>;
 }): Promise<void> {
   if (!file.nodeId) {
@@ -403,14 +406,18 @@ async function writeMarkdownFile({
     await repository.setTags(file.nodeId, parsedMarkdown.tags);
   }
 
-  const session = await repository.openSession(file.nodeId);
+  const ydoc = new YDocManager();
   try {
-    await addMarkdownPageFrameToYDoc(session.ydoc, parsedMarkdown.body, {
+    await addMarkdownPageFrameToYDoc(ydoc, parsedMarkdown.body, {
       resolveNoteLinkId,
     });
-    await session.save();
+    ydoc.sweepOrphanPageFrameFragments();
+    await repository.writeFileBytes(
+      file.nodeId,
+      Y.encodeStateAsUpdate(ydoc.doc),
+    );
   } finally {
-    await session.close().catch(() => {});
+    ydoc.doc.destroy();
   }
 }
 
@@ -422,22 +429,22 @@ async function importPdfVaultFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'pdf' }>;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
 }): Promise<void> {
   const bytes = await reader.readFile(file.sourcePath);
   const pageSizes = await getPdfPageSizes(bytes);
-  const nodeId = await repository.createFile(
-    getPdfCanvasName(file.name),
-    'mcanvas',
-    parentId,
-  );
-  const session = await repository.openSession(nodeId);
+  const ydoc = new YDocManager();
   try {
-    addPdfElementToYDoc(session.ydoc, bytes, file.name, pageSizes);
-    await session.save();
+    addPdfElementToYDoc(ydoc, bytes, file.name, pageSizes);
+    await repository.createFile(
+      getPdfCanvasName(file.name),
+      'mcanvas',
+      parentId,
+      Y.encodeStateAsUpdate(ydoc.doc),
+    );
   } finally {
-    await session.close().catch(() => {});
+    ydoc.doc.destroy();
   }
 }
 
@@ -449,15 +456,17 @@ async function importStorageVaultFile({
 }: {
   reader: FolderReader;
   file: Extract<VaultImportFile, { kind: 'storage' }>;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
 }): Promise<void> {
-  await repository.createFile(
-    file.name,
-    file.fileType,
+  await importStoragePath({
+    path: file.sourcePath,
+    name: file.name,
+    fileType: file.fileType,
     parentId,
-    await reader.readFile(file.sourcePath),
-  );
+    repository,
+    reader,
+  });
 }
 
 export async function importObsidianVault({
@@ -481,7 +490,7 @@ export async function importObsidianVault({
   try {
     // Every folder and note this import creates lands on one manifest, saved
     // once when the batch closes, instead of a manifest write per node.
-    return await repository.batchManifestWrites(async () => {
+    return await repository.batchMetadataWrites(async () => {
       const root = await repository.createFolder(vaultName, parentId);
       rootFolderId = root;
       const folderIds = await createImportedFolders(

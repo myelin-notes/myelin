@@ -181,7 +181,7 @@ export interface Repository {
    * Batches `fn`'s manifest writes onto one manifest, saved once when `fn` resolves. For additive
    * bulk work such as imports — no deletes inside. Reads inside `fn` observe the pending writes.
    */
-  batchManifestWrites<T>(fn: () => Promise<T>): Promise<T>;
+  batchMetadataWrites<T>(fn: () => Promise<T>): Promise<T>;
   readFileBytes(nodeId: VFSNodeId): Promise<Uint8Array | null>;
   writeFileBytes(nodeId: VFSNodeId, bytes: Uint8Array): Promise<void>;
   listFileVersions(nodeId: VFSNodeId): Promise<FileVersion[]>;

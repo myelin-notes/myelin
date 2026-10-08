@@ -5,8 +5,8 @@ import {
 } from '@myelin/editor/thumbnails';
 import { Logger } from '@myelin/shared/logger';
 import {
+  type NativeRepository,
   type NoteSession,
-  type Repository,
   useRepository,
   type VFSNodeId,
 } from '@/lib/sync';
@@ -49,7 +49,7 @@ export function useCanvasSessionSaving({
   const saveSession = useCallback(
     async (
       session: NoteSession,
-      saveRepository: Pick<Repository, 'createFileVersionIfDue'>,
+      saveRepository: Pick<NativeRepository, 'createFileVersionIfDue'>,
       shouldContinue: () => boolean = () => true,
     ): Promise<boolean> => {
       let savedChanges = false;
@@ -99,7 +99,7 @@ export function useCanvasSessionSaving({
     async (
       session: NoteSession,
       id: VFSNodeId | undefined,
-      saveRepository: Pick<Repository, 'createFileVersionIfDue'>,
+      saveRepository: Pick<NativeRepository, 'createFileVersionIfDue'>,
     ): Promise<void> => {
       clearScheduledSave();
       const savedChanges = await saveSession(session, saveRepository);

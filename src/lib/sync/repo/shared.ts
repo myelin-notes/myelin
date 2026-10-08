@@ -5,7 +5,6 @@ import {
   type SearchIndex,
 } from '@/lib/search';
 import { addChild, dropNode, getChildIds, removeChild } from './child-index';
-import { MAX_CUSTOM_COLORS, MAX_PEN_PRESETS } from './config';
 import { expandTagWithAncestors, nodeMatchesAnyTag } from './tag-hierarchy';
 import type {
   CustomColorTool,
@@ -14,7 +13,6 @@ import type {
   NodeSearchResult,
   NoteBacklink,
   PenPreset,
-  PenPresetTool,
   RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
@@ -35,11 +33,6 @@ export interface VFSManifest {
   penPresets: PenPreset[];
 }
 
-export interface RepositorySnapshot {
-  manifest: VFSManifest;
-  notes: Record<VFSNodeId, Uint8Array | null>;
-}
-
 export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
   'pen',
   'highlighter',
@@ -47,11 +40,7 @@ export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
   'folder',
 ];
 
-// 2 dropped the `children` arrays: parentage is stored only as `node.parentId`,
-// and the adjacency index is derived at runtime by `./child-index`.
-export const CURRENT_MANIFEST_VERSION = 3;
-export const MANIFEST_PATH = 'manifest.json';
-export const FILES_DIR = 'files';
+const CURRENT_MANIFEST_VERSION = 3;
 export const FILE_EXT = '.myelin';
 export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;
 export const VERSION_HISTORY_MAX_PER_FILE = 32;
@@ -65,86 +54,6 @@ export function createEmptyManifest(): VFSManifest {
     tagRegistry: [],
     penPresets: [],
   };
-}
-
-export function migrate(manifest: VFSManifest): void {
-  // Fields added after the initial schema are absent from manifests written by
-  // older builds; default them so read paths don't spread `undefined`.
-  manifest.tagRegistry ??= [];
-  manifest.penPresets = sanitizePenPresets(manifest.penPresets);
-  if (manifest.version < 2) {
-    // Clear the v1 `children` arrays. Nothing reads them, but a parsed manifest round-trips unknown
-    // keys back to disk on every save; `JSON.stringify` omits undefined-valued keys.
-    (manifest as VFSManifest & { children?: undefined }).children = undefined;
-    for (const node of Object.values(manifest.nodes)) {
-      (node as VFSNode & { children?: undefined }).children = undefined;
-    }
-    manifest.version = 2;
-  }
-
-  const legacyManifest = manifest as VFSManifest & {
-    customColors?: string[];
-  };
-  if (manifest.version < 3) {
-    manifest.colors = {
-      pen: (legacyManifest.customColors ?? []).slice(0, MAX_CUSTOM_COLORS),
-      highlighter: [],
-      text: [],
-      folder: [],
-    };
-    legacyManifest.customColors = undefined;
-    manifest.version = 3;
-  }
-  manifest.colors = {
-    pen: manifest.colors?.pen ?? [],
-    highlighter: manifest.colors?.highlighter ?? [],
-    text: manifest.colors?.text ?? [],
-    folder: manifest.colors?.folder ?? [],
-  };
-}
-
-// Mirrors the pen and highlighter size options; a manifest can outlive the build that wrote it, so
-// the bounds are restated here rather than imported from the tools.
-const PEN_PRESET_SIZE_RANGE: Record<PenPresetTool, [number, number]> = {
-  pen: [1, 40],
-  highlighter: [12, 60],
-};
-
-/**
- * Presets arrive from another device and possibly another build, so entries are validated rather
- * than defaulted: anything unrecognised is dropped and out-of-range sizes are clamped.
- */
-function sanitizePenPresets(presets: PenPreset[] | undefined): PenPreset[] {
-  if (!Array.isArray(presets)) {
-    return [];
-  }
-  const sane: PenPreset[] = [];
-  for (const entry of presets) {
-    const range = PEN_PRESET_SIZE_RANGE[entry?.tool];
-    const color =
-      typeof entry?.color === 'string'
-        ? normalizeCustomColor(entry.color)
-        : null;
-    if (
-      !range ||
-      !color ||
-      typeof entry.id !== 'string' ||
-      !Number.isFinite(entry.size)
-    ) {
-      continue;
-    }
-    sane.push({
-      id: entry.id,
-      tool: entry.tool,
-      color,
-      size: Math.min(Math.max(entry.size, range[0]), range[1]),
-      inWheel: entry.inWheel === true,
-    });
-    if (sane.length === MAX_PEN_PRESETS) {
-      break;
-    }
-  }
-  return sane;
 }
 
 export function createNodeId(): string {
@@ -601,6 +510,7 @@ export function getUniqueFileName(
 export function deleteNodeFromManifest(
   manifest: VFSManifest,
   nodeId: string,
+  deletedIds?: string[],
 ): VFSFileNode[] {
   const node = manifest.nodes[nodeId];
   if (!node) {
@@ -634,6 +544,7 @@ export function deleteNodeFromManifest(
       }
     }
 
+    deletedIds?.push(currentId);
     delete manifest.linksBySource[currentId];
     delete manifest.nodes[currentId];
     dropNode(manifest, currentId);
@@ -695,16 +606,6 @@ export function getStoredFileName(
   return `${node.id}.${node.fileType}`;
 }
 
-export function getStoredFilePath(
-  node: Pick<VFSFileNode, 'id' | 'fileType'>,
-): string {
-  return `${FILES_DIR}/${getStoredFileName(node)}`;
-}
-
 export function getNoteFileName(nodeId: VFSNodeId): string {
   return `${nodeId}${FILE_EXT}`;
-}
-
-export function getNotePath(nodeId: VFSNodeId): string {
-  return `${FILES_DIR}/${getNoteFileName(nodeId)}`;
 }

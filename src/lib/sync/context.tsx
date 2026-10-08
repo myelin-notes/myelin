@@ -3,6 +3,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
@@ -14,6 +15,7 @@ import {
   subscribeCredentialChanges,
 } from './repo/credential-vault';
 import { createRepository } from './repo/factory';
+import type { NativeRepository } from './repo/native';
 import { noteContentIndex } from './repo/note-content-index';
 import { credentialTokenKey } from './repo/oauth/client';
 import { isRepositoryFullyConfigured } from './repo/readiness';
@@ -97,6 +99,7 @@ export function RepositoryProvider({
     () => createRepository(resolvedConfig),
     [resolvedConfig],
   );
+  const mountedRepository = useRef<NativeRepository | null>(null);
   const [status, setStatus] = useState<RepositoryStatus>(() =>
     createRepositoryStatus(resolvedConfig),
   );
@@ -131,6 +134,7 @@ export function RepositoryProvider({
   );
 
   useEffect(() => {
+    mountedRepository.current = repository;
     let currentStatus = mergeRuntimeStatus(
       createRepositoryStatus(resolvedConfig),
       repository.getRuntimeStatus(),
@@ -212,8 +216,14 @@ export function RepositoryProvider({
         window.clearTimeout(readinessRetryTimer);
       }
       unsubscribeStatus();
-      void repository.dispose().catch((error) => {
-        logger.error('Failed to dispose repository', error);
+      mountedRepository.current = null;
+      // Strict Mode replays setup with the same instance before this microtask.
+      queueMicrotask(() => {
+        if (mountedRepository.current !== repository) {
+          void repository.dispose().catch((error) => {
+            logger.error('Failed to dispose repository', error);
+          });
+        }
       });
     };
   }, [resolvedConfig, repository]);

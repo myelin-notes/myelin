@@ -94,6 +94,9 @@ vi.mock('@/lib/sync/repo/github/credentials', () => ({
 
 vi.mock('@/lib/sync/repo/google-drive/credentials', () => ({
   getGoogleDriveToken: vi.fn(async () => 'test-drive-token'),
+  requireGoogleDriveSignIn: vi.fn(async () => {}),
+  GOOGLE_DRIVE_SIGN_IN_REQUIRED:
+    'Google Drive access expired. Sign in again from Settings.',
   hasGoogleDriveToken: vi.fn(async () => true),
 }));
 
@@ -112,7 +115,4 @@ vi.mock('@tauri-apps/plugin-fs', async () => {
   return createPluginFsModule();
 });
 
-vi.mock('@tauri-apps/plugin-http', async () => {
-  const { createPluginHttpModule } = await import('./repository-test-utils');
-  return createPluginHttpModule();
-});
+vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }));

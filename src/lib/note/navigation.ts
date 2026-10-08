@@ -2,7 +2,7 @@ import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import {
   type FileType,
   getFileViewer,
-  type Repository,
+  type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
 import type { TabStateController } from '@/lib/tabs/controller';
@@ -60,7 +60,7 @@ export function openNote(
 
 export async function openNoteLink(
   controller: TabStateController,
-  repository: Repository,
+  repository: NativeRepository,
   currentNoteId: VFSNodeId,
   target: NoteLinkRouteTarget,
 ): Promise<void> {

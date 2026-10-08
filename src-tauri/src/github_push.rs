@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 use git2::{
     build::{RepoBuilder, TreeUpdateBuilder},
@@ -6,53 +6,40 @@ use git2::{
     Repository, Signature,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushFile {
-    path: String,
-    index: usize,
+    pub(crate) path: String,
+    pub(crate) index: usize,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushRequest {
-    owner: String,
-    repo: String,
-    branch: String,
-    token: String,
-    expected_head_oid: String,
-    message: String,
-    staging_id: String,
-    additions: Vec<GitPushFile>,
-    deletions: Vec<String>,
+    pub(crate) owner: String,
+    pub(crate) repo: String,
+    pub(crate) branch: String,
+    pub(crate) token: String,
+    pub(crate) expected_head_oid: String,
+    pub(crate) message: String,
+    pub(crate) staging_id: String,
+    pub(crate) additions: Vec<GitPushFile>,
+    pub(crate) deletions: Vec<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushResponse {
-    status: &'static str,
-    commit_oid: Option<String>,
-    blob_shas: HashMap<String, String>,
-    failure_reason: Option<String>,
+    pub(crate) status: &'static str,
+    pub(crate) commit_oid: Option<String>,
+    pub(crate) failure_reason: Option<String>,
 }
 
-#[tauri::command]
-pub async fn github_push_batch(
-    app: AppHandle,
+pub(crate) fn push_batch(
+    cache_dir: &Path,
     request: GitPushRequest,
 ) -> Result<GitPushResponse, String> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
-        .map_err(|_| "Could not resolve Git staging directory")?;
-    tokio::task::spawn_blocking(move || push_batch(&cache_dir, request))
-        .await
-        .map_err(|_| "Git push task failed")?
-}
-
-fn push_batch(cache_dir: &Path, request: GitPushRequest) -> Result<GitPushResponse, String> {
     if request.staging_id.len() != 36
         || !request
             .staging_id
@@ -125,9 +112,12 @@ fn push_batch_to_url(
 ) -> Result<GitPushResponse, String> {
     static GIT_PUSH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     // ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
+    let trace = crate::repository_engine::telemetry::current();
+    let waiting = trace.phase("git_lock_wait");
     let _lock = GIT_PUSH_LOCK
         .lock()
         .map_err(|_| "Git push lock unavailable")?;
+    drop(waiting);
     #[cfg(any(target_os = "android", test))]
     {
         let cert_path = stage.with_file_name("cacert.pem");
@@ -154,6 +144,8 @@ fn push_batch_to_url(
     if !was_cached && repo_path.exists() {
         std::fs::remove_dir_all(repo_path).map_err(|_| "Git cache unavailable")?;
     }
+    trace.set("git_cache_hit", was_cached);
+    let fetching = trace.phase("git_fetch");
     let repo = if let Some(repo) = cached {
         let refspec = format!(
             "+refs/heads/{}:refs/remotes/origin/{}",
@@ -177,13 +169,14 @@ fn push_batch_to_url(
         Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
     };
 
+    drop(fetching);
+    let building = trace.phase("git_build_commit");
     let refname = format!("refs/heads/{}", request.branch);
     let parent = find_parent(&repo, &request.branch, was_cached)?;
     if parent.id().to_string() != request.expected_head_oid {
         return Ok(GitPushResponse {
             status: "head-conflict",
             commit_oid: None,
-            blob_shas: HashMap::new(),
             failure_reason: None,
         });
     }
@@ -192,13 +185,11 @@ fn push_batch_to_url(
         .tree()
         .map_err(|error| git_failure("Git tree unavailable", error))?;
     let mut updates = TreeUpdateBuilder::new();
-    let mut blob_shas = HashMap::new();
     for file in &request.additions {
         let blob = repo
             .blob_path(&stage.join(file.index.to_string()))
             .map_err(|error| git_failure("Git blob write failed", error))?;
         updates.upsert(&file.path, blob, FileMode::Blob);
-        blob_shas.insert(file.path.clone(), blob.to_string());
     }
     for path in &request.deletions {
         if baseline.get_path(Path::new(path)).is_ok() {
@@ -212,7 +203,6 @@ fn push_batch_to_url(
         return Ok(GitPushResponse {
             status: "pushed",
             commit_oid: Some(parent.id().to_string()),
-            blob_shas,
             failure_reason: None,
         });
     }
@@ -232,6 +222,8 @@ fn push_batch_to_url(
         )
         .map_err(|error| git_failure("Git commit failed", error))?;
 
+    drop(building);
+    let _pushing = trace.phase("git_push");
     let mut push_callbacks = RemoteCallbacks::new();
     push_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
     let rejected = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -262,7 +254,6 @@ fn push_batch_to_url(
             "push-failed"
         },
         commit_oid: Some(commit.to_string()),
-        blob_shas,
         failure_reason,
     })
 }

@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as Y from 'yjs';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
 } from '@myelin/editor/elements/page-frame-constants';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { NoteSession, Repository } from '@/lib/sync';
+import type { NativeRepository } from '@/lib/sync';
 import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from './pdf';
 
 vi.mock('@myelin/editor/pdf-renderer', () => ({
@@ -17,13 +18,12 @@ vi.mock('@myelin/editor/pdf-renderer', () => ({
   getPdfPageSizes: vi.fn(async () => [{ w: 680, h: 880 }]),
 }));
 
-function createRepository(session: Partial<NoteSession>) {
+function createRepository() {
   return {
     getUniqueFileName: vi.fn(async (name: string) => name),
     createFile: vi.fn(async () => 'canvas-1'),
-    openSession: vi.fn(async () => session as NoteSession),
     deleteNode: vi.fn(async () => {}),
-  } as unknown as Repository;
+  } as unknown as NativeRepository;
 }
 
 describe('PDF library import', () => {
@@ -45,13 +45,7 @@ describe('PDF library import', () => {
   });
 
   it('creates a canvas containing one PDF element', async () => {
-    const ydoc = new YDocManager();
-    const session = {
-      ydoc,
-      save: vi.fn(async () => true),
-      close: vi.fn(async () => {}),
-    };
-    const repository = createRepository(session);
+    const repository = createRepository();
 
     const importedId = await importPdfFile({
       file: new File([new Uint8Array([1, 2, 3])], 'Deck.pdf', {
@@ -71,12 +65,11 @@ describe('PDF library import', () => {
       'Deck',
       'mcanvas',
       'folder-1',
+      expect.any(Uint8Array),
     );
-    expect(repository.openSession).toHaveBeenCalledWith('canvas-1', {
-      skipRemotePull: true,
-    });
-    expect(session.save).toHaveBeenCalledTimes(1);
-    expect(session.close).toHaveBeenCalledTimes(1);
+    const ydoc = new YDocManager();
+    const bytes = vi.mocked(repository.createFile).mock.calls[0][3]!;
+    Y.applyUpdate(ydoc.doc, bytes);
 
     expect(ydoc.elements.length).toBe(1);
     const pdfElement = ydoc.elements.get(0);
@@ -98,17 +91,10 @@ describe('PDF library import', () => {
     ]);
   });
 
-  it('deletes the canvas if saving the imported PDF fails', async () => {
+  it('does not publish a canvas if its initial bytes cannot be saved', async () => {
     const error = new Error('save failed');
-    const session = {
-      ydoc: new YDocManager(),
-      save: vi.fn(async () => {
-        throw error;
-      }),
-      close: vi.fn(async () => {}),
-    };
-    const repository = createRepository(session);
-
+    const repository = createRepository();
+    vi.mocked(repository.createFile).mockRejectedValueOnce(error);
     await expect(
       importPdfFile({
         file: new File([new Uint8Array([1])], 'Deck.pdf', {
@@ -119,8 +105,6 @@ describe('PDF library import', () => {
         fallbackTitle: 'Untitled Canvas',
       }),
     ).rejects.toThrow(error);
-
-    expect(session.close).toHaveBeenCalledTimes(1);
-    expect(repository.deleteNode).toHaveBeenCalledWith('canvas-1');
+    expect(repository.deleteNode).not.toHaveBeenCalled();
   });
 });

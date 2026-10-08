@@ -1,11 +1,10 @@
 import { OneNoteIcon } from '../brand-icons';
 import {
-  countOneNotePages,
   importOneNote,
   ONENOTE_DIALOG_FILTERS,
-  type OneNoteNotebook,
+  type OneNotePreview,
   oneNoteRootName,
-  parseOneNoteFile,
+  scanOneNoteFile,
 } from '../onenote';
 import { createRootFolderImportJob } from './root-folder-job';
 import { expectFilePath, type ImportProvider } from './types';
@@ -19,7 +18,7 @@ export const onenoteProvider: ImportProvider = {
     const path = expectFilePath(selection);
     const source = strings.library.importSources.onenote;
 
-    return createRootFolderImportJob<OneNoteNotebook>({
+    return createRootFolderImportJob<OneNotePreview>({
       title: source.title,
       scanningLabel: source.scanning,
       emptyLabel: source.empty,
@@ -27,23 +26,23 @@ export const onenoteProvider: ImportProvider = {
       repository,
       parentId,
 
-      scan: () => parseOneNoteFile(path),
+      scan: () => scanOneNoteFile(path),
 
       preview: (notebook) => {
-        const pages = countOneNotePages(notebook);
+        const pages = notebook.pages;
         return {
           lines: [
             { icon: 'page', text: source.pages(pages) },
-            { icon: 'note', text: source.sections(notebook.sections.length) },
+            { icon: 'note', text: source.sections(notebook.sections) },
           ],
           skippedText: null,
           isEmpty: pages === 0,
         };
       },
 
-      async run({ scanned, rootName, onProgress }) {
+      async run({ rootName, onProgress }) {
         const result = await importOneNote({
-          notebook: scanned,
+          path,
           repository,
           parentId,
           rootName,

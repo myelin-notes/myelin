@@ -1,34 +1,31 @@
-import type { Repository, VFSNodeId } from '@/lib/sync';
-import {
-  getFileTypeForName,
-  ImportableFileTypes,
-  isImportableFileType,
-} from '@/lib/sync';
+import type { FolderReader } from '@/lib/folder-reader';
+import type { FileType, NativeRepository, VFSNodeId } from '@/lib/sync';
+import { getFileTypeForName, isImportableFileType } from '@/lib/sync';
 
-export const STORAGE_FILE_ACCEPT = ImportableFileTypes.map(
-  (extension) => `.${extension}`,
-).join(',');
-
-export function isStorageFile(file: File): boolean {
+export function isStorageFile(file: Pick<File, 'name' | 'type'>): boolean {
   const fileType = getFileTypeForName(file.name);
   return fileType !== null && isImportableFileType(fileType);
 }
 
-export async function importStorageFile({
-  file,
+export async function importStoragePath({
+  path,
+  name,
+  fileType,
   repository,
   parentId,
+  reader,
 }: {
-  file: File;
-  repository: Repository;
-  parentId: string | null;
+  path: string;
+  name: string;
+  fileType: FileType;
+  repository: NativeRepository;
+  parentId: VFSNodeId | null;
+  reader?: FolderReader;
 }): Promise<VFSNodeId> {
-  const fileType = getFileTypeForName(file.name);
-  if (!fileType || !isImportableFileType(fileType)) {
-    throw new Error(`Unsupported file type: ${file.name}`);
-  }
-
-  const name = await repository.getUniqueFileName(file.name, parentId);
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  return repository.createFile(name, fileType, parentId, bytes);
+  return repository.importFile(
+    name,
+    fileType,
+    parentId,
+    reader ? reader.importSource(path) : { kind: 'path', path },
+  );
 }

@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { Logger } from '@myelin/shared/logger';
 import { trackEvent } from '@/lib/analytics';
+import { subscribeCredentialChanges } from '@/lib/sync/repo/credential-vault';
+import { credentialTokenKey } from '@/lib/sync/repo/oauth/client';
 
 export interface RemoteAuthState {
   tokenPresent: boolean;
@@ -27,6 +29,7 @@ export type RemoteOAuthResult =
 export interface RemoteOAuthProvider<TStartPayload> {
   /** Display name, used in copy and in the analytics event prefix. */
   name: string;
+  credentialClientName: string;
   /** Prefix for `<prefix>_auth_completed` / `<prefix>_auth_failed`. */
   analyticsPrefix: string;
   isAuthAvailable: () => Promise<boolean>;
@@ -104,7 +107,15 @@ export function useRemoteAuth<TStartPayload>(
       return;
     }
     void checkToken();
-  }, [enabled, checkToken]);
+    return subscribeCredentialChanges((change) => {
+      if (
+        change.clientName === provider.credentialClientName &&
+        change.key === credentialTokenKey(credentialId)
+      ) {
+        void checkToken();
+      }
+    });
+  }, [enabled, checkToken, provider.credentialClientName, credentialId]);
 
   // Abandoning the flow (unmount) has to tear down the redirect listener too,
   // otherwise the loopback server or deep link handler outlives the attempt.

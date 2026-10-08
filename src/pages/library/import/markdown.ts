@@ -1,5 +1,5 @@
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createCanvasFile } from './canvas-file';
 
 export const MARKDOWN_FILE_ACCEPT =
@@ -7,7 +7,7 @@ export const MARKDOWN_FILE_ACCEPT =
 export const MARKDOWN_EXTENSION_RE = /\.(md|markdown|mdx)$/i;
 const MARKDOWN_MIME_TYPES = new Set(['text/markdown', 'text/x-markdown']);
 
-export function isMarkdownFile(file: File): boolean {
+export function isMarkdownFile(file: Pick<File, 'name' | 'type'>): boolean {
   return (
     MARKDOWN_EXTENSION_RE.test(file.name) || MARKDOWN_MIME_TYPES.has(file.type)
   );
@@ -25,7 +25,7 @@ export async function importMarkdownFile({
   fallbackTitle,
 }: {
   file: File;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: string | null;
   fallbackTitle: string;
 }): Promise<VFSNodeId> {

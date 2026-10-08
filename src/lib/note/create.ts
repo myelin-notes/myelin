@@ -6,10 +6,10 @@ import {
 } from '@myelin/editor/elements/page-frame-constants';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 
 export async function createBlankCanvasFile(
-  repository: Repository,
+  repository: NativeRepository,
   name: string,
   parentId: VFSNodeId | null,
   initialPageFrameName?: string | null,

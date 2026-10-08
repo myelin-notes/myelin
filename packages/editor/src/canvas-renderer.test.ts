@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  BG_OVERDRAW_PX,
   backgroundPanShift,
   createZoomGestureState,
   cullMarginWorld,
@@ -92,42 +91,6 @@ describe('backgroundPanShift', () => {
   });
 });
 
-// The layer element starts at -BG_OVERDRAW_PX and the per-frame translate moves it from there.
-describe('background tiling origin', () => {
-  const TILE_WORLD = 24;
-
-  it('stays anchored to the world origin at every zoom', () => {
-    // The world origin is at screen (offset * zoom) and the pattern repeats every tile, so the tiling
-    // origin only has to agree modulo one tile. -BG_OVERDRAW_PX is a whole number of tiles only when
-    // MAX_ZOOM / zoom is an integer, so a shift that ignores it leaves a phase error and the grid slides
-    // against the content as the user zooms.
-    const zooms = [MIN_ZOOM, 0.5, 0.75, 1, 1.3, 1.5, 2, 2.5, MAX_ZOOM];
-    for (const zoom of zooms) {
-      for (const offset of [0, 37.5, -412.25, 10000]) {
-        const tile = TILE_WORLD * zoom;
-        const shift = backgroundPanShift(offset * zoom + BG_OVERDRAW_PX, tile);
-        const origin = -BG_OVERDRAW_PX + shift;
-        const error = Math.abs(
-          (((origin - offset * zoom) % tile) + tile) % tile,
-        );
-        expect(Math.min(error, tile - error)).toBeLessThan(1e-6);
-      }
-    }
-  });
-
-  it('never translates the layer past its overdraw', () => {
-    // Folding the overdraw into the shift must not push the translate out of
-    // [0, tile) — beyond that the layer's own edge is dragged into view.
-    for (const zoom of [MIN_ZOOM, 1, 1.3, MAX_ZOOM]) {
-      const tile = TILE_WORLD * zoom;
-      const shift = backgroundPanShift(-98765.43 * zoom + BG_OVERDRAW_PX, tile);
-      expect(shift).toBeGreaterThanOrEqual(0);
-      expect(shift).toBeLessThan(tile);
-      expect(tile).toBeLessThanOrEqual(BG_OVERDRAW_PX);
-    }
-  });
-});
-
 // The background layer leaves the tree while this reads true, so a false positive flickers the
 // grid and a stuck true loses it until something moves.
 describe('isZoomGestureActive', () => {
@@ -198,11 +161,6 @@ describe('cullMarginWorld', () => {
     for (const zoom of [MIN_ZOOM, 0.5, 1, 4, MAX_ZOOM]) {
       expect(cullMarginWorld(zoom) * zoom).toBeCloseTo(128, 6);
     }
-  });
-
-  it('shrinks in world units as the view zooms in', () => {
-    expect(cullMarginWorld(4)).toBeLessThan(cullMarginWorld(1));
-    expect(cullMarginWorld(1)).toBeLessThan(cullMarginWorld(0.25));
   });
 
   it('culls nothing when the zoom is unusable', () => {

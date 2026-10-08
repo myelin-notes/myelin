@@ -1,9 +1,11 @@
 import type { Platform } from '@myelin/editor/platform/types';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { MOBILE_PLATFORM } from '@/lib/env';
 import { artifactCache } from './artifact-cache';
 import { codeRunner } from './code-runner';
 import { IrohTransport } from './iroh';
@@ -12,6 +14,18 @@ import { transcription } from './transcription';
 
 export const tauriPlatform: Platform = {
   async saveFile({ suggestedName, filter, data }) {
+    if (MOBILE_PLATFORM === 'ios') {
+      const resolved = await data;
+      const bytes =
+        typeof resolved === 'string'
+          ? new TextEncoder().encode(resolved)
+          : resolved;
+      const saved = await invoke<boolean>('export_file_ios', {
+        suggestedName,
+        bytes: Array.from(bytes),
+      });
+      return { cancelled: !saved };
+    }
     const path = await save({
       defaultPath: suggestedName,
       filters: filter ? [filter] : undefined,

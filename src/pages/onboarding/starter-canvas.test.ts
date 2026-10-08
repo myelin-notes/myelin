@@ -2,14 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import en from '@myelin/editor/i18n/messages/en';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import { createStarterCanvasFile } from './starter-canvas';
 
 function buildCanvas() {
-  const createFile = vi.fn<Repository['createFile']>(
+  const createFile = vi.fn<NativeRepository['createFile']>(
     async () => 'note-1' as VFSNodeId,
   );
-  const repository = { createFile } as unknown as Repository;
+  const repository = { createFile } as unknown as NativeRepository;
   return { createFile, repository };
 }
 
