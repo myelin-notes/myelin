@@ -162,35 +162,32 @@ describe('child index', () => {
   it('drops unusable pen presets and clamps oversized strokes', () => {
     const manifest = createEmptyManifest();
     manifest.penPresets = [
-      { id: 'a', tool: 'eraser', color: '#abcdef', size: 4, inWheel: true },
-      { id: 'b', tool: 'pen', color: 'not-a-color', size: 4, inWheel: true },
-      { id: 'c', tool: 'pen', color: '#ABCDEF', size: 9999, inWheel: true },
+      { id: 'a', tool: 'eraser', color: '#abcdef', size: 4 },
+      { id: 'b', tool: 'pen', color: 'not-a-color', size: 4 },
+      { id: 'c', tool: 'pen', color: '#ABCDEF', size: 9999 },
       {
         id: 'd',
         tool: 'highlighter',
         color: '#facc15',
         size: 1,
-        inWheel: false,
       },
       {
         id: 'e',
         tool: 'pen',
         color: '#abcdef',
         size: Number.NaN,
-        inWheel: true,
       },
     ] as unknown as VFSManifest['penPresets'];
 
     migrate(manifest);
 
     expect(manifest.penPresets).toEqual([
-      { id: 'c', tool: 'pen', color: '#abcdef', size: 40, inWheel: true },
+      { id: 'c', tool: 'pen', color: '#abcdef', size: 40 },
       {
         id: 'd',
         tool: 'highlighter',
         color: '#facc15',
         size: 12,
-        inWheel: false,
       },
     ]);
   });
@@ -204,7 +201,6 @@ describe('child index', () => {
         tool: 'pen' as const,
         color: '#abcdef',
         size: 8,
-        inWheel: false,
       }),
     );
 

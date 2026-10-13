@@ -18,7 +18,8 @@ export interface PenPresetsContextValue {
   // False once the list is full. Callers drop their save affordance rather than
   // offering one that can only fail.
   canAddPreset: boolean;
-  addPreset: (preset: Omit<PenPreset, 'id'>) => Promise<void>;
+  /** Resolves to the full list after the add. */
+  addPreset: (preset: Omit<PenPreset, 'id'>) => Promise<PenPreset[]>;
   updatePreset: (id: string, changes: PenPresetChanges) => Promise<void>;
   reorderPresets: (ids: readonly string[]) => Promise<void>;
   removePreset: (id: string) => Promise<void>;
@@ -54,7 +55,9 @@ export function PenPresetsProvider({ children }: PropsWithChildren) {
 
   const addPreset = useCallback(
     async (preset: Omit<PenPreset, 'id'>) => {
-      setPresets(await repository.addPenPreset(preset));
+      const next = await repository.addPenPreset(preset);
+      setPresets(next);
+      return next;
     },
     [repository],
   );

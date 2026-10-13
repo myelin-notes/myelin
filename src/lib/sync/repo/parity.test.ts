@@ -118,13 +118,11 @@ describe('Repository business logic parity', () => {
         tool: 'pen',
         color: '#ABCDEF',
         size: 12,
-        inWheel: true,
       });
       await repository.addPenPreset({
         tool: 'highlighter',
         color: '#FACC15',
         size: 36,
-        inWheel: false,
       });
 
       const [rootFolders, rootFiles] = await repository.listDirectory(null);
@@ -187,13 +185,11 @@ describe('Repository business logic parity', () => {
           tool: 'pen',
           color: '#abcdef',
           size: 12,
-          inWheel: true,
         },
         expect.objectContaining({
           tool: 'highlighter',
           color: '#facc15',
           size: 36,
-          inWheel: false,
         }),
       ]);
       expect(
@@ -260,7 +256,6 @@ describe('Repository business logic parity', () => {
           tool: 'pen',
           color: '#abcdef',
           size: 20,
-          inWheel: true,
         },
       ]);
     });

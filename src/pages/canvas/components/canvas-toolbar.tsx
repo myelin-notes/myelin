@@ -35,6 +35,7 @@ interface CanvasToolbarProps {
   hasOptions: boolean;
   wheelEnabledIndices: Set<number>;
   presets: PenPreset[];
+  wheelPresetIds: Set<string>;
   activePresetId: string | null;
   editingPresetId: string | null;
   wheelFull: boolean;
@@ -79,6 +80,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   hasOptions,
   wheelEnabledIndices,
   presets,
+  wheelPresetIds,
   activePresetId,
   editingPresetId,
   wheelFull,
@@ -608,6 +610,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               tools={tools}
               enabledIndices={wheelEnabledIndices}
               presets={presets}
+              wheelPresetIds={wheelPresetIds}
               wheelFull={wheelFull}
               savePresetDisabledReason={savePresetDisabledReason}
               onToggle={onToggleWheelTool}

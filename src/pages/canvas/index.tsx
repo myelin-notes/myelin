@@ -668,6 +668,7 @@ function CanvasViewInner({
         hasOptions={toolState.hasOptions}
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         presets={toolState.presets}
+        wheelPresetIds={toolState.wheelPresetIds}
         activePresetId={toolState.activePresetId}
         editingPresetId={toolState.editingPresetId}
         wheelFull={toolState.wheelFull}

@@ -17,6 +17,7 @@ interface ToolShelfProps {
   tools: ITool[];
   enabledIndices: Set<number>;
   presets: PenPreset[];
+  wheelPresetIds: Set<string>;
   wheelFull: boolean;
   /** Null when the live tool can be saved; otherwise why it can't. */
   savePresetDisabledReason: string | null;
@@ -81,6 +82,7 @@ export function ToolShelf({
   tools,
   enabledIndices,
   presets,
+  wheelPresetIds,
   wheelFull,
   savePresetDisabledReason,
   onToggle,
@@ -107,7 +109,8 @@ export function ToolShelf({
   }, []);
 
   const wheelEmpty =
-    enabledIndices.size === 0 && presets.every((preset) => !preset.inWheel);
+    enabledIndices.size === 0 &&
+    presets.every((preset) => !wheelPresetIds.has(preset.id));
 
   return (
     <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-popover/85 shadow-ambient backdrop-blur-md duration-200">
@@ -162,7 +165,7 @@ export function ToolShelf({
             key={preset.id}
             glyph={<PenPresetMark preset={preset} className="size-4" />}
             label={getPenPresetLabel(preset, strings)}
-            enabled={preset.inWheel}
+            enabled={wheelPresetIds.has(preset.id)}
             onClick={() => onTogglePresetInWheel(preset)}
             onContextMenu={(event) => event.preventDefault()}
           />

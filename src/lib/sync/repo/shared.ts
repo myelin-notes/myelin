@@ -138,7 +138,6 @@ function sanitizePenPresets(presets: PenPreset[] | undefined): PenPreset[] {
       tool: entry.tool,
       color,
       size: Math.min(Math.max(entry.size, range[0]), range[1]),
-      inWheel: entry.inWheel === true,
     });
     if (sane.length === MAX_PEN_PRESETS) {
       break;

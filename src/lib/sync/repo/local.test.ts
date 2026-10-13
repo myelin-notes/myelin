@@ -741,7 +741,6 @@ describe('LocalRepository', () => {
         tool: 'pen',
         color: '#abcdef',
         size: i + 1,
-        inWheel: false,
       });
     }
 
@@ -751,7 +750,6 @@ describe('LocalRepository', () => {
         tool: 'pen',
         color: '#ABCDEF',
         size: 1,
-        inWheel: false,
       }),
     ).toHaveLength(MAX_PEN_PRESETS);
 
@@ -760,7 +758,6 @@ describe('LocalRepository', () => {
         tool: 'pen',
         color: '#abcdef',
         size: MAX_PEN_PRESETS + 1,
-        inWheel: false,
       }),
     ).rejects.toThrow();
     expect(await repository.getPenPresets()).toHaveLength(MAX_PEN_PRESETS);
@@ -776,19 +773,16 @@ describe('LocalRepository', () => {
       tool: 'pen',
       color: '#111111',
       size: 1,
-      inWheel: false,
     });
     const second = await repository.addPenPreset({
       tool: 'pen',
       color: '#222222',
       size: 2,
-      inWheel: false,
     });
     const third = await repository.addPenPreset({
       tool: 'highlighter',
       color: '#333333',
       size: 3,
-      inWheel: true,
     });
     const ids = [third[2].id, second[1].id, first[0].id];
 
