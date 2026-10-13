@@ -4,6 +4,7 @@ import {
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@myelin/editor/page-frame/markdown/import';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import type {
   ActiveRepository,
@@ -1154,6 +1155,7 @@ export class McpToolService {
         session = await this.options.repository.openSession(createdId);
         await addMarkdownPageFrameToYDoc(session.ydoc, markdown, {
           repository: this.options.repository,
+          pageLayout: UserPrefs.get('defaultPageLayout'),
         });
         await session.save();
         await session.close();
@@ -1371,6 +1373,7 @@ export class McpToolService {
           displayName,
           offsetX,
           offsetY,
+          pageLayout: UserPrefs.get('defaultPageLayout'),
         },
       );
       await session.save();
