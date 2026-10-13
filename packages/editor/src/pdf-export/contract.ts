@@ -52,7 +52,9 @@ export type PageItem =
       pts: number[];
       closed: boolean;
       fill?: Rgb;
+      /** Stroked with round caps/joins. */
       stroke?: Rgb;
+      lineWidth?: number;
       opacity?: number;
     }
   | {

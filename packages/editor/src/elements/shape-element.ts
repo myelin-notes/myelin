@@ -434,8 +434,6 @@ export class ShapeElement extends AnchorableElement {
     if (g.length < 4) {
       return;
     }
-    // World-space polyline for this shape (PageItem.path has no line width, so
-    // shapes are emitted as width-carrying `line` segments instead).
     const worldPts = this.toWorldOutline();
 
     // Measured off the outline, not boundingBox — the latter is inflated to the
@@ -448,40 +446,21 @@ export class ShapeElement extends AnchorableElement {
     ) {
       return;
     }
-    const { rgb } = parseCssColor(this.style.color);
-    const width = ctx.ptPerWorldY * this.style.size * Math.abs(this.scale.y);
-    const closed =
-      this.shapeType === 'rect' ||
-      this.shapeType === 'triangle' ||
-      this.shapeType === 'ellipse';
-
-    const last = worldPts.length - 1;
-    for (let i = 0; i < last; i++) {
-      const p1 = ctx.worldToPagePt(worldPts[i][0], worldPts[i][1]);
-      const p2 = ctx.worldToPagePt(worldPts[i + 1][0], worldPts[i + 1][1]);
-      ctx.push({
-        t: 'line',
-        x1: p1.x,
-        y1: p1.y,
-        x2: p2.x,
-        y2: p2.y,
-        color: rgb,
-        width,
-      });
+    const pts: number[] = [];
+    for (const [x, y] of worldPts) {
+      const p = ctx.worldToPagePt(x, y);
+      pts.push(p.x, p.y);
     }
-    if (closed && worldPts.length >= 2) {
-      const p1 = ctx.worldToPagePt(worldPts[last][0], worldPts[last][1]);
-      const p2 = ctx.worldToPagePt(worldPts[0][0], worldPts[0][1]);
-      ctx.push({
-        t: 'line',
-        x1: p1.x,
-        y1: p1.y,
-        x2: p2.x,
-        y2: p2.y,
-        color: rgb,
-        width,
-      });
-    }
+    // One path, not per-segment lines: translucent segments would double up at the joints.
+    const { rgb, opacity } = parseCssColor(this.style.color);
+    ctx.push({
+      t: 'path',
+      pts,
+      closed: this.shapeType !== 'line',
+      stroke: rgb,
+      lineWidth: ctx.ptPerWorldY * this.style.size * Math.abs(this.scale.y),
+      opacity,
+    });
   }
 
   /** Local→world outline as an ordered list of vertices (open for line). */
