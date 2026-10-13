@@ -8,7 +8,7 @@ use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, Stroke};
+use krilla::paint::{Fill, LineCap, LineJoin, Stroke};
 use krilla::pdf::{Pdf, PdfDocument};
 use krilla::surface::Surface;
 use krilla::text::TextDirection;
@@ -147,7 +147,15 @@ fn draw_item(
             pb.line_to(*x, *y + *h);
             pb.close();
             if let Some(path) = pb.finish() {
-                paint_path(surface, &path, *fill_c, *stroke_c, *line_width, *opacity);
+                paint_path(
+                    surface,
+                    &path,
+                    *fill_c,
+                    *stroke_c,
+                    *line_width,
+                    *opacity,
+                    false,
+                );
             }
         }
         PageItem::Line {
@@ -162,7 +170,15 @@ fn draw_item(
             pb.move_to(*x1, *y1);
             pb.line_to(*x2, *y2);
             if let Some(path) = pb.finish() {
-                paint_path(surface, &path, None, Some(*color), Some(*width), None);
+                paint_path(
+                    surface,
+                    &path,
+                    None,
+                    Some(*color),
+                    Some(*width),
+                    None,
+                    false,
+                );
             }
         }
         PageItem::Path {
@@ -170,10 +186,19 @@ fn draw_item(
             closed,
             fill: fill_c,
             stroke: stroke_c,
+            line_width,
             opacity,
         } => {
             if let Some(path) = build_path(pts, *closed) {
-                paint_path(surface, &path, *fill_c, *stroke_c, None, *opacity);
+                paint_path(
+                    surface,
+                    &path,
+                    *fill_c,
+                    *stroke_c,
+                    *line_width,
+                    *opacity,
+                    true,
+                );
             }
         }
         PageItem::Image {
@@ -217,6 +242,7 @@ fn paint_path(
     stroke_c: Option<[u8; 3]>,
     line_width: Option<f32>,
     opacity: Option<f32>,
+    round: bool,
 ) {
     if let Some(c) = fill_c {
         surface.set_stroke(None);
@@ -229,6 +255,12 @@ fn paint_path(
             paint: rgb::Color::new(c[0], c[1], c[2]).into(),
             width: line_width.unwrap_or(1.0),
             opacity: norm(opacity),
+            line_cap: if round { LineCap::Round } else { LineCap::Butt },
+            line_join: if round {
+                LineJoin::Round
+            } else {
+                LineJoin::Miter
+            },
             ..Default::default()
         }));
         surface.draw_path(path);

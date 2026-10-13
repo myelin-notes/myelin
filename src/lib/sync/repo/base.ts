@@ -827,9 +827,6 @@ export abstract class BaseRepository
               ...preset,
               ...(normalized ? { color: normalized } : {}),
               ...(changes.size !== undefined ? { size: changes.size } : {}),
-              ...(changes.inWheel !== undefined
-                ? { inWheel: changes.inWheel }
-                : {}),
             }
           : preset,
       );

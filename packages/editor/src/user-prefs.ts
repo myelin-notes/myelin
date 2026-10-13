@@ -19,6 +19,8 @@ const PREFS = {
     {},
   ),
   wheelTools: pref<number[]>('wheel-tools', []),
+  // Per device, unlike the presets themselves, so each device's wheel limit holds.
+  wheelPresets: pref<string[]>('wheel-presets', []),
   toolOptions: pref<Record<string, Record<string, unknown>>>(
     'tool-options',
     {},

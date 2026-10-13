@@ -60,8 +60,11 @@ pub enum PageItem {
         closed: bool,
         #[serde(default)]
         fill: Option<[u8; 3]>,
+        /// Stroked with round caps/joins.
         #[serde(default)]
         stroke: Option<[u8; 3]>,
+        #[serde(default)]
+        line_width: Option<f32>,
         #[serde(default)]
         opacity: Option<f32>,
     },

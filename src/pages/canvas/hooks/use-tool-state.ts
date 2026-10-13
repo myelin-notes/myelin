@@ -337,9 +337,26 @@ export function useToolState(
     [canvasTools, drawableCanvasRef],
   );
 
+  const [wheelPresetIds, setWheelPresetIds] = useState<Set<string>>(
+    () => new Set(UserPrefs.get('wheelPresets')),
+  );
+
+  const setPresetInWheel = useCallback((id: string, inWheel: boolean) => {
+    setWheelPresetIds((prev) => {
+      const next = new Set(prev);
+      if (inWheel) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      UserPrefs.set('wheelPresets', [...next]);
+      return next;
+    });
+  }, []);
+
   const wheelPresets = useMemo(
-    () => presets.filter((preset) => preset.inWheel),
-    [presets],
+    () => presets.filter((preset) => wheelPresetIds.has(preset.id)),
+    [presets, wheelPresetIds],
   );
 
   // Presets take the trailing arc, so adding one never moves a tool's angle.
@@ -424,24 +441,34 @@ export function useToolState(
       return;
     }
     // An exact duplicate is a no-op in the repository, so this can't stack.
-    void addPreset({ tool: activePenTool, ...settings, inWheel: !wheelFull });
+    void addPreset({ tool: activePenTool, ...settings }).then((next) => {
+      const created = next.find(
+        (preset) => !presets.some((existing) => existing.id === preset.id),
+      );
+      if (created && !wheelFull) {
+        setPresetInWheel(created.id, true);
+      }
+    });
   }, [
     activePenTool,
     addPreset,
     canAddPreset,
     canvasTools,
+    presets,
     selectedToolIndex,
+    setPresetInWheel,
     wheelFull,
   ]);
 
   const togglePresetInWheel = useCallback(
     (preset: PenPreset) => {
-      if (!preset.inWheel && wheelFull) {
+      const inWheel = wheelPresetIds.has(preset.id);
+      if (!inWheel && wheelFull) {
         return;
       }
-      void updatePreset(preset.id, { inWheel: !preset.inWheel });
+      setPresetInWheel(preset.id, !inWheel);
     },
-    [updatePreset, wheelFull],
+    [setPresetInWheel, wheelFull, wheelPresetIds],
   );
 
   const editPreset = useCallback(
@@ -459,9 +486,10 @@ export function useToolState(
       if (editingPresetId === preset.id) {
         setEditingPresetId(null);
       }
+      setPresetInWheel(preset.id, false);
       void removePreset(preset.id);
     },
-    [editingPresetId, removePreset],
+    [editingPresetId, removePreset, setPresetInWheel],
   );
 
   const handleToolSwitched = useCallback((index: number) => {
@@ -519,6 +547,7 @@ export function useToolState(
     wheelEnabledIndices,
     handleToggleWheelTool,
     presets,
+    wheelPresetIds,
     activePresetId,
     editingPresetId,
     wheelFull,
