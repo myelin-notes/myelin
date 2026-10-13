@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getPlatform } from '@myelin/editor/platform';
 import { Logger } from '@myelin/shared/logger';
+import { useDocumentVisible } from '@/hooks/useDocumentVisible';
 import { LIVE_DISCOVERY_URL } from '@/lib/env';
 import { registerShutdownTask } from '@/lib/shutdown-tasks';
 import {
@@ -17,13 +18,21 @@ export function useLivePeerDiscovery(
   noteSession: NoteSession | null,
 ): Error | null {
   const repositoryStatus = useRepositoryStatus();
+  const visible = useDocumentVisible();
   const [pauseError, setPauseError] = useState<Error | null>(null);
 
   useEffect(() => {
     setPauseError(null);
     // No live transport capability means this client can't join live sync.
     const createLiveTransport = getPlatform().createLiveTransport;
-    if (!noteSession || !LIVE_DISCOVERY_URL || !createLiveTransport) {
+    // Leaving while hidden stops discovery polling and lets the iroh endpoint shut down; peers see
+    // this client go, and it rejoins when shown again.
+    if (
+      !noteSession ||
+      !LIVE_DISCOVERY_URL ||
+      !createLiveTransport ||
+      !visible
+    ) {
       return;
     }
 
@@ -91,7 +100,7 @@ export function useLivePeerDiscovery(
       unregisterShutdownTask();
       void stopDiscovery();
     };
-  }, [noteSession, repositoryStatus.config]);
+  }, [noteSession, repositoryStatus.config, visible]);
 
   return pauseError;
 }
