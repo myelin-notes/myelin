@@ -9,10 +9,16 @@ interface TestPageDom extends PdfPageSurface {
 }
 
 function createPageDom(width: number, height: number): TestPageDom {
+  const styles = new Map<string, string>();
   return {
     root: {
       remove: vi.fn(),
-      style: {},
+      style: {
+        getPropertyValue: (property: string) => styles.get(property) ?? '',
+        setProperty: vi.fn((property: string, value: string) => {
+          styles.set(property, value);
+        }),
+      },
     } as unknown as TestPageDom['root'],
     canvas: {
       width,
@@ -134,8 +140,13 @@ describe('PdfPageView', () => {
 
     view.syncPageGeometry(pageDom, page, 2, 0.5, 1.25);
 
-    expect(pageDom.root.style.transform).toBe('translate(25px, 12.5px)');
-    expect(pageDom.root.style.width).toBe('250px');
-    expect(pageDom.root.style.height).toBe('125px');
+    const { style } = pageDom.root;
+    expect(style.getPropertyValue('transform')).toBe('translate(25px, 12.5px)');
+    expect(style.getPropertyValue('width')).toBe('250px');
+    expect(style.getPropertyValue('height')).toBe('125px');
+
+    // Synced on every canvas frame: an unchanged layout must not rewrite styles.
+    view.syncPageGeometry(pageDom, page, 2, 0.5, 1.25);
+    expect(style.setProperty).toHaveBeenCalledTimes(3);
   });
 });

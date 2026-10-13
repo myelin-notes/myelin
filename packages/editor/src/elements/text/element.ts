@@ -1,5 +1,6 @@
 import { selectAll } from 'prosemirror-commands';
 import { keymap } from 'prosemirror-keymap';
+import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import {
   EditorState,
   TextSelection,
@@ -79,6 +80,10 @@ export class TextElement
 
   private _richText = docFromText('');
   private _view: EditorView | null = null;
+  // Inputs of the inline styles `syncDOM` last wrote. It runs on every canvas frame, and WebKit
+  // dirties style on any assignment, even of an identical value.
+  private _domStyleKey = '';
+  private _fontsEnsuredFor: ProseMirrorNode | null = null;
 
   // TTF bytes for the display font, staged by prepareForPdf so the synchronous
   // drawToPdf pass can embed the real face; null falls back to familyToKey.
@@ -202,12 +207,33 @@ export class TextElement
 
   public override syncDOM(viewport: CanvasViewport, host: HTMLElement): void {
     const editor = this._view?.dom ?? this.createDom(host);
+    this.ensureFonts();
 
+    const sx = Math.abs(this._scale.x) || 1;
     const sy = Math.abs(this._scale.y) || 1;
     const screen = viewport.worldToScreen({
       x: this.offset.x,
       y: this.offset.y,
     });
+    const color = resolveInkColor(this._style.color);
+    const { fontSize, bold, italic, fontFamily } = this._style;
+    const styleKey = [
+      screen.x,
+      screen.y,
+      viewport.zoom,
+      this.box.height * sy,
+      color,
+      this._editing,
+      this._boxWidth * sx,
+      fontSize,
+      bold,
+      italic,
+      fontFamily,
+    ].join('|');
+    if (styleKey === this._domStyleKey) {
+      return;
+    }
+    this._domStyleKey = styleKey;
 
     this.applyContentStyle(editor);
 
@@ -217,11 +243,11 @@ export class TextElement
     editor.style.top = `${screen.y}px`;
     editor.style.transform = `scale(${viewport.zoom})`;
     editor.style.minHeight = `${this.box.height * sy}px`;
-    editor.style.color = resolveInkColor(this._style.color);
+    editor.style.color = color;
     editor.dataset.editing = this._editing ? 'true' : 'false';
   }
 
-  // syncDOM pushes these each frame; the measure pass applies them first, so a recomputeBox running
+  // syncDOM pushes these on change; the measure pass applies them first, so a recomputeBox running
   // before the next frame (font or scale change) measures the new wrapping, not the last frame's.
   private applyContentStyle(editor: HTMLElement): void {
     const sx = Math.abs(this._scale.x) || 1;
@@ -230,9 +256,18 @@ export class TextElement
     editor.style.lineHeight = '1.3';
     editor.style.fontWeight = this._style.bold ? '700' : '400';
     editor.style.fontStyle = this._style.italic ? 'italic' : 'normal';
-    // Deduped internally; covers documents opened with existing text boxes,
-    // which the tool UI's font loading never sees.
+    this.ensureFonts();
+    editor.style.fontFamily = this._style.fontFamily;
+  }
+
+  // Deduped internally; covers documents opened with existing text boxes,
+  // which the tool UI's font loading never sees.
+  private ensureFonts(): void {
     ensureDisplayFont(this._style.fontFamily);
+    if (this._fontsEnsuredFor === this._richText) {
+      return;
+    }
+    this._fontsEnsuredFor = this._richText;
     this._richText.descendants((node) => {
       for (const mark of node.marks) {
         const family = mark.attrs.fontFamily;
@@ -241,7 +276,6 @@ export class TextElement
         }
       }
     });
-    editor.style.fontFamily = this._style.fontFamily;
   }
 
   // scrollHeight never reports less than min-height, so temporarily clear the box floor to measure
@@ -333,6 +367,7 @@ export class TextElement
   public override disposeDOM(): void {
     this._view?.destroy();
     this._view = null;
+    this._domStyleKey = '';
   }
 
   public override enterEditMode(canvas: DrawableCanvas): HTMLElement | null {

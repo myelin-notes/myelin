@@ -32,6 +32,7 @@ import {
 } from '../../pdf-renderer';
 import { getPlatform } from '../../platform';
 import { quantizeRasterZoom } from '../../raster-zoom';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import type {
   CanvasElementContext,
   CanvasUiServices,
@@ -702,8 +703,16 @@ export class PdfElement
     if (!this._contentRoot) {
       return;
     }
-    this._contentRoot.style.width = `${contentWidth * rasterZoom}px`;
-    this._contentRoot.style.height = `${contentHeight * rasterZoom}px`;
+    setStyleIfChanged(
+      this._contentRoot,
+      'width',
+      `${contentWidth * rasterZoom}px`,
+    );
+    setStyleIfChanged(
+      this._contentRoot,
+      'height',
+      `${contentHeight * rasterZoom}px`,
+    );
   }
 
   private createDom(host: HTMLElement): void {
