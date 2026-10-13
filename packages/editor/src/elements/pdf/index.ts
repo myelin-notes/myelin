@@ -667,6 +667,7 @@ export class PdfElement
         return;
       }
       this._pdfDocument = document;
+      this.onRedrawNeeded?.();
       if (
         !forceMetadata &&
         !this.model.shouldLoadPageMetadata({
@@ -682,6 +683,7 @@ export class PdfElement
         return;
       }
       this.setPageSizes(pageSizes, syncMetadata);
+      this.onRedrawNeeded?.();
     } catch (error) {
       if (generation === this._loadGeneration) {
         logger.error('Failed to load PDF', error, {

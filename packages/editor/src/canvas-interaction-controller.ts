@@ -167,6 +167,7 @@ export class CanvasInteractionController {
       this.host.clearSelection();
     }
     this.host.setActiveTool(next);
+    this.host.drawableCanvas.requestRedraw();
     this.toolCursor = 'default';
     this.updateCursor();
     this.onToolSwitched?.(index);
@@ -265,6 +266,8 @@ export class CanvasInteractionController {
   }
 
   private onPointerMove(event: PointerEvent): void {
+    // Tools draw from pointer state (cursor, live stroke, marquee) that never reaches the Y doc.
+    this.host.drawableCanvas.requestRedraw();
     if (
       event.pointerType === 'touch' &&
       this.palm.isPalm(event.pointerId, event.width, event.height)
@@ -292,6 +295,7 @@ export class CanvasInteractionController {
   }
 
   private onPointerDown(event: PointerEvent): void {
+    this.host.drawableCanvas.requestRedraw();
     if (
       event.pointerType === 'touch' &&
       this.palm.isPalm(event.pointerId, event.width, event.height)
@@ -383,6 +387,7 @@ export class CanvasInteractionController {
   }
 
   private onPointerUp(event: PointerEvent): void {
+    this.host.drawableCanvas.requestRedraw();
     this.activeTouchPointers.delete(event.pointerId);
     if (this.palm.pointerUp(event.pointerId, event.pointerType === 'pen')) {
       return;

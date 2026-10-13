@@ -292,6 +292,7 @@ export class LatexElement extends AnchorableElement {
     void fonts.ready.then(() => {
       if (token === this._fontRemeasureToken) {
         this._naturalDirty = true;
+        this.onRedrawNeeded?.();
       }
     });
   }

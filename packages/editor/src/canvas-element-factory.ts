@@ -15,6 +15,7 @@ export interface CanvasElementFactoryOptions {
   getElements: () => readonly DrawableElement[];
   onChange: () => void;
   invalidateContentBounds: () => void;
+  requestRedraw: () => void;
   resolveNoteLink?: ResolveNoteLink;
   resolveMedia?: ResolveMediaSrc;
   localPeerId: string;
@@ -79,10 +80,12 @@ export class CanvasElementFactory {
     element.onLockChanged = this.options.onChange;
     element.onTransformChanged = () => {
       this.options.invalidateContentBounds();
+      this.options.requestRedraw();
       if (element.isSelected) {
         this.options.onChange();
       }
     };
+    element.onRedrawNeeded = this.options.requestRedraw;
     element.configureCanvas(this.createContext());
   }
 

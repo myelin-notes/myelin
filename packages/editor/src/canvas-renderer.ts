@@ -138,6 +138,7 @@ export class CanvasRenderer {
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
     foregroundCanvas: HTMLCanvasElement,
+    private readonly requestRedraw: () => void,
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
@@ -151,6 +152,8 @@ export class CanvasRenderer {
     // Theme toggle changes the grid color, but the tile is cached — rebuild.
     this.unsubTheme = onCanvasThemeChange(() => {
       this.setBackgroundStyle(this.bgStyle);
+      // Adaptive ink resolves against the theme.
+      this.requestRedraw();
     });
     // Pane width also changes on sidebar toggle/resize and pane splits, not just window resize.
     this.resizeObserver = new ResizeObserver(() => {
@@ -216,7 +219,7 @@ export class CanvasRenderer {
     placementController: PlacementController,
     domOverlayHost: HTMLElement | null,
     selection: SelectionController,
-  ): void {
+  ): boolean {
     const dpr = window.devicePixelRatio || 1;
     const logicalW = this.canvas.width / dpr;
     const logicalH = this.canvas.height / dpr;
@@ -281,6 +284,9 @@ export class CanvasRenderer {
       // in sync. `syncDOM` only appends on create, so only out-of-position nodes move.
       reorderDomOverlay(domOverlayHost, elements);
     }
+
+    // The background comes back only once a frame sees the zoom settle.
+    return this.bgTakenDown || selection.isOverlayAnimating;
   }
 
   // A pan is a compositor translate of the already-painted tiling. Styles are written only when
@@ -352,6 +358,8 @@ export class CanvasRenderer {
     }
     this.resizeCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
+    // Resizing a canvas clears it.
+    this.requestRedraw();
     // Only on a DPR change: dragging the sidebar or a split divider fires a resize per frame, and
     // a rebuild encodes a PNG and repaints the whole overdrawn layer for an identical tile.
     if ((window.devicePixelRatio || 1) !== this.bgTileDpr) {

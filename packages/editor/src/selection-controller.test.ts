@@ -50,6 +50,20 @@ describe('SelectionController', () => {
     expect(controller.selectedElements).toEqual([locked]);
     expect(controller.hitHandle({ x: -4, y: -4 }, 1, 'mouse')).toBeNull();
   });
+  it('animates the overlay from a fresh selection until it is fully shown', () => {
+    const element = createElement('el', new DOMRect(0, 0, 20, 20));
+    const controller = new SelectionController(() => [element]);
+    expect(controller.isOverlayAnimating).toBe(false);
+
+    controller.selectByUuid(['el']);
+    // The first frame after an idle loop advances by 0, so the selection alone must keep it going.
+    controller.advanceOverlay(0);
+    expect(controller.isOverlayAnimating).toBe(true);
+
+    controller.advanceOverlay(1);
+    expect(controller.isOverlayAnimating).toBe(false);
+    expect(controller.hasOverlay).toBe(true);
+  });
   it('owns selection and derives its shared bounds without a canvas', () => {
     const first = createElement('first', new DOMRect(10, 20, 30, 40));
     const second = createElement('second', new DOMRect(-5, 50, 20, 10));

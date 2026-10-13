@@ -92,6 +92,7 @@ describe('touch editing', () => {
     const interaction = new CanvasInteractionController({
       drawableCanvas: {
         shouldUseSelectToolForTouch: () => false,
+        requestRedraw: () => {},
       } as never,
       canvas,
       viewport: {
@@ -178,6 +179,7 @@ describe('tablet selection routing', () => {
     const interaction = new CanvasInteractionController({
       drawableCanvas: {
         shouldUseSelectToolForTouch: () => selectionClaimsTouch,
+        requestRedraw: () => {},
       } as never,
       canvas,
       viewport: viewport as never,
@@ -382,7 +384,7 @@ describe('pen eraser override', () => {
       style: {},
     }) as unknown as HTMLCanvasElement;
     const interaction = new CanvasInteractionController({
-      drawableCanvas: {} as never,
+      drawableCanvas: { requestRedraw: () => {} } as never,
       canvas,
       viewport: {} as never,
       getActiveTool: () => selectedTool,
