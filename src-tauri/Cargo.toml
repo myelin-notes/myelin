@@ -34,7 +34,8 @@ tauri-plugin-pencil = { path = "plugins/tauri-plugin-pencil" }
 tauri-plugin-scoped-storage = "=1.5.1"
 tauri-plugin-stronghold = "2"
 tauri-plugin-http = "2"
-iroh = "=1.0.3"
+# Defaults minus `portmapper`, whose UPnP/NAT-PMP probing costs mobile battery; relay covers NATs.
+iroh = { version = "=1.0.3", default-features = false, features = ["metrics", "fast-apple-datapath", "tls-ring"] }
 # iroh's own deps are caret ranges, so pinning `iroh` alone still lets `cargo update` float these
 # to 1.1 (which changes CustomAddr serialization). Declared only to hold them.
 iroh-base = "=1.0.3"
