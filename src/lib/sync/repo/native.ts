@@ -1195,9 +1195,6 @@ export class NativeRepository implements Repository {
                 ...preset,
                 ...(normalized ? { color: normalized } : {}),
                 ...(changes.size !== undefined ? { size: changes.size } : {}),
-                ...(changes.inWheel !== undefined
-                  ? { inWheel: changes.inWheel }
-                  : {}),
               }
             : preset,
         );

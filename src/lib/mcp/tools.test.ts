@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { TestRepository } from '@/test/test-repository';
 import { McpToolService } from './tools';
+import type { McpNoteReadModel, McpPageFrameContent } from './types';
 
 let repositoryCounter = 0;
 
@@ -300,6 +302,33 @@ describe('MCP tool service', () => {
     ).toMatchObject({
       plainText: 'Added\nNew body',
     });
+  });
+
+  it('creates page frames with the default page layout pref', async () => {
+    const { repository, noteId } = await createRepositoryWithNote();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+    UserPrefs.set('defaultPageLayout', 'continuous');
+
+    try {
+      const frame = (await service.callTool('create_page_frame', {
+        noteId,
+        markdown: 'Body',
+      })) as McpPageFrameContent;
+      expect(frame.layout).toBe('continuous');
+
+      const note = (await service.callTool('create_note', {
+        title: 'Layout Note',
+        markdown: 'Body',
+      })) as McpNoteReadModel;
+      expect(note.elements).toMatchObject([
+        { kind: 'page-frame', layout: 'continuous' },
+      ]);
+    } finally {
+      UserPrefs.set('defaultPageLayout', 'vertical');
+    }
   });
 
   it('creates folders and notes and lists directories', async () => {

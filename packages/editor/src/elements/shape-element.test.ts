@@ -304,54 +304,46 @@ describe('ShapeElement drawToPdf', () => {
     const { ctx, items } = makePdfCtx();
     shape.drawToPdf(ctx);
 
-    expect(items[0]).toMatchObject({ t: 'line', width: 32 });
+    expect(items[0]).toMatchObject({ t: 'path', lineWidth: 32 });
   });
 
-  it('emits one width-carrying line for a line shape', () => {
+  it('emits one open stroked path for a line shape', () => {
     const shape = new ShapeElement('l', 'line', [0, 0, 100, 50], STYLE);
     shape.setOffset(0, 0);
     const { ctx, items } = makePdfCtx();
     shape.drawToPdf(ctx);
 
     expect(items).toHaveLength(1);
-    const it = items[0];
-    expect(it.t).toBe('line');
-    if (it.t === 'line') {
-      expect(it.width).toBe(16); // ptPerWorldY(2) * size(8)
-      expect(it.x1).toBe(0);
-      expect(it.x2).toBe(200); // worldToPagePt scales by 2
-      expect(it.y2).toBe(100);
+    expect(items[0]).toMatchObject({
+      t: 'path',
+      closed: false,
+      lineWidth: 16, // ptPerWorldY(2) * size(8)
+      pts: [0, 0, 200, 100], // worldToPagePt scales by 2
+    });
+  });
+
+  it('emits one closed path per closed shape', () => {
+    const shapes = [
+      new ShapeElement('r', 'rect', [0, 0, 100, 60], STYLE),
+      new ShapeElement('t', 'triangle', [50, 0, 100, 80, 0, 80], STYLE),
+      new ShapeElement('e', 'ellipse', [0, 0, 80, 60], STYLE),
+    ];
+    for (const shape of shapes) {
+      const { ctx, items } = makePdfCtx();
+      shape.drawToPdf(ctx);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({ t: 'path', closed: true });
     }
   });
 
-  it('emits 4 lines for a rect', () => {
-    const shape = new ShapeElement('r', 'rect', [0, 0, 100, 60], STYLE);
+  it('keeps the stroke color alpha (highlighter shapes)', () => {
+    const shape = new ShapeElement('h', 'rect', [0, 0, 100, 60], {
+      ...STYLE,
+      color: 'rgba(250,204,21,0.3)',
+    });
     const { ctx, items } = makePdfCtx();
     shape.drawToPdf(ctx);
-    expect(items).toHaveLength(4);
-    expect(items.every((i) => i.t === 'line')).toBe(true);
-  });
-
-  it('emits 3 lines for a triangle', () => {
-    const shape = new ShapeElement(
-      't',
-      'triangle',
-      [50, 0, 100, 80, 0, 80],
-      STYLE,
-    );
-    const { ctx, items } = makePdfCtx();
-    shape.drawToPdf(ctx);
-    expect(items).toHaveLength(3);
-    expect(items.every((i) => i.t === 'line')).toBe(true);
-  });
-
-  it('emits N segments for an ellipse and never a bare path', () => {
-    const shape = new ShapeElement('e', 'ellipse', [0, 0, 80, 60], STYLE);
-    const { ctx, items } = makePdfCtx();
-    shape.drawToPdf(ctx);
-    expect(items.length).toBeGreaterThan(8);
-    expect(items.every((i) => i.t === 'line')).toBe(true);
-    expect(items.some((i) => i.t === 'path' || i.t === 'rect')).toBe(false);
+    expect(items[0]).toMatchObject({ stroke: [250, 204, 21], opacity: 0.3 });
   });
 
   it('skips degenerate (sub-pixel) shapes', () => {

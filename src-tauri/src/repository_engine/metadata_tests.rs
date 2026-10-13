@@ -717,11 +717,11 @@ fn legacy_preferences_are_normalized_during_automatic_open() {
     assert_eq!(presets.len(), 6);
     assert_eq!(
         presets[0],
-        json!({"id":"pen","tool":"pen","color":"#abcdef","size":40.0,"inWheel":true})
+        json!({"id":"pen","tool":"pen","color":"#abcdef","size":40.0})
     );
     assert_eq!(
         presets[1],
-        json!({"id":"highlight","tool":"highlighter","color":"#facc15","size":12.0,"inWheel":false})
+        json!({"id":"highlight","tool":"highlighter","color":"#facc15","size":12.0})
     );
     assert_eq!(presets[5]["id"], "six");
 }

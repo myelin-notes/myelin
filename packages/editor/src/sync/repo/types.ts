@@ -15,15 +15,12 @@ export interface PenPreset {
   /** Normalized hex, or the `ADAPTIVE_INK` sentinel. */
   color: string;
   size: number;
-  /** Outer-ring membership. Unlike the built-in tools' membership, this syncs. */
-  inWheel: boolean;
 }
 
 /** Partial edit. Absent fields are left as they are. */
 export interface PenPresetChanges {
   color?: string;
   size?: number;
-  inWheel?: boolean;
 }
 
 export interface VFSFileNode {

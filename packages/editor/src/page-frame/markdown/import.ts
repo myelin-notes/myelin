@@ -6,6 +6,7 @@ import {
   normalizePageFrameDisplayName,
   PAGE_HEIGHT,
   PAGE_WIDTH,
+  type PageLayout,
 } from '../../elements/page-frame-constants';
 import type { VFSNodeId } from '../../sync/types';
 import type { YDocManager } from '../../ydoc-manager';
@@ -34,6 +35,7 @@ interface AddMarkdownPageFrameOptions extends MarkdownPageFrameImportOptions {
   offsetX?: number;
   offsetY?: number;
   displayName?: string;
+  pageLayout?: PageLayout;
 }
 
 async function buildMarkdownPageFrameDoc(
@@ -103,6 +105,7 @@ export async function addMarkdownPageFrameToYDoc(
     displayName: normalizePageFrameDisplayName(options.displayName),
     pageWidth: PAGE_WIDTH,
     pageHeight: PAGE_HEIGHT,
+    pageLayout: options.pageLayout ?? 'vertical',
   });
 
   const fragment = ydoc.getXmlFragment(uuid);
