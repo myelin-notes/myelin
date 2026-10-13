@@ -81,6 +81,7 @@ interface FrameRefs {
   viewportDiv: HTMLDivElement;
   contentDiv: HTMLDivElement;
   pageChromeDivs: HTMLDivElement[];
+  stopWatchingLayout: () => void;
 }
 
 interface PageFrameNoteLinkHit extends NoteLinkPreviewHit {
@@ -245,6 +246,7 @@ function syncEditorLayout(
 function createFrameRefs(
   frame: PageFrameElement,
   container: HTMLDivElement,
+  requestRedraw: () => void,
 ): FrameRefs {
   const chrome = new FrameChrome(
     {
@@ -278,10 +280,22 @@ function createFrameRefs(
   container.appendChild(chrome.root);
 
   frame.mountDOM(frameDiv, contentDiv);
-  frame.pmEditor?.createView(contentDiv, (pageCount, contentHeight) => {
-    frame.numPages = pageCount;
-    frame.setMeasuredContentHeight(contentHeight);
-  });
+  const view = frame.pmEditor?.createView(
+    contentDiv,
+    (pageCount, contentHeight) => {
+      frame.numPages = pageCount;
+      frame.setMeasuredContentHeight(contentHeight);
+    },
+  );
+
+  // Anchoring reads this editor's layout on canvas frames, and the canvas only draws on demand.
+  // Page-break and anchor-gap decorations move text without touching the Y doc, and late images or
+  // math resize it. Capture phase because PM_UPDATE_EVENT doesn't bubble.
+  contentDiv.addEventListener(PM_UPDATE_EVENT, requestRedraw, true);
+  const resizeObserver = new ResizeObserver(requestRedraw);
+  if (view) {
+    resizeObserver.observe(view.dom);
+  }
 
   return {
     frame,
@@ -290,10 +304,15 @@ function createFrameRefs(
     viewportDiv,
     contentDiv,
     pageChromeDivs: [],
+    stopWatchingLayout: () => {
+      contentDiv.removeEventListener(PM_UPDATE_EVENT, requestRedraw, true);
+      resizeObserver.disconnect();
+    },
   };
 }
 
 function disposeFrameRefs(refs: FrameRefs): void {
+  refs.stopWatchingLayout();
   refs.frame.pmEditor?.destroyView();
   refs.chrome.dispose();
 }
@@ -413,7 +432,7 @@ function getNoteLinkPreviewTargetAtPoint(
 }
 
 interface PageFrameDomLayerProps {
-  canvasRef: React.RefObject<DrawableCanvas | null>;
+  drawableCanvas: DrawableCanvas | null;
   editingElement: DrawableElement | null;
   autocompleteController?: PageFrameAutocompleteController | null;
   autocompleteKind?: PageFrameAutocompleteKind | null;
@@ -425,7 +444,7 @@ interface PageFrameDomLayerProps {
 }
 
 export function PageFrameDomLayer({
-  canvasRef,
+  drawableCanvas,
   editingElement: rawEditingElement,
   autocompleteController = null,
   autocompleteKind = null,
@@ -477,18 +496,16 @@ export function PageFrameDomLayer({
     return () => document.removeEventListener('click', handleClick);
   }, [editingElement, getPreviewTargetAtPoint]);
 
-  // Sync loop — create/remove/position frame containers each frame
+  // Create/remove/position frame containers on every canvas frame.
   useEffect(() => {
-    let rafId: number;
+    const container = containerRef.current;
+    if (!(drawableCanvas && container)) {
+      return;
+    }
+    const dc = drawableCanvas;
+    const requestRedraw = () => dc.requestRedraw();
 
-    function sync() {
-      const dc = canvasRef.current;
-      const container = containerRef.current;
-      if (!(dc && container)) {
-        rafId = requestAnimationFrame(sync);
-        return;
-      }
-
+    const sync = () => {
       const zoom = dc.viewport.zoom;
       const offset = dc.viewport.offset;
       const viewAnimating = dc.viewport.isAnimatingView;
@@ -509,7 +526,7 @@ export function PageFrameDomLayer({
           refs = undefined;
         }
         if (!refs) {
-          refs = createFrameRefs(frame, container);
+          refs = createFrameRefs(frame, container, requestRedraw);
           frameMap.current.set(frame.uuid, refs);
         }
         const screenX = snapToDevicePixel((frame.offset.x + offset.x) * zoom);
@@ -605,37 +622,34 @@ export function PageFrameDomLayer({
       }
 
       removeStaleFrames(frameMap.current, activeFrames);
+    };
 
-      rafId = requestAnimationFrame(sync);
-    }
-
-    rafId = requestAnimationFrame(sync);
+    const stopSyncing = dc.onFrame(sync);
+    const fontSet = document.fonts;
+    fontSet.addEventListener('loadingdone', requestRedraw);
 
     // The browser may scrollIntoView the focused contentEditable on its own. Zero those out, but
     // DON'T convert them into a canvas pan — the follow-cursor effect below is the single source
     // of truth. Driven by the scroll event rather than polled: reading scrollTop right after the
     // sync loop wrote the chrome's transform forced a synchronous layout flush every frame.
-    const container = containerRef.current;
     const resetScroll = () => {
-      if (
-        container &&
-        (container.scrollTop !== 0 || container.scrollLeft !== 0)
-      ) {
+      if (container.scrollTop !== 0 || container.scrollLeft !== 0) {
         container.scrollTop = 0;
         container.scrollLeft = 0;
       }
     };
-    container?.addEventListener('scroll', resetScroll);
+    container.addEventListener('scroll', resetScroll);
 
     return () => {
-      cancelAnimationFrame(rafId);
-      container?.removeEventListener('scroll', resetScroll);
+      stopSyncing();
+      fontSet.removeEventListener('loadingdone', requestRedraw);
+      container.removeEventListener('scroll', resetScroll);
       for (const refs of frameMap.current.values()) {
         disposeFrameRefs(refs);
       }
       frameMap.current.clear();
     };
-  }, [canvasRef]);
+  }, [drawableCanvas]);
 
   // Keep the caret inside a margin-padded viewport while editing. Fires on every PM transaction
   // and on browser-driven selectionchange (drag-select).
@@ -672,7 +686,7 @@ export function PageFrameDomLayer({
     const POINTER_GRACE_MS = 150;
     const followCursor = () => {
       pendingRaf = 0;
-      const dc = canvasRef.current;
+      const dc = drawableCanvas;
       if (!dc || dc.viewport.isAnimatingView) {
         return;
       }
@@ -756,7 +770,7 @@ export function PageFrameDomLayer({
       document.removeEventListener('pointerup', handlePointerEnd, true);
       document.removeEventListener('pointercancel', handlePointerEnd, true);
     };
-  }, [editingElement, canvasRef]);
+  }, [editingElement, drawableCanvas]);
 
   useEffect(() => {
     if (!editingElement) {

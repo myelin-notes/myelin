@@ -81,6 +81,7 @@ export class DrawableCanvas {
   private readonly editSession: EditSessionController;
   private readonly placement = new PlacementController();
   private readonly changeListeners = new Set<() => void>();
+  private readonly frameListeners = new Set<() => void>();
   private redrawScheduler: (() => void) | null = null;
   private readonly handleDocUpdate = () => this.requestRedraw();
   private contentBoundsCache: DOMRect | null = null;
@@ -206,6 +207,13 @@ export class DrawableCanvas {
     this.redrawScheduler = scheduler;
   }
 
+  /** Runs after each redraw, in the same frame, for DOM layers positioned against the viewport. */
+  public onFrame(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    this.requestRedraw();
+    return () => this.frameListeners.delete(listener);
+  }
+
   public setOnPageFrameRenamed(
     callback?: (uuid: string, newName: string, oldName: string) => void,
   ): void {
@@ -300,6 +308,7 @@ export class DrawableCanvas {
 
   public destroy(): void {
     this.ydoc.doc.off('update', this.handleDocUpdate);
+    this.frameListeners.clear();
     this.editSession.destroy();
     if (this.placement.isActive) {
       this.endPlacement();
@@ -317,7 +326,7 @@ export class DrawableCanvas {
   /** Returns whether an animation needs the next frame even if nothing requests one. */
   public redraw(deltaTime: number): boolean {
     this.anchoring.refresh();
-    return this.renderer.redraw(
+    const animating = this.renderer.redraw(
       deltaTime,
       this.viewport,
       this.elements,
@@ -328,6 +337,10 @@ export class DrawableCanvas {
       this.editSession.domHost,
       this.selection,
     );
+    for (const listener of this.frameListeners) {
+      listener();
+    }
+    return animating;
   }
 
   // `null` when empty — the viewport reads that as "no clamp" so fresh documents stay pannable.

@@ -174,6 +174,7 @@ export function useCanvasEngine({
 
   return {
     drawableCanvasRef,
+    drawableCanvas,
     clipboard,
     ...canvasViewState,
     ...sessionController,
