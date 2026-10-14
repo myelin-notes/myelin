@@ -98,6 +98,7 @@ function nativeBoundary() {
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+    syncing: false,
     dataVersion: version,
   });
   let competingEdit = false;

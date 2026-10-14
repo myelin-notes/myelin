@@ -31,6 +31,7 @@ impl TestDirectory {
             checkpoint_scheduling: AtomicBool::new(false),
             wake: Notify::new(),
             online: AtomicBool::new(true),
+            syncing: AtomicBool::new(false),
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
             cache_dir: self.0.join("cache"),

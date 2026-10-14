@@ -51,6 +51,7 @@ pub(crate) struct RepositoryEngine {
     checkpoint_scheduling: AtomicBool,
     wake: Notify,
     online: AtomicBool,
+    syncing: AtomicBool,
     // Millis of the last sync that confirmed the remote, including no-op checks; 0 = none yet.
     last_checked_at: AtomicU64,
     error: Mutex<Option<String>>,
@@ -97,6 +98,7 @@ struct NativeStatus {
     last_remote_sync_at: Option<u64>,
     last_error: Option<String>,
     data_version: u64,
+    syncing: bool,
 }
 
 #[derive(Deserialize)]
@@ -329,6 +331,7 @@ impl RepositoryEngine {
             ),
             last_error: recovery.or_else(|| self.error.lock().unwrap().clone()),
             data_version: version,
+            syncing: self.syncing.load(Ordering::Relaxed),
         }
     }
 
@@ -915,6 +918,7 @@ pub async fn repository_open(
             checkpoint_scheduling: AtomicBool::new(false),
             wake: Notify::new(),
             online: AtomicBool::new(true),
+            syncing: AtomicBool::new(false),
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
             cache_dir: app

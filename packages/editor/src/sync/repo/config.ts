@@ -32,6 +32,8 @@ export interface RepositoryRuntimeStatus {
   /** Last time a sync confirmed the remote, including checks that found nothing to transfer. */
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
+  /** True while a sync has been running for over a second; quick checks never set it. */
+  syncing: boolean;
   /**
    * Incremented on every local repository mutation — including ones made outside the current view,
    * such as the tab bar creating a file for a new tab. Unlike `lastRemoteSyncAt`, this advances for

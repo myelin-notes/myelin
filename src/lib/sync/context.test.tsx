@@ -82,6 +82,7 @@ it('loads the saved repository after Strict Mode replay and releases it on switc
           pendingRemoteWrites: 0,
           lastRemoteSyncAt: 1,
           lastError: null,
+          syncing: false,
           dataVersion: 0,
         },
       };
@@ -205,6 +206,7 @@ it('discards preference loads from a repository replaced while opening and repor
           pendingRemoteWrites: 0,
           lastRemoteSyncAt: null,
           lastError: null,
+          syncing: false,
           dataVersion: 0,
         },
       };

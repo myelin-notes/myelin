@@ -966,9 +966,20 @@ impl RepositoryEngine {
         // app cannot finish closing before the event for a shutdown-blocking sync is sent.
         let _network = self.network_lock.lock().await;
         drop(waiting);
-        let result = trace
-            .scope(self.synchronize_traced(app, refresh_auth))
-            .await;
+        let sync = trace.scope(self.synchronize_traced(app, refresh_auth));
+        tokio::pin!(sync);
+        // Delayed so the ~300ms no-op check every 30s doesn't flash a syncing state.
+        let result = tokio::select! {
+            result = &mut sync => result,
+            _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                self.syncing.store(true, Ordering::Relaxed);
+                let _ = app.emit("repository-status", self.status().await);
+                let result = sync.await;
+                self.syncing.store(false, Ordering::Relaxed);
+                let _ = app.emit("repository-status", self.status().await);
+                result
+            }
+        };
         let status = self.status().await;
         trace.set("duration_ms", started.elapsed().as_millis() as u64);
         trace.set("pending_writes_end", status.pending_remote_writes as u64);

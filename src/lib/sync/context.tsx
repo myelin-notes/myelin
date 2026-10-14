@@ -59,6 +59,7 @@ function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: null,
     lastError: null,
+    syncing: false,
     dataVersion: 0,
   };
 }
@@ -73,6 +74,7 @@ function mergeRuntimeStatus(
     pendingRemoteWrites: runtimeStatus.pendingRemoteWrites,
     lastRemoteSyncAt: runtimeStatus.lastRemoteSyncAt,
     lastError: runtimeStatus.lastError,
+    syncing: runtimeStatus.syncing,
     dataVersion: runtimeStatus.dataVersion,
   };
 }
