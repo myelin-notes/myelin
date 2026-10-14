@@ -244,7 +244,8 @@ export function SidebarTree({
     }
   }, [filterTags, explorer, loadAncestors, ready, trimmedQuery]);
 
-  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
+  // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
+  // bump `dataVersion`.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     if (isFlat) {
@@ -255,12 +256,7 @@ export function SidebarTree({
     return () => {
       cancelled = true;
     };
-  }, [
-    isFlat,
-    reload,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+  }, [isFlat, reload, repositoryStatus.dataVersion]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
@@ -284,7 +280,6 @@ export function SidebarTree({
     isFlat,
     isSearching,
     loadFlatResults,
-    repositoryStatus.lastRemoteSyncAt,
     repositoryStatus.dataVersion,
     noteIndexStatus.revision,
   ]);

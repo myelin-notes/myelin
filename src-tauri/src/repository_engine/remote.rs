@@ -1054,6 +1054,7 @@ impl RepositoryEngine {
         *self.error.lock().unwrap() = result.as_ref().err().cloned();
         match result {
             Ok(changes) => {
+                self.last_checked_at.store(now(), Ordering::Relaxed);
                 let _ = app.emit("repository-status", self.status().await);
                 let _ = app.emit("repository-data", json!({"repositoryId": self.id, "changed": changes.changed, "deleted": changes.deleted}));
                 for notification in changes.documents {

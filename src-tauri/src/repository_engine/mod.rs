@@ -18,7 +18,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex,
     },
 };
@@ -51,6 +51,8 @@ pub(crate) struct RepositoryEngine {
     checkpoint_scheduling: AtomicBool,
     wake: Notify,
     online: AtomicBool,
+    // Millis of the last sync that confirmed the remote, including no-op checks; 0 = none yet.
+    last_checked_at: AtomicU64,
     error: Mutex<Option<String>>,
     cache_dir: PathBuf,
 }
@@ -322,7 +324,9 @@ impl RepositoryEngine {
             repository_id: self.id.clone(),
             online: self.online.load(Ordering::Relaxed) && recovery.is_none(),
             pending_remote_writes: pending,
-            last_remote_sync_at: last,
+            last_remote_sync_at: last.max(
+                Some(self.last_checked_at.load(Ordering::Relaxed)).filter(|&checked| checked > 0),
+            ),
             last_error: recovery.or_else(|| self.error.lock().unwrap().clone()),
             data_version: version,
         }
@@ -911,6 +915,7 @@ pub async fn repository_open(
             checkpoint_scheduling: AtomicBool::new(false),
             wake: Notify::new(),
             online: AtomicBool::new(true),
+            last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
             cache_dir: app
                 .path()

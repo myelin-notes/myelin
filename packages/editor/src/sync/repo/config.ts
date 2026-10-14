@@ -29,6 +29,7 @@ export interface RepositoryLifecycle {
 export interface RepositoryRuntimeStatus {
   online: boolean;
   pendingRemoteWrites: number;
+  /** Last time a sync confirmed the remote, including checks that found nothing to transfer. */
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
   /**
