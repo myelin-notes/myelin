@@ -65,8 +65,16 @@ impl CachedFile {
         !revision.is_empty()
             && self.revision == revision
             && self.drive_id.as_deref() == drive_id
-            && std::fs::hard_link(&self.path, destination).is_ok()
+            && (std::fs::hard_link(&self.path, destination).is_ok()
+                || copy_durable(&self.path, destination).is_ok())
     }
+}
+
+// Where hard links are refused (Android sync re-downloaded ~700 MB per pull), copying keeps
+// the cache useful.
+fn copy_durable(source: &Path, destination: &Path) -> std::io::Result<()> {
+    std::fs::copy(source, destination)?;
+    File::open(destination)?.sync_all()
 }
 
 impl RemoteClient {
