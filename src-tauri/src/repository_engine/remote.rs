@@ -1399,6 +1399,13 @@ async fn upload(
                         Err(_) => "error",
                     },
                 );
+                // `github_push` errors are fixed labels with a git2 class/code, never server text.
+                if let Some(error) = match &native {
+                    Ok(response) => response.failure_reason.as_ref(),
+                    Err(error) => Some(error),
+                } {
+                    telemetry::current().set("git_native_error", error.as_str());
+                }
                 let _ = tokio::fs::remove_dir_all(stage).await;
                 match native {
                     Ok(response) if response.status == "head-conflict" => {
