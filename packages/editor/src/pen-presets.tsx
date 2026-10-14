@@ -46,7 +46,9 @@ export function PenPresetsProvider({ children }: PropsWithChildren) {
         }
       })
       .catch((error) => {
-        logger.error('Failed to load pen presets', error);
+        if (!cancelled) {
+          logger.error('Failed to load pen presets', error);
+        }
       });
     return () => {
       cancelled = true;

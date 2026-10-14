@@ -17,6 +17,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
@@ -25,7 +28,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["net", "io-util", "sync", "macros", "time", "process"] }
+tokio = { version = "1", features = ["net", "io-util", "fs", "sync", "macros", "time", "process"] }
 tauri-plugin-mcp-bridge = "0.12"
 tauri-plugin-pencil = { path = "plugins/tauri-plugin-pencil" }
 tauri-plugin-scoped-storage = "=1.5.1"
@@ -55,7 +58,23 @@ hyper-util = { version = "0.1", features = ["tokio"] }
 http-body-util = "0.1"
 form_urlencoded = "1"
 png = "0.18.1"
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }
 git2 = { version = "0.21", features = ["https", "vendored-libgit2", "vendored-openssl"] }
+flate2 = "1"
+tar = "0.4"
+uuid = { version = "1", features = ["v4"] }
+chrono = "0.4"
+libc = "0.2"
+
+[target.'cfg(not(target_os = "ios"))'.dependencies]
+crash-handler = "0.8.1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem", "Win32_System_IO"] }
+webview2-com = "0.38"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default
@@ -90,5 +109,5 @@ opt-level = 3
 # Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
 # a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
-tauri-plugin-scoped-storage = { git = "https://github.com/myelin-notes/tauri-plugin-scoped-storage.git" }
+tauri-plugin-scoped-storage = { git = "https://github.com/myelin-notes/tauri-plugin-scoped-storage.git", rev = "02572c6891221b311091e69963bda7565a6d8c11" }
 scribble = { git = "https://github.com/myelin-notes/scribble", branch = "feat/abort-signal-upstream" }

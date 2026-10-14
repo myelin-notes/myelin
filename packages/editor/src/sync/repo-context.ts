@@ -14,6 +14,7 @@ export interface RepositoryStatus {
   pendingRemoteWrites: number;
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
+  syncing: boolean;
   /** Bumped on every local repository mutation so views can refresh in sync. */
   dataVersion: number;
 }

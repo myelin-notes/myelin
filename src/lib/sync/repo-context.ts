@@ -1,20 +1,18 @@
-/**
- * App-side view of the repository context owned by `@myelin/editor`. The
- * package context is typed with the editor's session-less `ActiveRepository`;
- * the app's `RepositoryProvider` only ever installs the app's richer
- * `ActiveRepository`, so the cast below is sound.
- */
-
+import type { RepositoryStatus } from '@myelin/editor/sync/repo-context';
 import { useRepository as useEditorRepository } from '@myelin/editor/sync/repo-context';
-import type { ActiveRepository } from './repo/config';
+import type { NativeRepository } from './repo/native';
 
 export {
   RepositoryContext,
-  type RepositoryContextValue,
   type RepositoryStatus,
   useRepositoryStatus,
 } from '@myelin/editor/sync/repo-context';
 
-export function useRepository(): ActiveRepository {
-  return useEditorRepository() as ActiveRepository;
+export function useRepository(): NativeRepository {
+  return useEditorRepository() as NativeRepository;
+}
+
+export interface RepositoryContextValue {
+  repository: NativeRepository;
+  status: RepositoryStatus;
 }

@@ -468,6 +468,10 @@ const es: typeof en = {
             description:
               'Cargando repositorio en caché y verificando el remoto.',
           },
+          syncing: {
+            label: 'Sincronizando',
+            description: 'Intercambiando cambios con el repositorio remoto.',
+          },
           pending: {
             label: 'Pendiente',
             description: (count: number, online: boolean) =>

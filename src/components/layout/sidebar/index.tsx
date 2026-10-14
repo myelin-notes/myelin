@@ -70,7 +70,8 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     onChanged: refreshAfterImport,
   });
 
-  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
+  // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
+  // bump `dataVersion`.
   // Skip the initial render — the tags list already loads on mount.
   const didMountMetaRefresh = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
@@ -80,11 +81,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
       return;
     }
     refreshMeta();
-  }, [
-    refreshMeta,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+  }, [refreshMeta, repositoryStatus.dataVersion]);
 
   const cycleSortMode = useCallback(() => {
     setSortMode(

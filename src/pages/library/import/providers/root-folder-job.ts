@@ -1,4 +1,4 @@
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type {
   ImportJob,
   ImportPreviewLine,
@@ -13,7 +13,7 @@ interface RootFolderJobConfig<TScanned> {
   emptyLabel: string;
   /** Display name of the folder this import creates under `parentId`. */
   rootName: string;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   scan(): Promise<TScanned>;
   preview(scanned: TScanned): {

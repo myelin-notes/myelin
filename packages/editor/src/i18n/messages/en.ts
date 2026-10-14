@@ -461,6 +461,10 @@ const en = {
             description:
               'Loading the cached repository and checking the remote.',
           },
+          syncing: {
+            label: 'Syncing',
+            description: 'Exchanging changes with the remote repository.',
+          },
           pending: {
             label: 'Pending',
             description: (count: number, online: boolean) =>

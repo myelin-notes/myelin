@@ -5,6 +5,8 @@ import type { OAuthCallbackParams } from '../oauth/redirect';
 // at module load: `@/lib/env` reports one platform per build.
 vi.unmock('@/lib/sync/repo/google-drive/credentials');
 
+vi.mock('sonner', () => ({ toast: { warning: vi.fn(), dismiss: vi.fn() } }));
+
 vi.mock('@/lib/env', () => ({
   IS_DEV: false,
   MODE: 'test',

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import {
   importGoodnotesZip,
   isZipFile,
@@ -138,7 +138,7 @@ describe('Goodnotes ZIP import', () => {
 
   it('imports PDFs from a ZIP while preserving folder structure', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('goodnotes-zip-import');
+    const repository = new TestRepository('goodnotes-zip-import');
     const zipFile = new File(
       [
         createStoredZip([

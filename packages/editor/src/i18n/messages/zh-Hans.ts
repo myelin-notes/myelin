@@ -445,6 +445,10 @@ const zhHans: typeof en = {
             label: '加载中',
             description: '正在加载缓存的仓库并检查远程状态',
           },
+          syncing: {
+            label: '同步中',
+            description: '正在与远程仓库交换更改',
+          },
           pending: {
             label: '待处理',
             description: (count: number, online: boolean) =>

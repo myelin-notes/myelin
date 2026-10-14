@@ -70,7 +70,9 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
         }
       })
       .catch((error) => {
-        logger.error('Failed to load custom colors', error);
+        if (!cancelled) {
+          logger.error('Failed to load custom colors', error);
+        }
       });
     return () => {
       cancelled = true;

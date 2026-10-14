@@ -15,7 +15,7 @@ use iroh_tickets::endpoint::EndpointTicket;
 use n0_future::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{oneshot, Mutex};
 const GOSSIP_MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 
@@ -41,6 +41,7 @@ struct IrohRuntime {
 
 struct ActiveTopic {
     transport_id: String,
+    repository_id: Option<String>,
     sender: GossipSender,
     cancel: Option<oneshot::Sender<()>>,
 }
@@ -105,9 +106,9 @@ impl IrohRuntime {
         app: &AppHandle,
         note_id: &str,
         transport_id: &str,
+        repository: Option<(String, String)>,
     ) -> Result<String, String> {
-        self.endpoint.online().await;
-        self.attach_topic(app, note_id, transport_id, vec![])
+        self.attach_topic(app, note_id, transport_id, repository, vec![])
             .await?;
         Ok(EndpointTicket::new(self.endpoint.addr()).to_string())
     }
@@ -118,16 +119,15 @@ impl IrohRuntime {
         note_id: &str,
         transport_id: &str,
         ticket: &str,
+        repository: Option<(String, String)>,
     ) -> Result<(), String> {
-        self.endpoint.online().await;
-
         let ticket = EndpointTicket::from_str(ticket.trim())
             .map_err(|err| format!("Invalid iroh ticket: {err}"))?;
         let endpoint_addr = ticket.endpoint_addr().clone();
         let bootstrap = vec![endpoint_addr.id];
         self.memory_lookup.add_endpoint_info(endpoint_addr);
 
-        self.attach_topic(app, note_id, transport_id, bootstrap)
+        self.attach_topic(app, note_id, transport_id, repository, bootstrap)
             .await
     }
 
@@ -163,6 +163,7 @@ impl IrohRuntime {
         app: &AppHandle,
         note_id: &str,
         transport_id: &str,
+        repository: Option<(String, String)>,
         bootstrap: Vec<EndpointId>,
     ) -> Result<(), String> {
         self.leave_note(note_id);
@@ -178,6 +179,9 @@ impl IrohRuntime {
         let note_id_owned = note_id.to_string();
         let transport_id_owned = transport_id.to_string();
         let app_handle = app.clone();
+        let repository_id = repository.as_ref().map(|(_, id)| id.clone());
+        let repository_handle = repository.map(|(handle, _)| handle);
+        let initial_sender = sender.clone();
 
         // Each joined note gets its own receiver task so transport events remain scoped.
         tauri::async_runtime::spawn(async move {
@@ -193,6 +197,18 @@ impl IrohRuntime {
                         match event {
                             Some(Ok(GossipEvent::NeighborUp(peer_id))) => {
                                 if peers.insert(peer_id) {
+                                    if let Some(handle) = &repository_handle {
+                                        match crate::repository_engine::initial_peer_state(&app_handle, handle, &note_id_owned).await {
+                                            Ok(update) => {
+                                                let mut data = vec![1];
+                                                data.extend(update);
+                                                if let Err(error) = initial_sender.broadcast(Bytes::from(data)).await {
+                                                    let _ = emit_error(&app_handle, &note_id_owned, &transport_id_owned, error.to_string());
+                                                }
+                                            }
+                                            Err(error) => { let _ = emit_error(&app_handle, &note_id_owned, &transport_id_owned, error); }
+                                        }
+                                    }
                                     let _ = emit_connected(
                                         &app_handle,
                                         &note_id_owned,
@@ -213,11 +229,20 @@ impl IrohRuntime {
                                 }
                             }
                             Some(Ok(GossipEvent::Received(message))) => {
+                                let data = message.content.to_vec();
+                                if let Some(handle) = &repository_handle {
+                                    if data.first() == Some(&1) {
+                                        if let Err(error) = crate::repository_engine::peer_update(&app_handle, handle, &note_id_owned, data[1..].to_vec()).await {
+                                            let _ = emit_error(&app_handle, &note_id_owned, &transport_id_owned, error);
+                                        }
+                                        continue;
+                                    }
+                                }
                                 let _ = emit_message(
                                     &app_handle,
                                     &note_id_owned,
                                     &transport_id_owned,
-                                    message.content.to_vec(),
+                                    data,
                                 );
                             }
                             Some(Ok(GossipEvent::Lagged)) => {
@@ -259,6 +284,7 @@ impl IrohRuntime {
             note_id.to_string(),
             ActiveTopic {
                 transport_id: transport_id.to_string(),
+                repository_id,
                 sender,
                 cancel: Some(cancel_tx),
             },
@@ -352,16 +378,32 @@ pub async fn iroh_host(
     state: tauri::State<'_, IrohState>,
     note_id: String,
     transport_id: String,
+    repository_handle: Option<String>,
 ) -> Result<String, String> {
+    let repository = match repository_handle {
+        Some(handle) => {
+            let id = crate::repository_engine::repository_identity(&app, &handle).await?;
+            Some((handle, id))
+        }
+        None => None,
+    };
+    let endpoint = {
+        let mut runtime = state.runtime.lock().await;
+        if runtime.is_none() {
+            *runtime = Some(IrohRuntime::start().await?);
+        }
+        runtime
+            .as_ref()
+            .expect("runtime initialized")
+            .endpoint
+            .clone()
+    };
+    endpoint.online().await;
     let mut runtime = state.runtime.lock().await;
-    if runtime.is_none() {
-        *runtime = Some(IrohRuntime::start().await?);
-    }
-
     runtime
         .as_mut()
         .expect("runtime initialized")
-        .host(&app, &note_id, &transport_id)
+        .host(&app, &note_id, &transport_id, repository)
         .await
 }
 
@@ -372,17 +414,57 @@ pub async fn iroh_join(
     note_id: String,
     transport_id: String,
     ticket: String,
+    repository_handle: Option<String>,
 ) -> Result<(), String> {
+    let repository = match repository_handle {
+        Some(handle) => {
+            let id = crate::repository_engine::repository_identity(&app, &handle).await?;
+            Some((handle, id))
+        }
+        None => None,
+    };
+    let endpoint = {
+        let mut runtime = state.runtime.lock().await;
+        if runtime.is_none() {
+            *runtime = Some(IrohRuntime::start().await?);
+        }
+        runtime
+            .as_ref()
+            .expect("runtime initialized")
+            .endpoint
+            .clone()
+    };
+    endpoint.online().await;
     let mut runtime = state.runtime.lock().await;
-    if runtime.is_none() {
-        *runtime = Some(IrohRuntime::start().await?);
-    }
-
     runtime
         .as_mut()
         .expect("runtime initialized")
-        .join(&app, &note_id, &transport_id, &ticket)
+        .join(&app, &note_id, &transport_id, &ticket, repository)
         .await
+}
+
+pub(crate) async fn broadcast_document(
+    app: &AppHandle,
+    repository_id: &str,
+    note_id: &str,
+    update: Vec<u8>,
+) {
+    let state = app.state::<IrohState>();
+    let sender = {
+        let runtime = state.runtime.lock().await;
+        runtime
+            .as_ref()
+            .and_then(|runtime| runtime.topics.get(note_id))
+            .filter(|topic| topic.repository_id.as_deref() == Some(repository_id))
+            .map(|topic| topic.sender.clone())
+    };
+    if let Some(sender) = sender {
+        let mut data = vec![1];
+        data.extend(update);
+        if let Err(error) = sender.broadcast(Bytes::from(data)).await {
+            eprintln!("[iroh] native document broadcast failed: {error}");
+        }
+    }
 }
 
 #[tauri::command]

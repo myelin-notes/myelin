@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { Logger } from '@myelin/shared/logger';
 import { fetch } from '@tauri-apps/plugin-http';
 import {
@@ -26,6 +27,8 @@ import {
 const logger = new Logger('GoogleDriveCredentials');
 
 export const GOOGLE_DRIVE_PROVIDER_NAME = 'Google Drive';
+export const GOOGLE_DRIVE_SIGN_IN_REQUIRED =
+  'Google Drive access expired or was revoked. Sign in again from Settings to resume sync.';
 
 const vault = createCredentialVault({
   filename: 'google-drive-credentials.hold',
@@ -146,6 +149,19 @@ export async function hasGoogleDriveToken(
   credentialId: string,
 ): Promise<boolean> {
   return Boolean(await readStoredToken(credentialId));
+}
+
+export async function requireGoogleDriveSignIn(
+  credentialId: string,
+): Promise<void> {
+  const normalized = normalizeCredentialId(credentialId);
+  if (await hasGoogleDriveToken(normalized)) {
+    toast.warning(GOOGLE_DRIVE_SIGN_IN_REQUIRED, {
+      id: `google-drive-auth:${normalized}`,
+      duration: Infinity,
+    });
+    await clearGoogleDriveToken(normalized);
+  }
 }
 
 export async function isGoogleDriveSecureStorageAvailable(): Promise<boolean> {
@@ -280,11 +296,11 @@ async function refreshAccessToken(
     // The grant was revoked or expired; the stored refresh token is dead, so
     // drop it and make the UI show a disconnected account rather than retrying.
     logger.warn('Google Drive refresh token rejected; clearing credential');
-    await clearGoogleDriveToken(credentialId);
-    throw new GoogleDriveRequestError(
-      'Google Drive access expired. Sign in again from Settings.',
-      { ...diagnostics, google_drive_error_code: 'invalid_grant' },
-    );
+    await requireGoogleDriveSignIn(credentialId);
+    throw new GoogleDriveRequestError(GOOGLE_DRIVE_SIGN_IN_REQUIRED, {
+      ...diagnostics,
+      google_drive_error_code: 'invalid_grant',
+    });
   }
   if (error) {
     const code = /^[a-zA-Z0-9_]{1,64}$/.test(error) ? error : 'unknown';
@@ -311,6 +327,7 @@ async function refreshAccessToken(
 
 export async function getGoogleDriveToken(
   credentialId: string,
+  options: { forceRefresh?: boolean } = {},
 ): Promise<string> {
   const normalized = normalizeCredentialId(credentialId);
   const stored = await readStoredToken(normalized);
@@ -319,6 +336,7 @@ export async function getGoogleDriveToken(
   }
 
   if (
+    !options.forceRefresh &&
     stored.accessToken &&
     stored.expiresAtMs - TOKEN_EXPIRY_SKEW_MS > Date.now()
   ) {
@@ -380,6 +398,7 @@ async function exchangeGoogleDriveCode({
     credentialId,
     toStoredToken(payload, payload.refresh_token),
   );
+  toast.dismiss(`google-drive-auth:${normalizeCredentialId(credentialId)}`);
   return { status: 'complete', credentialId };
 }
 

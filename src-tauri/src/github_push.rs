@@ -1,58 +1,48 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard},
+};
 
 use git2::{
     build::{RepoBuilder, TreeUpdateBuilder},
-    AutotagOption, Cred, FetchOptions, FileMode, Oid, PushOptions, Reference, RemoteCallbacks,
-    Repository, Signature,
+    AutotagOption, Cred, FetchOptions, FileMode, ObjectType, Oid, PushOptions, Reference,
+    RemoteCallbacks, Repository, Signature, TreeWalkMode, TreeWalkResult,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushFile {
-    path: String,
-    index: usize,
+    pub(crate) path: String,
+    pub(crate) index: usize,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushRequest {
-    owner: String,
-    repo: String,
-    branch: String,
-    token: String,
-    expected_head_oid: String,
-    message: String,
-    staging_id: String,
-    additions: Vec<GitPushFile>,
-    deletions: Vec<String>,
+    pub(crate) owner: String,
+    pub(crate) repo: String,
+    pub(crate) branch: String,
+    pub(crate) token: String,
+    pub(crate) expected_head_oid: String,
+    pub(crate) message: String,
+    pub(crate) staging_id: String,
+    pub(crate) additions: Vec<GitPushFile>,
+    pub(crate) deletions: Vec<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GitPushResponse {
-    status: &'static str,
-    commit_oid: Option<String>,
-    blob_shas: HashMap<String, String>,
-    failure_reason: Option<String>,
+    pub(crate) status: &'static str,
+    pub(crate) commit_oid: Option<String>,
+    pub(crate) failure_reason: Option<String>,
 }
 
-#[tauri::command]
-pub async fn github_push_batch(
-    app: AppHandle,
+pub(crate) fn push_batch(
+    cache_dir: &Path,
     request: GitPushRequest,
 ) -> Result<GitPushResponse, String> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
-        .map_err(|_| "Could not resolve Git staging directory")?;
-    tokio::task::spawn_blocking(move || push_batch(&cache_dir, request))
-        .await
-        .map_err(|_| "Git push task failed")?
-}
-
-fn push_batch(cache_dir: &Path, request: GitPushRequest) -> Result<GitPushResponse, String> {
     if request.staging_id.len() != 36
         || !request
             .staging_id
@@ -69,11 +59,7 @@ fn push_batch(cache_dir: &Path, request: GitPushRequest) -> Result<GitPushRespon
     }
 
     let stage = cache_dir.join("git-sync").join(&request.staging_id);
-    let repo_path = cache_dir
-        .join("git-sync")
-        .join("repositories")
-        .join(&request.owner)
-        .join(&request.repo);
+    let repo_path = repository_cache(cache_dir, &request.owner, &request.repo);
     let url = format!("https://github.com/{}/{}.git", request.owner, request.repo);
     push_batch_to_url(&stage, &repo_path, &url, request)
 }
@@ -98,7 +84,7 @@ fn valid_path(value: &str) -> bool {
         })
 }
 
-fn git_failure(label: &str, error: git2::Error) -> String {
+pub(crate) fn git_failure(label: &str, error: git2::Error) -> String {
     format!("{label} ({:?}/{:?})", error.class(), error.code())
 }
 
@@ -117,31 +103,48 @@ fn find_parent<'a>(
         .map_err(|error| git_failure("Git head unavailable", error))
 }
 
-fn push_batch_to_url(
-    stage: &Path,
+static GIT_LOCK: Mutex<()> = Mutex::new(());
+
+// ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
+pub(crate) fn lock_git() -> Result<MutexGuard<'static, ()>, String> {
+    let _waiting = crate::repository_engine::telemetry::current().phase("git_lock_wait");
+    GIT_LOCK.lock().map_err(|_| "Git lock unavailable".into())
+}
+
+/// Fetches `branch` into the bare cache at `repo_path`, cloning on first use, and returns its
+/// head. The caller must hold [`lock_git`]; `scratch` must be an existing, empty directory.
+pub(crate) fn fetch_head(
+    scratch: &Path,
     repo_path: &Path,
     url: &str,
-    request: GitPushRequest,
-) -> Result<GitPushResponse, String> {
-    static GIT_PUSH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    // ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
-    let _lock = GIT_PUSH_LOCK
-        .lock()
-        .map_err(|_| "Git push lock unavailable")?;
+    branch: &str,
+    token: &str,
+) -> Result<(Repository, Oid), String> {
+    let trace = crate::repository_engine::telemetry::current();
     #[cfg(any(target_os = "android", test))]
     {
-        let cert_path = stage.with_file_name("cacert.pem");
+        let cert_path = scratch.with_file_name("cacert.pem");
         std::fs::write(&cert_path, include_bytes!("../resources/cacert.pem"))
             .map_err(|_| "Git CA bundle unavailable")?;
         if cfg!(target_os = "android") {
-            // All Git network operations in this app use GIT_PUSH_LOCK.
+            // All Git network operations in this app hold GIT_LOCK.
             unsafe { git2::opts::set_ssl_cert_file(cert_path.as_path()) }
                 .map_err(|_| "Git TLS certificates unavailable")?;
         }
     }
-    let token = request.token;
+    // Same bound as the REST client; a stalled fetch could otherwise hold the sync locks.
+    unsafe {
+        git2::opts::set_server_connect_timeout_in_milliseconds(30_000)
+            .and_then(|_| git2::opts::set_server_timeout_in_milliseconds(120_000))
+    }
+    .map_err(|error| git_failure("Git timeout unavailable", error))?;
+    let received = std::cell::Cell::new(0);
     let mut fetch_callbacks = RemoteCallbacks::new();
-    fetch_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
+    fetch_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", token));
+    fetch_callbacks.transfer_progress(|progress| {
+        received.set(progress.received_bytes());
+        true
+    });
     let mut fetch_options = FetchOptions::new();
     if url.starts_with("https://") {
         fetch_options.depth(1);
@@ -149,16 +152,23 @@ fn push_batch_to_url(
     fetch_options
         .download_tags(AutotagOption::None)
         .remote_callbacks(fetch_callbacks);
-    let cached = Repository::open_bare(repo_path).ok();
+    let mut cached = Repository::open_bare(repo_path).ok();
+    if cached
+        .as_ref()
+        .is_some_and(|repo| outgrown(repo, repo_path, branch))
+    {
+        // Dropped before the directory is removed; Windows refuses to delete open pack files.
+        cached = None;
+        trace.set("git_cache_reset", true);
+    }
     let was_cached = cached.is_some();
     if !was_cached && repo_path.exists() {
         std::fs::remove_dir_all(repo_path).map_err(|_| "Git cache unavailable")?;
     }
+    trace.set("git_cache_hit", was_cached);
+    let fetching = trace.phase("git_fetch");
     let repo = if let Some(repo) = cached {
-        let refspec = format!(
-            "+refs/heads/{}:refs/remotes/origin/{}",
-            request.branch, request.branch
-        );
+        let refspec = format!("+refs/heads/{branch}:refs/remotes/origin/{branch}");
         repo.find_remote("origin")
             .and_then(|mut remote| remote.fetch(&[&refspec], Some(&mut fetch_options), None))
             .map_err(|error| git_failure("Git fetch failed", error))?;
@@ -166,24 +176,89 @@ fn push_batch_to_url(
     } else {
         let cloned = RepoBuilder::new()
             .bare(true)
-            .branch(&request.branch)
+            .branch(branch)
             .fetch_options(fetch_options)
-            .clone(url, &stage.join("repo"))
+            .clone(url, &scratch.join("repo"))
             .map_err(|error| git_failure("Git clone failed", error))?;
         drop(cloned);
         std::fs::create_dir_all(repo_path.parent().ok_or("Git cache path unavailable")?)
             .map_err(|_| "Git cache unavailable")?;
-        std::fs::rename(stage.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
+        std::fs::rename(scratch.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
         Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
     };
+    drop(fetching);
+    trace.add("git_received_bytes", received.get() as u64);
+    let head = find_parent(&repo, branch, was_cached)?.id();
+    Ok((repo, head))
+}
 
+// libgit2 never garbage-collects, so every version a fetch or push adds stays on disk. A re-clone
+// costs one download of the current tree, so wait until stale versions outweigh it about twice;
+// the 64 MiB floor keeps small repositories from re-cloning on most syncs.
+fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
+    let Some(tree) = find_parent(repo, branch, true)
+        .or_else(|_| find_parent(repo, branch, false))
+        .ok()
+        .and_then(|head| head.tree().ok())
+    else {
+        return false;
+    };
+    let Ok(odb) = repo.odb() else {
+        return false;
+    };
+    let mut current = 0;
+    let walked = tree.walk(TreeWalkMode::PreOrder, |_, entry| {
+        if entry.kind() == Some(ObjectType::Blob) {
+            current += odb
+                .read_header(entry.id())
+                .map_or(0, |(size, _)| size as u64);
+        }
+        TreeWalkResult::Ok
+    });
+    walked.is_ok() && directory_size(repo_path) > current * 3 + 64 * 1024 * 1024
+}
+
+fn directory_size(path: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .map(|entry| match entry.file_type() {
+            Ok(kind) if kind.is_dir() => directory_size(&entry.path()),
+            Ok(kind) if kind.is_file() => entry.metadata().map_or(0, |metadata| metadata.len()),
+            _ => 0,
+        })
+        .sum()
+}
+
+pub(crate) fn repository_cache(cache_dir: &Path, owner: &str, repo: &str) -> PathBuf {
+    cache_dir
+        .join("git-sync")
+        .join("repositories")
+        .join(owner)
+        .join(repo)
+}
+
+fn push_batch_to_url(
+    stage: &Path,
+    repo_path: &Path,
+    url: &str,
+    request: GitPushRequest,
+) -> Result<GitPushResponse, String> {
+    let _lock = lock_git()?;
+    let token = request.token;
+    let (repo, head) = fetch_head(stage, repo_path, url, &request.branch, &token)?;
+    let trace = crate::repository_engine::telemetry::current();
+    let building = trace.phase("git_build_commit");
     let refname = format!("refs/heads/{}", request.branch);
-    let parent = find_parent(&repo, &request.branch, was_cached)?;
+    let parent = repo
+        .find_commit(head)
+        .map_err(|error| git_failure("Git head unavailable", error))?;
     if parent.id().to_string() != request.expected_head_oid {
         return Ok(GitPushResponse {
             status: "head-conflict",
             commit_oid: None,
-            blob_shas: HashMap::new(),
             failure_reason: None,
         });
     }
@@ -192,13 +267,11 @@ fn push_batch_to_url(
         .tree()
         .map_err(|error| git_failure("Git tree unavailable", error))?;
     let mut updates = TreeUpdateBuilder::new();
-    let mut blob_shas = HashMap::new();
     for file in &request.additions {
         let blob = repo
             .blob_path(&stage.join(file.index.to_string()))
             .map_err(|error| git_failure("Git blob write failed", error))?;
         updates.upsert(&file.path, blob, FileMode::Blob);
-        blob_shas.insert(file.path.clone(), blob.to_string());
     }
     for path in &request.deletions {
         if baseline.get_path(Path::new(path)).is_ok() {
@@ -212,7 +285,6 @@ fn push_batch_to_url(
         return Ok(GitPushResponse {
             status: "pushed",
             commit_oid: Some(parent.id().to_string()),
-            blob_shas,
             failure_reason: None,
         });
     }
@@ -232,6 +304,8 @@ fn push_batch_to_url(
         )
         .map_err(|error| git_failure("Git commit failed", error))?;
 
+    drop(building);
+    let _pushing = trace.phase("git_push");
     let mut push_callbacks = RemoteCallbacks::new();
     push_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
     let rejected = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -262,7 +336,6 @@ fn push_batch_to_url(
             "push-failed"
         },
         commit_oid: Some(commit.to_string()),
-        blob_shas,
         failure_reason,
     })
 }
@@ -485,6 +558,81 @@ mod tests {
         drop(root_tree);
         drop(files);
         drop(seed);
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn reclones_a_cache_that_outgrew_the_current_tree() {
+        let root = std::env::temp_dir().join(format!(
+            "myelin-git-cache-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let remote_path = root.join("remote.git");
+        let remote = Repository::init_bare(&remote_path).expect("remote repository");
+        let note = remote.blob(b"current note").expect("note blob");
+        let mut builder = remote.treebuilder(None).expect("tree");
+        builder
+            .insert("note.myelin", note, 0o100644)
+            .expect("note entry");
+        let tree_id = builder.write().expect("tree id");
+        drop(builder);
+        let tree = remote.find_tree(tree_id).expect("tree");
+        let signature = Signature::now("Test", "test@example.invalid").expect("identity");
+        let head = remote
+            .commit(
+                Some("refs/heads/main"),
+                &signature,
+                &signature,
+                "seed",
+                &tree,
+                &[],
+            )
+            .expect("commit");
+        let url = remote_path.to_str().expect("remote path");
+        let cache_path = root.join("cache.git");
+        let fetch = |name: &str| {
+            let scratch = root.join(name);
+            fs::create_dir_all(&scratch).expect("scratch directory");
+            let _lock = lock_git().expect("git lock");
+            fetch_head(&scratch, &cache_path, url, "main", "").expect("fetch")
+        };
+        fetch("clone");
+
+        let small = Repository::open_bare(&cache_path)
+            .expect("cache")
+            .blob(b"an old version")
+            .expect("small garbage");
+        let (cache, fetched) = fetch("kept");
+        assert_eq!(fetched, head);
+        assert!(cache.find_blob(small).is_ok(), "a modest cache is reused");
+        drop(cache);
+
+        let mut state = 0x9e37_79b9_u32;
+        let large: Vec<u8> = (0..70 * 1024 * 1024)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                (state >> 24) as u8
+            })
+            .collect();
+        let large = Repository::open_bare(&cache_path)
+            .expect("cache")
+            .blob(&large)
+            .expect("large garbage");
+        let (cache, fetched) = fetch("reset");
+        assert_eq!(fetched, head);
+        assert!(
+            cache.find_blob(large).is_err(),
+            "an outgrown cache is re-cloned"
+        );
+        assert!(cache.find_blob(note).is_ok());
+        drop(cache);
+        drop(tree);
+        drop(remote);
         fs::remove_dir_all(root).expect("remove test directory");
     }
 }

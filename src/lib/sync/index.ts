@@ -1,7 +1,5 @@
 export * from '@myelin/editor/sync/live/transport';
 export * from '@myelin/editor/sync/repo/file-types';
-// `Repository` from the editor contract is shadowed below with the app's
-// extension (adds `openSession`), so importers here keep the full contract.
 export * from '@myelin/editor/sync/repo/types';
 export * from '@myelin/editor/sync/types';
 export { RepositoryProvider } from './context';
@@ -27,12 +25,10 @@ export type {
   YjsUpdateMessage,
 } from './live/protocol';
 export {
-  type ActiveRepository,
   DEFAULT_GOOGLE_DRIVE_FOLDER_NAME,
   DEFAULT_REPOSITORY_CONFIG,
   type ReadableRepository,
   type RepositoryConfig,
-  type RepositoryLifecycle,
 } from './repo/config';
 export { createRepository } from './repo/factory';
 export {
@@ -62,10 +58,6 @@ export {
   storeGitHubToken,
   waitForGitHubOAuth,
 } from './repo/github/credentials';
-export {
-  ensureGoogleDriveFolder,
-  renameGoogleDriveFolder,
-} from './repo/google-drive';
 export type {
   GoogleDriveOAuthResult,
   GoogleDriveOAuthStartPayload,
@@ -83,6 +75,11 @@ export {
   waitForGoogleDriveAuth,
 } from './repo/google-drive/credentials';
 export {
+  ensureGoogleDriveFolder,
+  renameGoogleDriveFolder,
+} from './repo/google-drive/folders';
+export { NativeRepository } from './repo/native';
+export {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
   REPOSITORY_SETUP_INCOMPLETE_MESSAGE,
@@ -93,7 +90,6 @@ export {
   setRepositoryConfig,
   subscribeRepositoryConfig,
 } from './repo/repository-settings';
-export type { Repository } from './repo/types';
 export type { RepositoryStatus } from './repo-context';
 export { useRepository, useRepositoryStatus } from './repo-context';
 export { NoteSession } from './session';
