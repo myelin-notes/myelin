@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard},
+};
 
 use git2::{
     build::{RepoBuilder, TreeUpdateBuilder},
@@ -56,11 +59,7 @@ pub(crate) fn push_batch(
     }
 
     let stage = cache_dir.join("git-sync").join(&request.staging_id);
-    let repo_path = cache_dir
-        .join("git-sync")
-        .join("repositories")
-        .join(&request.owner)
-        .join(&request.repo);
+    let repo_path = repository_cache(cache_dir, &request.owner, &request.repo);
     let url = format!("https://github.com/{}/{}.git", request.owner, request.repo);
     push_batch_to_url(&stage, &repo_path, &url, request)
 }
@@ -85,7 +84,7 @@ fn valid_path(value: &str) -> bool {
         })
 }
 
-fn git_failure(label: &str, error: git2::Error) -> String {
+pub(crate) fn git_failure(label: &str, error: git2::Error) -> String {
     format!("{label} ({:?}/{:?})", error.class(), error.code())
 }
 
@@ -104,34 +103,48 @@ fn find_parent<'a>(
         .map_err(|error| git_failure("Git head unavailable", error))
 }
 
-fn push_batch_to_url(
-    stage: &Path,
+static GIT_LOCK: Mutex<()> = Mutex::new(());
+
+// ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
+pub(crate) fn lock_git() -> Result<MutexGuard<'static, ()>, String> {
+    let _waiting = crate::repository_engine::telemetry::current().phase("git_lock_wait");
+    GIT_LOCK.lock().map_err(|_| "Git lock unavailable".into())
+}
+
+/// Fetches `branch` into the bare cache at `repo_path`, cloning on first use, and returns its
+/// head. The caller must hold [`lock_git`]; `scratch` must be an existing, empty directory.
+pub(crate) fn fetch_head(
+    scratch: &Path,
     repo_path: &Path,
     url: &str,
-    request: GitPushRequest,
-) -> Result<GitPushResponse, String> {
-    static GIT_PUSH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    // ponytail: one lock serializes repository cache writes; split by repository if sync throughput needs it.
+    branch: &str,
+    token: &str,
+) -> Result<(Repository, Oid), String> {
     let trace = crate::repository_engine::telemetry::current();
-    let waiting = trace.phase("git_lock_wait");
-    let _lock = GIT_PUSH_LOCK
-        .lock()
-        .map_err(|_| "Git push lock unavailable")?;
-    drop(waiting);
     #[cfg(any(target_os = "android", test))]
     {
-        let cert_path = stage.with_file_name("cacert.pem");
+        let cert_path = scratch.with_file_name("cacert.pem");
         std::fs::write(&cert_path, include_bytes!("../resources/cacert.pem"))
             .map_err(|_| "Git CA bundle unavailable")?;
         if cfg!(target_os = "android") {
-            // All Git network operations in this app use GIT_PUSH_LOCK.
+            // All Git network operations in this app hold GIT_LOCK.
             unsafe { git2::opts::set_ssl_cert_file(cert_path.as_path()) }
                 .map_err(|_| "Git TLS certificates unavailable")?;
         }
     }
-    let token = request.token;
+    // Same bound as the REST client; a stalled fetch could otherwise hold the sync locks.
+    unsafe {
+        git2::opts::set_server_connect_timeout_in_milliseconds(30_000)
+            .and_then(|_| git2::opts::set_server_timeout_in_milliseconds(120_000))
+    }
+    .map_err(|error| git_failure("Git timeout unavailable", error))?;
+    let received = std::cell::Cell::new(0);
     let mut fetch_callbacks = RemoteCallbacks::new();
-    fetch_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", &token));
+    fetch_callbacks.credentials(|_, _, _| Cred::userpass_plaintext("x-access-token", token));
+    fetch_callbacks.transfer_progress(|progress| {
+        received.set(progress.received_bytes());
+        true
+    });
     let mut fetch_options = FetchOptions::new();
     if url.starts_with("https://") {
         fetch_options.depth(1);
@@ -147,10 +160,7 @@ fn push_batch_to_url(
     trace.set("git_cache_hit", was_cached);
     let fetching = trace.phase("git_fetch");
     let repo = if let Some(repo) = cached {
-        let refspec = format!(
-            "+refs/heads/{}:refs/remotes/origin/{}",
-            request.branch, request.branch
-        );
+        let refspec = format!("+refs/heads/{branch}:refs/remotes/origin/{branch}");
         repo.find_remote("origin")
             .and_then(|mut remote| remote.fetch(&[&refspec], Some(&mut fetch_options), None))
             .map_err(|error| git_failure("Git fetch failed", error))?;
@@ -158,21 +168,45 @@ fn push_batch_to_url(
     } else {
         let cloned = RepoBuilder::new()
             .bare(true)
-            .branch(&request.branch)
+            .branch(branch)
             .fetch_options(fetch_options)
-            .clone(url, &stage.join("repo"))
+            .clone(url, &scratch.join("repo"))
             .map_err(|error| git_failure("Git clone failed", error))?;
         drop(cloned);
         std::fs::create_dir_all(repo_path.parent().ok_or("Git cache path unavailable")?)
             .map_err(|_| "Git cache unavailable")?;
-        std::fs::rename(stage.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
+        std::fs::rename(scratch.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
         Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
     };
-
     drop(fetching);
+    trace.add("git_received_bytes", received.get() as u64);
+    let head = find_parent(&repo, branch, was_cached)?.id();
+    Ok((repo, head))
+}
+
+pub(crate) fn repository_cache(cache_dir: &Path, owner: &str, repo: &str) -> PathBuf {
+    cache_dir
+        .join("git-sync")
+        .join("repositories")
+        .join(owner)
+        .join(repo)
+}
+
+fn push_batch_to_url(
+    stage: &Path,
+    repo_path: &Path,
+    url: &str,
+    request: GitPushRequest,
+) -> Result<GitPushResponse, String> {
+    let _lock = lock_git()?;
+    let token = request.token;
+    let (repo, head) = fetch_head(stage, repo_path, url, &request.branch, &token)?;
+    let trace = crate::repository_engine::telemetry::current();
     let building = trace.phase("git_build_commit");
     let refname = format!("refs/heads/{}", request.branch);
-    let parent = find_parent(&repo, &request.branch, was_cached)?;
+    let parent = repo
+        .find_commit(head)
+        .map_err(|error| git_failure("Git head unavailable", error))?;
     if parent.id().to_string() != request.expected_head_oid {
         return Ok(GitPushResponse {
             status: "head-conflict",
