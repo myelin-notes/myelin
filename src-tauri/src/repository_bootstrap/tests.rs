@@ -399,3 +399,113 @@ async fn prepares_empty_drive_repositories_without_creating_a_legacy_manifest() 
             .all(|message| message.starts_with("GET ")));
     }
 }
+
+fn commit_files(repository: &git2::Repository, branch: &str, files: &[(&str, &[u8])]) -> git2::Oid {
+    let mut index = git2::Index::new().unwrap();
+    for (path, bytes) in files {
+        let entry = git2::IndexEntry {
+            ctime: git2::IndexTime::new(0, 0),
+            mtime: git2::IndexTime::new(0, 0),
+            dev: 0,
+            ino: 0,
+            mode: 0o100644,
+            uid: 0,
+            gid: 0,
+            file_size: bytes.len() as u32,
+            id: repository.blob(bytes).unwrap(),
+            flags: 0,
+            flags_extended: 0,
+            path: path.as_bytes().to_vec(),
+        };
+        index.add(&entry).unwrap();
+    }
+    let tree = repository
+        .find_tree(index.write_tree_to(repository).unwrap())
+        .unwrap();
+    let reference = format!("refs/heads/{branch}");
+    let parent = repository
+        .find_reference(&reference)
+        .and_then(|head| head.peel_to_commit())
+        .ok();
+    let signature = git2::Signature::now("Test", "test@example.invalid").unwrap();
+    repository
+        .commit(
+            Some(&reference),
+            &signature,
+            &signature,
+            "update",
+            &tree,
+            &parent.iter().collect::<Vec<_>>(),
+        )
+        .unwrap()
+}
+
+#[tokio::test]
+async fn github_git_pull_writes_the_snapshot_and_follows_new_commits() {
+    let directory = TestDirectory::new();
+    let remote_path = directory.0.join("remote.git");
+    let remote = git2::Repository::init_bare(&remote_path).unwrap();
+    let manifest = serde_json::to_vec(&manifest()).unwrap();
+    let note = vec![7; 150_000];
+    let first = commit_files(
+        &remote,
+        "feature/notes",
+        &[
+            ("manifest.json", &manifest),
+            ("files/canvas.myelin", &note),
+            ("files/version.pdf", b"pdf"),
+            ("unrelated.txt", b"ignore"),
+        ],
+    );
+    let url = remote_path.to_str().unwrap();
+    let cache_dir = directory.0.join("app-cache");
+    let pull = |stage: PathBuf| {
+        let cache_dir = cache_dir.clone();
+        async move {
+            fs::create_dir_all(stage.join("files")).unwrap();
+            download::download_github_git(
+                &stage,
+                &cache_dir,
+                url,
+                "owner",
+                "repo",
+                "feature/notes",
+                "",
+                &std::collections::HashMap::new(),
+            )
+            .await
+        }
+    };
+
+    let stage = directory.0.join("first");
+    assert_eq!(pull(stage.clone()).await.unwrap(), Some((2, 150_003)));
+    assert_eq!(fs::read(stage.join("files/canvas.myelin")).unwrap(), note);
+    assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
+    assert_eq!(fs::read(stage.join("manifest.json")).unwrap(), manifest);
+    assert_eq!(
+        fs::read_to_string(stage.join(".remote-revision")).unwrap(),
+        first.to_string()
+    );
+    assert!(!stage.join("unrelated.txt").exists());
+
+    // The second pull fetches into the cached clone, whose branch lives under refs/remotes.
+    let second = commit_files(
+        &remote,
+        "feature/notes",
+        &[
+            ("manifest.json", &manifest),
+            ("files/canvas.myelin", b"edited on the tablet"),
+            ("files/version.pdf", b"pdf"),
+        ],
+    );
+    let stage = directory.0.join("second");
+    assert_eq!(pull(stage.clone()).await.unwrap(), Some((2, 23)));
+    assert_eq!(
+        fs::read(stage.join("files/canvas.myelin")).unwrap(),
+        b"edited on the tablet"
+    );
+    assert_eq!(
+        fs::read_to_string(stage.join(".remote-revision")).unwrap(),
+        second.to_string()
+    );
+}

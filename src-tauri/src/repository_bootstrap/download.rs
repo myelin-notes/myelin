@@ -247,14 +247,17 @@ pub(crate) async fn download_repository(
     source: RepositorySource,
     endpoints: &RemoteEndpoints,
 ) -> Result<(usize, u64), String> {
-    download_repository_cached(stage, source, endpoints, &HashMap::new()).await
+    download_repository_cached(stage, source, endpoints, &HashMap::new(), None).await
 }
 
+/// `git_cache` enables fetching GitHub repositories with Git into that cache directory, falling
+/// back to the REST API when Git fails.
 pub(crate) async fn download_repository_cached(
     stage: &Path,
     source: RepositorySource,
     endpoints: &RemoteEndpoints,
     cached: &HashMap<String, CachedFile>,
+    git_cache: Option<&Path>,
 ) -> Result<(usize, u64), String> {
     match source {
         RepositorySource::Github {
@@ -268,6 +271,31 @@ pub(crate) async fn download_repository_cached(
                 || !git2::Reference::is_valid_name(&format!("refs/heads/{branch}"))
             {
                 return Err("Invalid GitHub repository configuration".into());
+            }
+            if let Some(cache_dir) = git_cache {
+                let trace = crate::repository_engine::telemetry::current();
+                let pulled = {
+                    let _phase = trace.phase("git_pull");
+                    let url = format!("https://github.com/{owner}/{repo}.git");
+                    download_github_git(
+                        stage, cache_dir, &url, &owner, &repo, &branch, &token, cached,
+                    )
+                    .await
+                };
+                trace.set(
+                    "git_pull_outcome",
+                    match &pulled {
+                        Ok(Some(_)) => "pulled",
+                        Ok(None) => "unsupported",
+                        Err(_) => "error",
+                    },
+                );
+                if let Ok(Some(result)) = pulled {
+                    return Ok(result);
+                }
+                // A partial Git snapshot could leave sidecars the REST revision no longer has.
+                std::fs::remove_dir_all(stage).map_err(io_error)?;
+                std::fs::create_dir_all(stage.join("files")).map_err(io_error)?;
             }
             let client = RemoteClient::new(token, true)?;
             if !cached.is_empty() {
@@ -424,21 +452,149 @@ async fn download_github_cached(
     if tree["truncated"] == true {
         return Ok(None);
     }
-    let entries: HashMap<_, _> = tree["tree"]
+    let entries = tree["tree"]
         .as_array()
         .ok_or("Unreadable GitHub repository tree")?
         .iter()
-        .filter_map(|entry| entry["path"].as_str().map(|path| (path, entry)))
+        .filter_map(|entry| {
+            Some((
+                entry["path"].as_str()?.to_owned(),
+                TreeEntry {
+                    file: entry["type"] == "blob"
+                        && matches!(entry["mode"].as_str(), Some("100644" | "100755")),
+                    sha: entry["sha"].as_str().unwrap_or_default().to_owned(),
+                },
+            ))
+        })
         .collect();
+    let blobs = BlobSource::Rest {
+        client,
+        blobs: url(&["git", "blobs"])?,
+    };
+    write_github_snapshot(stage, revision, &entries, cached, &blobs).await
+}
+
+pub(super) async fn download_github_git(
+    stage: &Path,
+    cache_dir: &Path,
+    url: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    token: &str,
+    cached: &HashMap<String, CachedFile>,
+) -> Result<Option<(usize, u64)>, String> {
+    let scratch = cache_dir
+        .join("git-sync")
+        .join(uuid::Uuid::new_v4().to_string());
+    std::fs::create_dir_all(&scratch).map_err(io_error)?;
+    let repo_path = crate::github_push::repository_cache(cache_dir, owner, repo);
+    let (url, branch, token) = (url.to_owned(), branch.to_owned(), token.to_owned());
+    let trace = crate::repository_engine::telemetry::current();
+    let fetched = tauri::async_runtime::spawn_blocking({
+        let scratch = scratch.clone();
+        move || {
+            trace.sync_scope(|| {
+                let _lock = crate::github_push::lock_git()?;
+                let (repository, head) =
+                    crate::github_push::fetch_head(&scratch, &repo_path, &url, &branch, &token)?;
+                let entries = tree_entries(&repository, head)?;
+                Ok::<_, String>((repository, head, entries))
+            })
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    let _ = std::fs::remove_dir_all(&scratch);
+    let (repository, head, entries) = fetched.inspect_err(|error| {
+        // Only Git labels reach here, never server text or paths.
+        crate::repository_engine::telemetry::current().set("git_pull_error", error.as_str());
+    })?;
+    let blobs = BlobSource::Git(std::sync::Mutex::new(repository));
+    write_github_snapshot(stage, &head.to_string(), &entries, cached, &blobs).await
+}
+
+fn tree_entries(
+    repository: &git2::Repository,
+    head: git2::Oid,
+) -> Result<HashMap<String, TreeEntry>, String> {
+    let unavailable = |error| crate::github_push::git_failure("Git tree unavailable", error);
+    let tree = repository
+        .find_commit(head)
+        .and_then(|commit| commit.tree())
+        .map_err(unavailable)?;
+    let mut entries = HashMap::new();
+    tree.walk(git2::TreeWalkMode::PreOrder, |directory, entry| {
+        if let Ok(name) = entry.name() {
+            entries.insert(
+                format!("{directory}{name}"),
+                TreeEntry {
+                    file: entry.kind() == Some(git2::ObjectType::Blob)
+                        && matches!(entry.filemode(), 0o100644 | 0o100755),
+                    sha: entry.id().to_string(),
+                },
+            );
+        }
+        git2::TreeWalkResult::Ok
+    })
+    .map_err(unavailable)?;
+    Ok(entries)
+}
+
+struct TreeEntry {
+    /// A regular or executable blob; anything else is rejected where a repository file is expected.
+    file: bool,
+    sha: String,
+}
+
+enum BlobSource<'a> {
+    Rest {
+        client: &'a RemoteClient,
+        blobs: Url,
+    },
+    // A Mutex makes `&BlobSource` Send so the snapshot future can cross await points.
+    Git(std::sync::Mutex<git2::Repository>),
+}
+
+impl BlobSource<'_> {
+    async fn read(&self, sha: &str) -> Result<Vec<u8>, String> {
+        match self {
+            Self::Rest { client, blobs } => {
+                let mut url = blobs.clone();
+                url.path_segments_mut()
+                    .map_err(|_| "Invalid GitHub blob URL")?
+                    .push(sha);
+                github_blob(client, url, sha).await
+            }
+            Self::Git(repository) => {
+                let oid = git2::Oid::from_str(sha).map_err(|_| "Invalid Git blob revision")?;
+                let repository = repository.lock().map_err(|_| "Git cache unavailable")?;
+                let blob = repository.find_blob(oid).map_err(|error| {
+                    crate::github_push::git_failure("Git blob unavailable", error)
+                })?;
+                Ok(blob.content().to_vec())
+            }
+        }
+    }
+}
+
+/// Writes the GitHub tree at `revision` into `stage` in the snapshot layout. `None` means the tree
+/// is not a Myelin repository the incremental path understands; fall back to the tarball.
+async fn write_github_snapshot(
+    stage: &Path,
+    revision: &str,
+    entries: &HashMap<String, TreeEntry>,
+    cached: &HashMap<String, CachedFile>,
+    blobs: &BlobSource<'_>,
+) -> Result<Option<(usize, u64)>, String> {
     let blob_revision = |path: &str| -> Result<&str, String> {
         let entry = entries
             .get(path)
             .ok_or("GitHub tree is missing a repository file")?;
-        if entry["type"] != "blob" || !matches!(entry["mode"].as_str(), Some("100644" | "100755")) {
+        if !entry.file {
             return Err("GitHub tree contains an invalid repository file".into());
         }
-        entry["sha"]
-            .as_str()
+        Some(entry.sha.as_str())
             .filter(|sha| git2::Oid::from_str(sha).is_ok())
             .ok_or("Invalid GitHub blob revision".into())
     };
@@ -452,7 +608,7 @@ async fn download_github_cached(
     {
         std::fs::read(stage.join("manifest.json")).map_err(io_error)?
     } else {
-        github_blob(client, url(&["git", "blobs", manifest_sha])?, manifest_sha).await?
+        blobs.read(manifest_sha).await?
     };
     if manifest_bytes.is_empty() {
         return Ok(None);
@@ -461,22 +617,22 @@ async fn download_github_cached(
         || (metadata::legacy::parse_manifest(&manifest_bytes).is_err()
             && entries
                 .keys()
-                .any(|path| *path == metadata::SETTINGS || metadata::is_metadata_path(path)))
+                .any(|path| path == metadata::SETTINGS || metadata::is_metadata_path(path)))
     {
         if !stage.join("manifest.json").exists() {
             write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
         }
         for path in entries
             .keys()
-            .filter(|path| **path == metadata::SETTINGS || metadata::is_metadata_path(path))
+            .filter(|path| *path == metadata::SETTINGS || metadata::is_metadata_path(path))
         {
             let sha = blob_revision(path)?;
             let destination = stage.join(path);
             if !cached
-                .get(*path)
+                .get(path.as_str())
                 .is_some_and(|file| file.link(&destination, sha, None))
             {
-                let bytes = github_blob(client, url(&["git", "blobs", sha])?, sha).await?;
+                let bytes = blobs.read(sha).await?;
                 write_durable(&destination, &bytes)?;
             }
         }
@@ -495,7 +651,7 @@ async fn download_github_cached(
         {
             continue;
         }
-        let bytes = github_blob(client, url(&["git", "blobs", sha])?, sha).await?;
+        let bytes = blobs.read(sha).await?;
         size += bytes.len() as u64;
         write_durable(&destination, &bytes)?;
     }

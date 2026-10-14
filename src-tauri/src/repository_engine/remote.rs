@@ -1178,6 +1178,8 @@ impl RepositoryEngine {
                         source.clone(),
                         endpoints,
                         &cached,
+                        (endpoints.github == RemoteEndpoints::default().github)
+                            .then_some(self.cache_dir.as_path()),
                     )
                     .await?;
                     trace.add("download_snapshot_file_count", files as u64);
