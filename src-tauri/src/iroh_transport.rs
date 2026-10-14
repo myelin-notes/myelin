@@ -33,7 +33,7 @@ impl IrohState {
 
 struct IrohRuntime {
     endpoint: Endpoint,
-    _router: Router,
+    router: Router,
     gossip: Gossip,
     memory_lookup: MemoryLookup,
     topics: HashMap<String, ActiveTopic>,
@@ -94,7 +94,7 @@ impl IrohRuntime {
 
         Ok(Self {
             endpoint,
-            _router: router,
+            router,
             gossip,
             memory_lookup,
             topics: HashMap::new(),
@@ -291,6 +291,13 @@ impl IrohRuntime {
         );
 
         Ok(())
+    }
+
+    /// Closes the endpoint along with its relay connection and periodic network probes.
+    async fn shutdown(self) {
+        if let Err(err) = self.router.shutdown().await {
+            eprintln!("[iroh] shutdown failed: {err}");
+        }
     }
 
     fn leave_note(&mut self, note_id: &str) {
@@ -502,8 +509,16 @@ pub async fn iroh_leave(
     transport_id: String,
 ) -> Result<(), String> {
     let mut runtime = state.runtime.lock().await;
-    if let Some(runtime) = runtime.as_mut() {
-        runtime.leave(&note_id, &transport_id);
+    let Some(active) = runtime.as_mut() else {
+        return Ok(());
+    };
+    active.leave(&note_id, &transport_id);
+    // An idle endpoint still pings its relay every 15s and re-probes the network every ~20s, which
+    // keeps a mobile radio awake. Host and join start a fresh one on demand.
+    if active.topics.is_empty() {
+        if let Some(idle) = runtime.take() {
+            idle.shutdown().await;
+        }
     }
     Ok(())
 }

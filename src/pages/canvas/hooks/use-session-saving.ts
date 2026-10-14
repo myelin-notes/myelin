@@ -184,17 +184,38 @@ export function useCanvasSessionSaving({
       scheduleSave();
     });
 
+    let isWriter = false;
+    const syncAutoSave = () => {
+      if (isWriter && document.visibilityState === 'visible') {
+        startAutoSave();
+        return;
+      }
+      stopAutoSave();
+    };
     const unsubscribePeerSnapshot = noteSession.subscribePeerSnapshot(
       (snapshot) => {
-        if (snapshot.isWriter) {
-          startAutoSave();
-          return;
-        }
-        stopAutoSave();
+        isWriter = snapshot.isWriter;
+        syncAutoSave();
       },
     );
 
+    // A backgrounded mobile app is suspended, or killed, without further notice.
+    const handleVisibilityChange = () => {
+      syncAutoSave();
+      if (document.visibilityState !== 'hidden') {
+        return;
+      }
+      clearScheduledSave();
+      void saveNow().catch((error) => {
+        logger.error('Failed to save canvas session on hide', error, {
+          id: noteIdRef.current,
+        });
+      });
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       stopAutoSave();
       void saveSessionBeforeExit(
         cleanupSession,
@@ -213,6 +234,7 @@ export function useCanvasSessionSaving({
     noteId,
     noteSession,
     repository,
+    saveNow,
     scheduleSave,
     saveSessionBeforeExit,
     startAutoSave,

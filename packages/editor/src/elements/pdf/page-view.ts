@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { CanvasViewport } from '../../canvas-viewport';
 import { cleanupPdfPage, getPdfRenderScale } from '../../pdf-renderer';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import type { PageLayout } from '../page-frame-constants';
 import {
   getPdfVisiblePageRange,
@@ -232,9 +233,13 @@ export class PdfPageView {
     const top = page.localTop * scaleY * rasterZoom;
     const width = page.size.w * scaleX * rasterZoom;
     const height = page.size.h * scaleY * rasterZoom;
-    pageDom.root.style.transform = `translate(${left}px, ${top}px)`;
-    pageDom.root.style.width = `${width}px`;
-    pageDom.root.style.height = `${height}px`;
+    setStyleIfChanged(
+      pageDom.root,
+      'transform',
+      `translate(${left}px, ${top}px)`,
+    );
+    setStyleIfChanged(pageDom.root, 'width', `${width}px`);
+    setStyleIfChanged(pageDom.root, 'height', `${height}px`);
   }
 
   private removeInactivePageDoms(

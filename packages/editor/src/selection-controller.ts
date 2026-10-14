@@ -232,6 +232,13 @@ export class SelectionController {
     );
   }
 
+  public get isOverlayAnimating(): boolean {
+    return (
+      this.overlayProgress < 1 &&
+      this.selectedElements.some((element) => !element.hidden)
+    );
+  }
+
   public advanceOverlay(deltaTime: number): void {
     const selected = this.selectedElements;
     const changed =

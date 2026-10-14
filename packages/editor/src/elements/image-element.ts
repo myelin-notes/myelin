@@ -91,6 +91,7 @@ export class ImageElement extends AnchorableElement {
         this._bitmapDecode = createImageBitmap(blob).then(
           (bmp) => {
             this._bitmap = bmp;
+            this.onRedrawNeeded?.();
           },
           () => {
             // A corrupt blob leaves _bitmap null; draw passes already no-op.

@@ -258,6 +258,11 @@ export abstract class DrawableElement {
   public onSelectionChanged?: () => void;
   public onLockChanged?: () => void;
   public onTransformChanged?: () => void;
+  /**
+   * Call when something `draw` or `syncDOM` reads changed outside the Y doc and input events (an
+   * async decode or load finishing). The canvas only redraws on demand, so it is otherwise stale.
+   */
+  public onRedrawNeeded?: () => void;
 
   /** Yjs backing map — set after element is bound to a Y.Doc. */
   protected _yMap: Y.Map<unknown> | null = null;
@@ -364,7 +369,11 @@ export abstract class DrawableElement {
     return this._hidden;
   }
   public set hidden(value: boolean) {
+    if (this._hidden === value) {
+      return;
+    }
     this._hidden = value;
+    this.onRedrawNeeded?.();
   }
 
   public get locked(): boolean {

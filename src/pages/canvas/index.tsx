@@ -596,7 +596,7 @@ function CanvasViewInner({
 
         {/* DOM layer: page chrome + PM editor text */}
         <PageFrameDomLayer
-          canvasRef={engine.drawableCanvasRef}
+          drawableCanvas={engine.drawableCanvas}
           editingElement={engine.editingElement}
           autocompleteController={pageFrameAutocomplete.controller}
           autocompleteKind={pageFrameAutocomplete.activeKind}

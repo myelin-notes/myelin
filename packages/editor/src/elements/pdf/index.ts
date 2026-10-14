@@ -32,6 +32,7 @@ import {
 } from '../../pdf-renderer';
 import { getPlatform } from '../../platform';
 import { quantizeRasterZoom } from '../../raster-zoom';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import type {
   CanvasElementContext,
   CanvasUiServices,
@@ -667,6 +668,7 @@ export class PdfElement
         return;
       }
       this._pdfDocument = document;
+      this.onRedrawNeeded?.();
       if (
         !forceMetadata &&
         !this.model.shouldLoadPageMetadata({
@@ -682,6 +684,7 @@ export class PdfElement
         return;
       }
       this.setPageSizes(pageSizes, syncMetadata);
+      this.onRedrawNeeded?.();
     } catch (error) {
       if (generation === this._loadGeneration) {
         logger.error('Failed to load PDF', error, {
@@ -700,8 +703,16 @@ export class PdfElement
     if (!this._contentRoot) {
       return;
     }
-    this._contentRoot.style.width = `${contentWidth * rasterZoom}px`;
-    this._contentRoot.style.height = `${contentHeight * rasterZoom}px`;
+    setStyleIfChanged(
+      this._contentRoot,
+      'width',
+      `${contentWidth * rasterZoom}px`,
+    );
+    setStyleIfChanged(
+      this._contentRoot,
+      'height',
+      `${contentHeight * rasterZoom}px`,
+    );
   }
 
   private createDom(host: HTMLElement): void {
