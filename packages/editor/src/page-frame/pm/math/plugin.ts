@@ -16,6 +16,7 @@ import {
 import { buildTextOffsetMap } from '../markdown/text-offset-map';
 import { positionMathBlockSources } from './block-node-view';
 import { renderKatex } from './render';
+import { moveVerticallyFromLeadingMath } from './vertical-move';
 
 const mathPreviewKey = new PluginKey<DecorationSet>('math-preview');
 
@@ -145,6 +146,29 @@ function setCursor(
   );
 }
 
+// The DOM caret only sits before a formula's uneditable widget, rather than in a text node, when
+// nothing editable precedes the formula on its line: at a textblock start or right after a hard break.
+function headBeforeLineLeadingMath(selection: Selection): boolean {
+  if (!(selection instanceof TextSelection)) {
+    return false;
+  }
+  const { $head } = selection;
+  const parent = $head.parent;
+  if (!parent.isTextblock || parent.type.spec.code) {
+    return false;
+  }
+  if (
+    $head.parentOffset > 0 &&
+    $head.nodeBefore?.type !== parent.type.schema.nodes.hardBreak
+  ) {
+    return false;
+  }
+  return inlineMathRanges(parent, $head.before()).some(
+    ({ from, to }) =>
+      from === $head.pos && !selectionTouches(selection, from, to),
+  );
+}
+
 function addEnclosingTextblock(
   doc: PMNode,
   pos: number,
@@ -225,12 +249,22 @@ export function mathPreviewPlugin(): Plugin<DecorationSet> {
       // The browser can't place a caret reliably around display:none source text, so default horizontal
       // arrow movement skips or misplaces the cursor at rendered formulas.
       handleKeyDown(view, event) {
+        if (event.altKey || event.metaKey || event.ctrlKey) {
+          return false;
+        }
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          return (
+            headBeforeLineLeadingMath(view.state.selection) &&
+            moveVerticallyFromLeadingMath(
+              view,
+              event.key === 'ArrowUp' ? -1 : 1,
+              event.shiftKey,
+            )
+          );
+        }
         if (
           (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
-          event.shiftKey ||
-          event.altKey ||
-          event.metaKey ||
-          event.ctrlKey
+          event.shiftKey
         ) {
           return false;
         }
