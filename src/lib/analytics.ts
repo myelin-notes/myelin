@@ -1,3 +1,4 @@
+import type { CaptureOptions } from 'posthog-js';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { isErrorTrackingEnabled, posthog } from '@/lib/posthog';
 
@@ -7,9 +8,10 @@ import { isErrorTrackingEnabled, posthog } from '@/lib/posthog';
 export function trackEvent(
   event: string,
   properties?: Record<string, unknown>,
+  options?: CaptureOptions,
 ): void {
   if (!isErrorTrackingEnabled() || !UserPrefs.get('analyticsEnabled')) {
     return;
   }
-  posthog.capture(event, properties);
+  posthog.capture(event, properties, options);
 }

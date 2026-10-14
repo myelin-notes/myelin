@@ -171,7 +171,9 @@ export class NativeRepository implements Repository {
   private handle = '';
   private initializing: Promise<void> | null = null;
   private disposed = false;
+  private released = false;
   private readonly unlisteners: UnlistenFn[] = [];
+  private unlistenDiagnostics: UnlistenFn | null = null;
   private nativeVersion = -1;
 
   constructor(private readonly backend: NativeRepositoryOptions) {
@@ -200,16 +202,23 @@ export class NativeRepository implements Repository {
           }
         }),
       );
-      this.unlisteners.push(
-        await listen<{
-          repositoryId: string;
-          properties: Record<string, string | number | boolean>;
-        }>('repository-sync-diagnostics', ({ payload }) => {
-          if (payload.repositoryId === this.repositoryId && !this.disposed) {
-            trackEvent('sync_diagnostics', payload.properties);
-          }
-        }),
-      );
+      this.unlistenDiagnostics = await listen<{
+        repositoryId: string;
+        properties: Record<string, string | number | boolean>;
+      }>('repository-sync-diagnostics', ({ payload }) => {
+        if (payload.repositoryId !== this.repositoryId || this.released) {
+          return;
+        }
+        // While disposing, the window may close as soon as `repository_release` returns, so a
+        // batched event would be lost.
+        trackEvent(
+          'sync_diagnostics',
+          payload.properties,
+          this.disposed
+            ? { send_instantly: true, transport: 'sendBeacon' }
+            : undefined,
+        );
+      });
       this.unlisteners.push(
         await listen<DataEvent>('repository-data', ({ payload }) => {
           if (payload.repositoryId === this.repositoryId && !this.disposed) {
@@ -269,6 +278,8 @@ export class NativeRepository implements Repository {
       for (const unlisten of this.unlisteners.splice(0)) {
         unlisten();
       }
+      this.unlistenDiagnostics?.();
+      this.unlistenDiagnostics = null;
       throw error;
     }
   }
@@ -558,9 +569,16 @@ export class NativeRepository implements Repository {
     for (const unlisten of this.unlisteners.splice(0)) {
       unlisten();
     }
-    if (this.handle) {
-      await invoke('repository_release', { handle: this.handle });
-      this.handle = '';
+    try {
+      // Release waits for an in-flight sync, whose diagnostics must still be forwarded.
+      if (this.handle) {
+        await invoke('repository_release', { handle: this.handle });
+        this.handle = '';
+      }
+    } finally {
+      this.released = true;
+      this.unlistenDiagnostics?.();
+      this.unlistenDiagnostics = null;
     }
   }
 

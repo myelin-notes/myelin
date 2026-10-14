@@ -961,6 +961,11 @@ impl RepositoryEngine {
     ) -> Result<(), String> {
         let trace = telemetry::SyncTrace::new();
         let started = std::time::Instant::now();
+        let waiting = trace.phase("network_lock_wait");
+        // Held until diagnostics are emitted: `repository_release` waits on this lock, so the
+        // app cannot finish closing before the event for a shutdown-blocking sync is sent.
+        let _network = self.network_lock.lock().await;
+        drop(waiting);
         let result = trace
             .scope(self.synchronize_traced(app, refresh_auth))
             .await;
@@ -1003,9 +1008,6 @@ impl RepositoryEngine {
 
     async fn synchronize_traced(&self, app: &AppHandle, refresh_auth: bool) -> Result<(), String> {
         let trace = telemetry::current();
-        let waiting = trace.phase("network_lock_wait");
-        let _network = self.network_lock.lock().await;
-        drop(waiting);
         let Some(mut source) = self.source.lock().await.clone() else {
             return Ok(());
         };

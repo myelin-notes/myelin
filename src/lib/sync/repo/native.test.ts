@@ -323,6 +323,32 @@ it('uses native factories, imports bytes before publishing a batch, and replays 
   expect(listeners.size).toBe(0);
 });
 
+it('reports diagnostics from a sync that finishes while the repository is being released', async () => {
+  nativeBoundary();
+  const implementation = vi.mocked(invoke).getMockImplementation()!;
+  vi.mocked(invoke).mockImplementation(async (command, args) => {
+    if (command === 'repository_release') {
+      listeners.get('repository-sync-diagnostics')?.({
+        payload: { repositoryId: 'local', properties: { sync_id: 'closing' } },
+      });
+      return;
+    }
+    return implementation(command, args);
+  });
+  const repository = createRepositoryFromConfig({ kind: 'local' });
+  await repository.initialize();
+  vi.mocked(trackEvent).mockClear();
+
+  await repository.dispose();
+
+  expect(trackEvent).toHaveBeenCalledWith(
+    'sync_diagnostics',
+    { sync_id: 'closing' },
+    { send_instantly: true, transport: 'sendBeacon' },
+  );
+  expect(listeners.size).toBe(0);
+});
+
 it('forwards GitHub refresh requests and turns a final 401 into a sign-in prompt', async () => {
   nativeBoundary();
   const implementation = vi.mocked(invoke).getMockImplementation()!;
@@ -1150,6 +1176,7 @@ it('reports sync diagnostics only for the active repository and releases the lis
   expect(trackEvent).toHaveBeenCalledExactlyOnceWith(
     'sync_diagnostics',
     properties,
+    undefined,
   );
   await repository.dispose();
   expect(listeners.has('repository-sync-diagnostics')).toBe(false);
