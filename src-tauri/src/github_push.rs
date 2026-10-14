@@ -5,8 +5,8 @@ use std::{
 
 use git2::{
     build::{RepoBuilder, TreeUpdateBuilder},
-    AutotagOption, Cred, FetchOptions, FileMode, Oid, PushOptions, Reference, RemoteCallbacks,
-    Repository, Signature,
+    AutotagOption, Cred, FetchOptions, FileMode, ObjectType, Oid, PushOptions, Reference,
+    RemoteCallbacks, Repository, Signature, TreeWalkMode, TreeWalkResult,
 };
 use serde::{Deserialize, Serialize};
 
@@ -152,7 +152,15 @@ pub(crate) fn fetch_head(
     fetch_options
         .download_tags(AutotagOption::None)
         .remote_callbacks(fetch_callbacks);
-    let cached = Repository::open_bare(repo_path).ok();
+    let mut cached = Repository::open_bare(repo_path).ok();
+    if cached
+        .as_ref()
+        .is_some_and(|repo| outgrown(repo, repo_path, branch))
+    {
+        // Dropped before the directory is removed; Windows refuses to delete open pack files.
+        cached = None;
+        trace.set("git_cache_reset", true);
+    }
     let was_cached = cached.is_some();
     if !was_cached && repo_path.exists() {
         std::fs::remove_dir_all(repo_path).map_err(|_| "Git cache unavailable")?;
@@ -182,6 +190,46 @@ pub(crate) fn fetch_head(
     trace.add("git_received_bytes", received.get() as u64);
     let head = find_parent(&repo, branch, was_cached)?.id();
     Ok((repo, head))
+}
+
+// libgit2 never garbage-collects, so every version a fetch or push adds stays on disk. A re-clone
+// costs one download of the current tree, so wait until stale versions outweigh it about twice;
+// the 64 MiB floor keeps small repositories from re-cloning on most syncs.
+fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
+    let Some(tree) = find_parent(repo, branch, true)
+        .or_else(|_| find_parent(repo, branch, false))
+        .ok()
+        .and_then(|head| head.tree().ok())
+    else {
+        return false;
+    };
+    let Ok(odb) = repo.odb() else {
+        return false;
+    };
+    let mut current = 0;
+    let walked = tree.walk(TreeWalkMode::PreOrder, |_, entry| {
+        if entry.kind() == Some(ObjectType::Blob) {
+            current += odb
+                .read_header(entry.id())
+                .map_or(0, |(size, _)| size as u64);
+        }
+        TreeWalkResult::Ok
+    });
+    walked.is_ok() && directory_size(repo_path) > current * 3 + 64 * 1024 * 1024
+}
+
+fn directory_size(path: &Path) -> u64 {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return 0;
+    };
+    entries
+        .flatten()
+        .map(|entry| match entry.file_type() {
+            Ok(kind) if kind.is_dir() => directory_size(&entry.path()),
+            Ok(kind) if kind.is_file() => entry.metadata().map_or(0, |metadata| metadata.len()),
+            _ => 0,
+        })
+        .sum()
 }
 
 pub(crate) fn repository_cache(cache_dir: &Path, owner: &str, repo: &str) -> PathBuf {
@@ -510,6 +558,81 @@ mod tests {
         drop(root_tree);
         drop(files);
         drop(seed);
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn reclones_a_cache_that_outgrew_the_current_tree() {
+        let root = std::env::temp_dir().join(format!(
+            "myelin-git-cache-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let remote_path = root.join("remote.git");
+        let remote = Repository::init_bare(&remote_path).expect("remote repository");
+        let note = remote.blob(b"current note").expect("note blob");
+        let mut builder = remote.treebuilder(None).expect("tree");
+        builder
+            .insert("note.myelin", note, 0o100644)
+            .expect("note entry");
+        let tree_id = builder.write().expect("tree id");
+        drop(builder);
+        let tree = remote.find_tree(tree_id).expect("tree");
+        let signature = Signature::now("Test", "test@example.invalid").expect("identity");
+        let head = remote
+            .commit(
+                Some("refs/heads/main"),
+                &signature,
+                &signature,
+                "seed",
+                &tree,
+                &[],
+            )
+            .expect("commit");
+        let url = remote_path.to_str().expect("remote path");
+        let cache_path = root.join("cache.git");
+        let fetch = |name: &str| {
+            let scratch = root.join(name);
+            fs::create_dir_all(&scratch).expect("scratch directory");
+            let _lock = lock_git().expect("git lock");
+            fetch_head(&scratch, &cache_path, url, "main", "").expect("fetch")
+        };
+        fetch("clone");
+
+        let small = Repository::open_bare(&cache_path)
+            .expect("cache")
+            .blob(b"an old version")
+            .expect("small garbage");
+        let (cache, fetched) = fetch("kept");
+        assert_eq!(fetched, head);
+        assert!(cache.find_blob(small).is_ok(), "a modest cache is reused");
+        drop(cache);
+
+        let mut state = 0x9e37_79b9_u32;
+        let large: Vec<u8> = (0..70 * 1024 * 1024)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                (state >> 24) as u8
+            })
+            .collect();
+        let large = Repository::open_bare(&cache_path)
+            .expect("cache")
+            .blob(&large)
+            .expect("large garbage");
+        let (cache, fetched) = fetch("reset");
+        assert_eq!(fetched, head);
+        assert!(
+            cache.find_blob(large).is_err(),
+            "an outgrown cache is re-cloned"
+        );
+        assert!(cache.find_blob(note).is_ok());
+        drop(cache);
+        drop(tree);
+        drop(remote);
         fs::remove_dir_all(root).expect("remove test directory");
     }
 }
