@@ -71,7 +71,14 @@ export class PageFrameEditorState {
     // transaction during the EditorView constructor, before `this._view` is assigned.
     const editable = () => this._editable;
 
-    this._view = new EditorView(container, {
+    const mount = (dom: HTMLElement) => {
+      // Without overflow-anchor support (WebKit), PM preserves ancestor scroll around every update:
+      // a forced layout plus elementFromPoint probes per transaction, and the initial Y render of a
+      // 40-frame note paid it 40 times. A non-null style.overflowAnchor is what PM checks to skip it.
+      dom.style.overflowAnchor = 'none';
+      container.appendChild(dom);
+    };
+    this._view = new EditorView(mount, {
       state,
       editable: (_state) => editable(),
       nodeViews: buildNodeViews(this._ensureCodeOutputCard),

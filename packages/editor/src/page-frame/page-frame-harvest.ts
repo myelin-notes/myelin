@@ -26,6 +26,7 @@ import {
 } from '../pdf-export/coords';
 import { resolveFont } from '../pdf-export/fonts';
 import { createFontTable, type PdfHarvestContext } from '../pdf-export/harvest';
+import { MERMAID_DIAGRAM_SELECTOR } from './pm/mermaid/node-view';
 
 const logger = new Logger('PageFramePdfExport');
 
@@ -150,6 +151,11 @@ function buildOffscreenClone(source: PageFramePdfSource): {
   });
 
   const clone = source.contentDiv.cloneNode(true) as HTMLElement;
+  // cloneNode drops shadow roots; inline the diagrams so they keep their height and labels.
+  const diagrams = source.contentDiv.querySelectorAll(MERMAID_DIAGRAM_SELECTOR);
+  clone.querySelectorAll(MERMAID_DIAGRAM_SELECTOR).forEach((host, i) => {
+    host.innerHTML = diagrams[i]?.shadowRoot?.innerHTML ?? '';
+  });
   // Neutralize dom-layer's live transforms/zoom so the clone lays out at its natural scale-1 size;
   // the pagination spacer widgets (and horizontal layout's column styles) are already baked in.
   Object.assign(clone.style, {
