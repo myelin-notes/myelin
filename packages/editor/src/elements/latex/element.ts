@@ -17,7 +17,7 @@ import {
 // selectable and gives the placeholder room to render.
 const EMPTY_WIDTH = 140;
 const EMPTY_HEIGHT = 44;
-const LATEX_FONT_SIZE_BASE = 16;
+export const LATEX_FONT_SIZE_BASE = 16;
 const PLACEHOLDER = 'Add LaTeX…';
 const EDIT_PANEL_MIN_WIDTH = 240;
 const EDIT_PANEL_GAP = 6;

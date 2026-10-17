@@ -21,8 +21,10 @@ import { roundBounds } from './bounds';
 import type {
   McpBounds,
   McpCanvasTextContent,
+  McpElementSummary,
   McpImageContent,
   McpImageSummary,
+  McpIndividualElementSummary,
   McpLatexContent,
   McpLatexSummary,
   McpNoteElementSummary,
@@ -34,6 +36,7 @@ import type {
   McpPdfContent,
   McpPdfSummary,
   McpStrokeGroupSummary,
+  McpStrokeSummary,
   McpTextElementSummary,
   McpUnknownElementSummary,
 } from './types';
@@ -202,6 +205,26 @@ function getStrokeBounds(yMap: Y.Map<unknown>): McpBounds {
 
 function getUnknownBounds(yMap: Y.Map<unknown>): McpBounds {
   return scaleBounds(yMap, 0, 0);
+}
+
+/** World-space bounds, the same rect read_note reports for the element. */
+export function getMcpElementBounds(yMap: Y.Map<unknown>): McpBounds {
+  switch (getElementType(yMap)) {
+    case ElementType.PAGE_FRAME:
+      return getPageFrameBounds(yMap);
+    case ElementType.TEXT:
+      return getTextBounds(yMap);
+    case ElementType.IMAGE:
+      return getImageBounds(yMap);
+    case ElementType.PDF:
+      return getPdfBounds(yMap);
+    case ElementType.LATEX:
+      return getLatexBounds(yMap);
+    case ElementType.STROKE:
+      return getStrokeBounds(yMap);
+    default:
+      return getUnknownBounds(yMap);
+  }
 }
 
 function getNumberArray(value: unknown): number[] {
@@ -403,7 +426,7 @@ function summarizeStrokeGroup(
 
   return {
     kind: 'stroke-group',
-    reader: 'screenshot_canvas',
+    reader: 'read_strokes',
     count: boxes.length,
     bounds: roundBounds({
       x: minX,
@@ -430,7 +453,7 @@ type ExternalSummaryProvider = (
   noteId: VFSNodeId,
   ydoc: YDocManager,
   yMap: Y.Map<unknown>,
-) => McpNoteElementSummary;
+) => McpIndividualElementSummary;
 
 const EXTERNAL_SUMMARY_PROVIDERS = {
   'page-frame': (_noteId, ydoc, yMap) => summarizePageFrame(ydoc, yMap),
@@ -446,7 +469,7 @@ function summarizeElement(
   noteId: VFSNodeId,
   ydoc: YDocManager,
   yMap: Y.Map<unknown>,
-): McpNoteElementSummary {
+): McpIndividualElementSummary {
   const descriptor = getElementDescriptor(getElementType(yMap));
   const provider =
     descriptor?.externalSummary === 'supported'
@@ -456,6 +479,23 @@ function summarizeElement(
     return provider(noteId, ydoc, yMap);
   }
   return summarizeUnknown(yMap);
+}
+
+export function summarizeMcpElement(
+  noteId: VFSNodeId,
+  ydoc: YDocManager,
+  yMap: Y.Map<unknown>,
+): McpElementSummary {
+  if (getElementType(yMap) === ElementType.STROKE) {
+    return {
+      kind: 'stroke',
+      id: getElementId(yMap),
+      type: ElementType.STROKE,
+      bounds: getStrokeBounds(yMap),
+      reader: 'read_strokes',
+    } satisfies McpStrokeSummary;
+  }
+  return summarizeElement(noteId, ydoc, yMap);
 }
 
 function noteReadModelFromLoaded(loaded: LoadedMcpNote): McpNoteReadModel {

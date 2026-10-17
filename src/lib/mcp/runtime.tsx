@@ -35,6 +35,15 @@ function enqueue<T>(op: () => Promise<T>): Promise<T> {
   return next;
 }
 
+async function readRequestFile(requestId: string): Promise<Uint8Array> {
+  const response = await invoke<ArrayBuffer | number[]>('mcp_read_file', {
+    requestId,
+  });
+  return response instanceof ArrayBuffer
+    ? new Uint8Array(response)
+    : Uint8Array.from(response);
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -73,6 +82,7 @@ export function McpRuntime() {
     const service = new McpToolService({
       repository,
       allowDirectWrites: () => allowDirectWrites,
+      readPathArgument: () => readRequestFile(payload.requestId),
     });
     trackEvent('mcp_tool_called', { tool_name: payload.toolName });
     void service
