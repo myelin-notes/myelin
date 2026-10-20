@@ -360,16 +360,20 @@ export class SelectTool implements ITool {
         const movingIds = new Set(
           this.movingElements.map((element) => element.uuid),
         );
-        for (const e of this.movingElements) {
-          if (
-            e instanceof AnchorableElement &&
-            e.pageAnchor &&
-            movingIds.has(e.pageAnchor.frameId)
-          ) {
-            continue;
+        // One transaction per pointer move, not per element: each emits a doc update that the
+        // native save queue later merges — 2000 elements cost ~45ms per move unbatched.
+        canvas.transact(() => {
+          for (const e of this.movingElements) {
+            if (
+              e instanceof AnchorableElement &&
+              e.pageAnchor &&
+              movingIds.has(e.pageAnchor.frameId)
+            ) {
+              continue;
+            }
+            e.translate(dx, dy);
           }
-          e.translate(dx, dy);
-        }
+        });
         this.lastPoint = position;
         break;
       }
@@ -379,7 +383,7 @@ export class SelectTool implements ITool {
           break;
         }
         if (interaction.kind === 'group') {
-          this.updateGroupScale(interaction, position);
+          canvas.transact(() => this.updateGroupScale(interaction, position));
           break;
         }
         const e = interaction.element;
