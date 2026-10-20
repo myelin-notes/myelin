@@ -62,4 +62,4 @@ export const DEFAULT_GOOGLE_DRIVE_FOLDER_NAME = 'Myelin';
 
 export const MAX_CUSTOM_COLORS = 8;
 
-export const MAX_PEN_PRESETS = 6;
+export const MAX_PEN_PRESETS = 12;
