@@ -16,7 +16,7 @@ import { handlePageFrameImagePaste } from '@myelin/editor/clipboard/page-frame-i
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { useMessages } from '@myelin/editor/i18n';
 import { invoke } from '@tauri-apps/api/core';
-import { readText } from '@tauri-apps/plugin-clipboard-manager';
+import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 import type { VFSNodeId } from '@/lib/sync';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -148,11 +148,17 @@ export function useCanvasClipboard({
           }),
         }),
       ]);
-      copiedCanvasPayloadRef.current = payload;
-      return true;
     } catch {
-      return false;
+      // Chromium (Android WebView) rejects custom MIME types on write. The label alone
+      // is enough for `paste`, which restores the payload from copiedCanvasPayloadRef.
+      try {
+        await writeText(MYELIN_CANVAS_CLIPBOARD_LABEL);
+      } catch {
+        return false;
+      }
     }
+    copiedCanvasPayloadRef.current = payload;
+    return true;
   });
   const paste = useEffectEvent(async () => {
     if (!id) {
