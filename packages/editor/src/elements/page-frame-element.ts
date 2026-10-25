@@ -279,11 +279,19 @@ export class PageFrameElement
     return this._numPages;
   }
   public set numPages(n: number) {
+    if (this._numPages === n) {
+      return;
+    }
     this._numPages = n;
+    this.onRedrawNeeded?.();
   }
   // Pass `null` from paginated/column layouts so the geometry getters fall back to page math.
   public setMeasuredContentHeight(height: number | null): void {
+    if (this._measuredContentHeight === height) {
+      return;
+    }
     this._measuredContentHeight = height;
+    this.onRedrawNeeded?.();
   }
 
   public get totalWidth(): number {

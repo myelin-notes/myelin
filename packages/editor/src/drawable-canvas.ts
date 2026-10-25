@@ -81,6 +81,9 @@ export class DrawableCanvas {
   private readonly editSession: EditSessionController;
   private readonly placement = new PlacementController();
   private readonly changeListeners = new Set<() => void>();
+  private readonly frameListeners = new Set<() => void>();
+  private redrawScheduler: (() => void) | null = null;
+  private readonly handleDocUpdate = () => this.requestRedraw();
   private contentBoundsCache: DOMRect | null = null;
   private contentBoundsValid = false;
   private toolSelected: ITool;
@@ -104,8 +107,11 @@ export class DrawableCanvas {
     }
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
-    this.renderer = new CanvasRenderer(this.ctx, canvas);
+    this.renderer = new CanvasRenderer(this.ctx, canvas, () =>
+      this.requestRedraw(),
+    );
     this.viewport = new CanvasViewport(canvas);
+    this.viewport.onViewChange(() => this.requestRedraw());
     this.tools = tools ?? DrawableCanvas.makeTools(() => catalogs.en);
     this.toolSelected = this.tools[0];
     this.elementFactory = new CanvasElementFactory({
@@ -113,6 +119,7 @@ export class DrawableCanvas {
       getElements: () => this.elements,
       onChange: () => this.notifyChange(),
       invalidateContentBounds: () => this.invalidateContentBounds(),
+      requestRedraw: () => this.requestRedraw(),
       resolveNoteLink,
       resolveMedia,
       localPeerId: this.localPeerIdValue,
@@ -163,6 +170,8 @@ export class DrawableCanvas {
       () => this.interaction.palmSuppressed,
     );
     this.documentBinding.hydrate();
+    // Local and remote edits alike, including page-frame text, which lives in the same doc.
+    ydoc.doc.on('update', this.handleDocUpdate);
   }
 
   public get ydoc(): YDocManager {
@@ -175,6 +184,7 @@ export class DrawableCanvas {
 
   public setLivePeers(snapshot: LivePeersSnapshot | null): void {
     this.elementFactory.setLivePeers(snapshot);
+    this.requestRedraw();
   }
 
   public transact(fn: () => void): void {
@@ -184,6 +194,24 @@ export class DrawableCanvas {
   public onChange(listener: () => void): () => void {
     this.changeListeners.add(listener);
     return () => this.changeListeners.delete(listener);
+  }
+
+  /** Schedules a frame; calls before the next frame coalesce into it. */
+  public requestRedraw(): void {
+    this.redrawScheduler?.();
+  }
+
+  // Installed by the render loop. Requests made while none is installed are dropped; the loop draws
+  // a first frame when it starts.
+  public setRedrawScheduler(scheduler: (() => void) | null): void {
+    this.redrawScheduler = scheduler;
+  }
+
+  /** Runs after each redraw, in the same frame, for DOM layers positioned against the viewport. */
+  public onFrame(listener: () => void): () => void {
+    this.frameListeners.add(listener);
+    this.requestRedraw();
+    return () => this.frameListeners.delete(listener);
   }
 
   public setOnPageFrameRenamed(
@@ -279,6 +307,8 @@ export class DrawableCanvas {
   }
 
   public destroy(): void {
+    this.ydoc.doc.off('update', this.handleDocUpdate);
+    this.frameListeners.clear();
     this.editSession.destroy();
     if (this.placement.isActive) {
       this.endPlacement();
@@ -293,9 +323,10 @@ export class DrawableCanvas {
     this.notifyChange(),
   );
 
-  public redraw(deltaTime: number): void {
+  /** Returns whether an animation needs the next frame even if nothing requests one. */
+  public redraw(deltaTime: number): boolean {
     this.anchoring.refresh();
-    this.renderer.redraw(
+    const animating = this.renderer.redraw(
       deltaTime,
       this.viewport,
       this.elements,
@@ -306,6 +337,10 @@ export class DrawableCanvas {
       this.editSession.domHost,
       this.selection,
     );
+    for (const listener of this.frameListeners) {
+      listener();
+    }
+    return animating;
   }
 
   // `null` when empty — the viewport reads that as "no clamp" so fresh documents stay pannable.
@@ -458,6 +493,7 @@ export class DrawableCanvas {
 
   private notifyChange(): void {
     this.invalidateContentBounds();
+    this.requestRedraw();
     for (const listener of this.changeListeners) {
       listener();
     }

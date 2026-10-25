@@ -4,6 +4,7 @@ import type { DrawableCanvas } from '../../drawable-canvas';
 import { mountLatexProbe } from '../../page-frame/pm/math/latex-probe';
 import { renderKatex } from '../../page-frame/pm/math/render';
 import type { PdfHarvestContext } from '../../pdf-export/harvest';
+import { setStyleIfChanged } from '../../utils/style-cache';
 import { AnchorableElement } from '../anchorable-element';
 import { ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
@@ -266,10 +267,17 @@ export class LatexElement extends AnchorableElement {
       x: this.offset.x,
       y: this.offset.y,
     });
-    root.style.left = `${screen.x}px`;
-    root.style.top = `${screen.y}px`;
-    root.style.transform = `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`;
-    root.dataset.editing = this._editing ? 'true' : 'false';
+    setStyleIfChanged(root, 'left', `${screen.x}px`);
+    setStyleIfChanged(root, 'top', `${screen.y}px`);
+    setStyleIfChanged(
+      root,
+      'transform',
+      `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`,
+    );
+    const editing = this._editing ? 'true' : 'false';
+    if (root.dataset.editing !== editing) {
+      root.dataset.editing = editing;
+    }
 
     if (this._naturalDirty) {
       this.syncNaturalSize(root);
@@ -292,6 +300,7 @@ export class LatexElement extends AnchorableElement {
     void fonts.ready.then(() => {
       if (token === this._fontRemeasureToken) {
         this._naturalDirty = true;
+        this.onRedrawNeeded?.();
       }
     });
   }

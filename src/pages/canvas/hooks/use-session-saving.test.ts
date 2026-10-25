@@ -54,7 +54,22 @@ interface MockNoteSession {
   ) => () => void;
 }
 
-function createSession(id: string, hasUnsyncedChanges = true) {
+function stubDocument(visibilityState: DocumentVisibilityState = 'visible') {
+  const doc = Object.assign(new EventTarget(), { visibilityState });
+  vi.stubGlobal('document', doc);
+  return {
+    setVisibility(next: DocumentVisibilityState) {
+      doc.visibilityState = next;
+      doc.dispatchEvent(new Event('visibilitychange'));
+    },
+  };
+}
+
+function createSession(
+  id: string,
+  hasUnsyncedChanges = true,
+  isWriter = false,
+) {
   let localChangeListener = () => {};
   const session: MockNoteSession = {
     id,
@@ -65,7 +80,7 @@ function createSession(id: string, hasUnsyncedChanges = true) {
       return vi.fn();
     }),
     subscribePeerSnapshot: vi.fn((listener) => {
-      listener({ isWriter: false });
+      listener({ isWriter });
       return vi.fn();
     }),
   };
@@ -102,6 +117,7 @@ describe('useCanvasSessionSaving', () => {
       setInterval: vi.fn(() => 2),
       clearInterval: vi.fn(),
     });
+    stubDocument();
     const noteA = createSession('note-a');
     const noteB = createSession('note-b');
 
@@ -125,6 +141,32 @@ describe('useCanvasSessionSaving', () => {
       noteB.session,
       mocks.repository,
     );
+  });
+
+  it('saves on hide and pauses the autosave until the app is shown again', async () => {
+    vi.stubGlobal('window', {
+      setTimeout: vi.fn(() => 1),
+      clearTimeout: vi.fn(),
+      setInterval: vi.fn(() => 2),
+      clearInterval: vi.fn(),
+    });
+    const visibility = stubDocument();
+    const note = createSession('note-a', true, true);
+
+    renderSaving('note-a', note.session);
+    mocks.effects[0]?.();
+    expect(window.setInterval).toHaveBeenCalledTimes(1);
+
+    visibility.setVisibility('hidden');
+    await Promise.resolve();
+    expect(window.clearInterval).toHaveBeenCalledWith(2);
+    expect(mocks.saveSessionAndCreateVersion).toHaveBeenCalledWith(
+      note.session,
+      mocks.repository,
+    );
+
+    visibility.setVisibility('visible');
+    expect(window.setInterval).toHaveBeenCalledTimes(2);
   });
 
   it('does not regenerate the thumbnail when leaving an unchanged note', async () => {
