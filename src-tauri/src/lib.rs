@@ -107,6 +107,7 @@ pub fn run() {
             mcp_server::mcp_stop,
             mcp_server::mcp_status,
             mcp_server::mcp_respond,
+            mcp_server::mcp_read_file,
             transcription::start_audio_transcription,
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,

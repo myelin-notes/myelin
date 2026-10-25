@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -10,7 +11,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{ipc::Response, AppHandle, Emitter, State};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -21,6 +22,9 @@ const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
 const MCP_EVENT_TOOL_CALL: &str = "mcp-tool-call";
 const MCP_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+/// Tools whose `path` argument names a local file for the frontend to embed.
+const MCP_FILE_TOOLS: &[&str] = &["create_image", "create_pdf"];
+const MAX_MCP_FILE_BYTES: u64 = 100 * 1024 * 1024;
 
 #[derive(Clone)]
 pub struct McpServerState {
@@ -30,6 +34,9 @@ pub struct McpServerState {
 struct McpServerInner {
     runtime: Mutex<Option<McpServerRuntime>>,
     pending: Mutex<HashMap<String, oneshot::Sender<McpFrontendToolResponse>>>,
+    // Keyed by request id. The webview fetches bytes by id through `mcp_read_file`, so it can only
+    // read a file an MCP client named, never an arbitrary path of its own.
+    pending_files: Mutex<HashMap<String, PathBuf>>,
     tool_definitions: Mutex<Value>,
     next_request_id: AtomicU64,
 }
@@ -87,6 +94,7 @@ impl McpServerState {
             inner: Arc::new(McpServerInner {
                 runtime: Mutex::new(None),
                 pending: Mutex::new(HashMap::new()),
+                pending_files: Mutex::new(HashMap::new()),
                 tool_definitions: Mutex::new(json!([])),
                 next_request_id: AtomicU64::new(1),
             }),
@@ -174,6 +182,44 @@ pub async fn mcp_respond(
             .map_err(|_| "MCP request receiver dropped".to_string())?;
     }
     Ok(())
+}
+
+/// Read the file named by an in-flight tool call's `path` argument. One-shot per request.
+#[tauri::command]
+pub async fn mcp_read_file(
+    state: State<'_, McpServerState>,
+    request_id: String,
+) -> Result<Response, String> {
+    let path = state
+        .inner
+        .pending_files
+        .lock()
+        .await
+        .remove(&request_id)
+        .ok_or_else(|| "No file path is pending for this MCP request".to_string())?;
+    read_mcp_file(&path).await.map(Response::new)
+}
+
+async fn read_mcp_file(path: &Path) -> Result<Vec<u8>, String> {
+    let display = path.display();
+    if !path.is_absolute() {
+        return Err(format!("path must be absolute: {display}"));
+    }
+    let metadata = tokio::fs::metadata(path)
+        .await
+        .map_err(|err| format!("read {display}: {err}"))?;
+    if !metadata.is_file() {
+        return Err(format!("not a file: {display}"));
+    }
+    if metadata.len() > MAX_MCP_FILE_BYTES {
+        return Err(format!(
+            "{display} is {} bytes, over the {MAX_MCP_FILE_BYTES}-byte limit",
+            metadata.len()
+        ));
+    }
+    tokio::fs::read(path)
+        .await
+        .map_err(|err| format!("read {display}: {err}"))
 }
 
 async fn serve_mcp(
@@ -313,6 +359,18 @@ async fn call_frontend_tool(
         .lock()
         .await
         .insert(request_id.clone(), sender);
+    if let Some(path) = MCP_FILE_TOOLS
+        .contains(&tool_name)
+        .then(|| arguments.get("path").and_then(Value::as_str))
+        .flatten()
+    {
+        state
+            .inner
+            .pending_files
+            .lock()
+            .await
+            .insert(request_id.clone(), PathBuf::from(path));
+    }
 
     let payload = McpToolCallPayload {
         request_id: request_id.clone(),
@@ -322,10 +380,13 @@ async fn call_frontend_tool(
 
     if let Err(err) = app.emit(MCP_EVENT_TOOL_CALL, payload) {
         state.inner.pending.lock().await.remove(&request_id);
+        state.inner.pending_files.lock().await.remove(&request_id);
         return Err((-32000, format!("emit MCP tool call: {err}")));
     }
 
-    let response = match tokio::time::timeout(MCP_REQUEST_TIMEOUT, receiver).await {
+    let outcome = tokio::time::timeout(MCP_REQUEST_TIMEOUT, receiver).await;
+    state.inner.pending_files.lock().await.remove(&request_id);
+    let response = match outcome {
         Ok(Ok(response)) => response,
         Ok(Err(_)) => return Err((-32000, "MCP tool response dropped".to_string())),
         Err(_) => {

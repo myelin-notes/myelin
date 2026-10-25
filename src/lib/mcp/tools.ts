@@ -1,10 +1,13 @@
 import { ElementType } from '@myelin/editor/elements/element-type';
+import type { TextStyle } from '@myelin/editor/elements/text/element';
 import {
   addMarkdownPageFrameToYDoc,
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@myelin/editor/page-frame/markdown/import';
+import { getPdfPageSizes, type PdfPageSize } from '@myelin/editor/pdf-renderer';
 import { UserPrefs } from '@myelin/editor/user-prefs';
+import type { YDocManager } from '@myelin/editor/ydoc-manager';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import type {
   NativeRepository,
@@ -22,6 +25,20 @@ import {
   type RenameNoteReferencesResult,
   renameNoteReferences,
 } from '@/lib/sync/repo/rename-note-references';
+import { roundBounds } from './bounds';
+import {
+  DEFAULT_STROKE_COLOR,
+  DEFAULT_STROKE_SIZE,
+  DEFAULT_TEXT_STYLE,
+  insertCanvasText,
+  insertImage,
+  insertLatex,
+  insertPdf,
+  insertStrokes,
+  type McpElementChanges,
+  type McpStrokeInput,
+  updateElement,
+} from './element-writes';
 import {
   buildMcpNoteReadModel,
   findElementMap,
@@ -32,15 +49,22 @@ import {
   readMcpNoteFull,
   readMcpPageFrame,
   readMcpPdf,
+  summarizeMcpElement,
 } from './read-model';
 import { clampScreenshotMaxSize, renderMcpScreenshot } from './screenshot';
+import { parseStrokePoints, readMcpStrokes } from './strokes';
 import type {
+  McpBounds,
   McpDirectoryListing,
+  McpElementSummary,
+  McpElementWriteResult,
   McpFileListItem,
   McpFolderListItem,
   McpNodeListItem,
   McpNoteListItem,
   McpPageFrameContent,
+  McpStrokesCreated,
+  McpStrokesRead,
   McpToolContentResult,
   McpToolDefinition,
 } from './types';
@@ -50,6 +74,8 @@ type CanvasNoteSearchResult = NodeSearchResult & { node: VFSFileNode };
 
 const DEFAULT_NOTE_LIMIT = 50;
 const CREATE_FRAME_OFFSET_STEP = 48;
+const DEFAULT_STROKE_LIMIT = 200;
+const MAX_STROKE_LIMIT = 2000;
 
 function objectArg(args: unknown): Record<string, unknown> {
   if (!args || typeof args !== 'object' || Array.isArray(args)) {
@@ -131,6 +157,100 @@ function optionalNumber(
     : undefined;
 }
 
+function requiredNumber(args: Record<string, unknown>, key: string): number {
+  const value = optionalNumber(args, key);
+  if (value === undefined) {
+    throw new Error(`Missing required number argument: ${key}`);
+  }
+  return value;
+}
+
+function optionalPositiveNumber(
+  args: Record<string, unknown>,
+  key: string,
+): number | undefined {
+  const value = optionalNumber(args, key);
+  if (value !== undefined && value <= 0) {
+    throw new Error(`${key} must be greater than zero.`);
+  }
+  return value;
+}
+
+function optionalRegion(args: Record<string, unknown>): McpBounds | null {
+  const keys = ['x', 'y', 'width', 'height'] as const;
+  const values = keys.map((key) => optionalNumber(args, key));
+  if (values.every((value) => value === undefined)) {
+    return null;
+  }
+  const [x, y, width, height] = values;
+  if (
+    x === undefined ||
+    y === undefined ||
+    width === undefined ||
+    height === undefined
+  ) {
+    throw new Error('Give x, y, width, and height together, or none of them.');
+  }
+  return { x, y, width, height };
+}
+
+function textStyleArgs(args: Record<string, unknown>): Partial<TextStyle> {
+  const style: Partial<TextStyle> = {};
+  const fontSize = optionalPositiveNumber(args, 'fontSize');
+  const color = optionalString(args, 'color')?.trim();
+  const fontFamily = optionalString(args, 'fontFamily')?.trim();
+  const bold = optionalBoolean(args, 'bold');
+  const italic = optionalBoolean(args, 'italic');
+  if (fontSize !== undefined) {
+    style.fontSize = fontSize;
+  }
+  if (color) {
+    style.color = color;
+  }
+  if (fontFamily) {
+    style.fontFamily = fontFamily;
+  }
+  if (bold !== undefined) {
+    style.bold = bold;
+  }
+  if (italic !== undefined) {
+    style.italic = italic;
+  }
+  return style;
+}
+
+function fileNameOf(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
+async function decodeImageSize(
+  bytes: Uint8Array,
+  path: string,
+): Promise<{ width: number; height: number }> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(new Blob([bytes.slice()]));
+  } catch {
+    throw new Error(`Could not decode ${path} as an image.`);
+  }
+  const size = { width: bitmap.width, height: bitmap.height };
+  bitmap.close();
+  return size;
+}
+
+function unionBounds(boxes: readonly McpBounds[]): McpBounds {
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.x + box.width));
+  const bottom = Math.max(...boxes.map((box) => box.y + box.height));
+  return roundBounds({
+    x: left,
+    y: top,
+    width: right - left,
+    height: bottom - top,
+  });
+}
+
 function optionalLimit(args: Record<string, unknown>): number {
   const limit = optionalNumber(args, 'limit');
   if (!limit) {
@@ -196,6 +316,28 @@ const MARKDOWN_PROPERTY = {
   description:
     'Page frame body as Markdown. Supported: ATX headings, paragraphs, "- " and "1. " lists (indent nested items by two spaces), "- [ ]" / "- [x]" tasks, blockquotes and "> [!note]" callouts, fenced code blocks, "$$" math blocks and "$...$" inline math, pipe tables, "---" rules, **bold**, *italic*, <u>underline</u>, ~~strikethrough~~, `code`, [links](url), and wiki-style "[[Note Title]]" or "[[Note Title#Page Frame]]" links to other Myelin notes (resolved against note titles at import time). Anything else is imported as plain text.',
 };
+
+function positionProperties(subject: string): Record<string, unknown> {
+  return {
+    x: {
+      type: 'number',
+      description: `Canvas x of ${subject}, in pixels; may be negative. Place it relative to the bounds read_note reports.`,
+    },
+    y: {
+      type: 'number',
+      description: `Canvas y of ${subject}, in pixels; y increases downward.`,
+    },
+  };
+}
+
+const FILE_PATH_PROPERTY = {
+  type: 'string',
+  description:
+    'Absolute path to the file on this computer. Myelin reads the file itself, so never send its contents.',
+};
+
+const INK_COLOR_DEFAULT =
+  'Defaults to "#191c1e", the adaptive ink color that turns light in dark mode.';
 
 export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
@@ -269,7 +411,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_note',
     description:
-      'Read the structure of one canvas note: its metadata plus an inventory of every element on the canvas. A Myelin note is an infinite 2D canvas, and each element carries a "kind" (page-frame, text, latex, image, pdf), an id, and pixel bounds {x, y, width, height} with y increasing downward. Page frames hold the rich text and are the only writable content; text and latex float directly on the canvas. Stroke elements are summarized by geometry for screenshot_canvas. Only snippets are included here; each element names the follow-up tool in its "reader" field. Use this first when you need to locate or modify something specific inside a note.',
+      'Read the structure of one canvas note: its metadata plus an inventory of every element on the canvas. A Myelin note is an infinite 2D canvas, and each element carries a "kind" (page-frame, text, latex, image, pdf), an id, and pixel bounds {x, y, width, height} with y increasing downward. Page frames hold the rich text; text, latex, images, and PDFs float directly on the canvas. Ink collapses into one "stroke-group" entry with a box per stroke - read_strokes returns the paths and screenshot_canvas shows what they say. Only snippets are included here; each element names the follow-up tool in its "reader" field. Use this first when you need to locate or modify something specific inside a note.',
     inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
@@ -296,7 +438,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_canvas_text',
     description:
-      'Read one floating text element - a plain text box placed directly on the canvas rather than inside a page frame. Returns its full text and bounds. There is no tool to edit these; report changes to the user instead.',
+      'Read one floating text element - a plain text box placed directly on the canvas rather than inside a page frame. Returns its full text and bounds. Edit it with update_element.',
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('text') },
       ['noteId', 'elementId'],
@@ -305,7 +447,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_latex',
     description:
-      'Read the LaTeX source of one floating math element on the canvas. Returns the raw source, not a rendered image. There is no tool to edit these; report changes to the user instead.',
+      'Read the LaTeX source of one floating math element on the canvas. Returns the raw source, not a rendered image. Edit it with update_element.',
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('latex') },
       ['noteId', 'elementId'],
@@ -327,6 +469,45 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('pdf') },
       ['noteId', 'elementId'],
+    ),
+  },
+  {
+    name: 'read_strokes',
+    description:
+      'Read freehand ink as compact vector paths, in drawing order. Use it for the geometry of handwriting or drawings - letter height, slant, spacing, stroke width, stroke order - and to imitate it with create_strokes; use screenshot_canvas to see what the ink says. Paths are simplified to within `tolerance` pixels of what was drawn. Every point is relative to the returned "origin", and each stroke points into the shared "styles" list.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        x: {
+          type: 'number',
+          description:
+            'Left edge of the region to read, in canvas pixels. Give x, y, width, and height together, or none to read every stroke.',
+        },
+        y: { type: 'number', description: 'Top edge of the region.' },
+        width: { type: 'number', description: 'Region width.' },
+        height: { type: 'number', description: 'Region height.' },
+        tolerance: {
+          type: 'number',
+          description:
+            'How far, in canvas pixels, a simplified path may stray from the recorded one. Defaults to 1; 0 returns every recorded point. Coordinates are whole pixels, or tenths below a tolerance of 1 - use that for writing done while zoomed in.',
+        },
+        includePressure: {
+          type: 'boolean',
+          description:
+            'Append pen pressure (0-1) as "x,y,p" to the points of strokes whose style has "pressure": true. Defaults to false.',
+        },
+        includeIds: {
+          type: 'boolean',
+          description:
+            "Include each stroke's id, which update_element and delete_elements take. Defaults to false.",
+        },
+        limit: {
+          type: 'number',
+          description:
+            'Maximum strokes to return. Defaults to 200, clamped to 1-2000; "total" says how many matched.',
+        },
+      },
+      ['noteId'],
     ),
   },
   {
@@ -529,6 +710,199 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
         },
       },
       ['noteId', 'pageFrameId', 'confirm'],
+    ),
+  },
+  {
+    name: 'create_canvas_text',
+    description:
+      'Add a floating text box to a canvas note, outside any page frame, and return it. Use it for labels and annotations at a specific spot; put document content in a page frame instead. Requires direct MCP writes to be enabled in Myelin settings.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        text: {
+          type: 'string',
+          description: 'Plain text; "\\n" starts a new line.',
+        },
+        ...positionProperties("the box's top-left corner"),
+        width: {
+          type: 'number',
+          description:
+            'Wrap width in canvas pixels. Defaults to 200, so set it for anything longer than a few words.',
+        },
+        fontSize: {
+          type: 'number',
+          description: 'Font size in pixels. Defaults to 24.',
+        },
+        color: {
+          type: 'string',
+          description: `CSS color. ${INK_COLOR_DEFAULT}`,
+        },
+        fontFamily: {
+          type: 'string',
+          description: 'CSS font family. Defaults to "Inter".',
+        },
+        bold: { type: 'boolean', description: 'Defaults to false.' },
+        italic: { type: 'boolean', description: 'Defaults to false.' },
+      },
+      ['noteId', 'text', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'create_latex',
+    description:
+      'Add a floating math element to a canvas note, rendered from LaTeX with KaTeX, and return it. Requires direct MCP writes to be enabled in Myelin settings.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        latex: {
+          type: 'string',
+          description:
+            'LaTeX source in display mode, without surrounding $ or $$ delimiters.',
+        },
+        ...positionProperties("the formula's top-left corner"),
+        fontSize: {
+          type: 'number',
+          description: 'Rendered size in pixels. Defaults to 16.',
+        },
+      },
+      ['noteId', 'latex', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'create_image',
+    description:
+      'Add an image file from this computer to a canvas note and return it. Raster formats the system can decode are accepted, such as PNG, JPEG, GIF, and WebP. Requires direct MCP writes to be enabled in Myelin settings.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        path: FILE_PATH_PROPERTY,
+        ...positionProperties("the image's top-left corner"),
+        width: {
+          type: 'number',
+          description:
+            "Displayed width in canvas pixels; height keeps the aspect ratio. Defaults to the image's own pixel width.",
+        },
+      },
+      ['noteId', 'path', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'create_pdf',
+    description:
+      "Embed a PDF file from this computer in a canvas note and return it. Pages are laid out in the user's default page layout, each about 612x792 pixels for US Letter, so leave room below or beside the position. Requires direct MCP writes to be enabled in Myelin settings.",
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        path: FILE_PATH_PROPERTY,
+        ...positionProperties("the first page's top-left corner"),
+      },
+      ['noteId', 'path', 'x', 'y'],
+    ),
+  },
+  {
+    name: 'create_strokes',
+    description:
+      "Draw freehand ink - handwriting, marks, or sketches - on a canvas note and return the new stroke ids. Points use the format read_strokes returns, so to write in the user's hand, read a sample of their ink first and match its stroke size and color, letter height, slant, spacing, and stroke order. Requires direct MCP writes to be enabled in Myelin settings.",
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        ...positionProperties('the origin every point is relative to'),
+        strokes: {
+          type: 'array',
+          minItems: 1,
+          description:
+            'Strokes in drawing order, each one continuous pen-down motion.',
+          items: {
+            type: 'object',
+            properties: {
+              points: {
+                type: 'string',
+                description:
+                  'Space-separated "x,y" points relative to x/y, joined by straight segments in order - so space them a few pixels apart along curves. Write "x,y,p" with pressure p from 0 to 1 to vary the width along the stroke; without pressure the width is uniform.',
+              },
+              color: {
+                type: 'string',
+                description: `CSS color. ${INK_COLOR_DEFAULT}`,
+              },
+              size: {
+                type: 'number',
+                description:
+                  'Stroke width in canvas pixels, at full pressure. Defaults to 8.',
+              },
+            },
+            required: ['points'],
+            additionalProperties: false,
+          },
+        },
+      },
+      ['noteId', 'x', 'y', 'strokes'],
+    ),
+  },
+  {
+    name: 'update_element',
+    description:
+      "Change a floating element - text, latex, image, pdf, or stroke - and return it. Pass only the fields to change; a field that does not apply to the element's kind is an error. Page frames are edited with replace_page_frame_markdown. Requires direct MCP writes to be enabled in Myelin settings.",
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        elementId: {
+          type: 'string',
+          description:
+            'Element id, from read_note, read_strokes with includeIds, or a create tool.',
+        },
+        x: {
+          type: 'number',
+          description:
+            "Any kind: new canvas x of the element's bounds' top-left corner.",
+        },
+        y: {
+          type: 'number',
+          description:
+            "Any kind: new canvas y of the element's bounds' top-left corner.",
+        },
+        width: {
+          type: 'number',
+          description:
+            'text: wrap width. image and pdf: displayed width, keeping the aspect ratio.',
+        },
+        text: {
+          type: 'string',
+          description:
+            'text only: replaces the whole text, dropping styling that applied to part of it.',
+        },
+        latex: { type: 'string', description: 'latex only: new source.' },
+        fontSize: {
+          type: 'number',
+          description: 'text and latex: size in pixels.',
+        },
+        color: { type: 'string', description: 'text only: CSS color.' },
+        fontFamily: {
+          type: 'string',
+          description: 'text only: CSS font family.',
+        },
+        bold: { type: 'boolean', description: 'text only.' },
+        italic: { type: 'boolean', description: 'text only.' },
+      },
+      ['noteId', 'elementId'],
+    ),
+  },
+  {
+    name: 'delete_elements',
+    description:
+      'Permanently delete floating elements - text, latex, image, pdf, or stroke - from one canvas note and return what was removed. Text and LaTeX can be recreated from the result; images, PDFs, and strokes cannot, so confirm with the user before deleting those. Page frames are rejected; use delete_page_frame. Nothing is deleted if any id is invalid. Requires direct MCP writes to be enabled in Myelin settings.',
+    inputSchema: textSchema(
+      {
+        noteId: NOTE_ID_PROPERTY,
+        elementIds: stringArraySchema(
+          'Ids of the elements to delete, from read_note, read_strokes with includeIds, or a create tool.',
+        ),
+        confirm: {
+          type: 'boolean',
+          description:
+            'Must be true. This exists so a deletion cannot happen by accident; set it only once you intend to delete.',
+        },
+      },
+      ['noteId', 'elementIds', 'confirm'],
     ),
   },
   {
@@ -809,6 +1183,11 @@ export class McpToolService {
     private readonly options: {
       repository: NativeRepository;
       allowDirectWrites?: () => boolean;
+      /**
+       * Bytes of the file named by this call's `path` argument. The native server holds the path
+       * itself, keyed to the request, so the webview never reads a path of its own choosing.
+       */
+      readPathArgument?: () => Promise<Uint8Array>;
     },
   ) {
     this.allowDirectWrites = options.allowDirectWrites ?? (() => false);
@@ -833,6 +1212,7 @@ export class McpToolService {
       read_latex: (input) => this.readLatex(input),
       read_image: (input) => this.readImage(input),
       read_pdf: (input) => this.readPdf(input),
+      read_strokes: (input) => this.readStrokes(input),
       read_note_full: (input) => this.readNoteFull(input),
       screenshot_canvas: (input) => this.screenshotCanvas(input),
       create_page_frame: (input) => this.createPageFrame(input),
@@ -844,6 +1224,13 @@ export class McpToolService {
       rename_node: (input) => this.renameNode(input),
       delete_node: (input) => this.deleteNode(input),
       delete_page_frame: (input) => this.deletePageFrame(input),
+      create_canvas_text: (input) => this.createCanvasText(input),
+      create_latex: (input) => this.createLatex(input),
+      create_image: (input) => this.createImage(input),
+      create_pdf: (input) => this.createPdf(input),
+      create_strokes: (input) => this.createStrokes(input),
+      update_element: (input) => this.updateElement(input),
+      delete_elements: (input) => this.deleteElements(input),
       edit_tags: (input) => this.editTags(input),
     };
     const handler = handlers[name];
@@ -1071,6 +1458,26 @@ export class McpToolService {
       requiredString(input, 'noteId'),
       requiredString(input, 'elementId'),
     );
+  }
+
+  private async readStrokes(args: unknown): Promise<McpStrokesRead> {
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const region = optionalRegion(input);
+    const { ydoc } = await loadMcpNote(this.options.repository, noteId);
+    return readMcpStrokes(ydoc, noteId, {
+      region,
+      tolerance: Math.max(0, optionalNumber(input, 'tolerance') ?? 1),
+      includePressure: optionalBoolean(input, 'includePressure') ?? false,
+      includeIds: optionalBoolean(input, 'includeIds') ?? false,
+      limit: Math.max(
+        1,
+        Math.min(
+          Math.trunc(optionalNumber(input, 'limit') ?? DEFAULT_STROKE_LIMIT),
+          MAX_STROKE_LIMIT,
+        ),
+      ),
+    });
   }
 
   private async readNoteFull(args: unknown): Promise<unknown> {
@@ -1406,5 +1813,213 @@ export class McpToolService {
     } finally {
       await session?.close().catch(() => {});
     }
+  }
+
+  // Throws before opening a session if the id is not a canvas note.
+  private async editNote<T>(
+    noteId: VFSNodeId,
+    edit: (ydoc: YDocManager) => T | Promise<T>,
+  ): Promise<T> {
+    await requireCanvasNote(this.options.repository, noteId);
+    let session: NoteSession | null = null;
+    try {
+      session = await this.options.repository.openSession(noteId);
+      const result = await edit(session.ydoc);
+      await session.save();
+      return result;
+    } finally {
+      await session?.close().catch(() => {});
+    }
+  }
+
+  private async readPathArgument(): Promise<Uint8Array> {
+    if (!this.options.readPathArgument) {
+      throw new Error('Reading local files is not available in this build.');
+    }
+    return this.options.readPathArgument();
+  }
+
+  private async createCanvasText(
+    args: unknown,
+  ): Promise<McpElementWriteResult> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const text = requiredString(input, 'text');
+    const x = requiredNumber(input, 'x');
+    const y = requiredNumber(input, 'y');
+    const width = optionalPositiveNumber(input, 'width');
+    const style = { ...DEFAULT_TEXT_STYLE, ...textStyleArgs(input) };
+    return this.editNote(noteId, (ydoc) => ({
+      noteId,
+      element: summarizeMcpElement(
+        noteId,
+        ydoc,
+        insertCanvasText(ydoc, { text, x, y, width, style }),
+      ),
+    }));
+  }
+
+  private async createLatex(args: unknown): Promise<McpElementWriteResult> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const latex = requiredTrimmedString(input, 'latex');
+    const x = requiredNumber(input, 'x');
+    const y = requiredNumber(input, 'y');
+    const fontSize = optionalPositiveNumber(input, 'fontSize');
+    return this.editNote(noteId, (ydoc) => ({
+      noteId,
+      element: summarizeMcpElement(
+        noteId,
+        ydoc,
+        insertLatex(ydoc, { latex, x, y, fontSize }),
+      ),
+    }));
+  }
+
+  private async createImage(args: unknown): Promise<McpElementWriteResult> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const path = requiredString(input, 'path');
+    const x = requiredNumber(input, 'x');
+    const y = requiredNumber(input, 'y');
+    const width = optionalPositiveNumber(input, 'width');
+    return this.editNote(noteId, async (ydoc) => {
+      const bytes = await this.readPathArgument();
+      const size = await decodeImageSize(bytes, path);
+      const yMap = insertImage(ydoc, {
+        bytes,
+        naturalWidth: size.width,
+        naturalHeight: size.height,
+        x,
+        y,
+        width,
+      });
+      return { noteId, element: summarizeMcpElement(noteId, ydoc, yMap) };
+    });
+  }
+
+  private async createPdf(args: unknown): Promise<McpElementWriteResult> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const path = requiredString(input, 'path');
+    const x = requiredNumber(input, 'x');
+    const y = requiredNumber(input, 'y');
+    return this.editNote(noteId, async (ydoc) => {
+      const bytes = await this.readPathArgument();
+      let pageSizes: PdfPageSize[];
+      try {
+        pageSizes = await getPdfPageSizes(bytes);
+      } catch {
+        throw new Error(`Could not open ${path} as a PDF.`);
+      }
+      const yMap = insertPdf(ydoc, {
+        bytes,
+        fileName: fileNameOf(path),
+        pageSizes,
+        pageLayout: UserPrefs.get('defaultPageLayout'),
+        x,
+        y,
+      });
+      return { noteId, element: summarizeMcpElement(noteId, ydoc, yMap) };
+    });
+  }
+
+  private async createStrokes(args: unknown): Promise<McpStrokesCreated> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const origin = {
+      x: requiredNumber(input, 'x'),
+      y: requiredNumber(input, 'y'),
+    };
+    const rawStrokes = input.strokes;
+    if (!Array.isArray(rawStrokes) || rawStrokes.length === 0) {
+      throw new Error('create_strokes requires a non-empty strokes array.');
+    }
+    const strokes = rawStrokes.map((raw, index): McpStrokeInput => {
+      const label = `strokes[${index}]`;
+      const stroke = objectArg(raw);
+      const parsed = parseStrokePoints(
+        requiredString(stroke, 'points'),
+        origin,
+        `${label}.points`,
+      );
+      return {
+        ...parsed,
+        color: optionalString(stroke, 'color')?.trim() || DEFAULT_STROKE_COLOR,
+        size: optionalPositiveNumber(stroke, 'size') ?? DEFAULT_STROKE_SIZE,
+      };
+    });
+
+    return this.editNote(noteId, (ydoc) => {
+      const bounds = insertStrokes(ydoc, strokes).map((yMap) =>
+        summarizeMcpElement(noteId, ydoc, yMap),
+      );
+      return {
+        noteId,
+        strokeIds: bounds.map((element) => element.id),
+        bounds: unionBounds(bounds.map((element) => element.bounds)),
+      };
+    });
+  }
+
+  private async updateElement(args: unknown): Promise<McpElementWriteResult> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const elementId = requiredString(input, 'elementId');
+    const changes: McpElementChanges = {
+      x: optionalNumber(input, 'x'),
+      y: optionalNumber(input, 'y'),
+      width: optionalPositiveNumber(input, 'width'),
+      text: optionalString(input, 'text'),
+      latex: optionalString(input, 'latex'),
+      ...textStyleArgs(input),
+    };
+    return this.editNote(noteId, (ydoc) => {
+      const yMap = findElementMap(ydoc, elementId);
+      updateElement(ydoc, yMap, changes);
+      return { noteId, element: summarizeMcpElement(noteId, ydoc, yMap) };
+    });
+  }
+
+  private async deleteElements(
+    args: unknown,
+  ): Promise<{ noteId: VFSNodeId; deleted: McpElementSummary[] }> {
+    this.assertWritesAllowed();
+    const input = objectArg(args);
+    const noteId = requiredString(input, 'noteId');
+    const elementIds = optionalStringArray(input, 'elementIds') ?? [];
+    if (elementIds.length === 0) {
+      throw new Error('delete_elements requires at least one element id.');
+    }
+    if (optionalBoolean(input, 'confirm') !== true) {
+      throw new Error('delete_elements requires confirm=true.');
+    }
+
+    return this.editNote(noteId, (ydoc) => {
+      const yMaps = [...new Set(elementIds)].map((id) => {
+        const yMap = findElementMap(ydoc, id);
+        if (yMap.get('type') === ElementType.PAGE_FRAME) {
+          throw new Error(
+            `${id} is a page frame; delete it with delete_page_frame.`,
+          );
+        }
+        return yMap;
+      });
+      const deleted = yMaps.map((yMap) =>
+        summarizeMcpElement(noteId, ydoc, yMap),
+      );
+      ydoc.transact(() => {
+        for (const yMap of yMaps) {
+          ydoc.removeElementMap(yMap);
+        }
+      });
+      return { noteId, deleted };
+    });
   }
 }

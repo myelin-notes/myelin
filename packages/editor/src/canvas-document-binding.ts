@@ -10,7 +10,7 @@ import type { DrawableElement } from './elements/drawable-element';
 import { isBackgroundElement } from './elements/element-type';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
-const ELEMENT_Z_ORDER_KEY = 'zOrder';
+export const ELEMENT_Z_ORDER_KEY = 'zOrder';
 
 type YElementsDeepObserver = Parameters<
   Y.Array<Y.Map<unknown>>['observeDeep']

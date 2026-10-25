@@ -64,8 +64,8 @@ export interface McpLatexSummary extends McpElementBase {
 }
 
 /**
- * Ink collapses into a single entry rather than one element per stroke. A note holds hundreds of
- * strokes and no tool accepts a stroke id, so the only actionable part is geometry — kept as `boxes`.
+ * Ink collapses into a single entry rather than one element per stroke: a note holds hundreds of
+ * strokes, so ids and paths are left to read_strokes and only per-stroke `boxes` are kept here.
  */
 export interface McpStrokeGroupSummary {
   kind: 'stroke-group';
@@ -82,14 +82,62 @@ export interface McpUnknownElementSummary extends McpElementBase {
   keys: string[];
 }
 
-export type McpNoteElementSummary =
+/** The kinds read_note lists one entry per element for; strokes are grouped instead. */
+export type McpIndividualElementSummary =
   | McpPageFrameSummary
   | McpTextElementSummary
   | McpImageSummary
   | McpPdfSummary
   | McpLatexSummary
-  | McpStrokeGroupSummary
   | McpUnknownElementSummary;
+
+export type McpNoteElementSummary =
+  | McpIndividualElementSummary
+  | McpStrokeGroupSummary;
+
+export interface McpStrokeSummary extends McpElementBase {
+  kind: 'stroke';
+}
+
+/** One element as the write tools report it; unlike read_note, strokes stand alone. */
+export type McpElementSummary = McpIndividualElementSummary | McpStrokeSummary;
+
+export interface McpElementWriteResult {
+  noteId: VFSNodeId;
+  element: McpElementSummary;
+}
+
+export interface McpStrokeStyle {
+  color: string;
+  size: number;
+  /** True when the stroke recorded stylus pressure, so its width varies along the path. */
+  pressure: boolean;
+}
+
+export interface McpStrokePath {
+  /** Only present when read_strokes was asked for ids. */
+  id?: string;
+  /** Index into `McpStrokesRead.styles`. */
+  style: number;
+  /** Space-separated `x,y` or `x,y,pressure` points, relative to `McpStrokesRead.origin`. */
+  points: string;
+}
+
+export interface McpStrokesRead {
+  noteId: VFSNodeId;
+  /** Canvas position every point is relative to. */
+  origin: { x: number; y: number };
+  /** Strokes that matched the region, before `limit` was applied. */
+  total: number;
+  styles: McpStrokeStyle[];
+  strokes: McpStrokePath[];
+}
+
+export interface McpStrokesCreated {
+  noteId: VFSNodeId;
+  strokeIds: string[];
+  bounds: McpBounds;
+}
 
 export interface McpNoteReadModel {
   note: McpNoteMetadata;

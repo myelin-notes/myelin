@@ -174,7 +174,7 @@ describe('MCP read model', () => {
 
     expect(note.elements[5]).toEqual({
       kind: 'stroke-group',
-      reader: 'screenshot_canvas',
+      reader: 'read_strokes',
       count: 2,
       bounds: { x: 9.8, y: 43.2, width: 112.7, height: 169.3 },
       boxes: [
