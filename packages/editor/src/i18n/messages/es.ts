@@ -1028,14 +1028,19 @@ const es: typeof en = {
   whatsNew: {
     title: 'Novedades',
     dismiss: 'Entendido',
-    items: [
-      {
-        title:
-          'Actualiza Myelin en todos tus dispositivos o no podrán sincronizarse.',
-        description:
-          'La sincronización se rehízo y las versiones anteriores ya no son compatibles.',
-      },
-    ],
+    back: 'Atrás',
+    next: 'Siguiente',
+    sync: {
+      title:
+        'Actualiza Myelin en todos tus dispositivos o no podrán sincronizarse.',
+      description:
+        'La sincronización se rehízo y las versiones anteriores ya no son compatibles.',
+    },
+    anchoring: {
+      title: 'Ancla elementos a tus páginas',
+      description:
+        'Selecciona una imagen, forma o dibujo en una página y elige Anclar a la página. Se moverá con el texto mientras escribes, y las imágenes pegadas se anclan automáticamente.',
+    },
   },
   onboarding: {
     skip: 'Omitir configuración',

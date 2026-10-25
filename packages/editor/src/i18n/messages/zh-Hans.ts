@@ -994,12 +994,17 @@ const zhHans: typeof en = {
   whatsNew: {
     title: '更新内容',
     dismiss: '知道了',
-    items: [
-      {
-        title: '请在所有设备上更新 Myelin，否则将无法同步。',
-        description: '同步功能已重建，旧版本不再兼容。',
-      },
-    ],
+    back: '上一步',
+    next: '下一步',
+    sync: {
+      title: '请在所有设备上更新 Myelin，否则将无法同步。',
+      description: '同步功能已重建，旧版本不再兼容。',
+    },
+    anchoring: {
+      title: '将内容锚定到页面',
+      description:
+        '在页面上选中图片、形状或手绘内容，然后选择“锚定到页面”。它会随文字一起移动，粘贴的图片也会自动锚定。',
+    },
   },
   onboarding: {
     skip: '跳过设置',

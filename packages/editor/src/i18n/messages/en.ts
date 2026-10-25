@@ -1018,13 +1018,18 @@ const en = {
   whatsNew: {
     title: "What's new",
     dismiss: 'Got it',
-    items: [
-      {
-        title: 'Update Myelin on all your devices, or they will fail to sync.',
-        description:
-          'Syncing was rebuilt and older versions are no longer compatible.',
-      },
-    ],
+    back: 'Back',
+    next: 'Next',
+    sync: {
+      title: 'Update Myelin on all your devices, or they will fail to sync.',
+      description:
+        'Syncing was rebuilt and older versions are no longer compatible.',
+    },
+    anchoring: {
+      title: 'Anchor things to your pages',
+      description:
+        'Select an image, shape or drawing on a page and choose Anchor to page. It moves with your text as you type, and pasted images are anchored automatically.',
+    },
   },
   onboarding: {
     skip: 'Skip setup',

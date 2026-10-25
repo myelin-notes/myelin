@@ -1038,14 +1038,19 @@ const fr: typeof en = {
   whatsNew: {
     title: 'Nouveautés',
     dismiss: 'Compris',
-    items: [
-      {
-        title:
-          'Mettez à jour Myelin sur tous vos appareils, sinon ils ne pourront plus se synchroniser.',
-        description:
-          'La synchronisation a été refaite et les anciennes versions ne sont plus compatibles.',
-      },
-    ],
+    back: 'Retour',
+    next: 'Suivant',
+    sync: {
+      title:
+        'Mettez à jour Myelin sur tous vos appareils, sinon ils ne pourront plus se synchroniser.',
+      description:
+        'La synchronisation a été refaite et les anciennes versions ne sont plus compatibles.',
+    },
+    anchoring: {
+      title: 'Ancrez des éléments à vos pages',
+      description:
+        'Sélectionnez une image, une forme ou un dessin sur une page et choisissez Ancrer à la page. Il suit votre texte pendant la saisie, et les images collées sont ancrées automatiquement.',
+    },
   },
   onboarding: {
     skip: 'Passer la configuration',
