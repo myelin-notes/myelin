@@ -12,6 +12,7 @@ import {
 } from '@myelin/shared/os';
 import { Button } from '@myelin/ui/button';
 import { WindowControls } from '@/components/layout/window-controls';
+import { WHATS_NEW_RELEASE } from '@/components/whats-new-dialog';
 import { trackEvent } from '@/lib/analytics';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
@@ -65,6 +66,8 @@ export function OnboardingFlow() {
         }
       }
 
+      // New users start on this release, so they have nothing to catch up on.
+      UserPrefs.set('whatsNewSeen', WHATS_NEW_RELEASE);
       UserPrefs.set('onboardingCompleted', true);
       trackEvent('onboarding_completed', { starter_canvas_opened: opened });
     },

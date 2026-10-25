@@ -1025,6 +1025,18 @@ const es: typeof en = {
   dialogs: {
     closeSrOnly: 'Cerrar',
   },
+  whatsNew: {
+    title: 'Novedades',
+    dismiss: 'Entendido',
+    items: [
+      {
+        title:
+          'Actualiza Myelin en todos tus dispositivos o no podrán sincronizarse.',
+        description:
+          'La sincronización se rehízo y las versiones anteriores ya no son compatibles.',
+      },
+    ],
+  },
   onboarding: {
     skip: 'Omitir configuración',
     back: 'Atrás',

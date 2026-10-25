@@ -1035,6 +1035,18 @@ const fr: typeof en = {
   dialogs: {
     closeSrOnly: 'Fermer',
   },
+  whatsNew: {
+    title: 'Nouveautés',
+    dismiss: 'Compris',
+    items: [
+      {
+        title:
+          'Mettez à jour Myelin sur tous vos appareils, sinon ils ne pourront plus se synchroniser.',
+        description:
+          'La synchronisation a été refaite et les anciennes versions ne sont plus compatibles.',
+      },
+    ],
+  },
   onboarding: {
     skip: 'Passer la configuration',
     back: 'Retour',

@@ -1015,6 +1015,17 @@ const en = {
   dialogs: {
     closeSrOnly: 'Close',
   },
+  whatsNew: {
+    title: "What's new",
+    dismiss: 'Got it',
+    items: [
+      {
+        title: 'Update Myelin on all your devices, or they will fail to sync.',
+        description:
+          'Syncing was rebuilt and older versions are no longer compatible.',
+      },
+    ],
+  },
   onboarding: {
     skip: 'Skip setup',
     back: 'Back',

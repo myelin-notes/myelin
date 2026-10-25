@@ -991,6 +991,16 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  whatsNew: {
+    title: '更新内容',
+    dismiss: '知道了',
+    items: [
+      {
+        title: '请在所有设备上更新 Myelin，否则将无法同步。',
+        description: '同步功能已重建，旧版本不再兼容。',
+      },
+    ],
+  },
   onboarding: {
     skip: '跳过设置',
     back: '上一步',

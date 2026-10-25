@@ -56,6 +56,7 @@ const PREFS = {
   mcpAllowDirectWrites: pref<boolean>('mcp-allow-direct-writes', false),
   analyticsEnabled: pref<boolean>('analytics-enabled', false),
   onboardingCompleted: pref<boolean>('onboarding-completed', false),
+  whatsNewSeen: pref<string>('whats-new-seen', ''),
   language: pref<string>('language', 'en'),
   repositoryConfig: pref<RepositoryConfig>('repository-config', {
     kind: 'local',
