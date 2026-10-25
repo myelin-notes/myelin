@@ -49,7 +49,10 @@ describe('page-frame PDF overlays', () => {
     };
 
     const { request } = await harvestPageFramePdf({
-      contentDiv: { cloneNode: () => clone } as unknown as HTMLElement,
+      contentDiv: {
+        cloneNode: () => clone,
+        querySelectorAll: () => [],
+      } as unknown as HTMLElement,
       numPages: 2,
       pageWidth: 100,
       pageHeight: 100,

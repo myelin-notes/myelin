@@ -30,6 +30,20 @@ import { onMermaidThemeChange, renderMermaidSvg } from './render';
 
 const RENDER_DEBOUNCE_MS = 250;
 
+let diagramSheet: CSSStyleSheet | null = null;
+
+function getDiagramSheet(): CSSStyleSheet {
+  if (!diagramSheet) {
+    diagramSheet = new CSSStyleSheet();
+    diagramSheet.replaceSync(
+      'svg { max-width: 100%; height: auto; display: inline-block; }',
+    );
+  }
+  return diagramSheet;
+}
+
+export const MERMAID_DIAGRAM_SELECTOR = '.pm-mermaid-block-diagram';
+
 export const MERMAID_SOURCE_PANEL_SELECTOR =
   '.pm-mermaid-block--editing .pm-mermaid-block-source';
 
@@ -45,6 +59,9 @@ export const MERMAID_SOURCE_PANEL_SELECTOR =
 export class MermaidBlockNodeView implements NodeView {
   dom: HTMLDivElement;
   private preview: HTMLDivElement;
+  // Holds the SVG in a shadow root so its <style> doesn't restyle the whole app (see render.ts).
+  private diagram: HTMLDivElement;
+  private diagramRoot: ShadowRoot;
   private source: HTMLDivElement;
   private node: PMNode;
   private editor: CodeBlockEditor | null = null;
@@ -84,6 +101,11 @@ export class MermaidBlockNodeView implements NodeView {
     );
     this.preview.addEventListener('wheel', this.handleWheel);
     this.preview.addEventListener('mousedown', this.handlePreviewMouseDown);
+
+    this.diagram = document.createElement('div');
+    this.diagram.className = 'pm-mermaid-block-diagram';
+    this.diagramRoot = this.diagram.attachShadow({ mode: 'open' });
+    this.diagramRoot.adoptedStyleSheets = [getDiagramSheet()];
 
     this.source = document.createElement('div');
     this.source.className = 'pm-mermaid-block-source';
@@ -336,7 +358,8 @@ export class MermaidBlockNodeView implements NodeView {
       if (this.destroyed || seq !== this.renderSeq) {
         return;
       }
-      this.preview.innerHTML = svg;
+      this.diagramRoot.innerHTML = svg;
+      this.preview.replaceChildren(this.diagram);
       this.hasDiagram = true;
       this.dom.classList.remove('pm-mermaid-block--error');
     } catch {
