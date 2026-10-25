@@ -313,6 +313,6 @@ pub(crate) fn normalize(manifest: &mut Value) {
         let color = color.strip_prefix('#').unwrap_or(color);
         if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() { return None; }
         Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max)}))
-    }).take(6).collect::<Vec<_>>()).unwrap_or_default();
+    }).take(12).collect::<Vec<_>>()).unwrap_or_default();
     manifest["penPresets"] = json!(presets);
 }

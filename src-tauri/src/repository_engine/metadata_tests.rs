@@ -699,6 +699,12 @@ fn legacy_preferences_are_normalized_during_automatic_open() {
         {"id":"four","tool":"pen","color":"#abcdef","size":8},
         {"id":"five","tool":"pen","color":"#abcdef","size":8},
         {"id":"six","tool":"pen","color":"#abcdef","size":8},
+        {"id":"seven","tool":"pen","color":"#abcdef","size":8},
+        {"id":"eight","tool":"pen","color":"#abcdef","size":8},
+        {"id":"nine","tool":"pen","color":"#abcdef","size":8},
+        {"id":"ten","tool":"pen","color":"#abcdef","size":8},
+        {"id":"eleven","tool":"pen","color":"#abcdef","size":8},
+        {"id":"twelve","tool":"pen","color":"#abcdef","size":8},
         {"id":"over-cap","tool":"pen","color":"#abcdef","size":8}
     ]);
     fs::write(
@@ -714,7 +720,7 @@ fn legacy_preferences_are_normalized_during_automatic_open() {
         ])
     );
     let presets = loaded.manifest["penPresets"].as_array().unwrap();
-    assert_eq!(presets.len(), 6);
+    assert_eq!(presets.len(), 12);
     assert_eq!(
         presets[0],
         json!({"id":"pen","tool":"pen","color":"#abcdef","size":40.0})

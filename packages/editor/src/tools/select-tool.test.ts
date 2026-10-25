@@ -38,9 +38,13 @@ class TestDOMRect {
   }
 }
 
-function makeImageElement(uuid = 'image-uuid', offsetX = 0, offsetY = 0) {
+function makeImageElement(
+  uuid = 'image-uuid',
+  offsetX = 0,
+  offsetY = 0,
+  ydoc = new YDocManager(),
+) {
   vi.stubGlobal('DOMRect', TestDOMRect);
-  const ydoc = new YDocManager();
   const yMap = ydoc.createElementMap(ElementType.IMAGE, uuid, {
     offsetX,
     offsetY,
@@ -131,6 +135,7 @@ function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
       getPoint: vi.fn(() => point),
       zoom,
     },
+    transact: (fn: () => void) => fn(),
   } as unknown as DrawableCanvas;
   enterElementEdit.mockImplementation((element: DrawableElement) => {
     element.enterEditMode(canvas);
@@ -503,14 +508,18 @@ describe('SelectTool', () => {
   });
 
   it('moves a multi-selection by dragging the gap inside its shared bounds', () => {
-    const { image: first } = makeImageElement('first', 0, 0);
-    const { image: second } = makeImageElement('second', 200, 0);
+    const ydoc = new YDocManager();
+    const { image: first } = makeImageElement('first', 0, 0, ydoc);
+    const { image: second } = makeImageElement('second', 200, 0, ydoc);
     first.select();
     second.select();
     const start = { x: 150, y: 40 };
     const { canvas } = makeCanvas([first, second], start);
+    canvas.transact = (fn) => ydoc.transact(fn);
     const tool = new SelectTool(() => catalogs.en);
     const event = { pointerType: 'touch' } as PointerEvent;
+    const docUpdate = vi.fn();
+    ydoc.doc.on('update', docUpdate);
 
     tool.start(canvas, event);
     tool.update(canvas, event, { x: 180, y: 60 });
@@ -518,6 +527,7 @@ describe('SelectTool', () => {
 
     expect(first.offset).toEqual({ x: 30, y: 20 });
     expect(second.offset).toEqual({ x: 230, y: 20 });
+    expect(docUpdate).toHaveBeenCalledTimes(1);
   });
 
   it('moves only unlocked members of an additive selection', () => {
@@ -540,18 +550,24 @@ describe('SelectTool', () => {
   });
 
   it('scales a multi-selection proportionally from its shared corner', () => {
-    const { image: first } = makeImageElement('first', 0, 0);
-    const { image: second } = makeImageElement('second', 200, 0);
+    const ydoc = new YDocManager();
+    const { image: first } = makeImageElement('first', 0, 0, ydoc);
+    const { image: second } = makeImageElement('second', 200, 0, ydoc);
     first.select();
     second.select();
     const start = { x: 304, y: 84 };
     const { canvas } = makeCanvas([first, second], start);
+    canvas.transact = (fn) => ydoc.transact(fn);
     const tool = new SelectTool(() => catalogs.en);
     const event = { pointerType: 'mouse' } as PointerEvent;
+    const docUpdate = vi.fn();
+    ydoc.doc.on('update', docUpdate);
 
     tool.start(canvas, event);
     tool.update(canvas, event, { x: 604, y: 164 });
     tool.finish(canvas, event);
+
+    expect(docUpdate).toHaveBeenCalledTimes(1);
 
     expect(first.offset).toEqual({ x: 0, y: 0 });
     expect(first.scale).toEqual({ x: 2, y: 2 });

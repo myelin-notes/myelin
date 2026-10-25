@@ -38,6 +38,7 @@
     "mcp-bridge:default",
     "pencil:default",
     "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
     {
       "identifier": "http:default",
       "allow": [
