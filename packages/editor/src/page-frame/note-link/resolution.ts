@@ -13,7 +13,7 @@ import type {
   VFSNode,
   VFSNodeId,
 } from '../../sync/repo/types';
-import type { YjsSyncTarget } from '../../sync/types';
+import type { DocumentSource } from '../../sync/types';
 import { YDocManager } from '../../ydoc-manager';
 import type { PageFrameAutocompleteItem } from '../pm/autocomplete';
 
@@ -25,9 +25,9 @@ export type NoteLinkSearchSource = Pick<
   Repository,
   'searchNodes' | 'getFolderChain'
 > &
-  Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
+  Partial<DocumentSource>;
 export type NoteLinkRefResolveSource = NoteLinkResolveSource &
-  Partial<Pick<YjsSyncTarget, 'loadDocument'>>;
+  Partial<DocumentSource>;
 
 export interface NoteLinkRef {
   noteId: VFSNodeId | null;
@@ -183,7 +183,7 @@ export async function resolveNoteLinkIdByTitle(
 }
 
 async function loadFrameMetas(
-  loadDocument: NonNullable<YjsSyncTarget['loadDocument']>,
+  loadDocument: DocumentSource['loadDocument'],
   noteId: VFSNodeId,
   cache?: PageFrameNameCache,
 ): Promise<readonly PageFrameMeta[]> {

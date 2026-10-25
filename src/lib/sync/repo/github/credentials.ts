@@ -1,8 +1,10 @@
+import { toast } from 'sonner';
 import { fetch } from '@tauri-apps/plugin-http';
 import { GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET } from '@/lib/env';
 import { createCredentialVault } from '../credential-vault';
 import {
   credentialTokenKey,
+  normalizeCredentialId,
   OAuthClient,
   type OAuthExchange,
   type OAuthResult,
@@ -20,7 +22,9 @@ const vault = createCredentialVault({
 
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
-const GITHUB_OAUTH_SCOPE = 'repo';
+const GITHUB_OAUTH_SCOPE = 'repo offline_access';
+export const GITHUB_SIGN_IN_REQUIRED =
+  'GitHub access expired or was revoked. Sign in again from Settings to resume sync.';
 
 function getGitHubClientId(): string {
   if (!GITHUB_CLIENT_ID) {
@@ -44,6 +48,9 @@ export function consumeGitHubVaultDiscarded(): boolean {
 
 interface GitHubTokenResponse {
   access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  refresh_token_expires_in?: number;
   error?: string;
   error_description?: string;
 }
@@ -67,8 +74,14 @@ async function postGitHubForm<T>(
   });
 
   if (!response.ok) {
-    const body = await response.text().catch(() => '<no response body>');
-    throw new Error(`${label} (${response.status}): ${body}`);
+    const payload = await response.json().catch(() => null);
+    if (
+      (response.status === 400 || response.status === 401) &&
+      payload?.error
+    ) {
+      return payload as T;
+    }
+    throw new Error(`${label} (${response.status}). Please try again.`);
   }
 
   return (await response.json()) as T;
@@ -87,13 +100,119 @@ export async function isGitHubSecureStorageAvailable(): Promise<boolean> {
   return vault.isAvailable();
 }
 
-export async function getGitHubToken(credentialId: string): Promise<string> {
-  const token = await vault.read(credentialTokenKey(credentialId));
-  if (!token) {
-    throw new Error('GitHub token is not configured.');
-  }
+interface StoredGitHubToken {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt?: number;
+  refreshExpiresAt?: number;
+}
 
-  return token;
+const pendingRefreshes = new Map<string, Promise<string>>();
+
+function tokenRecord(response: GitHubTokenResponse): StoredGitHubToken {
+  return {
+    accessToken: response.access_token!.trim(),
+    refreshToken: response.refresh_token,
+    expiresAt:
+      response.expires_in === undefined
+        ? undefined
+        : Date.now() + response.expires_in * 1000,
+    refreshExpiresAt:
+      response.refresh_token_expires_in === undefined
+        ? undefined
+        : Date.now() + response.refresh_token_expires_in * 1000,
+  };
+}
+
+export async function requireGitHubSignIn(credentialId: string): Promise<void> {
+  if (await hasGitHubToken(credentialId)) {
+    toast.warning(GITHUB_SIGN_IN_REQUIRED, {
+      id: `github-auth:${credentialId}`,
+      duration: Infinity,
+    });
+    await clearGitHubToken(credentialId);
+  }
+}
+
+export async function getGitHubToken(
+  credentialId: string,
+  options: { forceRefresh?: boolean } = {},
+): Promise<string> {
+  const normalized = normalizeCredentialId(credentialId);
+  const value = await vault.read(credentialTokenKey(normalized));
+  const existing = pendingRefreshes.get(normalized);
+  if (existing) {
+    return existing;
+  }
+  if (!value) {
+    throw new Error(GITHUB_SIGN_IN_REQUIRED);
+  }
+  // Older vaults stored only the access token.
+  const stored: StoredGitHubToken = value.startsWith('{')
+    ? JSON.parse(value)
+    : { accessToken: value };
+  if (
+    !options.forceRefresh &&
+    (stored.expiresAt === undefined || stored.expiresAt > Date.now() + 60_000)
+  ) {
+    return stored.accessToken;
+  }
+  const pending = refreshGitHubToken(normalized, stored, value).finally(() =>
+    pendingRefreshes.delete(normalized),
+  );
+  pendingRefreshes.set(normalized, pending);
+  return pending;
+}
+
+async function refreshGitHubToken(
+  credentialId: string,
+  stored: StoredGitHubToken,
+  originalValue: string,
+): Promise<string> {
+  if (
+    !stored.refreshToken ||
+    (stored.refreshExpiresAt !== undefined &&
+      stored.refreshExpiresAt <= Date.now())
+  ) {
+    await requireGitHubSignIn(credentialId);
+    throw new Error(GITHUB_SIGN_IN_REQUIRED);
+  }
+  const response = await postGitHubForm<GitHubTokenResponse>(
+    GITHUB_TOKEN_URL,
+    {
+      client_id: getGitHubClientId(),
+      client_secret: getGitHubClientSecret(),
+      grant_type: 'refresh_token',
+      refresh_token: stored.refreshToken,
+    },
+    'GitHub token refresh failed',
+  );
+  if ((await vault.read(credentialTokenKey(credentialId))) !== originalValue) {
+    throw new Error('GitHub credentials changed. Please try syncing again.');
+  }
+  if (
+    response.error === 'bad_refresh_token' ||
+    response.error === 'invalid_grant' ||
+    response.error === 'expired_token'
+  ) {
+    await requireGitHubSignIn(credentialId);
+    throw new Error(GITHUB_SIGN_IN_REQUIRED);
+  }
+  if (response.error) {
+    throw new Error(
+      oauthFailureMessage(response.error, response.error_description),
+    );
+  }
+  if (!response.access_token?.trim() || !response.refresh_token?.trim()) {
+    throw new Error(
+      'GitHub token refresh returned an incomplete token pair. Please try again.',
+    );
+  }
+  const next = tokenRecord(response);
+  await vault.write(credentialTokenKey(credentialId), JSON.stringify(next), {
+    notify: false,
+  });
+  return next.accessToken;
 }
 
 export async function hasGitHubToken(credentialId: string): Promise<boolean> {
@@ -160,7 +279,11 @@ async function exchangeGitHubCode({
     };
   }
 
-  await storeGitHubToken(credentialId, token);
+  await vault.write(
+    credentialTokenKey(credentialId),
+    JSON.stringify(tokenRecord(response)),
+  );
+  toast.dismiss(`github-auth:${credentialId}`);
   return { status: 'complete', credentialId };
 }
 

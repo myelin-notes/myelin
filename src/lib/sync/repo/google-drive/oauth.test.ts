@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetch } from '@tauri-apps/plugin-http';
 import type { OAuthCallbackParams } from '../oauth/redirect';
@@ -22,6 +23,8 @@ vi.mock('@/lib/env', () => ({
   POSTHOG_KEY: '',
   POSTHOG_HOST: '',
 }));
+
+vi.mock('sonner', () => ({ toast: { warning: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock('@tauri-apps/plugin-opener', () => ({
   openUrl: vi.fn(async () => {}),
@@ -91,6 +94,8 @@ const {
   cancelGoogleDriveAuth,
   getGoogleDriveToken,
   hasGoogleDriveToken,
+  GOOGLE_DRIVE_SIGN_IN_REQUIRED,
+  requireGoogleDriveSignIn,
   waitForGoogleDriveAuth,
 } = await import('./credentials');
 
@@ -112,6 +117,8 @@ async function base64UrlSha256(value: string): Promise<string> {
 describe('Google Drive OAuth', () => {
   beforeEach(() => {
     storedSecrets.clear();
+    vi.mocked(toast.warning).mockClear();
+    vi.mocked(toast.dismiss).mockClear();
     credentialWriteOptions.length = 0;
     tokenResponses.length = 0;
     tokenRequests.length = 0;
@@ -152,6 +159,7 @@ describe('Google Drive OAuth', () => {
       credentialId: 'default',
     });
 
+    expect(toast.dismiss).toHaveBeenCalledWith('google-drive-auth:default');
     const exchange = tokenRequests.at(-1);
     expect(exchange?.grant_type).toBe('authorization_code');
     expect(exchange?.code).toBe('auth-code');
@@ -278,6 +286,8 @@ describe('Google Drive OAuth', () => {
       'private-refresh-token',
     );
 
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(await hasGoogleDriveToken('default')).toBe(true);
     tokenResponses.push({ access_token: 'access-2', expires_in: 3600 });
     await expect(getGoogleDriveToken('default')).resolves.toBe('access-2');
   });
@@ -311,6 +321,13 @@ describe('Google Drive OAuth', () => {
     });
     expect(JSON.stringify(error.diagnostics)).not.toContain('private');
     expect(await hasGoogleDriveToken('default')).toBe(false);
+    expect(error.message).toBe(GOOGLE_DRIVE_SIGN_IN_REQUIRED);
+    expect(toast.warning).toHaveBeenCalledWith(GOOGLE_DRIVE_SIGN_IN_REQUIRED, {
+      id: 'google-drive-auth:default',
+      duration: Infinity,
+    });
+    await requireGoogleDriveSignIn('default');
+    expect(toast.warning).toHaveBeenCalledTimes(1);
   });
 
   it('cancelling tears the redirect listener down', async () => {

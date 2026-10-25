@@ -11,7 +11,7 @@ import { createFolderReader, type FolderReader } from '@/lib/folder-reader';
 import {
   type FileType,
   getFileTypeForName,
-  type Repository,
+  type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
 import {
@@ -22,6 +22,7 @@ import {
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
 import type { ImportProgress } from './dialog';
+import { importStoragePath } from './files';
 import {
   createImportedFolders,
   getImportParentId,
@@ -40,7 +41,7 @@ export interface ImportWorkspaceJsonResult {
 }
 
 export interface ImportWorkspaceJsonOptions {
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   /** Selected workspace folder, or an absolute path on desktop. */
   dirPath: string | PickedFolder;
@@ -271,7 +272,7 @@ async function createImportedNote({
   fallbackName,
 }: {
   note: NoteJson;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   folderPath: string;
   fallbackName: string;
@@ -293,7 +294,7 @@ async function createImportedNote({
  * round trips.
  */
 async function rebuildImportedNote(
-  repository: Repository,
+  repository: NativeRepository,
   prepared: PreparedNote,
   resolveNoteId: NoteIdResolver,
 ): Promise<void> {
@@ -378,7 +379,7 @@ export async function importWorkspaceJson({
   // Every folder and note lands on one manifest, saved once when the batch closes. Fatal setup
   // aborts and rolls back; per-file failures are isolated so one bad file can't discard the rest.
   try {
-    await repository.batchManifestWrites(async () => {
+    await repository.batchMetadataWrites(async () => {
       const root = await repository.createFolder(rootName, parentId);
       rootFolderId = root;
       const folderIds = await createImportedFolders(
@@ -445,12 +446,14 @@ export async function importWorkspaceJson({
       for (const file of scanned.media) {
         onProgress?.({ current: ++current, total, fileName: file.name });
         try {
-          await repository.createFile(
-            file.name,
-            file.fileType,
-            getImportParentId(root, folderIds, file.folderPath),
-            await reader.readFile(file.sourcePath),
-          );
+          await importStoragePath({
+            path: file.sourcePath,
+            name: file.name,
+            fileType: file.fileType,
+            parentId: getImportParentId(root, folderIds, file.folderPath),
+            repository,
+            reader,
+          });
           mediaImported += 1;
         } catch (error) {
           failedFiles += 1;

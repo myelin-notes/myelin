@@ -14,40 +14,8 @@ export interface YjsSyncSnapshot {
   revision: string | null;
 }
 
-export interface YjsSyncPushOptions {
-  /** Revision the caller believes it is writing against. */
-  baseRevision: string | null;
-  /** Optional caller-side state vector used by some backends during conflict resolution. */
-  localStateVector?: Uint8Array | null;
-}
-
-/**
- * When `accepted` is false the backend rejected the write and may include `remoteUpdate` so the
- * caller can merge and retry.
- */
-export interface YjsSyncPushResult extends YjsSyncSnapshot {
-  /** Whether the backend accepted the pushed update. */
-  accepted: boolean;
-  /** Whether the accepted push changed the stored document bytes. */
-  changed: boolean;
-  /** Remote changes that should be applied locally before retrying a push. */
-  remoteUpdate: Uint8Array | null;
-}
-
-export interface YjsSyncTarget {
-  /** Load the current document state for an initial session open. */
+export interface DocumentSource {
   loadDocument(nodeId: VFSNodeId): Promise<YjsSyncSnapshot>;
-  /** Pull remote changes since the provided state vector, or full state if omitted. */
-  pullUpdates(
-    nodeId: VFSNodeId,
-    stateVector?: Uint8Array | null,
-  ): Promise<YjsSyncSnapshot>;
-  /** Push local changes and receive the remote sync state after the attempt. */
-  pushUpdates(
-    nodeId: VFSNodeId,
-    update: Uint8Array,
-    options: YjsSyncPushOptions,
-  ): Promise<YjsSyncPushResult>;
 }
 
 export interface NoteSessionStatus {

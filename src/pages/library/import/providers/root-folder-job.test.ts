@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
 } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { createRootFolderImportJob } from './root-folder-job';
 
-function createJob(repository: LocalRepository, rootName: string) {
+function createJob(repository: TestRepository, rootName: string) {
   const created: string[] = [];
 
   const job = createRootFolderImportJob<{ items: number }>({
@@ -38,7 +38,7 @@ describe('root folder import job', () => {
 
   it('reports no conflict when the name is free', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('root-job-no-conflict');
+    const repository = new TestRepository('root-job-no-conflict');
 
     expect(
       (await createJob(repository, 'Notebook').job.scan()).conflict,
@@ -47,7 +47,7 @@ describe('root folder import job', () => {
 
   it('detects a same-named sibling case-insensitively', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('root-job-conflict');
+    const repository = new TestRepository('root-job-conflict');
     const existing = await repository.createFolder('Notebook', null);
 
     const preview = await createJob(repository, 'notebook').job.scan();
@@ -57,7 +57,7 @@ describe('root folder import job', () => {
 
   it('renames instead of duplicating when the user keeps both', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('root-job-rename');
+    const repository = new TestRepository('root-job-rename');
     await repository.createFolder('Notebook', null);
 
     const { job, created } = createJob(repository, 'Notebook');
@@ -72,7 +72,7 @@ describe('root folder import job', () => {
 
   it('replaces the existing folder when the user chooses replace', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('root-job-replace');
+    const repository = new TestRepository('root-job-replace');
     await repository.createFolder('Notebook', null);
 
     const { job, created } = createJob(repository, 'Notebook');
@@ -87,7 +87,7 @@ describe('root folder import job', () => {
 
   it('refuses to run before scanning', async () => {
     getRepositoryTestStorage();
-    const repository = new LocalRepository('root-job-unscanned');
+    const repository = new TestRepository('root-job-unscanned');
 
     await expect(
       createJob(repository, 'Notebook').job.run({

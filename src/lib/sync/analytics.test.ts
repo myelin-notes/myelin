@@ -21,6 +21,7 @@ function status(patch: Partial<RepositoryStatus> = {}): RepositoryStatus {
     pendingRemoteWrites: 0,
     lastRemoteSyncAt: 1,
     lastError: null,
+    syncing: false,
     dataVersion: 0,
     ...patch,
   };

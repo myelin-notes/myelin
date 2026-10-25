@@ -37,11 +37,16 @@ const logger = new Logger('IrohTransport');
 export class IrohTransport implements Transport {
   private readonly transportId = createTransportId();
   private _connected = false;
+  private repositoryHandle: string | null = null;
   private unlisteners: UnlistenFn[] = [];
   // biome-ignore lint/suspicious/noExplicitAny: generic event emitter
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
   constructor(private readonly noteId: VFSNodeId) {}
+
+  bindRepository(handle: string): void {
+    this.repositoryHandle = handle;
+  }
 
   get connected(): boolean {
     return this._connected;
@@ -73,6 +78,7 @@ export class IrohTransport implements Transport {
     const ticket = await invoke<string>('iroh_host', {
       noteId: this.noteId,
       transportId: this.transportId,
+      repositoryHandle: this.repositoryHandle,
     });
     logger.debug('Hosting note transport', { noteId: this.noteId });
     return ticket;
@@ -83,6 +89,7 @@ export class IrohTransport implements Transport {
     await invoke('iroh_join', {
       noteId: this.noteId,
       transportId: this.transportId,
+      repositoryHandle: this.repositoryHandle,
       ticket,
     });
     logger.debug('Joining note transport', { noteId: this.noteId });

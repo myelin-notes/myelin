@@ -3,7 +3,7 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import type { Messages } from '@myelin/editor/i18n';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 
 type StarterCopy = Messages['onboarding']['starter'];
 
@@ -121,7 +121,7 @@ function addText(
  * so nothing they pointed at could resolve.
  */
 export async function createStarterCanvasFile(
-  repository: Repository,
+  repository: NativeRepository,
   name: string,
   strings: Messages,
 ): Promise<VFSNodeId> {

@@ -492,6 +492,14 @@ function computeSyncStatus(
     };
   }
 
+  if (status.syncing) {
+    return {
+      label: copy.syncing.label,
+      tone: 'neutral',
+      description: copy.syncing.description,
+    };
+  }
+
   if (status.pendingRemoteWrites > 0) {
     return {
       label: copy.pending.label,

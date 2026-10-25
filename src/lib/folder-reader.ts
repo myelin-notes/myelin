@@ -7,9 +7,11 @@ import {
   readTextFile,
 } from '@tauri-apps/plugin-fs';
 import type { PickedFolder } from './folder-picker';
+import type { FileImportSource } from './sync/repo/types';
 
 export interface FolderReader {
   root: string;
+  importSource(path: string): FileImportSource;
   join(parent: string, name: string): Promise<string>;
   readDir(path: string): Promise<DirEntry[]>;
   readFile(path: string): Promise<Uint8Array>;
@@ -22,6 +24,7 @@ export function createFolderReader(
   if (typeof folder === 'string' || folder.kind === 'native') {
     return {
       root: typeof folder === 'string' ? folder : folder.path,
+      importSource: (path) => ({ kind: 'path', path }),
       join,
       readDir,
       readFile,
@@ -31,6 +34,7 @@ export function createFolderReader(
   const id = folder.handle.id;
   return {
     root: '',
+    importSource: (path) => ({ kind: 'scoped', folderId: id, path }),
     join: async (parent, name) => (parent ? `${parent}/${name}` : name),
     readDir: async (path) =>
       (await scoped.readDir(id, path)).map((entry) => ({

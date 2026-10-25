@@ -49,8 +49,8 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Add validation" → "Verify rejection of relevant invalid inputs"
+- "Fix the bug" → "Reproduce the failure, fix it, and verify the same scenario"
 - "Refactor X" → "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
@@ -61,6 +61,20 @@ For multi-step tasks, state a brief plan:
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+### Tests
+
+**Write the smallest check that catches a meaningful regression. Test count and coverage are not goals.**
+
+- Before adding a test, identify a plausible bug and its concrete user consequence. Skip tests for trivial getters, static mappings, forwarding wrappers, or changes already protected by existing tests unless they enforce a meaningful contract.
+- For a bug fix, prefer a regression test that fails before the fix and passes after it. If the failure needs the real app, report that verification requirement instead of substituting a fake that cannot reproduce it.
+- Exercise the production path responsible for the behavior and assert its observable result: saved content, restored state, rejected input, or the resulting document. A helper test does not verify that its caller uses it correctly.
+- Keep expected results independent of the implementation. Do not copy production formulas into tests or derive expected values from the same production table used to compute the result. Independent invariants are useful when they enforce a real contract.
+- Mock external boundaries such as filesystem, network, clocks, and native APIs when needed. Keep the logic under test real. Assert calls or ordering only when the interaction itself is the contract, such as preventing a destructive write.
+- Use real React hooks and lifecycle behavior for new hook tests; do not simulate React with mocked hooks. Node tests and fake DOM/canvas objects cannot verify layout, rendering, browser event delivery, or native integration.
+- Add cases for distinct failure modes or boundaries, not permutations that exercise the same behavior. Extend an existing test when it already covers the scenario.
+- For subtle or high-risk logic, temporarily introduce the specific plausible bug and confirm the test fails, then restore the code. A passing test alone does not establish regression protection.
+- Run the relevant automated checks. For app interaction verification, use Tauri MCP or computer use only when explicitly requested; otherwise state what remains unverified. Do not add dependencies or expose production internals solely to test a low-impact change.
 
 ## 5. React Hooks
 

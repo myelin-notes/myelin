@@ -1,14 +1,5 @@
-//! OneNote parsing for the library importer, covering both a bare `.one`
-//! section and a `.onepkg` notebook archive.
-//!
-//! The frontend hands over the picked file's path and gets back a flat,
-//! canvas-ready model in CSS pixels. Building the Yjs document stays in
-//! TypeScript alongside the other importers; this module only decodes and
-//! converts units.
-
 use std::io;
 
-use base64::Engine as _;
 use onenote_parser::Parser;
 use onenote_parser::contents::{
     Content, EmbeddedObject, Image, Ink, Outline, OutlineItem, RichText, Table,
@@ -19,7 +10,7 @@ use onenote_parser::property::common::ColorRef;
 use onenote_parser::section::{Section, SectionEntry};
 use serde::Serialize;
 use tauri::AppHandle;
-use tauri_plugin_fs::{FilePath, FsExt};
+use tauri_plugin_fs::FilePath;
 use typed_path::{TypedPath, TypedPathBuf};
 
 /// [MS-ONE] stores every layout value in half-inch increments; 96 CSS px to the
@@ -51,35 +42,25 @@ const DEFAULT_FONT_PX: f32 = 16.0;
 const DEFAULT_TEXT_COLOR: &str = "#1a1a1a";
 const DEFAULT_INK_COLOR: &str = "#191c1e";
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedNotebook {
-    sections: Vec<ImportedSection>,
+pub(crate) struct ImportedNotebook {
+    pub(crate) sections: Vec<ImportedSection>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedSection {
+pub(crate) struct ImportedSection {
     /// '/'-separated section-group path from the notebook root, empty when the
     /// section sits at the top level. A bare `.one` always yields exactly one
     /// section with an empty path.
-    folder_path: String,
-    name: String,
-    pages: Vec<ImportedPage>,
+    pub(crate) folder_path: String,
+    pub(crate) name: String,
+    pub(crate) pages: Vec<ImportedPage>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedPage {
-    title: Option<String>,
-    /// 1 for a top-level page, higher for subpages of the page above it.
-    level: i32,
-    elements: Vec<ImportedElement>,
+pub(crate) struct ImportedPage {
+    pub(crate) title: Option<String>,
+    pub(crate) elements: Vec<ImportedElement>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
-pub enum ImportedElement {
+pub(crate) enum ImportedElement {
     Text {
         x: f32,
         y: f32,
@@ -97,36 +78,43 @@ pub enum ImportedElement {
         y: f32,
         width: Option<f32>,
         height: Option<f32>,
-        /// Base64 of the original bytes; the webview decodes it.
-        data: String,
-        alt_text: Option<String>,
+        data: Vec<u8>,
     },
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedStroke {
+pub(crate) struct ImportedStroke {
     /// Flat `[x, y, x, y, ...]` in CSS px, already accumulated and offset.
-    points: Vec<f32>,
-    color: String,
-    size: f32,
+    pub(crate) points: Vec<f32>,
+    pub(crate) color: String,
+    pub(crate) size: f32,
 }
 
-/// The file is read here rather than sent over the IPC: Android cannot carry a
-/// raw invoke body, and a JSON number array would balloon a multi-megabyte
-/// notebook. `FilePath` + `FsExt` also resolve Android `content://` URIs.
+#[derive(Serialize)]
+pub struct OneNotePreview {
+    pages: usize,
+    sections: usize,
+}
+
 #[tauri::command]
-pub async fn parse_onenote(app: AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
-    // Reading and parsing a large notebook is CPU-bound; keep it off the async runtime.
+pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePreview, String> {
     tokio::task::spawn_blocking(move || {
-        let bytes = app
-            .fs()
-            .read(path)
-            .map_err(|e| format!("failed to read OneNote file: {e}"))?;
-        parse_file(&bytes)
+        let notebook = read_notebook(&app, path)?;
+        Ok(OneNotePreview {
+            pages: notebook
+                .sections
+                .iter()
+                .map(|section| section.pages.len())
+                .sum(),
+            sections: notebook.sections.len(),
+        })
     })
     .await
-    .map_err(|e| format!("OneNote parse task panicked: {e}"))?
+    .map_err(|e| format!("OneNote scan task panicked: {e}"))?
+}
+
+pub(crate) fn read_notebook(app: &AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
+    let bytes = crate::import_files::FileImportSource::Path { path }.read(app)?;
+    parse_file(&bytes)
 }
 
 fn parse_file(bytes: &[u8]) -> Result<ImportedNotebook, String> {
@@ -196,7 +184,7 @@ fn convert_section(section: &Section, folder_path: String) -> ImportedSection {
 }
 
 /// Section and group names come from the notebook, so they can hold anything. A
-/// separator would forge extra levels in `folder_path`, which the frontend
+/// separator would forge extra levels in `folder_path`, which the importer
 /// splits on.
 fn sanitize_name(name: &str) -> String {
     let cleaned: String = name
@@ -282,7 +270,6 @@ fn convert_page(page: &Page) -> ImportedPage {
 
     ImportedPage {
         title: page.title_text().map(str::to_string),
-        level: page.level(),
         elements,
     }
 }
@@ -455,8 +442,7 @@ fn push_image(image: &Image, origin: (f32, f32), out: &mut Vec<ImportedElement>)
         y: half_inches_to_px(image.offset_vertical().unwrap_or(origin.1)),
         width: image.layout_max_width().map(half_inches_to_px),
         height: image.layout_max_height().map(half_inches_to_px),
-        data: base64::engine::general_purpose::STANDARD.encode(&bytes),
-        alt_text: image.alt_text().map(str::to_string),
+        data: bytes,
     });
 }
 

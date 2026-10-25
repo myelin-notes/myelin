@@ -1,8 +1,8 @@
 import * as scoped from 'tauri-plugin-scoped-storage-api';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { PickedFolder } from '@/lib/folder-picker';
-import { LocalRepository } from '@/lib/sync/repo/local';
 import { resetRepositoryTestDoubles } from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { importObsidianVault } from './obsidian-vault';
 import { importWorkspaceJson } from './workspace-json';
 
@@ -56,7 +56,7 @@ it.each([
           tags: ['imported'],
         }),
   );
-  const repository = new LocalRepository(`mobile-${format}`);
+  const repository = new TestRepository(`mobile-${format}`);
   const result =
     format === 'obsidian'
       ? await importObsidianVault({

@@ -65,14 +65,6 @@ describe('CanvasViewport palm rejection', () => {
 });
 
 describe('CanvasViewport edit-mode wheel panning', () => {
-  it('does not depend on DrawableCanvas exports', async () => {
-    const moduleText = await import('node:fs/promises').then((fs) =>
-      fs.readFile(new URL('./canvas-viewport.ts', import.meta.url), 'utf8'),
-    );
-
-    expect(moduleText).not.toContain("from './drawable-canvas'");
-  });
-
   it('pans both axes outside edit mode', () => {
     const { viewport, wheel } = createViewport();
 

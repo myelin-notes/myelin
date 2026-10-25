@@ -86,6 +86,21 @@ export function useImports({
         return;
       }
 
+      if (provider.picker.kind === 'native-files') {
+        const selected = await openDialog({
+          multiple: provider.picker.multiple,
+          filters: provider.picker.filters,
+          fileAccessMode: 'copy',
+        });
+        if (selected) {
+          startJob(id, {
+            kind: 'native-files',
+            paths: Array.isArray(selected) ? selected : [selected],
+          });
+        }
+        return;
+      }
+
       if (provider.picker.kind === 'file') {
         const selected = await openDialog({
           multiple: false,

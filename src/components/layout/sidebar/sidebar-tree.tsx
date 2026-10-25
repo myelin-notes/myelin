@@ -174,8 +174,14 @@ export function SidebarTree({
       : NO_COLLAPSED_IDS;
 
   const loadFolder = useCallback(
-    async (folderId: string | null) => {
+    async (
+      folderId: string | null,
+      isCancelled: () => boolean = () => false,
+    ) => {
       const nodes = await explorer.loadFolder(folderId);
+      if (isCancelled()) {
+        return;
+      }
       setChildrenMap((prev) => {
         const next = new Map(prev);
         next.set(folderId, nodes);
@@ -185,20 +191,25 @@ export function SidebarTree({
     [explorer],
   );
 
-  const reload = useCallback(async () => {
-    if (!ready) {
-      setChildrenMap(new Map());
-      return;
-    }
-    const folderIds: (string | null)[] = [ROOT_KEY, ...expandedRef.current];
-    await Promise.all(
-      folderIds.map((id) =>
-        loadFolder(id).catch((err) => {
-          logger.error('Failed to load folder', err, { folderId: id });
-        }),
-      ),
-    );
-  }, [loadFolder, ready]);
+  const reload = useCallback(
+    async (isCancelled: () => boolean = () => false) => {
+      if (!ready) {
+        setChildrenMap(new Map());
+        return;
+      }
+      const folderIds: (string | null)[] = [ROOT_KEY, ...expandedRef.current];
+      await Promise.all(
+        folderIds.map((id) =>
+          loadFolder(id, isCancelled).catch((err) => {
+            if (!isCancelled()) {
+              logger.error('Failed to load folder', err, { folderId: id });
+            }
+          }),
+        ),
+      );
+    },
+    [loadFolder, ready],
+  );
 
   const loadAncestors = useCallback(
     (nodes: VFSNode[]): Promise<VFSFolderNode[]> =>
@@ -233,19 +244,19 @@ export function SidebarTree({
     }
   }, [filterTags, explorer, loadAncestors, ready, trimmedQuery]);
 
-  // `dataVersion` is the only refresh signal for local repos, where `lastRemoteSyncAt` stays null.
+  // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
+  // bump `dataVersion`.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     if (isFlat) {
       return;
     }
-    void reload();
-  }, [
-    isFlat,
-    reload,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+    let cancelled = false;
+    void reload(() => cancelled);
+    return () => {
+      cancelled = true;
+    };
+  }, [isFlat, reload, repositoryStatus.dataVersion]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
@@ -269,7 +280,6 @@ export function SidebarTree({
     isFlat,
     isSearching,
     loadFlatResults,
-    repositoryStatus.lastRemoteSyncAt,
     repositoryStatus.dataVersion,
     noteIndexStatus.revision,
   ]);

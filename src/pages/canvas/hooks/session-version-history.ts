@@ -1,8 +1,8 @@
-import type { NoteSession, Repository } from '@/lib/sync';
+import type { NativeRepository, NoteSession } from '@/lib/sync';
 
 type VersionedSession = Pick<NoteSession, 'id' | 'save'>;
 
-type VersionRepository = Pick<Repository, 'createFileVersionIfDue'>;
+type VersionRepository = Pick<NativeRepository, 'createFileVersionIfDue'>;
 
 export async function saveSessionAndCreateVersion(
   session: VersionedSession,

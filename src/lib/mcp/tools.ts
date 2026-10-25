@@ -7,11 +7,10 @@ import {
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { createBlankCanvasFile } from '@/lib/note/create';
 import type {
-  ActiveRepository,
+  NativeRepository,
   NodeSearchResult,
   NoteBacklink,
   NoteSession,
-  Repository,
   StoredNoteLink,
   VFSFileNode,
   VFSFolderNode,
@@ -572,7 +571,7 @@ function findPageFrameCount(session: NoteSession): number {
 }
 
 async function noteListItem(
-  repository: Repository,
+  repository: NativeRepository,
   node: VFSFileNode,
 ): Promise<McpNoteListItem> {
   const path = await repository.getFolderChain(node.parentId);
@@ -596,7 +595,7 @@ function normalizeTags(tags: string[]): string[] {
 }
 
 async function nodePath(
-  repository: Repository,
+  repository: NativeRepository,
   node: VFSNode,
 ): Promise<string[]> {
   const path = await repository.getFolderChain(node.parentId);
@@ -604,7 +603,7 @@ async function nodePath(
 }
 
 async function nodeListItem(
-  repository: Repository,
+  repository: NativeRepository,
   node: VFSNode,
 ): Promise<McpNodeListItem> {
   const base = {
@@ -631,7 +630,7 @@ async function nodeListItem(
 }
 
 async function requireNode(
-  repository: Repository,
+  repository: NativeRepository,
   nodeId: VFSNodeId,
 ): Promise<VFSNode> {
   const node = await repository.getNode(nodeId);
@@ -642,7 +641,7 @@ async function requireNode(
 }
 
 async function requireCanvasNote(
-  repository: Repository,
+  repository: NativeRepository,
   noteId: VFSNodeId,
 ): Promise<VFSFileNode> {
   const node = await requireNode(repository, noteId);
@@ -653,7 +652,7 @@ async function requireCanvasNote(
 }
 
 async function targetLinkInfo(
-  repository: Repository,
+  repository: NativeRepository,
   targetId: VFSNodeId | null,
 ): Promise<{
   targetName: string | null;
@@ -685,7 +684,7 @@ async function targetLinkInfo(
 }
 
 async function outgoingLinkItem(
-  repository: Repository,
+  repository: NativeRepository,
   link: StoredNoteLink,
 ): Promise<{
   targetId: VFSNodeId | null;
@@ -706,7 +705,7 @@ async function outgoingLinkItem(
 }
 
 async function backlinkItem(
-  repository: Repository,
+  repository: NativeRepository,
   backlink: NoteBacklink,
 ): Promise<{
   sourceId: VFSNodeId;
@@ -730,7 +729,7 @@ async function backlinkItem(
 }
 
 async function optionalFolderId(
-  repository: Repository,
+  repository: NativeRepository,
   folderId: string | undefined,
   key: string,
 ): Promise<VFSNodeId | null> {
@@ -745,7 +744,7 @@ async function optionalFolderId(
 }
 
 async function folderListItem(
-  repository: Repository,
+  repository: NativeRepository,
   folder: VFSFolderNode,
 ): Promise<McpFolderListItem> {
   const item = await nodeListItem(repository, folder);
@@ -756,7 +755,7 @@ async function folderListItem(
 }
 
 async function fileListItem(
-  repository: Repository,
+  repository: NativeRepository,
   file: VFSFileNode,
 ): Promise<McpFileListItem> {
   const item = await nodeListItem(repository, file);
@@ -767,7 +766,7 @@ async function fileListItem(
 }
 
 async function collectDirectoryNotes(
-  repository: Repository,
+  repository: NativeRepository,
   folderId: VFSNodeId | null,
   tag: string | undefined,
   notes: VFSFileNode[],
@@ -795,7 +794,7 @@ async function collectDirectoryNotes(
 }
 
 async function noteIsInFolder(
-  repository: Repository,
+  repository: NativeRepository,
   note: VFSFileNode,
   folderId: VFSNodeId,
 ): Promise<boolean> {
@@ -808,7 +807,7 @@ export class McpToolService {
 
   constructor(
     private readonly options: {
-      repository: ActiveRepository;
+      repository: NativeRepository;
       allowDirectWrites?: () => boolean;
     },
   ) {

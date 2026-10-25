@@ -1,5 +1,5 @@
 import { type Unzipped, unzip } from 'fflate';
-import type { Repository, VFSNodeId } from '@/lib/sync';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import type { ImportProgress } from './dialog';
 import {
   addFolderAncestors,
@@ -33,7 +33,7 @@ export interface GoodnotesZipImportResult {
 
 export interface ImportGoodnotesZipOptions {
   scanned: ScannedGoodnotesZip;
-  repository: Repository;
+  repository: NativeRepository;
   parentId: VFSNodeId | null;
   fallbackTitle: string;
   onProgress?: (progress: ImportProgress) => void;
@@ -152,7 +152,7 @@ export async function importGoodnotesZip({
   try {
     // Every folder and note this import creates lands on one manifest, saved
     // once when the batch closes, instead of a manifest write per node.
-    return await repository.batchManifestWrites(async () => {
+    return await repository.batchMetadataWrites(async () => {
       const folderPaths = new Set<string>();
       for (const entry of pdfEntries) {
         addFolderAncestors(folderPaths, entry.folderPath);

@@ -1,4 +1,4 @@
-import type { YjsSyncTarget } from '../types';
+import type { DocumentSource } from '../types';
 import type { Repository } from './types';
 
 export type RepositoryConfig =
@@ -29,8 +29,11 @@ export interface RepositoryLifecycle {
 export interface RepositoryRuntimeStatus {
   online: boolean;
   pendingRemoteWrites: number;
+  /** Last time a sync confirmed the remote, including checks that found nothing to transfer. */
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
+  /** True while a sync has been running for over a second; quick checks never set it. */
+  syncing: boolean;
   /**
    * Incremented on every local repository mutation — including ones made outside the current view,
    * such as the tab bar creating a file for a new tab. Unlike `lastRemoteSyncAt`, this advances for
@@ -47,11 +50,9 @@ export interface RepositoryStatusSource {
 }
 
 /** A repository that can be read and have its note documents loaded. */
-export type ReadableRepository = Repository &
-  Pick<YjsSyncTarget, 'loadDocument'>;
+export type ReadableRepository = Repository & DocumentSource;
 
-export type ActiveRepository = Repository &
-  YjsSyncTarget &
+export type ActiveRepository = ReadableRepository &
   RepositoryLifecycle &
   RepositoryStatusSource;
 

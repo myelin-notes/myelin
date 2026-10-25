@@ -474,6 +474,10 @@ const fr: typeof en = {
             description:
               'Chargement du dépôt en cache et vérification du distant.',
           },
+          syncing: {
+            label: 'Synchronisation',
+            description: 'Échange des modifications avec le dépôt distant.',
+          },
           pending: {
             label: 'En attente',
             description: (count: number, online: boolean) =>

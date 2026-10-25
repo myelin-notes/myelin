@@ -3,7 +3,7 @@ import { ELEMENT_DESCRIPTORS } from '@myelin/editor/elements/element-descriptors
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { LocalRepository } from '@/lib/sync/repo/local';
+import { TestRepository } from '@/test/test-repository';
 import {
   buildMcpNoteReadModel,
   readMcpCanvasText,
@@ -14,7 +14,7 @@ import {
 } from './read-model';
 
 async function createRepositoryNote() {
-  const repository = new LocalRepository();
+  const repository = new TestRepository();
   await repository.initialize();
   const ydoc = new YDocManager();
   const pageFrameId = await addMarkdownPageFrameToYDoc(

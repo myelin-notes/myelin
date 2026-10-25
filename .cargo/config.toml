@@ -1,0 +1,11 @@
+[env]
+# Wry inserts this into its generated client, preserving Tauri's navigation and IPC handlers.
+WRY_RUSTWEBVIEWCLIENT_CLASS_EXTENSION = '''
+    private external fun reportRendererTermination(didCrash: Boolean)
+
+    @android.annotation.TargetApi(26)
+    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+        reportRendererTermination(detail.didCrash())
+        return false
+    }
+'''
