@@ -73,29 +73,24 @@ html {
   animation: rise 1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rise {
-    animation-duration: 0.01ms;
-  }
-}
-
-/* Hand-drawn ink stroke: put on an SVG path with pathLength="1". Delay via --ink-delay. */
+/* Hand-drawn ink stroke: put on the <svg> holding the stroke; delay via --ink-delay.
+   A clip wipe, not stroke-dash: dashes on a non-scaling stroke are applied in screen
+   space and leave gaps. Negative insets keep the round caps unclipped. */
 @keyframes ink-draw {
   from {
-    stroke-dashoffset: 1;
+    clip-path: inset(-100% 100% -100% -10%);
   }
   to {
-    stroke-dashoffset: 0;
+    clip-path: inset(-100% -10% -100% -10%);
   }
 }
 
 .ink-draw {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
   animation: ink-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) var(--ink-delay, 0s) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rise,
   .ink-draw {
     animation: none;
   }
