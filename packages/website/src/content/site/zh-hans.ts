@@ -32,6 +32,7 @@ const zhHans: SiteCopy = {
   hero: {
     eyebrow: 'Myelin Notes · 本地优先的笔记应用',
     headline: '手写、打字与 PDF，都在同一则笔记。',
+    headlineMark: '都在同一则笔记。',
     subheadline:
       'Myelin Notes 是一款原生、本地优先的笔记应用：在同一块画布上，笔迹、富文本、PDF、图片与音频共处一处。你的笔记留在自己的设备上，同时仍可与他人实时协作编辑，无需任何服务器。',
     trustLine: '个人使用完全免费 · 无需账号 · 你的笔记永不被付费墙锁住',

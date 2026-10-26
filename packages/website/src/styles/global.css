@@ -79,6 +79,28 @@ html {
   }
 }
 
+/* Hand-drawn ink stroke: put on an SVG path with pathLength="1". Delay via --ink-delay. */
+@keyframes ink-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.ink-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: ink-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) var(--ink-delay, 0s) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-draw {
+    animation: none;
+  }
+}
+
 /* The bundled faces (Hanken Grotesk, Newsreader) carry no CJK glyphs, so a
    Chinese page would otherwise fall through to whatever `sans-serif` resolves
    to and mix two unrelated designs mid-sentence. Naming the platform UI faces

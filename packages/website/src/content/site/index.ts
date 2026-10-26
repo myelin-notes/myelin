@@ -92,6 +92,8 @@ export interface SiteCopy {
   hero: {
     eyebrow: string;
     headline: string;
+    /** Substring of `headline` that gets the ink underline. */
+    headlineMark: string;
     subheadline: string;
     trustLine: string;
     ctaPrimary: string;

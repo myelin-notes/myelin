@@ -37,6 +37,7 @@ const es: SiteCopy = {
   hero: {
     eyebrow: 'Myelin Notes · una app de notas que vive en tu equipo',
     headline: 'Escritura a mano, texto y PDFs. Una sola nota.',
+    headlineMark: 'Una sola nota.',
     subheadline:
       'Myelin Notes es una app de notas nativa que funciona en local: un lienzo donde la tinta, el texto enriquecido, los PDFs, las imágenes y el audio conviven. Tus notas se quedan en tu equipo, y aun así puedes editarlas en directo con otras personas, sin ningún servidor.',
     trustLine:

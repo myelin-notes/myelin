@@ -35,6 +35,7 @@ const en: SiteCopy = {
     // which is how crawlers and answer engines lift it.
     eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
     headline: 'Myelin Notes: handwriting, typing, and PDFs. One note.',
+    headlineMark: 'One note.',
     subheadline:
       'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:

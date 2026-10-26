@@ -30,6 +30,7 @@ const fr: SiteCopy = {
     eyebrow:
       'Myelin Notes · une app de prise de notes qui vit sur votre machine',
     headline: 'Écriture manuscrite, texte et PDF. Une seule note.',
+    headlineMark: 'Une seule note.',
     subheadline:
       'Myelin Notes est une app de prise de notes native et locale : un seul canevas où encre, texte enrichi, PDF, images et audio cohabitent. Vos notes restent sur votre machine, et vous pouvez tout de même éditer en direct avec d’autres, sans serveur.',
     trustLine:

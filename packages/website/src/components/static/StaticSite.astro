@@ -22,6 +22,7 @@ interface Props {
 const { locale } = Astro.props;
 const copy = getCopy(locale);
 const faqs = getFaqs(locale);
+const [headBefore, headAfter = ''] = copy.hero.headline.split(copy.hero.headlineMark);
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
@@ -40,38 +41,64 @@ const ctaOutline = cn(
 
 <div class="relative z-10 pt-12">
   <!-- Hero -->
-  <section class={wrap}>
-    <div class="pt-16 pb-20 lg:pt-24 lg:pb-24">
-      <p class:list={[kicker, 'rise']}>{copy.hero.eyebrow}</p>
-      <h1
-        class="rise mt-6 max-w-4xl font-heading text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
-        style="animation-delay:.06s"
-      >
-        {copy.hero.headline}
-      </h1>
-      <p
-        class="rise mt-7 max-w-xl text-lg leading-relaxed text-text-secondary"
-        style="animation-delay:.14s"
-      >
-        {copy.hero.subheadline}
-      </p>
-      <div
-        class="rise mt-10 flex flex-wrap items-center gap-x-4 gap-y-4"
-        style="animation-delay:.22s"
-      >
-        <a href={siteLinks.releases} data-download="auto" class={cta}>
-          {copy.hero.ctaPrimary}
-        </a>
-        <a href={localizePath('/try', locale)} class={ctaOutline}>
-          {copy.hero.ctaSecondary}
-        </a>
-      </div>
-      <p class="rise mt-7 text-sm text-text-muted" style="animation-delay:.28s">
-        {copy.hero.trustLine}
-      </p>
+  <section class="overflow-x-clip">
+    <div class:list={[wrap, 'pt-16 pb-20 lg:pt-24 lg:pb-24']}>
+      <div class="grid items-center gap-x-10 gap-y-14 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class="rise text-sm text-text-muted">{copy.hero.eyebrow}</p>
+          <h1
+            class="rise mt-6 font-heading text-[clamp(2.6rem,3.7vw,3.6rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
+            style="animation-delay:.06s"
+          >
+            {headBefore}<span class="relative inline-block whitespace-nowrap"
+              >{copy.hero.headlineMark}<svg
+                aria-hidden="true"
+                viewBox="0 0 200 14"
+                preserveAspectRatio="none"
+                class="pointer-events-none absolute -bottom-[0.14em] left-0 h-[0.26em] w-full overflow-visible text-ink"
+              >
+                <path
+                  d="M3 8.5C28 4.5 58 3 92 5.5S156 8 197 3.6"
+                  pathLength="1"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  vector-effect="non-scaling-stroke"
+                  class="ink-draw"
+                  style="--ink-delay:.9s"></path>
+              </svg></span
+            >{headAfter}
+          </h1>
+          <p
+            class="rise mt-6 max-w-md text-sm leading-relaxed text-text-muted"
+            style="animation-delay:.14s"
+          >
+            {copy.hero.subheadline}
+          </p>
+          <div
+            class="rise mt-9 flex flex-wrap items-center gap-x-4 gap-y-4"
+            style="animation-delay:.22s"
+          >
+            <a href={siteLinks.releases} data-download="auto" class={cta}>
+              {copy.hero.ctaPrimary}
+            </a>
+            <a href={localizePath('/try', locale)} class={ctaOutline}>
+              {copy.hero.ctaSecondary}
+            </a>
+          </div>
+          <p class="rise mt-6 text-sm text-text-muted" style="animation-delay:.28s">
+            {copy.hero.trustLine}
+          </p>
+        </div>
 
-      <div class="rise mt-16 lg:mt-20" style="animation-delay:.36s">
-        <Shot src="/library.png" alt={copy.shots.library} eager />
+        <div
+          class="rise lg:col-span-7 lg:w-[calc(100%+max(2.5rem,50vw-33.5rem)+4rem)]"
+          style="animation-delay:.36s"
+        >
+          <Shot src="/pdf.png" alt={copy.shots.pdf} eager />
+        </div>
       </div>
     </div>
   </section>
