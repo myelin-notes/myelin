@@ -48,7 +48,6 @@ export default defineConfig({
       include: [
         '@myelin/editor/clipboard/controller',
         '@myelin/editor/clipboard/drawable-canvas-adapter',
-        '@myelin/editor/clipboard/snapshot',
         '@myelin/editor/drawable-canvas',
         '@myelin/editor/elements/element-type',
         '@myelin/editor/elements/page-frame-element',

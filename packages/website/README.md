@@ -6,7 +6,7 @@ French, and Simplified Chinese. Copy for every locale lives in
 
 - `/` is a static landing page (`src/components/static/StaticSite.astro`).
 - `/try` mounts the real canvas engine from `@myelin/editor`
-  (`src/canvas/CanvasEditor.tsx`). The document is saved to localStorage and
+  (`src/canvas/CanvasEditor.tsx`). The document is saved to IndexedDB and
   restored on the next visit (`src/lib/try-canvas-storage.ts`). The editor
   bundle is only requested by this page.
 

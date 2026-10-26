@@ -162,7 +162,7 @@ function handleShapeEnter(canvas: DrawableCanvas, event: KeyboardEvent): void {
 
 /**
  * The try-it page: the real Myelin canvas engine with the app's tool rail, on
- * a Y.Doc kept in localStorage.
+ * a Y.Doc kept in IndexedDB.
  */
 export default function CanvasEditor({ locale }: { locale: Locale }) {
   // The locale is pinned from the URL: the site prerenders one page per

@@ -1,13 +1,12 @@
 import * as Y from 'yjs';
 import type { CanvasViewport } from '@myelin/editor/canvas-viewport';
-import {
-  base64ToBytes,
-  bytesToBase64,
-} from '@myelin/editor/clipboard/snapshot';
 
-const STORAGE_KEY = 'myelin:try-canvas';
+const DB_NAME = 'myelin-try';
+const UPDATES_STORE = 'updates';
 const VIEW_STORAGE_KEY = 'myelin:try-canvas-view';
 const SAVE_DELAY_MS = 300;
+// Updates that are already saved: loaded from storage, or sent by the tab that saved them.
+const SAVED_ORIGIN = Symbol('try-canvas-saved');
 
 // Throttled, not debounced, so continuous edits still save.
 function throttledSave(key: string, serialize: () => string) {
@@ -34,47 +33,90 @@ function throttledSave(key: string, serialize: () => string) {
   };
 }
 
-function merge(doc: Y.Doc, saved: string | null): void {
-  if (!saved) {
-    return;
-  }
-  try {
-    Y.applyUpdate(doc, base64ToBytes(saved));
-  } catch (error) {
-    console.warn('Ignoring an unreadable saved try-it canvas', error);
-  }
+function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(UPDATES_STORE, { autoIncrement: true });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function settle(transaction: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+    transaction.onabort = () => reject(transaction.error);
+  });
+}
+
+// One transaction, so an update another tab appends meanwhile is either merged here or kept after.
+async function loadAndCompact(db: IDBDatabase): Promise<Uint8Array | null> {
+  const transaction = db.transaction(UPDATES_STORE, 'readwrite');
+  const store = transaction.objectStore(UPDATES_STORE);
+  const request = store.getAll();
+  let merged: Uint8Array | null = null;
+  request.onsuccess = () => {
+    const updates = request.result as Uint8Array[];
+    if (updates.length > 0) {
+      merged = Y.mergeUpdates(updates);
+      store.clear();
+      store.add(merged);
+    }
+  };
+  await settle(transaction);
+  return merged;
+}
+
+function append(db: IDBDatabase, update: Uint8Array): Promise<void> {
+  const transaction = db.transaction(UPDATES_STORE, 'readwrite');
+  transaction.objectStore(UPDATES_STORE).add(update);
+  return settle(transaction);
 }
 
 /**
- * Restores the saved try-it canvas into `doc`, then saves it after edits.
- * Saves from other tabs are merged in, so two open tabs never overwrite each
- * other. Call before building the canvas on `doc`; the returned stop function
- * flushes a pending save.
+ * Loads the saved try-it canvas into `doc` once IndexedDB answers, and saves
+ * every edit as its own record, so tabs never overwrite each other. Edits from
+ * other open tabs are applied live.
  */
 export function persistTryCanvas(doc: Y.Doc): () => void {
-  try {
-    merge(doc, localStorage.getItem(STORAGE_KEY));
-  } catch (error) {
-    console.warn('Could not read the saved try-it canvas', error);
-  }
-
-  const { schedule: scheduleSave, flush } = throttledSave(STORAGE_KEY, () =>
-    bytesToBase64(Y.encodeStateAsUpdate(doc)),
+  const database = openDatabase();
+  database.then(loadAndCompact).then(
+    (saved) => {
+      if (saved) {
+        Y.applyUpdate(doc, saved, SAVED_ORIGIN);
+      }
+    },
+    (error) => console.warn('Could not restore the try-it canvas', error),
   );
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === STORAGE_KEY) {
-      merge(doc, event.newValue);
+
+  const channel = new BroadcastChannel(DB_NAME);
+  channel.onmessage = (event: MessageEvent<Uint8Array>) => {
+    Y.applyUpdate(doc, event.data, SAVED_ORIGIN);
+  };
+  const handleUpdate = (update: Uint8Array, origin: unknown) => {
+    if (origin === SAVED_ORIGIN) {
+      return;
     }
+    channel.postMessage(update);
+    database
+      .then((db) => append(db, update))
+      .catch((error) =>
+        console.warn('Could not save the try-it canvas', error),
+      );
   };
 
-  doc.on('update', scheduleSave);
-  window.addEventListener('pagehide', flush);
-  window.addEventListener('storage', handleStorage);
+  doc.on('update', handleUpdate);
   return () => {
-    doc.off('update', scheduleSave);
-    window.removeEventListener('pagehide', flush);
-    window.removeEventListener('storage', handleStorage);
-    flush();
+    doc.off('update', handleUpdate);
+    channel.close();
+    // close() lets the appends queued above commit first.
+    database.then(
+      (db) => db.close(),
+      () => {},
+    );
   };
 }
 

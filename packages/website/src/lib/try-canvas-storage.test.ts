@@ -1,3 +1,4 @@
+import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { persistTryCanvas } from './try-canvas-storage';
@@ -16,54 +17,74 @@ function elementUuids(doc: Y.Doc): string[] {
     .sort();
 }
 
+// Opens the canvas as a fresh page load would, once the saved state is in.
+async function reload(expectedUuids: string[]): Promise<Y.Doc> {
+  const doc = new Y.Doc();
+  const stop = persistTryCanvas(doc);
+  await vi.waitFor(() => expect(elementUuids(doc)).toEqual(expectedUuids));
+  stop();
+  return doc;
+}
+
 describe('persistTryCanvas', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    const store = new Map<string, string>();
-    vi.stubGlobal('localStorage', {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-    });
-    vi.stubGlobal('window', new EventTarget());
+    vi.stubGlobal('indexedDB', new IDBFactory());
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
-  it('restores elements and page text after a reload', () => {
-    const before = new Y.Doc();
-    const stop = persistTryCanvas(before);
-    addElement(before, 'a');
-    before.getXmlFragment('pf-a').insert(0, [new Y.XmlText('hello')]);
+  it('restores elements and page text after a reload', async () => {
+    const doc = new Y.Doc();
+    const stop = persistTryCanvas(doc);
+    addElement(doc, 'a');
+    doc.getXmlFragment('pf-a').insert(0, [new Y.XmlText('hello')]);
     stop();
 
-    const after = new Y.Doc();
-    persistTryCanvas(after);
-    expect(elementUuids(after)).toEqual(['a']);
-    expect(after.getXmlFragment('pf-a').toString()).toBe('hello');
+    const reloaded = await reload(['a']);
+    expect(reloaded.getXmlFragment('pf-a').toString()).toBe('hello');
   });
 
-  it("merges another tab's save instead of overwriting it", () => {
+  it('keeps edits made while the saved canvas is still loading', async () => {
+    const first = new Y.Doc();
+    const stopFirst = persistTryCanvas(first);
+    addElement(first, 'old');
+    stopFirst();
+
+    const second = new Y.Doc();
+    const stopSecond = persistTryCanvas(second);
+    addElement(second, 'early');
+    await vi.waitFor(() =>
+      expect(elementUuids(second)).toEqual(['early', 'old']),
+    );
+    stopSecond();
+
+    await reload(['early', 'old']);
+  });
+
+  it('shares edits between open tabs and keeps both after a reload', async () => {
+    const seed = new Y.Doc();
+    const stopSeed = persistTryCanvas(seed);
+    addElement(seed, 'seed');
+    stopSeed();
+
     const tabA = new Y.Doc();
     const tabB = new Y.Doc();
-    persistTryCanvas(tabA);
+    const stopA = persistTryCanvas(tabA);
     const stopB = persistTryCanvas(tabB);
-
+    await vi.waitFor(() => {
+      expect(elementUuids(tabA)).toEqual(['seed']);
+      expect(elementUuids(tabB)).toEqual(['seed']);
+    });
     addElement(tabA, 'from-a');
-    vi.runAllTimers();
-    window.dispatchEvent(
-      Object.assign(new Event('storage'), {
-        key: 'myelin:try-canvas',
-        newValue: localStorage.getItem('myelin:try-canvas'),
-      }),
-    );
     addElement(tabB, 'from-b');
+    await vi.waitFor(() =>
+      expect(elementUuids(tabB)).toEqual(['from-a', 'from-b', 'seed']),
+    );
+    stopA();
     stopB();
 
-    const reloaded = new Y.Doc();
-    persistTryCanvas(reloaded);
-    expect(elementUuids(reloaded)).toEqual(['from-a', 'from-b']);
+    await reload(['from-a', 'from-b', 'seed']);
   });
 });
