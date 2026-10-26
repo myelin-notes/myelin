@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import { AllSelection } from 'prosemirror-state';
 import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
+import { handlePageFrameImagePaste } from '@myelin/editor/clipboard/page-frame-image-paste';
 import { InsertPopover } from '@myelin/editor/components/insert-popover';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
@@ -23,6 +24,10 @@ import {
 } from '@myelin/editor/elements/page-frame-element';
 import { I18nProvider } from '@myelin/editor/i18n';
 import { keybindings } from '@myelin/editor/keybinds';
+import {
+  getMediaImportHandler,
+  type MediaImportOptions,
+} from '@myelin/editor/media';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
 import { TOOL_ACTIONS } from '@myelin/editor/tools/tool-keybinds';
@@ -41,6 +46,30 @@ import {
 import { initWebPlatform } from '@/lib/web-platform';
 
 const layerClass = 'absolute inset-0 h-full w-full';
+const EMBED_ACCEPT = 'application/pdf,image/*';
+
+// PDFs and images keep their bytes in the document; audio and markdown need
+// the app's media store and note repository.
+function isEmbeddable(file: File): boolean {
+  return file.type === 'application/pdf' || file.type.startsWith('image/');
+}
+
+function embedFiles(
+  canvas: DrawableCanvas,
+  files: Iterable<File>,
+  options?: MediaImportOptions,
+): void {
+  for (const file of files) {
+    const handler = isEmbeddable(file) && getMediaImportHandler(file.type);
+    if (!handler) {
+      console.warn(`Can't embed ${file.name} (${file.type || 'unknown type'})`);
+      continue;
+    }
+    void Promise.resolve(handler(file, canvas, options)).catch((error) =>
+      console.warn(`Could not embed ${file.name}`, error),
+    );
+  }
+}
 
 function startPageFramePlacement(canvas: DrawableCanvas): void {
   canvas.startPlacement({
@@ -85,9 +114,12 @@ function startLatexPlacement(canvas: DrawableCanvas): void {
   });
 }
 
-// The app's canvas bindings (src/pages/canvas/hooks/use-engine.ts), minus the
-// insert-embed composer, which needs the app's media store.
-function registerCanvasKeybindings(canvas: DrawableCanvas): () => void {
+// The app's canvas bindings (src/pages/canvas/hooks/use-engine.ts). Insert-embed
+// opens a file picker in place of the app's embed composer.
+function registerCanvasKeybindings(
+  canvas: DrawableCanvas,
+  openFilePicker: () => void,
+): () => void {
   return keybindings.register([
     {
       action: 'canvas:pan',
@@ -118,6 +150,7 @@ function registerCanvasKeybindings(canvas: DrawableCanvas): () => void {
       action: 'canvas:insert-frame',
       onDown: () => startPageFramePlacement(canvas),
     },
+    { action: 'canvas:insert-embed', onDown: openFilePicker },
     ...canvas.tools.map((tool, index) => ({
       action: TOOL_ACTIONS[tool.id],
       onDown: () => canvas.switchTool(index),
@@ -125,8 +158,8 @@ function registerCanvasKeybindings(canvas: DrawableCanvas): () => void {
   ]);
 }
 
-// Copy, cut and paste of canvas elements, as in the app. Pasted media is not
-// embedded: that needs the app's media store.
+// Copy, cut and paste of canvas elements, and pasting PDFs and images, as in the
+// app.
 function bindCanvasClipboard(canvas: DrawableCanvas): () => void {
   // The id only tells same-canvas pastes apart, so they land offset.
   const adapter = new DrawableCanvasClipboardAdapter(
@@ -138,8 +171,22 @@ function bindCanvasClipboard(canvas: DrawableCanvas): () => void {
     controller.handleCopy(event, adapter);
   const handleCut = (event: ClipboardEvent) =>
     controller.handleCut(event, adapter);
-  const handlePaste = (event: ClipboardEvent) =>
-    controller.handlePaste(event, adapter);
+  const handlePaste = (event: ClipboardEvent) => {
+    if (
+      handlePageFrameImagePaste(event, canvas, (files, target) =>
+        embedFiles(canvas, files, { pageFramePaste: target }),
+      )
+    ) {
+      return;
+    }
+    controller.handlePaste(event, adapter, (pasted) => {
+      const files = Array.from(pasted.clipboardData?.files ?? []).filter(
+        isEmbeddable,
+      );
+      embedFiles(canvas, files);
+      return files.length > 0;
+    });
+  };
   document.addEventListener('copy', handleCopy);
   document.addEventListener('cut', handleCut);
   document.addEventListener('paste', handlePaste, true);
@@ -147,6 +194,27 @@ function bindCanvasClipboard(canvas: DrawableCanvas): () => void {
     document.removeEventListener('copy', handleCopy);
     document.removeEventListener('cut', handleCut);
     document.removeEventListener('paste', handlePaste, true);
+  };
+}
+
+function bindFileDrop(
+  target: HTMLCanvasElement,
+  canvas: DrawableCanvas,
+): () => void {
+  const handleDragOver = (event: DragEvent) => event.preventDefault();
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    const rect = target.getBoundingClientRect();
+    embedFiles(canvas, event.dataTransfer?.files ?? [], {
+      screenX: event.clientX - rect.left,
+      screenY: event.clientY - rect.top,
+    });
+  };
+  target.addEventListener('dragover', handleDragOver);
+  target.addEventListener('drop', handleDrop);
+  return () => {
+    target.removeEventListener('dragover', handleDragOver);
+    target.removeEventListener('drop', handleDrop);
   };
 }
 
@@ -205,6 +273,7 @@ function CanvasEditorInner() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const domHostRef = useRef<HTMLDivElement>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const toolState = useToolState(drawableCanvasRef);
   const [canvas, setCanvas] = useState<DrawableCanvas | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
@@ -240,11 +309,14 @@ function CanvasEditorInner() {
     const handlePointerDown = () => hideOptions();
     fg.addEventListener('pointerdown', handlePointerDown);
 
-    const unregisterKeybindings = registerCanvasKeybindings(canvas);
+    const unregisterKeybindings = registerCanvasKeybindings(canvas, () =>
+      fileInputRef.current?.click(),
+    );
     const handleKeyDown = (event: KeyboardEvent) =>
       handleShapeEnter(canvas, event);
     document.addEventListener('keydown', handleKeyDown);
     const unbindClipboard = bindCanvasClipboard(canvas);
+    const unbindFileDrop = bindFileDrop(fg, canvas);
 
     const stopLoop = startDrawableCanvasAnimationLoop(canvas, () => {});
     setCanvas(canvas);
@@ -254,6 +326,7 @@ function CanvasEditorInner() {
       unregisterKeybindings();
       document.removeEventListener('keydown', handleKeyDown);
       unbindClipboard();
+      unbindFileDrop();
       stopLoop();
       stopPersisting();
       stopPersistingView();
@@ -269,6 +342,21 @@ function CanvasEditorInner() {
       data-canvas-root
       className="fixed inset-0 touch-none overflow-hidden bg-page"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={EMBED_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const input = event.currentTarget;
+          if (canvas && input.files) {
+            embedFiles(canvas, Array.from(input.files));
+          }
+          // Lets the same file be picked again.
+          input.value = '';
+        }}
+      />
       {/* Canvas layers live in their own stage. The viewport attaches its
           wheel listener to the foreground canvas's parent and preventDefaults
           scrolling, so the toolbar must be a sibling of this stage (not a
@@ -323,6 +411,10 @@ function CanvasEditorInner() {
                 onInsertFrame={() => {
                   setInsertOpen(false);
                   startPageFramePlacement(canvas);
+                }}
+                onInsertEmbed={() => {
+                  setInsertOpen(false);
+                  fileInputRef.current?.click();
                 }}
                 onInsertLatex={() => {
                   setInsertOpen(false);

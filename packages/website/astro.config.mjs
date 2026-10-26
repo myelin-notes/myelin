@@ -48,11 +48,13 @@ export default defineConfig({
       include: [
         '@myelin/editor/clipboard/controller',
         '@myelin/editor/clipboard/drawable-canvas-adapter',
+        '@myelin/editor/clipboard/page-frame-image-paste',
         '@myelin/editor/drawable-canvas',
         '@myelin/editor/elements/element-type',
         '@myelin/editor/elements/latex/element',
         '@myelin/editor/elements/page-frame-element',
         '@myelin/editor/keybinds',
+        '@myelin/editor/media',
         '@myelin/editor/tools/tool-keybinds',
         '@myelin/editor/ydoc-manager',
         '@myelin/editor/render-loop',
