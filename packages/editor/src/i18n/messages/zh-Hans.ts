@@ -338,7 +338,7 @@ const zhHans: typeof en = {
       mode: {
         label: '绘图输入',
         description:
-          '手指在画布上的作用。手写笔：只有手写笔能绘图，手指平移；触摸：手指绘图，双指平移和缩放。',
+          '手写笔：用手写笔绘图，用手指平移。触摸：用手指绘图，用双指平移或缩放。',
         options: {
           pen: '手写笔',
           touch: '触摸',
@@ -991,6 +991,21 @@ const zhHans: typeof en = {
   dialogs: {
     closeSrOnly: '关闭',
   },
+  whatsNew: {
+    title: '更新内容',
+    dismiss: '知道了',
+    back: '上一步',
+    next: '下一步',
+    sync: {
+      title: '请在所有设备上更新 Myelin，否则将无法同步。',
+      description: '同步功能已重建，旧版本不再兼容。',
+    },
+    anchoring: {
+      title: '将内容锚定到页面',
+      description:
+        '在页面上选中图片、形状或手绘内容，然后选择“锚定到页面”。它会随文字一起移动，粘贴的图片也会自动锚定。',
+    },
+  },
   onboarding: {
     skip: '跳过设置',
     back: '上一步',
@@ -1002,68 +1017,66 @@ const zhHans: typeof en = {
       eyebrow: '欢迎',
       title: 'Myelin Notes',
       description:
-        '一块无限画布，可以手写、输入文字，以及两者之间的一切。回答四个问题即可开始。',
+        '只需几个简单步骤，即可设置好你的无限画布，用来手写和输入文字。',
       language: '语言',
       start: '开始使用',
     },
     input: {
       eyebrow: '手写笔与触摸',
       title: '你打算怎么绘图？',
-      description: '选择手指在画布上的作用。随时可以在设置中更改。',
+      description: '你可以在这里或稍后在设置中更改手指在画布上的作用。',
     },
     privacy: {
       eyebrow: '隐私',
       title: '帮助改进 Myelin Notes',
-      description: '在你打开之前不会收集任何分析数据。随时可以在设置中更改。',
-      collected: '会发送的内容：使用了哪些功能、应用版本以及崩溃报告。',
-      notCollected: '绝不会发送的内容：你的笔记、笔记内容、文件名或手写内容。',
+      description: '分析功能默认关闭。打开它可以帮助改进 Myelin Notes。',
+      collected: '我们会收集你使用了哪些功能、应用版本以及崩溃报告。',
+      notCollected: '我们绝不会收集你的笔记、文件名或手写内容。',
       policy: '阅读隐私政策',
     },
     sync: {
       eyebrow: '同步',
-      title: '笔记要保存在哪里？',
+      title: '你想把笔记保存在哪里？',
       description:
-        '笔记默认保存在本设备上。连接 GitHub 仓库或 Google 云端硬盘即可备份，并在多台设备之间同步。',
+        '笔记保存在本设备上，你也可以连接 GitHub 或 Google 云端硬盘来备份笔记，并在多台设备之间同步。',
       later: '也可以稍后在设置中配置。',
-      incomplete:
-        '请登录并选好笔记的存放位置后继续，或选择「本地」稍后再决定。',
+      incomplete: '你需要完成其中一种存储方式的设置。之后可以在设置中更改。',
     },
     sample: {
       eyebrow: '画布',
       title: '要从示例画布开始吗？',
-      description: '创建一块示例画布，里面有一些功能演示，可以随意试试',
+      description: '我们会创建一块画布，里面有一些功能供你试用。',
       start: '打开画布',
       skip: '从空白开始',
       canvasName: '入门',
       highlights: {
         frame: '一个页面框，里面有代码、公式和 Mermaid 图',
-        canvas: '页面旁边浮在画布上的文本和 LaTeX 块',
-        syntax: '一份 Markdown 语法速查表',
-        checklist: '一份简短的清单，方便你自己动手试试',
+        canvas: '放在画布上、页面旁边的文本和 LaTeX 块',
+        syntax: '一份 Markdown 快捷方式列表',
+        checklist: '一份简短的清单，帮你快速上手',
       },
     },
     starter: {
       frameName: '基础功能',
       title: '入门',
       intro:
-        '这是一个页面框：一份存在于画布上的文档。你可以拖动它、调整大小，也可以在旁边再放一个。',
+        '这是一个页面框，一份放在画布上的文档。你可以移动它、调整大小，或在旁边添加更多页面框。',
       tipTitle: '按 / 插入内容',
       tipBody:
-        '在页面框中按 `/` 会打开插入菜单：标题、表格、代码、公式、嵌入内容和日期。',
+        '在页面框中输入 `/` 即可插入标题、表格、代码、公式、嵌入内容和日期。',
       codeHeading: '代码块',
-      codeBody:
-        '用三个反引号加语言名包住一段内容即可。它是一个真正的编辑器，而不是加了底色的文字。',
+      codeBody: '输入三个反引号和语言名，即可创建代码块。',
       mathHeading: '数学公式',
       mathBody:
-        '像 $E = mc^2$ 这样的行内公式可以写在句子里。用 `$$` 包住一段内容，公式就会独占一行：',
+        '像 $E = mc^2$ 这样的行内公式会留在句子中，而 `$$` 会让公式独占一行：',
       diagramHeading: 'Mermaid 图表',
-      diagramBody: '标记为 `mermaid` 的代码块会渲染成图表。',
+      diagramBody: '把代码块的语言设为 `mermaid`，即可将其变成图表。',
       diagramNodes: {
         idea: '想法',
         note: '笔记',
         canvas: '画布',
       },
-      syntaxHeading: '值得一记',
+      syntaxHeading: 'Markdown 快捷方式',
       syntaxColumns: {
         type: '输入',
         get: '得到',
@@ -1073,19 +1086,19 @@ const zhHans: typeof en = {
         callout: '提示框，就像上面那个',
         math: '公式块',
       },
-      linkTip: '连续输入两个左方括号即可开始链接其他笔记，自动补全会帮你完成。',
+      linkTip: '输入两个方括号即可链接到其他笔记，自动补全会帮你填写名称。',
       mediaHeading: '图片、PDF 和视频',
       mediaBody:
-        '把文件拖到画布上，或者在页面中输入 / 并选择「嵌入」把它放进去。粘贴 YouTube 或 Vimeo 链接也一样，会变成播放器。',
+        '把文件拖到画布上，或者在页面中输入 / 并选择「嵌入」，YouTube 链接也可以这样嵌入。',
       checklistHeading: '动手试试',
       checklistDone: '打开入门画布',
       checklistTodo1: '自己添加一个页面框',
       checklistTodo2: '在里面写点内容',
       canvas: {
-        heading: '外面就是画布',
-        body: '文本框和 LaTeX 块可以自由摆放。拖动、缩放，或者把它们排列在页面旁边。',
+        heading: '这就是画布',
+        body: '你可以把文本框和 LaTeX 块放在画布上任意位置，然后移动、缩放，或把它们排列在页面旁边。',
         latexCaption: '画布上的一个 LaTeX 块：',
-        toolbarHint: '其余内容都可以从工具栏顶部的 + 按钮插入。',
+        toolbarHint: '其他内容都可以通过工具栏顶部的 + 按钮添加。',
       },
     },
   },

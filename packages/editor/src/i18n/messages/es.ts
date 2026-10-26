@@ -356,7 +356,7 @@ const es: typeof en = {
       mode: {
         label: 'Entrada de dibujo',
         description:
-          'Qué hace un dedo en el lienzo. Lápiz deja el dibujo al lápiz y desplaza con el dedo; Toque dibuja con el dedo, y desplaza y hace zoom con dos.',
+          'Lápiz: dibuja con un lápiz óptico y desplázate con el dedo. Toque: dibuja con el dedo, y desplázate o haz zoom con dos dedos.',
         options: {
           pen: 'Lápiz',
           touch: 'Toque',
@@ -1025,6 +1025,23 @@ const es: typeof en = {
   dialogs: {
     closeSrOnly: 'Cerrar',
   },
+  whatsNew: {
+    title: 'Novedades',
+    dismiss: 'Entendido',
+    back: 'Atrás',
+    next: 'Siguiente',
+    sync: {
+      title:
+        'Actualiza Myelin en todos tus dispositivos o no podrán sincronizarse.',
+      description:
+        'La sincronización se rehízo y las versiones anteriores ya no son compatibles.',
+    },
+    anchoring: {
+      title: 'Ancla elementos a tus páginas',
+      description:
+        'Selecciona una imagen, forma o dibujo en una página y elige Anclar a la página. Se moverá con el texto mientras escribes, y las imágenes pegadas se anclan automáticamente.',
+    },
+  },
   onboarding: {
     skip: 'Omitir configuración',
     back: 'Atrás',
@@ -1036,7 +1053,7 @@ const es: typeof en = {
       eyebrow: 'Bienvenido',
       title: 'Myelin Notes',
       description:
-        'Un lienzo infinito para escritura a mano, texto y todo lo que hay entre medias. Cuatro preguntas rápidas y listo.',
+        'Configura tu lienzo infinito para escritura a mano y texto en unos pocos pasos.',
       language: 'Idioma',
       start: 'Empezar',
     },
@@ -1044,66 +1061,66 @@ const es: typeof en = {
       eyebrow: 'Lápiz y toque',
       title: '¿Cómo vas a dibujar?',
       description:
-        'Elige qué hace un dedo en el lienzo. Puedes cambiarlo en cualquier momento en Ajustes.',
+        'Puedes cambiar lo que hace tu dedo en el lienzo aquí o más tarde en Ajustes.',
     },
     privacy: {
       eyebrow: 'Privacidad',
       title: 'Ayuda a mejorar Myelin Notes',
       description:
-        'Las analíticas están desactivadas hasta que las actives aquí. Puedes cambiarlo cuando quieras en Ajustes.',
+        'Las analíticas están desactivadas por defecto. Actívalas para ayudar a mejorar Myelin Notes.',
       collected:
-        'Qué se envía: qué funciones se usan, la versión de la app e informes de errores.',
+        'Recopilamos qué funciones usas, la versión de la app e informes de errores.',
       notCollected:
-        'Qué nunca se envía: tus notas, su contenido, los nombres de archivo ni tu escritura a mano.',
+        'Nunca recopilamos tus notas, los nombres de archivo ni tu escritura a mano.',
       policy: 'Leer la política de privacidad',
     },
     sync: {
       eyebrow: 'Sincronización',
       title: '¿Dónde quieres guardar tus notas?',
       description:
-        'Tus notas se guardan en este dispositivo. Conecta un repositorio de GitHub o Google Drive para tener copia de seguridad y sincronizarlas entre equipos.',
+        'Tus notas se guardan en este dispositivo, pero puedes conectar GitHub o Google Drive para hacer una copia de seguridad y sincronizarlas entre dispositivos.',
       later: 'Puedes configurarlo más tarde en Ajustes.',
       incomplete:
-        'Inicia sesión y termina de elegir dónde se guardan tus notas para continuar, o selecciona Local para decidirlo más tarde.',
+        'Debes completar la configuración de una de las opciones de almacenamiento. Puedes cambiarlo más tarde en Ajustes.',
     },
     sample: {
       eyebrow: 'Lienzo',
       title: '¿Empezar con un lienzo de ejemplo?',
       description:
-        'Crea un lienzo de ejemplo con una muestra de funciones para que pruebes a tu aire',
+        'Crearemos un lienzo con algunas funciones para que las pruebes.',
       start: 'Abrir el lienzo',
       skip: 'Empezar en blanco',
       canvasName: 'Primeros pasos',
       highlights: {
         frame: 'Una página con código, fórmulas y un diagrama de Mermaid',
-        canvas: 'Texto y LaTeX flotando en el lienzo, junto a la página',
-        syntax: 'Una chuleta con los atajos de markdown',
-        checklist: 'Una lista breve para que pruebes tú mismo',
+        canvas: 'Texto y LaTeX colocados en el lienzo junto a la página',
+        syntax: 'Una lista de atajos de Markdown',
+        checklist: 'Una lista breve para que empieces',
       },
     },
     starter: {
       frameName: 'Lo básico',
       title: 'Primeros pasos',
       intro:
-        'Esto es un marco de página: un documento que vive en el lienzo. Arrástralo, cambia su tamaño o coloca otro al lado.',
+        'Esto es un marco de página, un documento que está en el lienzo. Puedes moverlo, cambiar su tamaño o añadir más al lado.',
       tipTitle: 'Pulsa / para insertar',
       tipBody:
-        'Dentro de un marco de página, `/` abre el menú de inserción: encabezados, tablas, código, fórmulas, incrustaciones y fechas.',
+        'Escribe `/` en un marco de página para insertar encabezados, tablas, código, fórmulas, incrustaciones y fechas.',
       codeHeading: 'Bloques de código',
       codeBody:
-        'Delimita un bloque con tres comillas invertidas y un lenguaje. Lo que obtienes es un editor de verdad, no texto sombreado.',
+        'Escribe tres comillas invertidas y el nombre de un lenguaje para empezar un bloque de código.',
       mathHeading: 'Fórmulas',
       mathBody:
-        'Las fórmulas en línea como $E = mc^2$ caben en una frase. Delimita un bloque con `$$` para darle su propia línea:',
+        'Las fórmulas en línea como $E = mc^2$ se quedan en la frase, y `$$` pone la fórmula en su propia línea:',
       diagramHeading: 'Diagramas de Mermaid',
       diagramBody:
-        'Un bloque de código etiquetado como `mermaid` se dibuja como un diagrama.',
+        'Cambia el lenguaje de un bloque de código a `mermaid` para convertirlo en un diagrama.',
       diagramNodes: {
         idea: 'Idea',
         note: 'Nota',
         canvas: 'Lienzo',
       },
-      syntaxHeading: 'Vale la pena saberlo',
+      syntaxHeading: 'Atajos de Markdown',
       syntaxColumns: {
         type: 'Escribe esto',
         get: 'Para obtener',
@@ -1114,20 +1131,20 @@ const es: typeof en = {
         math: 'Un bloque de fórmulas',
       },
       linkTip:
-        'Dos corchetes de apertura inician un enlace a otra nota, y el autocompletado lo termina.',
+        'Escribe dos corchetes para enlazar a otra nota, y el autocompletado rellenará el nombre.',
       mediaHeading: 'Imágenes, PDF y vídeo',
       mediaBody:
-        'Arrastra un archivo al lienzo, o escribe / dentro de una página y elige Incrustar para colocarlo ahí. Pega un enlace de YouTube o Vimeo de la misma forma y se convierte en un reproductor.',
-      checklistHeading: 'Te toca',
+        'Arrastra un archivo al lienzo, o escribe / en una página y elige Incrustar, que también funciona con enlaces de YouTube.',
+      checklistHeading: 'Pruébalo tú mismo',
       checklistDone: 'Abrir el lienzo de inicio',
       checklistTodo1: 'Añadir tu propio marco de página',
       checklistTodo2: 'Escribir algo en él',
       canvas: {
-        heading: 'Aquí fuera está el lienzo',
-        body: 'Los cuadros de texto y los bloques de LaTeX flotan libremente. Arrástralos, escálalos o alinéalos junto a una página.',
+        heading: 'Este es el lienzo',
+        body: 'Puedes colocar cuadros de texto y bloques de LaTeX en cualquier parte, y luego moverlos, cambiar su tamaño o alinearlos junto a una página.',
         latexCaption: 'Un bloque de LaTeX en el lienzo:',
         toolbarHint:
-          'Todo lo demás sale del botón + en la parte superior de la barra de herramientas.',
+          'Usa el botón + en la parte superior de la barra de herramientas para añadir cualquier otra cosa.',
       },
     },
   },
