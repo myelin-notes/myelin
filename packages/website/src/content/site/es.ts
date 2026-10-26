@@ -50,6 +50,8 @@ const es: SiteCopy = {
     title: 'Prueba Myelin Notes en el navegador',
     description:
       'Un lienzo de Myelin para dibujar, escribir y tomar notas, directamente en el navegador y guardado en él. Descarga la app para tener todas las funciones.',
+    limited:
+      'Esta es una versión web limitada. La app también incluye biblioteca de notas, búsqueda, grabación de audio, exportación a PDF y sincronización.',
   },
 
   ink: {

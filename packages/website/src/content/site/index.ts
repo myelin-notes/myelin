@@ -102,7 +102,12 @@ export interface SiteCopy {
   };
 
   /** Page title and meta description of the try-it canvas. */
-  tryIt: { title: string; description: string };
+  tryIt: {
+    title: string;
+    description: string;
+    /** Note on the canvas that the web version lacks app features. */
+    limited: string;
+  };
 
   ink: {
     pdfHeading: string;

@@ -44,6 +44,8 @@ const zhHans: SiteCopy = {
     title: '在浏览器中试用 Myelin Notes',
     description:
       '一块 Myelin 画布，可直接在浏览器中绘画、书写和打字，内容保存在此浏览器中。下载应用即可使用全部功能。',
+    limited:
+      '这是功能有限的网页预览版。应用还提供笔记库、搜索、录音、PDF 导出和同步。',
   },
 
   ink: {

@@ -22,4 +22,11 @@ const copy = getCopy(locale);
   <!-- Client-only so React Fast Refresh works in dev; the editor bundle is
        requested by this page alone, never by the landing page. -->
   <CanvasEditor client:only="react" locale={locale} />
+  {/* Clicks pass through to the canvas; z-40 matches the top bar, above the
+      canvas island. */}
+  <p
+    class="pointer-events-none fixed inset-x-4 bottom-4 z-40 mx-auto w-fit max-w-xl rounded-xl bg-popover/85 px-3 py-1.5 text-center text-[0.75rem] text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px]"
+  >
+    {copy.tryIt.limited}
+  </p>
 </Base>
