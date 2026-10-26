@@ -8,17 +8,18 @@ import {
   ClipboardPaste as PasteIcon,
   Sigma as SigmaIcon,
 } from 'lucide-react';
-import { useMessages } from '@myelin/editor/i18n';
-import { formatKeyCombo } from '@myelin/editor/keybinds';
-import { getInsertHotkey } from '@myelin/editor/tools/tool-keybinds';
+import { useMessages } from '../i18n';
+import { formatKeyCombo } from '../keybinds';
+import { getInsertHotkey } from '../tools/tool-keybinds';
 
+// An insert handler left out hides its item, for hosts that can't support it.
 interface InsertPopoverProps {
-  onPaste: () => void;
-  onInsertFrame: () => void;
-  onInsertEmbed: () => void;
-  onInsertLatex: () => void;
-  onInsertAudio: () => void;
-  onTakePhoto: () => void;
+  onPaste?: () => void;
+  onInsertFrame?: () => void;
+  onInsertEmbed?: () => void;
+  onInsertLatex?: () => void;
+  onInsertAudio?: () => void;
+  onTakePhoto?: () => void;
   onClose: () => void;
 }
 
@@ -127,7 +128,7 @@ export function InsertPopover({
       hotkey: '',
       onSelect: onInsertAudio,
     },
-  ];
+  ].filter((item) => item.onSelect);
 
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const firstEnabledIndex = items.findIndex((item) => !item.disabled);
