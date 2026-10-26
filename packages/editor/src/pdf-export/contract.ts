@@ -65,6 +65,8 @@ export type PageItem =
       h: number;
       /** Index into PdfExportRequest.imagesB64. */
       imageRef: number;
+      /** Clockwise degrees about the rect's center. */
+      rotation?: number;
     }
   | {
       t: 'pdfPage';

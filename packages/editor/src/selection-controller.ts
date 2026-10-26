@@ -5,12 +5,15 @@ import {
   drawControlPoints,
   drawSelectionBounds,
   getResizeHandles,
+  getRotateKnobHandle,
   hitResizeHandle,
   type ResizeHandle,
   ResizeHandles,
+  ROTATE_KNOB_RADIUS,
+  rotateHandle,
 } from './elements/drawable-element';
 import { PageFrameElement } from './elements/page-frame-element';
-import type { Vector2 } from './geometry';
+import { rotateVector, type Vector2 } from './geometry';
 
 const SELECTION_HIT_MIN_PX = {
   mouse: 20,
@@ -100,9 +103,25 @@ export class SelectionController {
   }
 
   public getScreenBounds(viewport: CanvasViewport): DOMRect | null {
-    const bounds = this.getBounds();
+    let bounds = this.getBounds();
     if (!bounds) {
       return null;
+    }
+    // Keeps the selection toolbar, which sits above these bounds, off the knob.
+    const knob = this.getHandles(viewport.zoom).find(
+      (handle) => handle.control?.kind === 'rotate',
+    );
+    if (knob) {
+      const { x, y } = knob.position;
+      const r = ROTATE_KNOB_RADIUS;
+      const left = Math.min(bounds.left, x - r);
+      const top = Math.min(bounds.top, y - r);
+      bounds = new DOMRect(
+        left,
+        top,
+        Math.max(bounds.right, x + r) - left,
+        Math.max(bounds.bottom, y + r) - top,
+      );
     }
 
     const topLeft = viewport.worldToScreen({ x: bounds.left, y: bounds.top });
@@ -134,11 +153,32 @@ export class SelectionController {
     return this.expandBounds(bounds, minWorld);
   }
 
-  private getDisplayBounds(zoom: number): DOMRect | null {
-    const bounds = this.getBounds();
+  // A sole selection is boxed along its own axes (`orientedBox`), a group along the world's.
+  private getAxisBounds(selected: readonly DrawableElement[]): DOMRect | null {
+    return selected.length === 1 ? selected[0].orientedBox : this.getBounds();
+  }
+
+  private getAxisRotation(selected: readonly DrawableElement[]): number {
+    return selected.length === 1 ? selected[0].rotation : 0;
+  }
+
+  private getDisplayBounds(
+    selected: readonly DrawableElement[],
+    zoom: number,
+  ): DOMRect | null {
+    const bounds = this.getAxisBounds(selected);
     return bounds
       ? this.expandBounds(bounds, SELECTION_DISPLAY_MIN_PX / zoom)
       : null;
+  }
+
+  private showsRotateKnob(selected: readonly DrawableElement[]): boolean {
+    return (
+      selected.length === 1 &&
+      selected[0].rotatable &&
+      !selected[0].locked &&
+      !selected[0].hasControlPoints
+    );
   }
 
   private expandBounds(bounds: DOMRect, minSize: number): DOMRect {
@@ -166,10 +206,19 @@ export class SelectionController {
     if (selected.length === 1 && selected[0].hasControlPoints) {
       return selected[0].getHandles();
     }
-    const bounds = this.getDisplayBounds(zoom);
-    return bounds
-      ? getResizeHandles(bounds, this.getResizeHandleFlags(selected, zoom))
-      : [];
+    const bounds = this.getDisplayBounds(selected, zoom);
+    if (!bounds) {
+      return [];
+    }
+    const handles = getResizeHandles(
+      bounds,
+      this.getResizeHandleFlags(selected, zoom),
+    );
+    if (this.showsRotateKnob(selected)) {
+      handles.push(getRotateKnobHandle(bounds));
+    }
+    const rotation = this.getAxisRotation(selected);
+    return handles.map((handle) => rotateHandle(handle, rotation));
   }
 
   public hitHandle(
@@ -183,13 +232,16 @@ export class SelectionController {
         ? null
         : selected[0].hitHandle(point, zoom, pointerType === 'touch');
     }
-    const bounds = this.getBounds();
+    const bounds = this.getAxisBounds(selected);
     if (bounds) {
       const minPx =
         SELECTION_MOVE_CORE_MIN_PX[
           pointerType as keyof typeof SELECTION_MOVE_CORE_MIN_PX
         ] ?? SELECTION_MOVE_CORE_MIN_PX.mouse;
-      if (rectContainsPoint(this.expandBounds(bounds, minPx / zoom), point)) {
+      const axisPoint = rotateVector(point, -this.getAxisRotation(selected));
+      if (
+        rectContainsPoint(this.expandBounds(bounds, minPx / zoom), axisPoint)
+      ) {
         return null;
       }
     }
@@ -199,7 +251,7 @@ export class SelectionController {
       zoom,
       pointerType === 'touch',
     );
-    if (!visualHandle || selected.length !== 1) {
+    if (!visualHandle || selected.length !== 1 || visualHandle.control) {
       return visualHandle;
     }
     return (
@@ -270,7 +322,7 @@ export class SelectionController {
       return;
     }
     const visible = selected.filter((element) => !element.hidden);
-    const bounds = this.getDisplayBounds(zoom);
+    const bounds = this.getDisplayBounds(selected, zoom);
     if (visible.length === 0 || !bounds) {
       return;
     }
@@ -280,21 +332,29 @@ export class SelectionController {
       ctx.globalAlpha = this.overlayProgress * 0.55;
       ctx.setLineDash([]);
       for (const element of visible) {
-        const box = element.boundingBox;
+        const box = element.orientedBox;
+        ctx.save();
+        ctx.rotate(element.rotation);
         ctx.beginPath();
         ctx.roundRect(box.x, box.y, box.width, box.height, 2 / zoom);
         ctx.stroke();
+        ctx.restore();
       }
     }
+    const isEditing = selected.length === 1 && selected[0] === editingElement;
+    ctx.save();
+    ctx.rotate(this.getAxisRotation(selected));
     drawSelectionBounds(
       ctx,
       bounds,
       this.overlayProgress,
-      selected.length === 1 && selected[0] === editingElement,
+      isEditing,
       selected.length === 1 && selected[0].hasControlPoints
         ? ResizeHandles.None
         : this.getResizeHandleFlags(selected, zoom),
+      !isEditing && this.showsRotateKnob(selected),
     );
+    ctx.restore();
     if (
       selected.length === 1 &&
       selected[0].hasControlPoints &&
@@ -317,7 +377,7 @@ export class SelectionController {
       return ResizeHandles.None;
     }
     const flags = selected[0].resizeHandles;
-    const bounds = this.getBounds();
+    const bounds = this.getAxisBounds(selected);
     if (
       bounds &&
       (bounds.width * zoom < COMPACT_SELECTION_PX ||

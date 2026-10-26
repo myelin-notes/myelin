@@ -16,6 +16,10 @@ function createElement(uuid: string, bounds: DOMRect): DrawableElement {
     get boundingBox() {
       return bounds;
     },
+    get orientedBox() {
+      return bounds;
+    },
+    rotation: 0,
     resizeHandles: ResizeHandles.All,
     locked: false,
     hidden: false,
@@ -160,6 +164,9 @@ describe('SelectionController', () => {
       roundRect,
       setLineDash: vi.fn(),
       stroke: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      rotate: vi.fn(),
     } as unknown as CanvasRenderingContext2D;
 
     controller.advanceOverlay(1);

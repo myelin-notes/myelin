@@ -64,8 +64,7 @@ export class StrokeElement extends AnchorableElement {
     y: number,
     radius: number,
   ): number[][] | null {
-    const localX = (x - this.offset.x) / this.scale.x;
-    const localY = (y - this.offset.y) / this.scale.y;
+    const { x: localX, y: localY } = this.worldToLocal({ x, y });
     const localRadius =
       radius / Math.min(Math.abs(this.scale.x), Math.abs(this.scale.y));
     const tolerance = localRadius + this.style.size / 2;
@@ -98,6 +97,10 @@ export class StrokeElement extends AnchorableElement {
     this.dirty = true;
     this.updateBounds();
     this.flushPoints();
+  }
+
+  public override get rotatable(): boolean {
+    return true;
   }
 
   public override getYMapProps(): Record<string, unknown> {
@@ -357,12 +360,9 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
     const pts: number[] = [];
-    const { offset, scale } = this;
     for (const [x, y] of outline) {
-      const p = ctx.worldToPagePt(
-        x * scale.x + offset.x,
-        y * scale.y + offset.y,
-      );
+      const world = this.localToWorld(x, y);
+      const p = ctx.worldToPagePt(world.x, world.y);
       pts.push(p.x, p.y);
     }
     const { rgb, opacity } = parseCssColor(this.style.color);

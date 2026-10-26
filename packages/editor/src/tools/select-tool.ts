@@ -13,6 +13,7 @@ import {
   type ResizeHandle,
 } from '../elements/drawable-element';
 import { ElementType, isBackgroundElement } from '../elements/element-type';
+import { rotateVector } from '../geometry';
 import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
@@ -21,11 +22,13 @@ enum SelectMode {
   None,
   Moving,
   Scaling,
+  Rotating,
   Marquee,
   Lasso,
 }
 
 const DOUBLE_CLICK_SLOP_PX = 8;
+const ROTATE_SNAP = Math.PI / 12;
 
 interface ElementTransformSnapshot {
   element: DrawableElement;
@@ -53,6 +56,16 @@ interface GroupScaleInteraction {
 
 type ScaleInteraction = ElementScaleInteraction | GroupScaleInteraction;
 
+interface RotateInteraction {
+  element: DrawableElement;
+  /** Local-space point held fixed in world space while turning. */
+  localPivot: Vector2;
+  worldPivot: Vector2;
+  originalRotation: number;
+  originalOffset: Vector2;
+  startPointerAngle: number;
+}
+
 export class SelectTool implements ITool {
   public constructor(private readonly getStrings: MessageGetter) {}
 
@@ -75,6 +88,8 @@ export class SelectTool implements ITool {
   // Scale state
   private scaleInteraction: ScaleInteraction | null = null;
   private scaleChanged = false;
+
+  private rotateInteraction: RotateInteraction | null = null;
 
   // Lasso state
   private lassoPath: Vector2[] = [];
@@ -150,55 +165,75 @@ export class SelectTool implements ITool {
     const insideSelectionBounds =
       selectionBounds !== null && CollisionHelper.inBox(point, selectionBounds);
 
-    // The selection body wins where a large touch target overlaps a handle. Handle centres sit
-    // outside the content bounds, so they remain reachable without stealing thin strokes' interior.
+    // hitSelectionHandle lets the selection body win where a large touch target overlaps a handle.
+    // Handle centres sit outside the content bounds, so they stay reachable without stealing thin
+    // strokes' interior.
     const handle = canvas.hitSelectionHandle(point, event.pointerType);
-    if (!insideSelectionBounds || handle?.control) {
-      if (handle) {
-        this.mode = SelectMode.Scaling;
-        if (selectedElements.length > 1 && selectionBounds) {
-          this.scaleInteraction = {
-            kind: 'group',
-            handle,
-            anchorWorld: {
-              x: selectionBounds.x + selectionBounds.width * handle.anchorFx,
-              y: selectionBounds.y + selectionBounds.height * handle.anchorFy,
-            },
-            originalDraggedWorld: {
-              x:
-                selectionBounds.x +
-                selectionBounds.width * (1 - handle.anchorFx),
-              y:
-                selectionBounds.y +
-                selectionBounds.height * (1 - handle.anchorFy),
-            },
-            transforms: selectedElements
-              .filter((element) => !element.locked)
-              .map((element) => ({
-                element,
-                offset: { ...element.offset },
-                scale: { ...element.scale },
-              })),
-          };
-        } else {
-          const element = selectedElements[0];
-          if (!element) {
-            this.reset();
-            return;
-          }
-          this.scaleInteraction = {
-            kind: 'element',
-            element,
-            handle,
-            originalScale: { ...element.scale },
-            originalOffset: { ...element.offset },
-            anchorWorld: handle.anchor,
-            originalDraggedWorld: handle.position,
-          };
-          element.beginResize();
+    if (handle?.control?.kind === 'rotate' && selectedElements.length === 1) {
+      const element = selectedElements[0];
+      const local = element.localBoundingBox;
+      const localPivot = {
+        x: local.x + local.width / 2,
+        y: local.y + local.height / 2,
+      };
+      const worldPivot = element.localToWorld(localPivot.x, localPivot.y);
+      this.mode = SelectMode.Rotating;
+      this.rotateInteraction = {
+        element,
+        localPivot,
+        worldPivot,
+        originalRotation: element.rotation,
+        originalOffset: { ...element.offset },
+        startPointerAngle: Math.atan2(
+          point.y - worldPivot.y,
+          point.x - worldPivot.x,
+        ),
+      };
+      return;
+    }
+    if (handle) {
+      this.mode = SelectMode.Scaling;
+      if (selectedElements.length > 1 && selectionBounds) {
+        this.scaleInteraction = {
+          kind: 'group',
+          handle,
+          anchorWorld: {
+            x: selectionBounds.x + selectionBounds.width * handle.anchorFx,
+            y: selectionBounds.y + selectionBounds.height * handle.anchorFy,
+          },
+          originalDraggedWorld: {
+            x:
+              selectionBounds.x + selectionBounds.width * (1 - handle.anchorFx),
+            y:
+              selectionBounds.y +
+              selectionBounds.height * (1 - handle.anchorFy),
+          },
+          transforms: selectedElements
+            .filter((element) => !element.locked)
+            .map((element) => ({
+              element,
+              offset: { ...element.offset },
+              scale: { ...element.scale },
+            })),
+        };
+      } else {
+        const element = selectedElements[0];
+        if (!element) {
+          this.reset();
+          return;
         }
-        return;
+        this.scaleInteraction = {
+          kind: 'element',
+          element,
+          handle,
+          originalScale: { ...element.scale },
+          originalOffset: { ...element.offset },
+          anchorWorld: handle.anchor,
+          originalDraggedWorld: handle.position,
+        };
+        element.beginResize();
       }
+      return;
     }
 
     // 2. Double-click detection for element editing
@@ -219,7 +254,7 @@ export class SelectTool implements ITool {
     const hits: DrawableElement[] = [];
     for (let i = canvas.elements.length - 1; i >= 0; i--) {
       const e = canvas.elements[i];
-      if (CollisionHelper.inBox(point, e.boundingBox)) {
+      if (e.containsPoint(point)) {
         hits.push(e);
       }
     }
@@ -393,14 +428,19 @@ export class SelectTool implements ITool {
           break;
         }
 
-        const origDist = {
+        // Measured along the element's own axes so a rotated element stretches along them.
+        const worldDist = {
           x: interaction.originalDraggedWorld.x - interaction.anchorWorld.x,
           y: interaction.originalDraggedWorld.y - interaction.anchorWorld.y,
         };
-        const curDist = {
-          x: origDist.x + position.x - this.startPoint.x,
-          y: origDist.y + position.y - this.startPoint.y,
-        };
+        const origDist = rotateVector(worldDist, -e.rotation);
+        const curDist = rotateVector(
+          {
+            x: worldDist.x + position.x - this.startPoint.x,
+            y: worldDist.y + position.y - this.startPoint.y,
+          },
+          -e.rotation,
+        );
 
         let ratioX = h.scaleX && origDist.x !== 0 ? curDist.x / origDist.x : 1;
         let ratioY = h.scaleY && origDist.y !== 0 ? curDist.y / origDist.y : 1;
@@ -428,6 +468,26 @@ export class SelectTool implements ITool {
         ) {
           this.scaleChanged = true;
         }
+        break;
+      }
+      case SelectMode.Rotating: {
+        const interaction = this.rotateInteraction;
+        if (!interaction) {
+          break;
+        }
+        const { element, localPivot, worldPivot } = interaction;
+        let rotation =
+          interaction.originalRotation +
+          Math.atan2(position.y - worldPivot.y, position.x - worldPivot.x) -
+          interaction.startPointerAngle;
+        if (_event.shiftKey) {
+          rotation = Math.round(rotation / ROTATE_SNAP) * ROTATE_SNAP;
+        }
+        canvas.transact(() => {
+          element.setRotation(rotation);
+          const moved = element.localToWorld(localPivot.x, localPivot.y);
+          element.translate(worldPivot.x - moved.x, worldPivot.y - moved.y);
+        });
         break;
       }
       case SelectMode.Marquee: {
@@ -506,6 +566,12 @@ export class SelectTool implements ITool {
         }
         break;
       }
+      case SelectMode.Rotating: {
+        if (this.rotateInteraction) {
+          canvas.anchoring?.finishTransform([this.rotateInteraction.element]);
+        }
+        break;
+      }
       case SelectMode.Marquee:
       case SelectMode.Lasso: {
         // Nothing caught means the gesture was a click on the backdrop it
@@ -566,6 +632,17 @@ export class SelectTool implements ITool {
         canvas.undo();
       }
     }
+    if (this.mode === SelectMode.Rotating && this.rotateInteraction) {
+      const { element, originalRotation, originalOffset } =
+        this.rotateInteraction;
+      if (
+        element.rotation !== originalRotation ||
+        element.offset.x !== originalOffset.x ||
+        element.offset.y !== originalOffset.y
+      ) {
+        canvas.undo();
+      }
+    }
     this.lastCycledElement = null;
     this.reset();
   }
@@ -579,17 +656,15 @@ export class SelectTool implements ITool {
       canvas.setCursor(this.scaleInteraction.handle.cursor);
       return;
     }
+    if (this.mode === SelectMode.Rotating) {
+      canvas.setCursor('grabbing');
+      return;
+    }
 
-    const selectionBounds = canvas.getSelectedElementBounds();
-    const insideSelectionBounds =
-      selectionBounds !== null &&
-      CollisionHelper.inBox(position, selectionBounds);
     const handle = canvas.hitSelectionHandle(position, 'mouse');
-    if (!insideSelectionBounds || handle?.control) {
-      if (handle) {
-        canvas.setCursor(handle.cursor);
-        return;
-      }
+    if (handle) {
+      canvas.setCursor(handle.cursor);
+      return;
     }
 
     const interactionBounds = canvas.getSelectionInteractionBounds('mouse');
@@ -610,6 +685,7 @@ export class SelectTool implements ITool {
     this.movingElements = [];
     this.scaleInteraction = null;
     this.scaleChanged = false;
+    this.rotateInteraction = null;
     this.lassoPath = [];
     this.pendingCycle = null;
     this.clickToEditCandidate = null;

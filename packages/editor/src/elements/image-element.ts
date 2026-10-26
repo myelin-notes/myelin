@@ -1,6 +1,7 @@
 import { Crop as CropIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { rotateVector } from '../geometry';
 import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
 import type { YDocManager } from '../ydoc-manager';
@@ -116,6 +117,10 @@ export class ImageElement extends AnchorableElement {
     return this._bitmap !== null && this._naturalWidth !== 0;
   }
 
+  public override get rotatable(): boolean {
+    return !this._cropMode;
+  }
+
   public async setImageData(data: ArrayBuffer) {
     const blob = new Blob([data]);
     this._bitmap = await createImageBitmap(blob);
@@ -178,9 +183,20 @@ export class ImageElement extends AnchorableElement {
     if (!b64) {
       return;
     }
-    const bb = this.boundingBox;
-    const p0 = ctx.worldToPagePt(bb.x, bb.y);
-    const p1 = ctx.worldToPagePt(bb.right, bb.bottom);
+    // The unrotated box about the element's world center; Rust turns it back about that center.
+    const box = this.orientedBox;
+    const center = rotateVector(
+      { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+      this.rotation,
+    );
+    const p0 = ctx.worldToPagePt(
+      center.x - box.width / 2,
+      center.y - box.height / 2,
+    );
+    const p1 = ctx.worldToPagePt(
+      center.x + box.width / 2,
+      center.y + box.height / 2,
+    );
     const imageRef = ctx.addImageBase64(b64);
     ctx.push({
       t: 'image',
@@ -189,6 +205,9 @@ export class ImageElement extends AnchorableElement {
       w: Math.abs(p1.x - p0.x),
       h: Math.abs(p1.y - p0.y),
       imageRef,
+      ...(this.rotation === 0
+        ? {}
+        : { rotation: (this.rotation * 180) / Math.PI }),
     });
   }
 
@@ -431,12 +450,14 @@ export class ImageElement extends AnchorableElement {
           ? anchorNaturalY
           : bcy;
 
+    const anchor = rotateVector(anchorWorld, -this.rotation);
+    const original = rotateVector(originalOffset, -this.rotation);
     const newOffsetX = h.scaleX
-      ? anchorWorld.x - (anchorNaturalX - newCx) * sx
-      : originalOffset.x;
+      ? anchor.x - (anchorNaturalX - newCx) * sx
+      : original.x;
     const newOffsetY = h.scaleY
-      ? anchorWorld.y - (anchorNaturalY - newCy) * sy
-      : originalOffset.y;
+      ? anchor.y - (anchorNaturalY - newCy) * sy
+      : original.y;
 
     this._cropX = newCx;
     this._cropY = newCy;
@@ -449,6 +470,6 @@ export class ImageElement extends AnchorableElement {
       cropW: newCw,
       cropH: newCh,
     });
-    this.setOffset(newOffsetX, newOffsetY);
+    this.setOffsetAlongAxes(newOffsetX, newOffsetY);
   }
 }
