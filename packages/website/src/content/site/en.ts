@@ -47,7 +47,7 @@ const en: SiteCopy = {
   tryIt: {
     title: 'Try Myelin Notes in your browser',
     description:
-      'A blank Myelin canvas to draw, type, and write on, right in your browser. Nothing is saved: download the app to keep your notes.',
+      'A Myelin canvas to draw, type, and write on, right in your browser, saved in this browser. Download the app for every feature.',
   },
 
   ink: {

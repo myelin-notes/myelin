@@ -43,7 +43,7 @@ const zhHans: SiteCopy = {
   tryIt: {
     title: '在浏览器中试用 Myelin Notes',
     description:
-      '一块空白的 Myelin 画布，可直接在浏览器中绘画、书写和打字。内容不会保存：下载应用即可保留你的笔记。',
+      '一块 Myelin 画布，可直接在浏览器中绘画、书写和打字，内容保存在此浏览器中。下载应用即可使用全部功能。',
   },
 
   ink: {
