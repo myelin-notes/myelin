@@ -118,7 +118,7 @@ html {
     .reveal-scale {
       animation: reveal linear both;
       animation-timeline: view();
-      animation-range: entry calc(var(--i, 0) * 6%) entry calc(35% + var(--i, 0) * 6%);
+      animation-range: cover calc(var(--i, 0) * 3%) cover calc(20% + var(--i, 0) * 3%);
     }
 
     .reveal-scale {
@@ -128,7 +128,7 @@ html {
     .ink-scroll {
       animation: ink-draw linear both;
       animation-timeline: view();
-      animation-range: entry 40% entry 100%;
+      animation-range: cover 10% cover 35%;
     }
   }
 }
