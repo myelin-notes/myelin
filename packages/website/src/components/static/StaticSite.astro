@@ -27,6 +27,7 @@ const [headBefore, headAfter = ''] = copy.hero.headline.split(copy.hero.headline
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
+const bleed = 'rounded-r-none! rounded-b-none!';
 const kicker = 'reveal kicker text-text-muted';
 const heading =
   'reveal font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
@@ -99,7 +100,7 @@ const ctaOutline = cn(
           class="rise lg:col-span-7 lg:w-[calc(100%+max(2.5rem,50vw-33.5rem)+4rem)]"
           style="animation-delay:.36s"
         >
-          <Shot src="/pdf.png" alt={copy.shots.pdf} eager />
+          <Shot src="/media/web-hero.mp4" alt={copy.shots.pdf} objectPosition="48% 50%" eager />
         </div>
       </div>
     </div>
@@ -118,7 +119,7 @@ const ctaOutline = cn(
       </p>
     </div>
     <div class="reveal-scale mt-14 lg:mt-16">
-      <Shot src="/pdf.png" alt={copy.shots.pdf} />
+      <Shot src="/media/web-pdf.mp4" alt={copy.shots.pdf} objectPosition="60% 50%" />
     </div>
   </section>
 
@@ -126,7 +127,7 @@ const ctaOutline = cn(
   <section class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
       <div class="reveal-scale order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
-        <Shot src="/page-frame.png" alt={copy.shots.pageFrame} />
+        <Shot src="/media/web-code.mp4" objectPosition="50% 50%" alt={copy.shots.pageFrame} />
       </div>
       <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
         <p class={kicker}>02 / {copy.sceneLabels.pages}</p>
@@ -140,7 +141,7 @@ const ctaOutline = cn(
   <!-- Audio and search, linked notes -->
   <section class:list={[wrap, band]}>
     <div class="grid gap-6 lg:grid-cols-2">
-      <div class="reveal-scale lift flex flex-col gap-10 rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
         <div>
           <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
           <h2 class:list={[tileHeading, 'mt-6']}>{copy.audioSearch.heading}</h2>
@@ -148,19 +149,19 @@ const ctaOutline = cn(
           <p class={lede}>{copy.audioSearch.audioBody}</p>
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
-        <div class="mt-auto">
-          <Shot src="/audio.png" alt={copy.shots.audio} />
+        <div class="-mr-7 -mb-7 mt-auto lg:-mr-10 lg:-mb-10">
+          <Shot src="/audio.png" alt={copy.shots.audio} objectPosition="50% 50%" class={bleed} />
         </div>
       </div>
-      <div class="reveal-scale lift flex flex-col gap-10 rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
         <div>
           <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
           <h2 class:list={[tileHeading, 'mt-6']}>{copy.linked.heading}</h2>
         <InkMark variant={0} class="mt-5" />
           <p class={lede}>{copy.linked.body}</p>
         </div>
-        <div class="mt-auto">
-          <Shot src="/graph.png" alt={copy.shots.graph} />
+        <div class="-mr-7 -mb-7 mt-auto lg:-mr-10 lg:-mb-10">
+          <Shot src="/graph.png" alt={copy.shots.graph} objectPosition="55% 50%" class={bleed} />
         </div>
       </div>
     </div>

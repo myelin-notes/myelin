@@ -164,7 +164,6 @@ export interface SiteCopy {
   };
 
   shots: {
-    library: string;
     pdf: string;
     pageFrame: string;
     audio: string;

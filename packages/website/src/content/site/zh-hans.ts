@@ -220,7 +220,6 @@ const zhHans: SiteCopy = {
   },
 
   shots: {
-    library: 'Myelin Notes 的资料库，包含文件夹、笔记卡片、标签与搜索',
     pdf: '嵌入 Myelin 画布的 PDF，一个公式被框出，旁边还有一支手绘的箭头',
     pageFrame:
       'Myelin 的页面框，包含标题、笔记链接、待办清单、行内公式，以及正在运行并在旁边显示输出的代码块',

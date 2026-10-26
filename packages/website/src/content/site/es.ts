@@ -230,8 +230,6 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   },
 
   shots: {
-    library:
-      'La biblioteca de Myelin Notes con carpetas, tarjetas de nota, etiquetas y búsqueda',
     pdf: 'Un PDF incrustado en el lienzo de Myelin, con una ecuación enmarcada y una flecha dibujada a mano al lado',
     pageFrame:
       'Un marco de página de Myelin con encabezados, enlaces entre notas, una lista de tareas, fórmulas en línea y bloques de código ejecutándose con su salida al lado',

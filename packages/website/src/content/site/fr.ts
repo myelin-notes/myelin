@@ -222,8 +222,6 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
   },
 
   shots: {
-    library:
-      'La bibliothèque Myelin Notes avec dossiers, cartes de notes, étiquettes et recherche',
     pdf: 'Un PDF intégré sur le canevas Myelin, avec une équation encadrée et une flèche dessinée à l’encre à côté',
     pageFrame:
       'Un cadre de page Myelin avec titres, liens de notes, liste de tâches, maths en ligne et blocs de code exécutés avec leur sortie à côté',

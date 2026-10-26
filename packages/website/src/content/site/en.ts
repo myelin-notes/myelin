@@ -230,8 +230,6 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
 
   /** Alt text for the static page's screenshots. */
   shots: {
-    library:
-      'The Myelin Notes library with folders, note cards, tags, and search',
     pdf: 'A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it',
     pageFrame:
       'A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them',

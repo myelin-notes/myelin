@@ -3,15 +3,71 @@ interface Props {
   src: string;
   alt: string;
   eager?: boolean;
+  /** CSS object-position for the phone crop, e.g. `50% 50%`. */
+  objectPosition?: string;
+  class?: string;
 }
 
-const { src, alt, eager = false } = Astro.props;
+const {
+  src,
+  alt,
+  eager = false,
+  objectPosition = '50% 50%',
+  class: className,
+} = Astro.props;
+const isVideo = src.endsWith('.mp4');
+const media =
+  'block h-auto w-full aspect-[4/5] object-cover object-[var(--pos)] sm:aspect-auto';
 ---
 
-<img
-  src={src}
-  alt={alt}
-  loading={eager ? 'eager' : 'lazy'}
-  decoding="async"
-  class="block h-auto w-full rounded-2xl shadow-elevated"
-/>
+<div
+  class:list={['overflow-hidden rounded-2xl shadow-elevated', className]}
+  style={`--pos:${objectPosition}`}
+>
+  {
+    isVideo ? (
+      <video
+        data-shot-video
+        src={src}
+        poster={src.replace(/\.mp4$/, '.jpg')}
+        aria-label={alt}
+        width="1650"
+        height="1020"
+        muted
+        loop
+        playsinline
+        preload={eager ? 'auto' : 'none'}
+        class={media}
+      />
+    ) : (
+      <img
+        src={src}
+        alt={alt}
+        loading={eager ? 'eager' : 'lazy'}
+        decoding="async"
+        class={media}
+      />
+    )
+  }
+</div>
+
+<script>
+  // Videos play only while on screen, and never under reduced motion (the poster stays).
+  const videos = document.querySelectorAll<HTMLVideoElement>('[data-shot-video]');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const { target, isIntersecting } of entries) {
+          const video = target as HTMLVideoElement;
+          if (isIntersecting) {
+            video.play().catch(() => {});
+          } else {
+            video.pause();
+          }
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    videos.forEach((video) => observer.observe(video));
+  }
+</script>
