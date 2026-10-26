@@ -50,6 +50,7 @@ export default defineConfig({
         '@myelin/editor/clipboard/drawable-canvas-adapter',
         '@myelin/editor/drawable-canvas',
         '@myelin/editor/elements/element-type',
+        '@myelin/editor/elements/latex/element',
         '@myelin/editor/elements/page-frame-element',
         '@myelin/editor/keybinds',
         '@myelin/editor/tools/tool-keybinds',

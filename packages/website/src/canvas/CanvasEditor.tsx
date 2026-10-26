@@ -6,6 +6,7 @@ import 'katex/dist/katex.min.css';
 import { AllSelection } from 'prosemirror-state';
 import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
 import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
+import { InsertPopover } from '@myelin/editor/components/insert-popover';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 import { ElementType } from '@myelin/editor/elements/element-type';
@@ -14,6 +15,7 @@ import {
   CHROME_HEADER_HEIGHT,
   CHROME_SIDE_PADDING,
 } from '@myelin/editor/elements/frame/chrome';
+import { LatexElement } from '@myelin/editor/elements/latex/element';
 import {
   PAGE_HEIGHT,
   PAGE_WIDTH,
@@ -60,6 +62,25 @@ function startPageFramePlacement(canvas: DrawableCanvas): void {
       frame.setOffset(worldPos.x, worldPos.y);
       frame.updateBounds();
       frame.select();
+    },
+  });
+}
+
+function startLatexPlacement(canvas: DrawableCanvas): void {
+  canvas.startPlacement({
+    getBounds: () => ({ x: 0, y: 0, width: 140, height: 44 }),
+    onPlace: (worldPos) => {
+      const latex = canvas.addElement((uuid) => {
+        const element = new LatexElement(uuid);
+        element.setOffset(worldPos.x, worldPos.y);
+        return element;
+      });
+      latex.updateBounds();
+      latex.select();
+      // Placement runs inside a canvas pointerdown; entering edit now would
+      // register a click-outside listener that the same event, still bubbling
+      // to document, immediately trips. Defer past this event.
+      requestAnimationFrame(() => canvas.enterElementEdit(latex));
     },
   });
 }
@@ -189,6 +210,7 @@ function CanvasEditorInner() {
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
   );
+  const [insertOpen, setInsertOpen] = useState(false);
 
   const { canvasTools, setSelectedToolIndex, hideOptions } = toolState;
 
@@ -294,6 +316,21 @@ function CanvasEditorInner() {
             hasOptions={toolState.hasOptions}
             onSelectTool={toolState.selectTool}
             onToggleOptions={toolState.toggleOptions}
+            insertOpen={insertOpen}
+            onToggleInsert={() => setInsertOpen((open) => !open)}
+            insertPopover={
+              <InsertPopover
+                onInsertFrame={() => {
+                  setInsertOpen(false);
+                  startPageFramePlacement(canvas);
+                }}
+                onInsertLatex={() => {
+                  setInsertOpen(false);
+                  startLatexPlacement(canvas);
+                }}
+                onClose={() => setInsertOpen(false)}
+              />
+            }
           />
         </div>
       )}
