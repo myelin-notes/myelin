@@ -261,7 +261,7 @@ function CanvasEditorInner() {
         {/* Page-frame chrome + ProseMirror editors (z 5, self-positioned). */}
         {canvas && (
           <PageFrameDomLayer
-            canvasRef={drawableCanvasRef}
+            drawableCanvas={canvas}
             editingElement={editingElement}
           />
         )}

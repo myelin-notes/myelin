@@ -110,6 +110,7 @@ export interface SiteCopy {
   hero: {
     eyebrow: string;
     headline: string;
+    canvasHeadline?: string;
     subheadline: string;
     trustLine: string;
     ctaPrimary: string;

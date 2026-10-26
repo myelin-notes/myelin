@@ -430,7 +430,14 @@ async function buildHero(
   const x = r.x + SCENE_PAD;
   const y = r.y + SCENE_PAD;
   const underline = copy.decorations.heroUnderline;
-  title(canvas, x, y + 30, copy.hero.headline, 88, 1120);
+  title(
+    canvas,
+    x,
+    y + 30,
+    copy.hero.canvasHeadline ?? copy.hero.headline,
+    88,
+    1120,
+  );
   drawUnderline(
     canvas,
     x + underline.dx,
