@@ -22,6 +22,7 @@ import {
 import {
   clearPdfTextLayerHighlight,
   highlightPdfTextLayer,
+  trackPdfTextSelection,
 } from './text-layer';
 
 const FAST_SCROLL_PX_PER_FRAME = 24;
@@ -45,6 +46,7 @@ interface PdfTextLayerDom {
   ready: boolean;
   // Identifies the marks applied to `div`; '' when there are none.
   highlightKey: string;
+  untrackSelection: (() => void) | null;
 }
 
 interface PdfPageDom extends PdfPageSurface {
@@ -259,6 +261,7 @@ export class PdfPageView {
   public dispose(document: PDFDocumentProxy | null): void {
     this.scheduler.dispose(this.pageDoms.values());
     for (const pageDom of this.pageDoms.values()) {
+      this.removeTextLayer(pageDom);
       pageDom.root.remove();
     }
     this.pageDoms.clear();
@@ -317,12 +320,17 @@ export class PdfPageView {
         pageIndex,
         ready: false,
         highlightKey: '',
+        untrackSelection: null,
       };
       layer = created;
       pageDom.textLayer = created;
       renderPdfTextLayer(pdfDocument, pageIndex, div).then(
         () => {
+          if (pageDom.textLayer !== created) {
+            return;
+          }
           created.ready = true;
+          created.untrackSelection = trackPdfTextSelection(div);
           this.onTextLayerRendered();
         },
         (error: unknown) => {
@@ -360,6 +368,7 @@ export class PdfPageView {
   }
 
   private removeTextLayer(pageDom: PdfPageDom): void {
+    pageDom.textLayer?.untrackSelection?.();
     pageDom.textLayer?.div.remove();
     pageDom.textLayer = null;
   }
@@ -397,6 +406,7 @@ export class PdfPageView {
     const cachedPageIndex =
       pageDom.rendered?.pageIndex ?? pageDom.rendering?.pageIndex;
     this.scheduler.release(pageDom, true);
+    this.removeTextLayer(pageDom);
     pageDom.root.remove();
     if (
       document &&

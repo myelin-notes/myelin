@@ -47,6 +47,21 @@
   display: contents;
 }
 
+/* Same specificity as `.textLayer > :not(.markedContent)`; comes later so z-index 0 wins. */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
 .textLayer ::selection {
   background: rgb(0 0 255 / 0.25);
   background: color-mix(in srgb, AccentColor, transparent 50%);

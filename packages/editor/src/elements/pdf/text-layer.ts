@@ -106,3 +106,133 @@ export function clearPdfTextLayerHighlight(layer: HTMLElement): void {
   }
   layer.normalize();
 }
+
+// Ported from pdf.js's TextLayerBuilder. Over empty layer space the hit lands on the layer itself,
+// which WebKit resolves to its first text, flipping the selection upward. While selecting, a
+// full-size `.endOfContent` takes those hits instead.
+const endOfContentByLayer = new Map<HTMLElement, HTMLDivElement>();
+let selectionListeners: AbortController | null = null;
+
+/** Call once the layer's text has rendered; returns the cleanup for when the layer is removed. */
+export function trackPdfTextSelection(layer: HTMLElement): () => void {
+  const end = document.createElement('div');
+  end.className = 'endOfContent';
+  layer.append(end);
+  layer.addEventListener('mousedown', () => layer.classList.add('selecting'));
+  endOfContentByLayer.set(layer, end);
+  selectionListeners ??= listenForSelection();
+  return () => {
+    endOfContentByLayer.delete(layer);
+    if (endOfContentByLayer.size === 0) {
+      selectionListeners?.abort();
+      selectionListeners = null;
+    }
+  };
+}
+
+function listenForSelection(): AbortController {
+  const controller = new AbortController();
+  const { signal } = controller;
+  // pdf.js moves the overlay only on WebKit and Chromium < 148; newer engines resolve hits on it.
+  const chromium = /\bChrome\/(\d+)/.exec(navigator.userAgent);
+  const movesEnd = chromium
+    ? Number(chromium[1]) < 148
+    : !navigator.userAgent.includes('Firefox/');
+  let pointerDown = false;
+  let previousRange: Range | null = null;
+  const resetAll = () => {
+    for (const [layer, end] of endOfContentByLayer) {
+      resetEndOfContent(layer, end);
+    }
+  };
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      pointerDown = true;
+    },
+    { signal },
+  );
+  document.addEventListener(
+    'pointerup',
+    () => {
+      pointerDown = false;
+      resetAll();
+    },
+    { signal },
+  );
+  window.addEventListener(
+    'blur',
+    () => {
+      pointerDown = false;
+      resetAll();
+    },
+    { signal },
+  );
+  document.addEventListener(
+    'keyup',
+    () => {
+      if (!pointerDown) {
+        resetAll();
+      }
+    },
+    { signal },
+  );
+  document.addEventListener(
+    'selectionchange',
+    () => {
+      const selection = document.getSelection();
+      if (!selection || selection.rangeCount === 0) {
+        resetAll();
+        return;
+      }
+      const range = selection.getRangeAt(0);
+      for (const [layer, end] of endOfContentByLayer) {
+        if (range.intersectsNode(layer)) {
+          layer.classList.add('selecting');
+        } else {
+          resetEndOfContent(layer, end);
+        }
+      }
+      if (!movesEnd) {
+        return;
+      }
+      // Which boundary the drag is moving, judged against the previous range as pdf.js does.
+      const modifyStart =
+        previousRange !== null &&
+        (range.compareBoundaryPoints(Range.END_TO_END, previousRange) === 0 ||
+          range.compareBoundaryPoints(Range.START_TO_END, previousRange) === 0);
+      previousRange = range.cloneRange();
+      let anchor: Node | null = modifyStart
+        ? range.startContainer
+        : range.endContainer;
+      if (anchor.nodeType === Node.TEXT_NODE) {
+        anchor = anchor.parentNode;
+      }
+      if (anchor?.nodeName === 'MARK') {
+        anchor = anchor.parentNode;
+      }
+      if (anchor && !modifyStart && range.endOffset === 0) {
+        // Nothing of `anchor` is selected; follow the last sibling that has content.
+        let previous = anchor.previousSibling;
+        while (previous && !previous.hasChildNodes()) {
+          previous = previous.previousSibling;
+        }
+        anchor = previous ?? anchor;
+      }
+      const layer = anchor?.parentElement;
+      const end = layer ? endOfContentByLayer.get(layer) : undefined;
+      if (anchor && layer && end) {
+        // Must stay user-select: none, though pdf.js makes it selectable here: a selectable overlay
+        // can hold the selection end, which this move then drags along.
+        layer.insertBefore(end, modifyStart ? anchor : anchor.nextSibling);
+      }
+    },
+    { signal },
+  );
+  return controller;
+}
+
+function resetEndOfContent(layer: HTMLElement, end: HTMLDivElement): void {
+  layer.append(end);
+  layer.classList.remove('selecting');
+}
