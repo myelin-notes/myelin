@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const updated = '5 September 2026';
+const updated = '25 October 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -89,9 +89,9 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
     <section class="pt-14">
       <h2 class={h2}>This website</h2>
       <p class={p}>
-        trymyelin.app uses PostHog to count page views and to record JavaScript
-        errors, so we can tell whether the site works and which pages people
-        read.
+        trymyelin.app uses PostHog to count page views and download clicks and to
+        record JavaScript errors, so we can tell whether the site works, which
+        pages people read, and whether they go on to download the app.
       </p>
       <ul class={list}>
         <li>
@@ -106,8 +106,9 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           <span class={term}>What is recorded.</span> The page you opened and when you
           left it, the page that referred you, your browser, operating system and screen
           size, and your IP address, from which PostHog derives an approximate location.
-          Autocapture
-          and session recording are both off, so clicks, keystrokes, form input, and
+          Clicking a download button records the platform it was for and whether the
+          page was showing its interactive canvas. Autocapture and
+          session recording are both off, so other clicks, keystrokes, form input, and
           screen contents are not recorded.
         </li>
         <li>

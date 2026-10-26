@@ -69,7 +69,8 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       jsonLd={[organization, ...pageJsonLd]}
     />
     <script>
-      import { initWebAnalytics } from '../lib/posthog';
+      import { detectPlatform } from '../lib/downloads';
+      import { initWebAnalytics, trackWebEvent } from '../lib/posthog';
 
       // Hold analytics until the main thread is free, so PostHog neither
       // downloads nor executes while the canvas bundle is still landing. The
@@ -79,6 +80,30 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       } else {
         setTimeout(() => void initWebAnalytics(), 2000);
       }
+
+      // Delegated, so it covers the canvas island's buttons that mount later;
+      // capture phase, so a handler that stops propagation cannot hide a click.
+      document.addEventListener(
+        'click',
+        (event) => {
+          const link = (event.target as Element).closest<HTMLAnchorElement>(
+            'a[data-download]',
+          );
+          if (!link) {
+            return;
+          }
+          const platform = link.dataset.download;
+          trackWebEvent('download_clicked', {
+            platform: platform === 'auto' ? detectPlatform() : platform,
+            site_version: document.documentElement.classList.contains(
+              'canvas-env',
+            )
+              ? 'canvas'
+              : 'static',
+          });
+        },
+        true,
+      );
     </script>
   </head>
   <body>

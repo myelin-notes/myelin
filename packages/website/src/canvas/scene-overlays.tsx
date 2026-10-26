@@ -28,6 +28,8 @@ interface ButtonProps {
   x?: number;
   y?: number;
   href?: string;
+  /** Marks the link as a download of this platform's build, for click analytics. */
+  platform?: PlatformKey;
   onClick?: () => void;
   variant?: 'primary' | 'outline';
   size?: number;
@@ -51,6 +53,7 @@ function WorldButton({
   x,
   y,
   href,
+  platform,
   onClick,
   variant = 'primary',
   size = 26,
@@ -117,6 +120,7 @@ function WorldButton({
         className={className}
         style={style}
         href={href}
+        data-download={platform}
         target="_blank"
         rel="noreferrer"
       >
@@ -216,7 +220,11 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           gap: 28,
         }}
       >
-        <WorldButton href={downloadHref(primary.key)} size={30}>
+        <WorldButton
+          href={downloadHref(primary.key)}
+          platform={primary.key}
+          size={30}
+        >
           {primary.label}
         </WorldButton>
         <WorldButton variant="outline" size={30} onClick={onSeeItInAction}>
@@ -236,6 +244,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
       >
         <WorldButton
           href={downloadHref(primary.key)}
+          platform={primary.key}
           size={36}
           width={520}
           sub={primary.sub}
@@ -251,6 +260,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
             <WorldButton
               key={platform.key}
               href={downloadHref(platform.key)}
+              platform={platform.key}
               variant="outline"
               size={26}
               sub={platform.sub}
@@ -308,6 +318,7 @@ export function SceneOverlay({ canvas, onSeeItInAction }: SceneOverlayProps) {
           className="pointer-events-auto font-semibold underline underline-offset-4"
           style={{ color: '#1a1a1a' }}
           href={downloadHref(primary.key)}
+          data-download={primary.key}
           target="_blank"
           rel="noreferrer"
         >
