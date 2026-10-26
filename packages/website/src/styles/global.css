@@ -96,12 +96,10 @@ html {
   }
 }
 
-/* Scroll-driven reveals and ink strokes. .lift uses `translate` so hover still works while
-   a reveal animation holds `transform`.
-   Outside the @supports/no-preference guard
-   nothing here applies, so content stays visible and strokes stay fully drawn.
-   Longhands only: the minifier folds `view()` into the `animation` shorthand, which Chrome rejects.
-   --i (0-3) staggers by shifting the range; .reveal-scale also scales up from 0.97. */
+/* Reveals and ink strokes start paused on their `from` keyframe; StaticSite's script adds
+   .in when they scroll into view. Without JS or with reduced motion nothing here applies, so
+   content stays visible. .lift uses `translate` so hover still works while a reveal holds
+   `transform`. --i (0-3) staggers the delay; .reveal-scale also scales up from 0.97. */
 @keyframes reveal {
   from {
     opacity: 0;
@@ -113,28 +111,22 @@ html {
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .reveal,
-    .reveal-scale {
-      animation-name: reveal;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
-      animation-timeline: view();
-      animation-range: cover calc(var(--i, 0) * 3%) cover calc(20% + var(--i, 0) * 3%);
-    }
+@media (prefers-reduced-motion: no-preference) and (scripting: enabled) {
+  .reveal,
+  .reveal-scale {
+    animation: reveal 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) calc(var(--i, 0) * 90ms) both paused;
+  }
 
-    .reveal-scale {
-      --reveal-from: 0.97;
-    }
+  .reveal-scale {
+    --reveal-from: 0.97;
+  }
 
-    .ink-scroll {
-      animation-name: ink-draw;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
-      animation-timeline: view();
-      animation-range: cover 10% cover 35%;
-    }
+  .ink-scroll {
+    animation: ink-draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.25s both paused;
+  }
+
+  .in {
+    animation-play-state: running;
   }
 }
 
