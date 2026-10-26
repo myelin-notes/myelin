@@ -120,13 +120,12 @@
   background-origin: border-box;
 }
 
+/* Obsidian's callout palette; unknown types fall back to note blue like Obsidian does. */
 .pm-editor .ProseMirror blockquote.pm-callout {
-  --pm-callout-fill-color: color-mix(
-    in srgb,
-    var(--bg-surface) 78%,
-    transparent
-  );
-  --pm-blockquote-rule-color: var(--rule-accent);
+  --pm-callout-rgb: 8 109 221;
+  --pm-callout-fill-color: rgb(var(--pm-callout-rgb) / 0.1);
+  --pm-blockquote-rule-color: rgb(var(--pm-callout-rgb) / 0.7);
+  color: var(--text-primary);
   padding-block: 0.85rem;
   padding-right: 1rem;
   border-radius: var(--radius-lg);
@@ -156,12 +155,65 @@
     var(--pm-callout-fill-repeats, no-repeat);
 }
 
+.pm-editor .ProseMirror blockquote.pm-callout:is(
+    [data-callout-type='abstract'],
+    [data-callout-type='summary'],
+    [data-callout-type='tldr'],
+    [data-callout-type='tip'],
+    [data-callout-type='hint'],
+    [data-callout-type='important']
+  ) {
+  --pm-callout-rgb: 0 191 188;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout:is(
+    [data-callout-type='success'],
+    [data-callout-type='check'],
+    [data-callout-type='done']
+  ) {
+  --pm-callout-rgb: 8 185 78;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout:is(
+    [data-callout-type='question'],
+    [data-callout-type='help'],
+    [data-callout-type='faq'],
+    [data-callout-type='warning'],
+    [data-callout-type='caution'],
+    [data-callout-type='attention']
+  ) {
+  --pm-callout-rgb: 236 117 0;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout:is(
+    [data-callout-type='failure'],
+    [data-callout-type='fail'],
+    [data-callout-type='missing'],
+    [data-callout-type='danger'],
+    [data-callout-type='error'],
+    [data-callout-type='bug']
+  ) {
+  --pm-callout-rgb: 233 49 71;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout[data-callout-type='example'] {
+  --pm-callout-rgb: 120 82 238;
+}
+
+.pm-editor .ProseMirror blockquote.pm-callout:is(
+    [data-callout-type='quote'],
+    [data-callout-type='cite']
+  ) {
+  --pm-callout-rgb: 158 158 158;
+}
+
 .pm-editor .ProseMirror blockquote.pm-callout .pm-callout-marker {
-  color: color-mix(in srgb, var(--text-muted) 68%, transparent);
+  color: rgb(var(--pm-callout-rgb) / 0.55);
   font-weight: 520;
 }
 
+/* Mixing toward the text color keeps the title legible on both light and dark pages. */
 .pm-editor .ProseMirror blockquote.pm-callout .pm-callout-title {
-  color: var(--text-primary);
+  color: color-mix(in srgb, rgb(var(--pm-callout-rgb)) 75%, var(--text-primary));
   font-weight: 650;
 }

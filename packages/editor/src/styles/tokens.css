@@ -33,9 +33,8 @@
   --bg-code: rgba(242, 244, 246, 0.92);
   --bg-inline-code: rgba(28, 39, 56, 0.08);
 
-  /* Stronger hairline + accent rule (blockquote / callout) */
+  /* Stronger hairline (blockquote rule) */
   --border-strong: rgba(195, 199, 202, 0.5);
-  --rule-accent: rgba(47, 62, 70, 0.28);
 
   /* Range / slider track */
   --track: rgba(195, 199, 202, 0.4);
@@ -74,7 +73,6 @@
   --bg-inline-code: rgba(255, 255, 255, 0.1);
 
   --border-strong: rgba(255, 255, 255, 0.15);
-  --rule-accent: rgba(159, 176, 196, 0.3);
 
   --track: rgba(255, 255, 255, 0.12);
 

@@ -128,6 +128,31 @@ export const insertNewlineInCallout: Command = (state, dispatch) => {
     return false;
   }
 
+  // Enter on a blank last line leaves the callout, like Obsidian.
+  const map = buildTextOffsetMap(node, $cursor.before());
+  const offset = textOffsetAtPos(map, $cursor.pos);
+  if (offset !== null) {
+    const lineStart = map.text.lastIndexOf('\n', offset - 1) + 1;
+    const lineEnd = lineEndAfter(map.text, offset);
+    if (
+      lineStart > 0 &&
+      lineEnd === map.text.length &&
+      /^[ \t]*$/.test(map.text.slice(lineStart, lineEnd))
+    ) {
+      if (dispatch) {
+        const tr = state.tr.delete(
+          map.posAt[lineStart - 1],
+          map.posAt[lineEnd],
+        );
+        const after = tr.mapping.map($cursor.after());
+        tr.insert(after, schema.nodes.paragraph.create());
+        tr.setSelection(TextSelection.create(tr.doc, after + 1));
+        dispatch(tr.scrollIntoView());
+      }
+      return true;
+    }
+  }
+
   if (dispatch) {
     const text = shouldAddCalloutCaretAnchor($cursor) ? '\n ' : '\n';
     const tr = state.tr.insertText(text);
@@ -267,9 +292,12 @@ interface DeleteRange {
   to: number;
 }
 
+// The anchor is the only trailing whitespace that sits right after the caret; a space the
+// user typed at line end has the caret after it and must survive.
 function collectCalloutCaretAnchorDeletes(
   node: PMNode,
   pos: number,
+  head: number,
 ): DeleteRange[] {
   if (node.type !== schema.nodes.blockquote) {
     return [];
@@ -291,7 +319,11 @@ function collectCalloutCaretAnchorDeletes(
     while (trailingStart > lineStart && /[ \t]/.test(text[trailingStart - 1])) {
       trailingStart--;
     }
-    if (trailingStart < i && /\S/.test(text.slice(lineStart, trailingStart))) {
+    if (
+      trailingStart < i &&
+      posAt[trailingStart] === head &&
+      /\S/.test(text.slice(lineStart, trailingStart))
+    ) {
       deletes.push({ from: posAt[trailingStart], to: posAt[i] });
     }
 
@@ -310,7 +342,13 @@ export function calloutCaretAnchorCleanupPlugin(): Plugin {
 
       const deletes: DeleteRange[] = [];
       newState.doc.descendants((node, pos) => {
-        deletes.push(...collectCalloutCaretAnchorDeletes(node, pos));
+        deletes.push(
+          ...collectCalloutCaretAnchorDeletes(
+            node,
+            pos,
+            newState.selection.head,
+          ),
+        );
         return true;
       });
       if (deletes.length === 0) {
