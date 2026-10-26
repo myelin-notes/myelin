@@ -68,6 +68,7 @@ export class CanvasInteractionController {
   private interactionPointer: { id: number; pen: boolean } | null = null;
   private lastToolSampleTime = 0;
   private toolCursor = 'default';
+  private rulerCursor: string | null = null;
   private appliedCursor: string | null = null;
   private spaceDown = false;
   private onToolSwitched?: (index: number) => void;
@@ -254,6 +255,23 @@ export class CanvasInteractionController {
       }
       this.updateCursor();
     });
+    this.state.addStart(InteractState.DraggingRuler, (event: PointerEvent) => {
+      this.interactionPointer = {
+        id: event.pointerId,
+        pen: event.pointerType === 'pen',
+      };
+      this.host.drawableCanvas.ruler.beginDrag(
+        this.host.viewport.getPoint(event),
+        this.host.viewport.zoom,
+      );
+    });
+    this.state.addUpdate(InteractState.DraggingRuler, (event: PointerEvent) => {
+      this.host.drawableCanvas.ruler.dragTo(this.host.viewport.getPoint(event));
+    });
+    this.state.addEnd(InteractState.DraggingRuler, () => {
+      this.interactionPointer = null;
+      this.host.drawableCanvas.ruler.endDrag();
+    });
     this.state.addUpdate(InteractState.Moving, (event: PointerEvent) => {
       const dx = event.movementX / this.host.viewport.zoom;
       const dy = event.movementY / this.host.viewport.zoom;
@@ -286,10 +304,14 @@ export class CanvasInteractionController {
     this.screenPosition = this.host.viewport.getScreenPoint(event);
     this.state.update(event);
     if (event.target === this.host.canvas) {
-      this.selectedTool.hover?.(
-        this.host.drawableCanvas,
-        this.host.viewport.screenToWorld(this.screenPosition),
-      );
+      const point = this.host.viewport.screenToWorld(this.screenPosition);
+      this.selectedTool.hover?.(this.host.drawableCanvas, point);
+      if (this.state.current === InteractState.Idle) {
+        this.rulerCursor = this.host.drawableCanvas.ruler.cursorAt(
+          point,
+          this.host.viewport.zoom,
+        );
+      }
     }
     this.updateCursor();
   }
@@ -323,7 +345,12 @@ export class CanvasInteractionController {
         }
         this.penContactOpen = true;
         this.beginPenContact(event);
-        this.state.change(InteractState.UsingTool, event);
+        this.state.change(
+          this.hitsRuler(event)
+            ? InteractState.DraggingRuler
+            : InteractState.UsingTool,
+          event,
+        );
         this.state.update(event);
         return;
       case 'mouse':
@@ -336,8 +363,22 @@ export class CanvasInteractionController {
           return;
         }
     }
-    this.state.change(InteractState.UsingTool, event);
+    this.state.change(
+      this.hitsRuler(event)
+        ? InteractState.DraggingRuler
+        : InteractState.UsingTool,
+      event,
+    );
     this.state.update(event);
+  }
+
+  private hitsRuler(event: PointerEvent): boolean {
+    return (
+      this.host.drawableCanvas.ruler.hit(
+        this.host.viewport.getPoint(event),
+        this.host.viewport.zoom,
+      ) !== null
+    );
   }
 
   private startTouchInteraction(event: PointerEvent): void {
@@ -348,6 +389,11 @@ export class CanvasInteractionController {
         this.abortInteraction();
       }
       this.state.change(InteractState.Idle, event);
+      return;
+    }
+    if (this.hitsRuler(event)) {
+      this.touchTapCandidate = null;
+      this.state.change(InteractState.DraggingRuler, event);
       return;
     }
     if (this.input.touchDrivesTool) {
@@ -431,6 +477,8 @@ export class CanvasInteractionController {
     this.touchTapCandidate = null;
     if (this.state.current === InteractState.UsingTool) {
       this.abortInteraction();
+    } else if (this.state.current === InteractState.DraggingRuler) {
+      this.state.change(InteractState.Idle, event);
     } else if (this.state.current === InteractState.Moving) {
       const startOffset = this.touchPanStartOffset;
       this.state.change(InteractState.Idle, event);
@@ -552,7 +600,7 @@ export class CanvasInteractionController {
         ? 'grabbing'
         : this.spaceDown
           ? 'grab'
-          : this.toolCursor;
+          : (this.rulerCursor ?? this.toolCursor);
     if (cursor !== this.appliedCursor) {
       this.appliedCursor = cursor;
       this.host.canvas.style.cursor = cursor;
@@ -563,5 +611,6 @@ export class CanvasInteractionController {
 enum InteractState {
   UsingTool,
   Moving,
+  DraggingRuler,
   Idle,
 }

@@ -8,6 +8,7 @@ import {
   moveElementOrderForSelection,
 } from './drawable-canvas';
 import { ElementType } from './elements/element-type';
+import { PX_PER_CM, Ruler } from './ruler';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 
@@ -93,6 +94,7 @@ describe('touch editing', () => {
       drawableCanvas: {
         shouldUseSelectToolForTouch: () => false,
         requestRedraw: () => {},
+        ruler: new Ruler(),
       } as never,
       canvas,
       viewport: {
@@ -176,10 +178,12 @@ describe('tablet selection routing', () => {
       endPanGesture: vi.fn(),
       setView: vi.fn(),
     };
+    const ruler = new Ruler();
     const interaction = new CanvasInteractionController({
       drawableCanvas: {
         shouldUseSelectToolForTouch: () => selectionClaimsTouch,
         requestRedraw: () => {},
+        ruler,
       } as never,
       canvas,
       viewport: viewport as never,
@@ -194,12 +198,42 @@ describe('tablet selection routing', () => {
       enterEditAtPoint: () => false,
       refreshRendererSize: () => {},
     }) as unknown as TestableInteraction;
-    return { interaction, tool, viewport };
+    return { interaction, tool, viewport, ruler };
   }
 
   afterEach(() => {
     vi.unstubAllGlobals();
     UserPrefs.set('inputMode', 'touch');
+  });
+
+  it.each([
+    'pen',
+    'touch',
+    'mouse',
+  ] as const)('drags the ruler instead of using the tool when a %s presses it', (pointerType) => {
+    const { interaction, tool, viewport, ruler } = makeInteraction(false);
+    // Centred on the pointer at (10, 10); show() makes it 16 cm long.
+    ruler.show(new DOMRect(-490, -240, 1000, 500));
+    const startEnd = 10 - 8 * PX_PER_CM;
+    const down = {
+      pointerId: 1,
+      pointerType,
+      buttons: 1,
+      button: 0,
+      type: 'pointerdown',
+    } as PointerEvent;
+
+    interaction.onPointerDown(down);
+    viewport.getPoint = () => ({ x: 60, y: 10 });
+    interaction.onPointerMove({ ...down, type: 'pointermove' } as PointerEvent);
+    interaction.onPointerUp({ ...down, type: 'pointerup' } as PointerEvent);
+
+    expect(tool.start).not.toHaveBeenCalled();
+    expect(viewport.panBy).not.toHaveBeenCalled();
+    expect(viewport.panGestureBy).not.toHaveBeenCalled();
+    expect(ruler.hit({ x: startEnd + 52, y: 10 }, 1)).toBe('start');
+    expect(ruler.hit({ x: startEnd + 2, y: 10 }, 1)).toBeNull();
+    interaction.destroy();
   });
 
   it.each([

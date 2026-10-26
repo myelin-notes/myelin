@@ -837,6 +837,7 @@ const fr: typeof en = {
       clickForOptions: 'cliquez pour les options',
       customizeWheel: 'Outils et préréglages',
       insert: 'Insérer',
+      ruler: 'Règle',
     },
     selectionToolbar: {
       anchor: 'Ancrer à la page',

@@ -267,7 +267,12 @@ export function getRotateKnobHandle(box: DOMRect): ResizeHandle {
   };
 }
 
-const RESIZE_CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'];
+export const RESIZE_CURSORS = [
+  'ew-resize',
+  'nwse-resize',
+  'ns-resize',
+  'nesw-resize',
+];
 
 /** Maps a handle built on an element's own axes into world space by turning it `angle` radians. */
 export function rotateHandle(

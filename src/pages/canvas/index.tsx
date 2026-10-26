@@ -202,6 +202,18 @@ function CanvasViewInner({
     uiServices: canvasUiServices,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
+  // Keyed by canvas so a canvas swapped in for another note starts with the ruler off.
+  const [rulerCanvas, setRulerCanvas] = useState<DrawableCanvas | null>(null);
+  const rulerVisible =
+    rulerCanvas !== null && rulerCanvas === engine.drawableCanvas;
+  const onToggleRuler = useCallback(() => {
+    const canvas = engine.drawableCanvas;
+    if (!canvas) {
+      return;
+    }
+    canvas.setRulerVisible(!rulerVisible);
+    setRulerCanvas(rulerVisible ? null : canvas);
+  }, [engine.drawableCanvas, rulerVisible]);
   const onExportCanvasPdf = useCallback(() => {
     const canvas = drawableCanvasRef.current;
     if (!canvas) {
@@ -683,6 +695,8 @@ function CanvasViewInner({
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
         onToggleInsert={inserts.toggleInsert}
+        rulerVisible={rulerVisible}
+        onToggleRuler={onToggleRuler}
         onToggleWheelTool={toolState.handleToggleWheelTool}
         insertPopover={insertPopover}
         embedComposer={embedComposer}
