@@ -102,6 +102,45 @@ describe('insertNewlineInCallout', () => {
       '> [!info] Info\n> Body\n> X\n',
     );
   });
+
+  it('keeps spaces typed at the end of a callout line', () => {
+    let state = EditorState.create({
+      schema,
+      doc: parseMarkdownToDoc('> [!info]', schema),
+      plugins: [calloutCaretAnchorCleanupPlugin()],
+    });
+    state = state.apply(state.tr.setSelection(TextSelection.atEnd(state.doc)));
+    for (const ch of ' Two words') {
+      state = state.applyTransaction(state.tr.insertText(ch)).state;
+    }
+
+    expect(serializeDocToMarkdown(state.doc)).toBe('> [!info] Two words\n');
+  });
+
+  it('exits the callout when Enter is pressed on a blank last line', () => {
+    let state = createStateAtBlockEnd('> [!info] Info\n> Body');
+    for (let i = 0; i < 2; i++) {
+      insertNewlineInCallout(state, (tr) => {
+        state = state.apply(tr);
+      });
+    }
+
+    expect(state.doc.toJSON()).toEqual({
+      type: 'doc',
+      content: [
+        {
+          type: 'blockquote',
+          content: [
+            { type: 'text', text: '[!info] Info' },
+            { type: 'hardBreak' },
+            { type: 'text', text: 'Body' },
+          ],
+        },
+        { type: 'paragraph' },
+      ],
+    });
+    expect(state.selection.$head.parent.type).toBe(schema.nodes.paragraph);
+  });
 });
 
 describe('deleteBackwardInCallout', () => {
