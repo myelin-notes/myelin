@@ -33,7 +33,11 @@ const { path } = splitLocalePath(Astro.url.pathname);
   {/* The auto margin sits on the wordmark group so the rest forms one right-hand
       group, whether or not the nav (hidden on phones) or picker (English-only pages) exist. */}
   <div class="mr-auto flex min-w-0 items-center gap-2">
-    <a href={localizePath('/', locale)} class="no-underline">
+    <a
+      href={localizePath('/', locale)}
+      class="flex shrink-0 items-center gap-2 no-underline"
+    >
+      <img src="/favicon.svg" alt="" width="24" height="24" class="size-6" />
       <Wordmark className="text-[1.1rem]" />
     </a>
     {
