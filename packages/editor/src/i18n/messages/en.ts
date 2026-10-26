@@ -350,7 +350,7 @@ const en = {
       mode: {
         label: 'Drawing input',
         description:
-          'What a finger does on the canvas. Pen leaves drawing to the stylus and pans with a finger; Touch draws with a finger, and pans and zooms with two.',
+          'Pen: draw with a stylus and pan with your finger. Touch: draw with your finger, and pan or zoom with two fingers.',
         options: {
           pen: 'Pen',
           touch: 'Touch',
@@ -1042,7 +1042,7 @@ const en = {
       eyebrow: 'Welcome',
       title: 'Myelin Notes',
       description:
-        'An infinite canvas for handwriting, text, and everything in between. Four quick questions and you are done.',
+        'Set up your infinite canvas for handwriting and text in a few quick steps.',
       language: 'Language',
       start: 'Get started',
     },
@@ -1050,41 +1050,40 @@ const en = {
       eyebrow: 'Pen & Touch',
       title: 'How will you draw?',
       description:
-        'Pick what a finger does on the canvas. You can change this any time in Settings.',
+        'You can change what your finger does on the canvas here or later in Settings.',
     },
     privacy: {
       eyebrow: 'Privacy',
       title: 'Help improve Myelin Notes',
       description:
-        'Analytics are off until you turn them on here. You can change this any time in Settings.',
+        'Analytics are off by default. Turn them on to help improve Myelin Notes.',
       collected:
-        'What is sent: which features get used, the app version, and crash reports.',
-      notCollected:
-        'What is never sent: your notes, their contents, file names, or handwriting.',
+        'We collect which features you use, the app version, and crash reports.',
+      notCollected: 'We never collect your notes, file names, or handwriting.',
       policy: 'Read the privacy policy',
     },
     sync: {
       eyebrow: 'Sync',
-      title: 'Where should your notes live?',
+      title: 'Where do you want to save your notes?',
       description:
-        'Notes are stored on this device. Connect a GitHub repository or Google Drive to keep them backed up and in sync across machines.',
+        'Notes are saved on this device, but you can connect GitHub or Google Drive to back them up and sync them across devices.',
       later: 'You can set this up later in Settings.',
       incomplete:
-        'Sign in and finish picking where notes go to continue, or choose Local to decide later.',
+        'You must complete the setup of one of the storage options. You can change this later in Settings.',
     },
     sample: {
       eyebrow: 'Canvas',
       title: 'Start with a sample canvas?',
       description:
-        'Create a sample canvas with some feature showcase that you can play around with',
+        "We'll make a canvas with a few features for you to try out.",
       start: 'Open the canvas',
       skip: 'Start empty',
       canvasName: 'Getting started',
       highlights: {
         frame: 'A page frame with code, math, and a Mermaid diagram',
-        canvas: 'Text and LaTeX floating on the canvas beside it',
-        syntax: 'A cheat sheet for the markdown shortcuts',
-        checklist: 'A short checklist to try things yourself',
+        canvas: 'Text and LaTeX placed on the canvas next to it',
+        syntax: 'A list of Markdown shortcuts',
+        checklist: 'A short checklist to get you started',
       },
     },
     // Content of the starter canvas. Syntax inside these strings
@@ -1094,24 +1093,25 @@ const en = {
       frameName: 'The basics',
       title: 'Getting started',
       intro:
-        'This is a page frame: a document that lives on the canvas. Drag it, resize it, or drop another one beside it.',
+        'This is a page frame, a document that sits on the canvas. You can move it, resize it, or add more next to it.',
       tipTitle: 'Press / to insert',
       tipBody:
-        'Inside a page frame, `/` opens the insert menu: headings, tables, code, math, embeds, dates.',
+        'Type `/` in a page frame to insert headings, tables, code, math, embeds, and dates.',
       codeHeading: 'Code blocks',
       codeBody:
-        'Fence a block with three backticks and a language. What you get is a real editor, not shaded text.',
+        'Type three backticks and a language name to start a code block.',
       mathHeading: 'Math',
       mathBody:
-        'Inline math like $E = mc^2$ sits in a sentence. Fence a block with `$$` to give it a line of its own:',
+        'Inline math like $E = mc^2$ stays in the sentence, and `$$` puts math on its own line:',
       diagramHeading: 'Mermaid diagrams',
-      diagramBody: 'A code block tagged `mermaid` renders as a diagram.',
+      diagramBody:
+        "Set a code block's language to `mermaid` to turn it into a diagram.",
       diagramNodes: {
         idea: 'Idea',
         note: 'Note',
         canvas: 'Canvas',
       },
-      syntaxHeading: 'Worth knowing',
+      syntaxHeading: 'Markdown shortcuts',
       syntaxColumns: {
         type: 'Type this',
         get: 'To get',
@@ -1122,20 +1122,20 @@ const en = {
         math: 'A block of math',
       },
       linkTip:
-        'Two opening square brackets start a link to another note, and the autocomplete finishes it.',
+        'Type two square brackets to link to another note, and autocomplete will fill in the name.',
       mediaHeading: 'Images, PDFs and video',
       mediaBody:
-        'Drag a file onto the canvas, or type / inside a page and choose Embed to place one there. Paste a YouTube or Vimeo link the same way and it becomes a player.',
-      checklistHeading: 'Your turn',
+        'Drag a file onto the canvas, or type / in a page and choose Embed, which also works for YouTube links.',
+      checklistHeading: 'Try it yourself',
       checklistDone: 'Open the starter canvas',
       checklistTodo1: 'Add a page frame of your own',
       checklistTodo2: 'Write something in it',
       canvas: {
-        heading: 'Out here is the canvas',
-        body: 'Text boxes and LaTeX blocks float freely on it. Drag them around, scale them, or line them up beside a page.',
+        heading: 'This is the canvas',
+        body: 'You can put text boxes and LaTeX blocks anywhere on it, then move them, resize them, or line them up next to a page.',
         latexCaption: 'A LaTeX block on the canvas:',
         toolbarHint:
-          'Everything else comes from the + button at the top of the toolbar.',
+          'Use the + button at the top of the toolbar to add anything else.',
       },
     },
   },

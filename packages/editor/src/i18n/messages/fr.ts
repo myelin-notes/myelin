@@ -361,7 +361,7 @@ const fr: typeof en = {
       mode: {
         label: 'Mode de dessin',
         description:
-          'Ce que fait un doigt sur le canevas. Stylet réserve le dessin au stylet et déplace au doigt ; Tactile dessine au doigt, et déplace ou zoome à deux doigts.',
+          'Stylet : dessinez au stylet et déplacez-vous au doigt. Tactile : dessinez au doigt, et déplacez-vous ou zoomez à deux doigts.',
         options: {
           pen: 'Stylet',
           touch: 'Tactile',
@@ -1063,7 +1063,7 @@ const fr: typeof en = {
       eyebrow: 'Bienvenue',
       title: 'Myelin Notes',
       description:
-        'Un canevas infini pour l’écriture manuscrite, le texte et tout ce qu’il y a entre les deux. Quatre questions rapides et c’est fini.',
+        'Configurez votre canevas infini pour l’écriture manuscrite et le texte en quelques étapes rapides.',
       language: 'Langue',
       start: 'Commencer',
     },
@@ -1071,42 +1071,42 @@ const fr: typeof en = {
       eyebrow: 'Stylet et tactile',
       title: 'Comment allez-vous dessiner ?',
       description:
-        'Choisissez ce que fait un doigt sur le canevas. Vous pourrez le changer à tout moment dans les Réglages.',
+        'Vous pouvez modifier ce que fait votre doigt sur le canevas ici ou plus tard dans les Réglages.',
     },
     privacy: {
       eyebrow: 'Confidentialité',
       title: 'Aidez à améliorer Myelin Notes',
       description:
-        'Les statistiques sont désactivées tant que vous ne les activez pas ici. Vous pouvez changer d’avis à tout moment dans les Réglages.',
+        'Les statistiques sont désactivées par défaut. Activez-les pour aider à améliorer Myelin Notes.',
       collected:
-        'Ce qui est envoyé : les fonctionnalités utilisées, la version de l’application et les rapports de plantage.',
+        'Nous collectons les fonctionnalités que vous utilisez, la version de l’application et les rapports de plantage.',
       notCollected:
-        'Ce qui n’est jamais envoyé : vos notes, leur contenu, les noms de fichiers ou votre écriture manuscrite.',
+        'Nous ne collectons jamais vos notes, vos noms de fichiers ni votre écriture manuscrite.',
       policy: 'Lire la politique de confidentialité',
     },
     sync: {
       eyebrow: 'Synchronisation',
-      title: 'Où vos notes doivent-elles vivre ?',
+      title: 'Où voulez-vous enregistrer vos notes ?',
       description:
-        'Les notes sont stockées sur cet appareil. Reliez un dépôt GitHub ou Google Drive pour les sauvegarder et les synchroniser entre vos machines.',
+        'Les notes sont enregistrées sur cet appareil, mais vous pouvez connecter GitHub ou Google Drive pour les sauvegarder et les synchroniser entre vos appareils.',
       later: 'Vous pourrez configurer cela plus tard dans les Réglages.',
       incomplete:
-        'Connectez-vous et finissez de choisir où vont les notes pour continuer, ou choisissez Local pour décider plus tard.',
+        'Vous devez terminer la configuration de l’une des options de stockage. Vous pourrez modifier ce choix plus tard dans les Réglages.',
     },
     sample: {
       eyebrow: 'Canevas',
       title: 'Commencer avec un canevas d’exemple ?',
       description:
-        'Créer un canevas d’exemple présentant quelques fonctionnalités avec lesquelles vous pouvez jouer',
+        'Nous allons créer un canevas avec quelques fonctionnalités à essayer.',
       start: 'Ouvrir le canevas',
       skip: 'Commencer à vide',
       canvasName: 'Premiers pas',
       highlights: {
         frame:
           'Un cadre de page avec du code, des maths et un diagramme Mermaid',
-        canvas: 'Du texte et du LaTeX flottant sur le canevas à côté',
-        syntax: 'Un aide-mémoire des raccourcis markdown',
-        checklist: 'Une courte liste de choses à essayer vous-même',
+        canvas: 'Du texte et du LaTeX placés sur le canevas à côté',
+        syntax: 'Une liste des raccourcis Markdown',
+        checklist: 'Une courte liste pour bien démarrer',
       },
     },
     // Content of the starter canvas. Syntax inside these strings
@@ -1116,25 +1116,25 @@ const fr: typeof en = {
       frameName: 'Les bases',
       title: 'Premiers pas',
       intro:
-        'Ceci est un cadre de page : un document qui vit sur le canevas. Faites-le glisser, redimensionnez-le ou déposez-en un autre à côté.',
+        'Ceci est un cadre de page, un document posé sur le canevas. Vous pouvez le déplacer, le redimensionner ou en ajouter d’autres à côté.',
       tipTitle: 'Appuyez sur / pour insérer',
       tipBody:
-        'Dans un cadre de page, `/` ouvre le menu d’insertion : titres, tableaux, code, maths, intégrations, dates.',
+        'Tapez `/` dans un cadre de page pour insérer des titres, des tableaux, du code, des maths, des intégrations et des dates.',
       codeHeading: 'Blocs de code',
       codeBody:
-        'Délimitez un bloc avec trois accents graves et un langage. Vous obtenez un vrai éditeur, pas du texte grisé.',
+        'Tapez trois accents graves suivis du nom d’un langage pour créer un bloc de code.',
       mathHeading: 'Maths',
       mathBody:
-        'Les maths en ligne comme $E = mc^2$ s’insèrent dans une phrase. Délimitez un bloc avec `$$` pour lui donner sa propre ligne :',
+        'Les maths en ligne comme $E = mc^2$ restent dans la phrase, et `$$` place les maths sur leur propre ligne :',
       diagramHeading: 'Diagrammes Mermaid',
       diagramBody:
-        'Un bloc de code marqué `mermaid` s’affiche sous forme de diagramme.',
+        'Définissez le langage d’un bloc de code sur `mermaid` pour le transformer en diagramme.',
       diagramNodes: {
         idea: 'Idée',
         note: 'Note',
         canvas: 'Canevas',
       },
-      syntaxHeading: 'Bon à savoir',
+      syntaxHeading: 'Raccourcis Markdown',
       syntaxColumns: {
         type: 'Tapez ceci',
         get: 'Pour obtenir',
@@ -1145,20 +1145,20 @@ const fr: typeof en = {
         math: 'Un bloc de maths',
       },
       linkTip:
-        'Deux crochets ouvrants commencent un lien vers une autre note, et l’autocomplétion le termine.',
+        'Tapez deux crochets pour créer un lien vers une autre note, et l’autocomplétion remplira le nom.',
       mediaHeading: 'Images, PDF et vidéos',
       mediaBody:
-        'Faites glisser un fichier sur le canevas, ou tapez / dans une page et choisissez Intégration pour l’y placer. Collez un lien YouTube ou Vimeo de la même façon et il devient un lecteur.',
-      checklistHeading: 'À vous',
+        'Faites glisser un fichier sur le canevas, ou tapez / dans une page et choisissez Intégration, qui fonctionne aussi avec les liens YouTube.',
+      checklistHeading: 'Essayez vous-même',
       checklistDone: 'Ouvrir le canevas de démarrage',
       checklistTodo1: 'Ajouter un cadre de page à vous',
       checklistTodo2: 'Y écrire quelque chose',
       canvas: {
-        heading: 'Ici, c’est le canevas',
-        body: 'Les blocs de texte et de LaTeX y flottent librement. Déplacez-les, redimensionnez-les ou alignez-les à côté d’une page.',
+        heading: 'Voici le canevas',
+        body: 'Vous pouvez placer des blocs de texte et de LaTeX n’importe où, puis les déplacer, les redimensionner ou les aligner à côté d’une page.',
         latexCaption: 'Un bloc LaTeX sur le canevas :',
         toolbarHint:
-          'Tout le reste se trouve derrière le bouton + en haut de la barre d’outils.',
+          'Utilisez le bouton + en haut de la barre d’outils pour ajouter tout le reste.',
       },
     },
   },
