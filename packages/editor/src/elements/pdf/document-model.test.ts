@@ -34,7 +34,7 @@ describe('PdfDocumentModel', () => {
       ],
       pageOrder: [
         { kind: 'pdf', originalIndex: 0 },
-        { kind: 'blank', size: { w: 612, h: 792 } },
+        { kind: 'blank', id: expect.any(String), size: { w: 612, h: 792 } },
         { kind: 'pdf', originalIndex: 1 },
       ],
       pageOrderCustom: true,

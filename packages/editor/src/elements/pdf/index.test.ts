@@ -521,7 +521,7 @@ describe('PdfElement', () => {
     editable.insertBlankPage(1);
     expect(yMap.get('pageOrder')).toEqual([
       { kind: 'pdf', originalIndex: 0 },
-      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'blank', id: expect.any(String), size: { w: 612, h: 792 } },
       { kind: 'pdf', originalIndex: 1 },
       { kind: 'pdf', originalIndex: 2 },
     ]);
@@ -530,7 +530,7 @@ describe('PdfElement', () => {
     editable.deletePage(2);
     expect(yMap.get('pageOrder')).toEqual([
       { kind: 'pdf', originalIndex: 0 },
-      { kind: 'blank', size: { w: 612, h: 792 } },
+      { kind: 'blank', id: expect.any(String), size: { w: 612, h: 792 } },
       { kind: 'pdf', originalIndex: 2 },
     ]);
   });

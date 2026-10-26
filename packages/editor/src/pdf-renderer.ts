@@ -13,6 +13,8 @@ export interface PdfPageOrderPdfEntry {
 
 export interface PdfPageOrderBlankEntry {
   kind: 'blank';
+  /** Anchors reference blank pages by id; pages inserted before ids existed get one on first anchor. */
+  id?: string;
   size: PdfPageSize;
 }
 
@@ -228,9 +230,11 @@ export function normalizePdfPageOrder(
     const kind = (entry as { kind: unknown }).kind;
     if (kind === 'blank') {
       const size = parsePageSize((entry as { size?: unknown }).size);
+      const id = (entry as { id?: unknown }).id;
       return [
         {
           kind: 'blank',
+          ...(typeof id === 'string' ? { id } : {}),
           size: size ?? { ...blankPageFallback },
         },
       ];

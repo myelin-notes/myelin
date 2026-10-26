@@ -209,8 +209,8 @@ export class TextElement
     const editor = this._view?.dom ?? this.createDom(host);
     this.ensureFonts();
 
-    const sx = Math.abs(this._scale.x) || 1;
-    const sy = Math.abs(this._scale.y) || 1;
+    const sx = Math.abs(this.scale.x) || 1;
+    const sy = Math.abs(this.scale.y) || 1;
     const screen = viewport.worldToScreen({
       x: this.offset.x,
       y: this.offset.y,
@@ -250,7 +250,7 @@ export class TextElement
   // syncDOM pushes these on change; the measure pass applies them first, so a recomputeBox running
   // before the next frame (font or scale change) measures the new wrapping, not the last frame's.
   private applyContentStyle(editor: HTMLElement): void {
-    const sx = Math.abs(this._scale.x) || 1;
+    const sx = Math.abs(this.scale.x) || 1;
     editor.style.width = `${this._boxWidth * sx}px`;
     editor.style.fontSize = `${this._style.fontSize}px`;
     editor.style.lineHeight = '1.3';
@@ -508,8 +508,8 @@ export class TextElement
     if (!this._text) {
       return;
     }
-    const sx = this._scale.x;
-    const sy = this._scale.y;
+    const sx = this.scale.x;
+    const sy = this.scale.y;
 
     // Counter the caller's scale so text renders at native font size
     ctx.scale(1 / sx, 1 / sy);
@@ -589,8 +589,8 @@ export class TextElement
   }
 
   private recomputeBox() {
-    const sx = Math.abs(this._scale.x) || 1;
-    const sy = Math.abs(this._scale.y) || 1;
+    const sx = Math.abs(this.scale.x) || 1;
+    const sy = Math.abs(this.scale.y) || 1;
     const fontSize = this._style.fontSize;
     const lineHeight = fontSize * 1.3;
     this._cachedLineHeight = lineHeight;

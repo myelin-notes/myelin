@@ -13,9 +13,11 @@ import type {
   ExportResult,
   ExportTarget,
 } from '../../export/export-controller';
+import type { Vector2 } from '../../geometry';
 import { getMessages } from '../../i18n';
 import {
   buildPdfElementRequest,
+  type PdfElementExportPage,
   type PdfElementExportPdfPage,
   type PdfElementExportSource,
   prepareExportOverlays,
@@ -34,7 +36,12 @@ import {
 import { getPlatform } from '../../platform';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
-import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
+import { ASYNC_RESULT_ORIGIN, type YDocManager } from '../../ydoc-manager';
+import type {
+  AnchorOrigin,
+  PageAnchor,
+  PdfPageKey,
+} from '../anchorable-element';
 import type {
   CanvasElementContext,
   CanvasUiServices,
@@ -68,7 +75,13 @@ import {
   getPdfExportFileName,
   getPositiveScale,
 } from './export-adapter';
-import { isPdfPageVisible, PDF_PAGE_RENDER_MARGIN } from './layout';
+import {
+  findPdfPageAt,
+  getPdfPageKey,
+  isPdfPageVisible,
+  PDF_PAGE_RENDER_MARGIN,
+  type PdfLayout,
+} from './layout';
 import { PdfPageView, type PdfSearchHighlight } from './page-view';
 
 const logger = new Logger('PdfElement');
@@ -96,6 +109,11 @@ export class PdfElement
   private _pageTexts: string[] = [];
   private _editing = false;
   private _searchHighlight: PdfSearchHighlight | null = null;
+  private _ydoc: YDocManager | null = null;
+  private _pagesByKey: {
+    layout: PdfLayout;
+    pages: Map<PdfPageKey, PdfElementExportPage>;
+  } | null = null;
 
   public constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
@@ -135,6 +153,10 @@ export class PdfElement
   public override configureCanvas(context: CanvasElementContext): void {
     this.setExportElementsProvider(context.getElements);
     this._uiServices = context.uiServices;
+  }
+
+  public override bindSharedYState(ydoc: YDocManager): void {
+    this._ydoc = ydoc;
   }
 
   public override get editable(): boolean {
@@ -314,6 +336,74 @@ export class PdfElement
       page.size.w * scaleX,
       page.size.h * scaleY,
     );
+  }
+
+  /** Index of the page under the world `point`, or -1; `band` also counts the margin beside it. */
+  public findPageAt(point: Vector2, band: boolean): number {
+    return findPdfPageAt(
+      this.model.layout,
+      this.model.pageLayout,
+      {
+        x: (point.x - this.offset.x) / getPositiveScale(this._scale.x),
+        y: (point.y - this.offset.y) / getPositiveScale(this._scale.y),
+      },
+      band,
+    );
+  }
+
+  /** The key anchors store for the page at `position`; persists an id for a blank page lacking one. */
+  public getAnchorPageKey(position: number): PdfPageKey | null {
+    const page = this.model.layout.pages[position];
+    if (!page) {
+      return null;
+    }
+    const key = getPdfPageKey(page);
+    if (key !== undefined) {
+      return key;
+    }
+    const id = this.model.ensureBlankPageId(position);
+    this.syncToYMap({
+      pageOrder: this.model.pageEntries,
+      pageOrderCustom: true,
+    });
+    return id;
+  }
+
+  public getAnchorOrigin(
+    anchor: PageAnchor | null,
+  ): Required<AnchorOrigin> | null {
+    return anchor?.kind === 'pdf' && anchor.frameId === this.uuid
+      ? this.getPageOrigin(anchor.page)
+      : null;
+  }
+
+  /** The page's world top-left and the PDF's scale; `null` if `key` isn't a current page. */
+  public getPageOrigin(key: PdfPageKey): Required<AnchorOrigin> | null {
+    const layout = this.model.layout;
+    if (this._pagesByKey?.layout !== layout) {
+      this._pagesByKey = {
+        layout,
+        pages: new Map(
+          layout.pages.flatMap((page) => {
+            const key = getPdfPageKey(page);
+            return key === undefined ? [] : [[key, page] as const];
+          }),
+        ),
+      };
+    }
+    const page = this._pagesByKey.pages.get(key);
+    if (!page) {
+      return null;
+    }
+    const scale = {
+      x: getPositiveScale(this._scale.x),
+      y: getPositiveScale(this._scale.y),
+    };
+    return {
+      x: this.offset.x + page.localLeft * scale.x,
+      y: this.offset.y + page.localTop * scale.y,
+      scale,
+    };
   }
 
   public get localBoundingBox(): DOMRect {
@@ -687,6 +777,8 @@ export class PdfElement
 
   private deletePage(position: number): void {
     const previousPages = this.model.layout.pages;
+    const deleted = previousPages[position];
+    const key = deleted && getPdfPageKey(deleted);
     if (!this.model.deletePage(position)) {
       return;
     }
@@ -700,6 +792,9 @@ export class PdfElement
       pageOrder: this.model.pageEntries,
       pageOrderCustom: true,
     });
+    if (key !== undefined) {
+      this._ydoc?.removeAnchoredElements(this.uuid, key);
+    }
   }
 
   private async loadPdfBytes(

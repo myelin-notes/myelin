@@ -315,7 +315,7 @@ export class CodeOutputElement extends AnchorableElement {
     }
     // Layout at world px, GPU-scale to the zoom: the virtualizer's measured row
     // heights stay zoom-independent (transform doesn't affect offsetHeight).
-    const transform = `scale(${viewport.zoom * this._scale.x}, ${viewport.zoom * this._scale.y})`;
+    const transform = `scale(${viewport.zoom * this.scale.x}, ${viewport.zoom * this.scale.y})`;
     if (root.style.transform !== transform) {
       root.style.transform = transform;
     }

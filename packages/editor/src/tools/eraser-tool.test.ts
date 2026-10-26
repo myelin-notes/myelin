@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '../drawable-canvas';
+import type { PageFrameAnchor } from '../elements/anchorable-element';
 import type { DrawableElement } from '../elements/drawable-element';
 import { ElementType } from '../elements/element-type';
 import { PageFrameElement } from '../elements/page-frame-element';
@@ -185,11 +186,11 @@ describe('EraserTool', () => {
 
     const fragments = elements.filter((item) => item instanceof StrokeElement);
     expect(fragments.length).toBeGreaterThan(1);
-    const gap = fragments[0].pageAnchor!.sharedGap;
+    const gap = (fragments[0].pageAnchor as PageFrameAnchor).sharedGap;
     expect(gap).toEqual({ id: expect.any(String), height });
     expect(gap!.id).not.toBe(element.uuid);
     for (const fragment of fragments) {
-      expect(fragment.pageAnchor?.sharedGap).toEqual(gap);
+      expect((fragment.pageAnchor as PageFrameAnchor).sharedGap).toEqual(gap);
       expect(fragment.makesSpace).toBe(true);
       expect(fragment.offset).toEqual(offset);
     }
@@ -197,7 +198,7 @@ describe('EraserTool', () => {
     for (const fragment of elements.filter(
       (item) => item instanceof StrokeElement,
     )) {
-      expect(fragment.pageAnchor?.sharedGap).toEqual(gap);
+      expect((fragment.pageAnchor as PageFrameAnchor).sharedGap).toEqual(gap);
     }
   });
 

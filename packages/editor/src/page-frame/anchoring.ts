@@ -1,6 +1,9 @@
 import { Anchor, Rows3, Unlink } from 'lucide-react';
 import type { DrawableCanvas } from '../drawable-canvas';
-import { AnchorableElement } from '../elements/anchorable-element';
+import {
+  AnchorableElement,
+  type PageFrameAnchor,
+} from '../elements/anchorable-element';
 import type {
   DrawableElement,
   SelectionToolbarItem,
@@ -10,6 +13,7 @@ import {
   PAGE_PADDING,
   PageFrameElement,
 } from '../elements/page-frame-element';
+import { PdfElement } from '../elements/pdf';
 import type { StrokeElement } from '../elements/stroke-element';
 import type { Vector2 } from '../geometry';
 import type { Messages } from '../i18n/messages';
@@ -19,6 +23,13 @@ import {
   resolveAnchorPosition,
   setAnchorGaps,
 } from './pm/anchoring';
+
+type AnchorTarget = PageFrameElement | PdfElement;
+
+function frameAnchor(element: AnchorableElement): PageFrameAnchor | null {
+  const anchor = element.pageAnchor;
+  return anchor?.kind === 'pdf' ? null : anchor;
+}
 
 export interface PageFramePasteTarget {
   frameId: string;
@@ -92,17 +103,40 @@ export class PageFrameAnchoring {
     return frame instanceof PageFrameElement ? frame : null;
   }
 
-  public findFrame(point: Vector2): PageFrameElement | null {
+  private pdfFor(element: AnchorableElement): PdfElement | null {
+    const pdf = this.canvas.elements.find(
+      (pdf) => pdf.uuid === element.pageAnchor?.frameId,
+    );
+    return pdf instanceof PdfElement ? pdf : null;
+  }
+
+  // A page under the point wins over a PDF whose margin band holds it.
+  public findFrame(point: Vector2): AnchorTarget | null {
     return (
       [...this.canvas.elements]
         .reverse()
         .find(
-          (element): element is PageFrameElement =>
-            element instanceof PageFrameElement &&
+          (element): element is AnchorTarget =>
             !element.hidden &&
-            pageContainsPoint(element, point),
-        ) ?? null
+            ((element instanceof PageFrameElement &&
+              pageContainsPoint(element, point)) ||
+              (element instanceof PdfElement &&
+                element.findPageAt(point, false) >= 0)),
+        ) ??
+      this.findPdfBand(point) ??
+      null
     );
+  }
+
+  private findPdfBand(point: Vector2): PdfElement | undefined {
+    return [...this.canvas.elements]
+      .reverse()
+      .find(
+        (element): element is PdfElement =>
+          element instanceof PdfElement &&
+          !element.hidden &&
+          element.findPageAt(point, true) >= 0,
+      );
   }
 
   private pointOnElement(element: DrawableElement): Vector2 {
@@ -157,9 +191,12 @@ export class PageFrameAnchoring {
 
   public attach(
     element: AnchorableElement,
-    frame: PageFrameElement,
+    frame: AnchorTarget,
     point = this.pointOnElement(element),
   ): boolean {
+    if (frame instanceof PdfElement) {
+      return this.attachToPdf(element, frame, point);
+    }
     const view = frame.pmEditor?.view;
     const content = frame.contentDiv;
     if (!view || !content) {
@@ -251,17 +288,43 @@ export class PageFrameAnchoring {
           gapTop - element.localBoundingBox.top * element.scale.y,
         ),
       );
+      const anchor = frameAnchor(element)!;
       element.setPageAnchor({
-        ...element.pageAnchor!,
+        ...anchor,
         spaceBefore: Math.max(
           0,
-          (element.pageAnchor!.y +
-            element.localBoundingBox.top * element.scale.y) /
+          (anchor.y + element.localBoundingBox.top * element.scale.y) /
             frame.scale.y,
         ),
       });
       this.refresh();
     }
+    return true;
+  }
+
+  private attachToPdf(
+    element: AnchorableElement,
+    pdf: PdfElement,
+    point: Vector2,
+  ): boolean {
+    const position = pdf.findPageAt(point, true);
+    const page = position < 0 ? null : pdf.getAnchorPageKey(position);
+    const origin = page === null ? null : pdf.getPageOrigin(page);
+    if (page === null || !origin) {
+      return false;
+    }
+    const offset = { ...element.offset };
+    const scale = { ...element.scale };
+    element.anchorOrigin = () => pdf.getAnchorOrigin(element.pageAnchor);
+    element.setPageAnchor({
+      kind: 'pdf',
+      frameId: pdf.uuid,
+      page,
+      x: (offset.x - origin.x) / origin.scale.x,
+      y: (offset.y - origin.y) / origin.scale.y,
+      scaleX: scale.x / origin.scale.x,
+      scaleY: scale.y / origin.scale.y,
+    });
     return true;
   }
 
@@ -307,6 +370,16 @@ export class PageFrameAnchoring {
         ) {
           continue;
         }
+        if (element.pageAnchor.kind === 'pdf') {
+          const pdf = this.pdfFor(element);
+          if (
+            !pdf ||
+            !this.attachToPdf(element, pdf, this.pointOnElement(element))
+          ) {
+            element.setPageAnchor(null);
+          }
+          continue;
+        }
         const frame = this.frameFor(element);
         const point = frame && overlapPoint(frame, element);
         if (!frame || !point) {
@@ -336,15 +409,15 @@ export class PageFrameAnchoring {
       }
       const view = frame.pmEditor.view;
       const children = anchored.filter(
-        (element) => element.pageAnchor!.frameId === frame.uuid,
+        (element) => frameAnchor(element)?.frameId === frame.uuid,
       );
       const positions = new Map(
         children.map((element) => [
           element.uuid,
           resolveAnchorPosition(
             view.state,
-            element.pageAnchor!.position,
-            element.pageAnchor!.blockPosition,
+            frameAnchor(element)!.position,
+            frameAnchor(element)!.blockPosition,
           ),
         ]),
       );
@@ -353,7 +426,7 @@ export class PageFrameAnchoring {
         if (!element.makesSpace) {
           continue;
         }
-        const anchor = element.pageAnchor!;
+        const anchor = frameAnchor(element)!;
         const id = anchor.sharedGap?.id ?? element.uuid;
         gaps.set(id, {
           id,
@@ -370,7 +443,7 @@ export class PageFrameAnchoring {
           if (pos >= previousEnd - 1) {
             const resolved = view.state.doc.resolve(pos);
             element.setPageAnchor({
-              ...element.pageAnchor!,
+              ...frameAnchor(element)!,
               position: encodeAnchorPosition(view.state, pos),
               blockPosition: encodeAnchorPosition(
                 view.state,
@@ -390,7 +463,7 @@ export class PageFrameAnchoring {
         const origin = this.origin(
           frame,
           positions.get(element.uuid)!,
-          widgets.get(element.pageAnchor!.sharedGap?.id ?? element.uuid),
+          widgets.get(frameAnchor(element)!.sharedGap?.id ?? element.uuid),
         );
         if (origin) {
           const previous = this.origins.get(element.uuid);
@@ -406,6 +479,18 @@ export class PageFrameAnchoring {
         element.anchorOrigin = () => this.worldOrigin(element, frame);
       }
     }
+    const pdfs = new Map(
+      this.canvas.elements.flatMap((pdf) =>
+        pdf instanceof PdfElement ? [[pdf.uuid, pdf] as const] : [],
+      ),
+    );
+    for (const element of anchored) {
+      const anchor = element.pageAnchor!;
+      const pdf = anchor.kind === 'pdf' ? pdfs.get(anchor.frameId) : undefined;
+      if (pdf) {
+        element.anchorOrigin = () => pdf.getAnchorOrigin(element.pageAnchor);
+      }
+    }
     if (changed) {
       this.onLayoutChange();
     }
@@ -418,32 +503,44 @@ export class PageFrameAnchoring {
     if (!(element instanceof AnchorableElement)) {
       return [];
     }
-    const frame = [...this.canvas.elements]
-      .reverse()
-      .find(
-        (candidate): candidate is PageFrameElement =>
-          candidate instanceof PageFrameElement &&
-          !candidate.hidden &&
-          overlapPoint(candidate, element) !== null,
-      );
+    const frame =
+      [...this.canvas.elements]
+        .reverse()
+        .find(
+          (candidate): candidate is PageFrameElement =>
+            candidate instanceof PageFrameElement &&
+            !candidate.hidden &&
+            overlapPoint(candidate, element) !== null,
+        ) ?? this.findPdfBand(this.pointOnElement(element));
     const labels = strings.canvas.selectionToolbar;
+    const anchorItem: SelectionToolbarItem = {
+      id: 'page-anchor',
+      label: element.pageAnchor ? labels.unanchor : labels.anchor,
+      icon: element.pageAnchor ? Unlink : Anchor,
+      active: !!element.pageAnchor,
+      disabled: element.locked || (!element.pageAnchor && !frame),
+      onClick: () =>
+        this.canvas.transact(() => {
+          if (element.pageAnchor) {
+            element.setPageAnchor(null);
+            this.refresh();
+          } else if (frame instanceof PdfElement) {
+            this.attach(element, frame);
+          } else if (frame) {
+            this.attach(element, frame, overlapPoint(frame, element)!);
+          }
+        }),
+    };
+    // PDF pages don't reflow, so there is no space to make.
+    if (
+      element.pageAnchor
+        ? element.pageAnchor.kind === 'pdf'
+        : frame instanceof PdfElement
+    ) {
+      return [anchorItem];
+    }
     return [
-      {
-        id: 'page-anchor',
-        label: element.pageAnchor ? labels.unanchor : labels.anchor,
-        icon: element.pageAnchor ? Unlink : Anchor,
-        active: !!element.pageAnchor,
-        disabled: element.locked || (!element.pageAnchor && !frame),
-        onClick: () =>
-          this.canvas.transact(() => {
-            if (element.pageAnchor) {
-              element.setPageAnchor(null);
-              this.refresh();
-            } else if (frame) {
-              this.attach(element, frame, overlapPoint(frame, element)!);
-            }
-          }),
-      },
+      anchorItem,
       {
         id: 'anchor-space',
         label: labels.makeSpace,

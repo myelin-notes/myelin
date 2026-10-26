@@ -82,6 +82,8 @@ export interface ExportPage {
   widthPt: number;
   heightPt: number;
   items: PageItem[];
+  /** pdfElement only: where the original page is drawn, in points. Absent means the full page. */
+  background?: { x: number; y: number; w: number; h: number };
 }
 
 /** Each pdfElement output page maps to an original page index or a blank page. */

@@ -82,6 +82,7 @@ export class DrawableCanvasClipboardAdapter implements CanvasClipboardPort {
           bounds: rectFromDomRect(element.boundingBox),
           yMap: element.yMap,
           offset: { ...element.offset },
+          scale: { ...element.scale },
           pageFrameFragment:
             element instanceof PageFrameElement ? element.yXmlFragment : null,
         },

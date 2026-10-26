@@ -120,7 +120,7 @@ export class LatexElement extends AnchorableElement {
 
   /** The formula's rendered size, derived from its uniform canvas scale. */
   public get fontSize(): number {
-    return Math.round(Math.abs(this._scale.x) * LATEX_FONT_SIZE_BASE);
+    return Math.round(Math.abs(this.scale.x) * LATEX_FONT_SIZE_BASE);
   }
 
   /** Updates the rendered size by changing the formula's uniform canvas scale. */
@@ -272,7 +272,7 @@ export class LatexElement extends AnchorableElement {
     setStyleIfChanged(
       root,
       'transform',
-      `scale(${this._scale.x * zoom}, ${this._scale.y * zoom})`,
+      `scale(${this.scale.x * zoom}, ${this.scale.y * zoom})`,
     );
     const editing = this._editing ? 'true' : 'false';
     if (root.dataset.editing !== editing) {

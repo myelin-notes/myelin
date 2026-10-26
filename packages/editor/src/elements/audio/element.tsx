@@ -351,8 +351,8 @@ export class AudioElement
     const root = this._root ?? this.mountReact(host);
 
     const zoom = viewport.zoom;
-    const scaleX = this._scale.x * zoom;
-    const scaleY = this._scale.y * zoom;
+    const scaleX = this.scale.x * zoom;
+    const scaleY = this.scale.y * zoom;
     const visualScale = Math.max(
       0.05,
       (Math.abs(scaleX) + Math.abs(scaleY)) / 2,

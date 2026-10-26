@@ -6,7 +6,7 @@ import { getCanvasPalette, withCanvasAlpha } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import type {
   AnchorableElement,
-  PageFrameAnchor,
+  PageAnchor,
 } from '../elements/anchorable-element';
 import { ElementType } from '../elements/element-type';
 import { ShapeElement } from '../elements/shape-element';
@@ -150,9 +150,14 @@ export class EraserTool implements ITool {
   private fragmentAnchor(
     canvas: DrawableCanvas,
     element: AnchorableElement,
-  ): PageFrameAnchor | null {
+  ): PageAnchor | null {
     const anchor = element.pageAnchor;
-    if (!anchor || !element.makesSpace || anchor.sharedGap) {
+    if (
+      !anchor ||
+      anchor.kind === 'pdf' ||
+      !element.makesSpace ||
+      anchor.sharedGap
+    ) {
       return anchor;
     }
     const frame = canvas.elements.find((item) => item.uuid === anchor.frameId);
