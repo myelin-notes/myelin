@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const updated = '25 October 2026';
+const updated = '26 October 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -95,12 +95,17 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
       </p>
       <ul class={list}>
         <li>
-          <span class={term}>No cookies, and no storage on your device.</span> PostHog
-          is configured to keep its state in memory only, so the site writes no cookie,
+          <span class={term}>No cookies, and no tracking storage.</span> PostHog
+          is configured to keep its state in memory only, so analytics writes no cookie,
           no localStorage entry, and no sessionStorage entry. The identifier attached
           to your visit lasts as long as the page is open and is gone when you close
-          the tab. There is no consent banner because there is nothing stored to consent
-          to.
+          the tab. There is no consent banner because nothing is stored to track you.
+        </li>
+        <li>
+          <span class={term}>The try-it canvas.</span> What you draw and write on the
+          try-it page, and the tools and colors you pick there, are kept in your
+          browser's localStorage so they are still there when you come back. They are
+          never sent to us. Clearing this site's data in your browser deletes them.
         </li>
         <li>
           <span class={term}>What is recorded.</span> The page you opened and when you
