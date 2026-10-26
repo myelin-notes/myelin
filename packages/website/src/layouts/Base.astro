@@ -13,6 +13,8 @@ interface Props {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** False on pages published in one language only (the privacy policy). */
   translated?: boolean;
+  /** Badges the top bar as a limited web version (the try-it canvas). */
+  limitedPreview?: boolean;
 }
 
 const {
@@ -22,6 +24,7 @@ const {
   image,
   jsonLd,
   translated = true,
+  limitedPreview = false,
 } = Astro.props;
 
 const organization = {
@@ -85,7 +88,11 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     </script>
   </head>
   <body>
-    <SiteTopbar locale={locale} translated={translated} />
+    <SiteTopbar
+      locale={locale}
+      translated={translated}
+      limitedPreview={limitedPreview}
+    />
     <slot />
   </body>
 </html>

@@ -14,9 +14,11 @@ interface Props {
   locale: Locale;
   /** False on pages published in one language only, which hides the picker. */
   translated?: boolean;
+  /** Shows the limited-web-version badge beside the wordmark. */
+  limitedPreview?: boolean;
 }
 
-const { locale, translated = true } = Astro.props;
+const { locale, translated = true, limitedPreview = false } = Astro.props;
 const copy = getCopy(locale);
 
 // The route the current URL maps to in another language, so the picker keeps
@@ -28,11 +30,24 @@ const { path } = splitLocalePath(Astro.url.pathname);
 <header
   class="fixed inset-x-0 top-0 z-40 flex h-12 items-center gap-3 border-b border-border-divider bg-toolbar px-4 backdrop-blur-[12px]"
 >
-  {/* The auto margin sits on the wordmark so the rest forms one right-hand group,
-      whether or not the nav (hidden on phones) or picker (English-only pages) exist. */}
-  <a href={localizePath('/', locale)} class="mr-auto no-underline">
-    <Wordmark className="text-[1.1rem]" />
-  </a>
+  {/* The auto margin sits on the wordmark group so the rest forms one right-hand
+      group, whether or not the nav (hidden on phones) or picker (English-only pages) exist. */}
+  <div class="mr-auto flex min-w-0 items-center gap-2">
+    <a href={localizePath('/', locale)} class="no-underline">
+      <Wordmark className="text-[1.1rem]" />
+    </a>
+    {
+      limitedPreview && (
+        /* Hidden on phones, where it would push the Download button off screen. */
+        <span
+          title={copy.tryIt.limited}
+          class="min-w-0 truncate rounded-md bg-surface px-1.5 py-0.5 text-[0.7rem] text-text-muted max-[640px]:hidden"
+        >
+          {copy.tryIt.badge}
+        </span>
+      )
+    }
+  </div>
   {/* Hidden on phones: five links plus picker and CTA overflow the bar, and the
       footer carries the same links. */}
   <nav

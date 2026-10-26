@@ -43,6 +43,7 @@ const fr: SiteCopy = {
     title: 'Essayez Myelin Notes dans votre navigateur',
     description:
       'Un canevas Myelin pour dessiner, écrire et prendre des notes, directement dans votre navigateur, qui l’enregistre. Téléchargez l’app pour profiter de toutes les fonctions.',
+    badge: 'Version web limitée',
     limited:
       'Ceci est une version web limitée. L’app propose aussi une bibliothèque de notes, la recherche, l’enregistrement audio, l’export PDF et la synchronisation.',
   },

@@ -105,7 +105,9 @@ export interface SiteCopy {
   tryIt: {
     title: string;
     description: string;
-    /** Note on the canvas that the web version lacks app features. */
+    /** Top-bar badge marking the canvas as a limited web version. */
+    badge: string;
+    /** The badge's tooltip: what the app has that the web version lacks. */
     limited: string;
   };
 

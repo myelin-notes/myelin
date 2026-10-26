@@ -48,6 +48,7 @@ const en: SiteCopy = {
     title: 'Try Myelin Notes in your browser',
     description:
       'A Myelin canvas to draw, type, and write on, right in your browser, saved in this browser. Download the app for every feature.',
+    badge: 'Limited web preview',
     limited:
       'This is a limited web preview. The app also has a notes library, search, audio recording, PDF export, and sync.',
   },
