@@ -32,7 +32,10 @@ import { SiteCopyProvider } from '@/content/copy-context';
 import { useToolState } from '@/hooks/use-tool-state';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import type { Locale } from '@/lib/locale';
-import { persistTryCanvas } from '@/lib/try-canvas-storage';
+import {
+  persistTryCanvas,
+  persistTryCanvasView,
+} from '@/lib/try-canvas-storage';
 import { initWebPlatform } from '@/lib/web-platform';
 
 const layerClass = 'absolute inset-0 h-full w-full';
@@ -202,6 +205,7 @@ function CanvasEditorInner() {
     const ydoc = new YDocManager();
     const stopPersisting = persistTryCanvas(ydoc.doc);
     const canvas = new DrawableCanvas(fg, ydoc, canvasTools);
+    const stopPersistingView = persistTryCanvasView(canvas.viewport);
     canvas.setBackgroundHost(bg);
     canvas.setOverlayCanvas(overlay);
     canvas.setDomOverlayHost(domHost);
@@ -230,6 +234,7 @@ function CanvasEditorInner() {
       unbindClipboard();
       stopLoop();
       stopPersisting();
+      stopPersistingView();
       canvas.destroy();
       drawableCanvasRef.current = null;
       setCanvas(null);
