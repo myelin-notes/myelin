@@ -100,6 +100,7 @@ html {
    a reveal animation holds `transform`.
    Outside the @supports/no-preference guard
    nothing here applies, so content stays visible and strokes stay fully drawn.
+   Longhands only: the minifier folds `view()` into the `animation` shorthand, which Chrome rejects.
    --i (0-3) staggers by shifting the range; .reveal-scale also scales up from 0.97. */
 @keyframes reveal {
   from {
@@ -116,7 +117,9 @@ html {
   @supports (animation-timeline: view()) {
     .reveal,
     .reveal-scale {
-      animation: reveal linear both;
+      animation-name: reveal;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
       animation-timeline: view();
       animation-range: cover calc(var(--i, 0) * 3%) cover calc(20% + var(--i, 0) * 3%);
     }
@@ -126,7 +129,9 @@ html {
     }
 
     .ink-scroll {
-      animation: ink-draw linear both;
+      animation-name: ink-draw;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
       animation-timeline: view();
       animation-range: cover 10% cover 35%;
     }
