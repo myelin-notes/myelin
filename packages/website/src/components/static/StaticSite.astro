@@ -27,7 +27,6 @@ const [headBefore, headAfter = ''] = copy.hero.headline.split(copy.hero.headline
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
-const bleed = 'rounded-r-none! rounded-b-none!';
 const kicker = 'reveal kicker text-text-muted';
 const heading =
   'reveal font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
@@ -160,8 +159,8 @@ const ctaOutline = cn(
         <InkMark variant={0} class="mt-5" />
           <p class={lede}>{copy.linked.body}</p>
         </div>
-        <div class="-mr-7 -mb-7 mt-auto lg:-mr-10 lg:-mb-10">
-          <Shot src="/graph.png" alt={copy.shots.graph} objectPosition="55% 50%" class={bleed} />
+        <div class="-mb-7 mt-auto lg:-mb-10">
+          <Shot src="/graph.png" alt={copy.shots.graph} objectPosition="55% 50%" class="rounded-b-none!" />
         </div>
       </div>
     </div>
@@ -251,9 +250,10 @@ const ctaOutline = cn(
 
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
-    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>{copy.faqKicker}</p>
-      <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
+    <div>
+      <p class={kicker}>{copy.faqKicker}</p>
+      <h2 class:list={[heading, 'mt-6']}>{copy.download.faqTitle}</h2>
+      <InkMark variant={2} class="mt-5" />
     </div>
     {/* The rules keep the entries separated at phone widths, where it is one
         column regardless. */}
@@ -337,9 +337,6 @@ const ctaOutline = cn(
     <div class="grid gap-10 py-16 lg:grid-cols-12">
       <div class="lg:col-span-5">
         <Wordmark className="text-[1.35rem]" />
-        <p class="mt-4 max-w-xs text-sm leading-relaxed text-text-muted">
-          {copy.footer.tagline}
-        </p>
       </div>
       <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
         <ul class="flex flex-wrap gap-x-8 gap-y-3">
