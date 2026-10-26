@@ -1,10 +1,5 @@
 ---
-// App-chrome style top bar, fixed above the full-screen canvas. Static markup
-// only: CanvasEditor intercepts the Download link and flies the camera to the
-// download scene, since the canvas is the whole page with no anchor to jump to.
-//
-// Being outside the island is what lets one language picker serve both
-// renderings: the canvas and the static page share this bar.
+// App-chrome style top bar, fixed above every page, the try-it canvas included.
 import { getCopy, linkHref, navLinks } from '../content/site';
 import {
   LOCALES,
@@ -39,8 +34,7 @@ const { path } = splitLocalePath(Astro.url.pathname);
   </nav>
   {
     translated && (
-      /* `details` rather than a scripted menu: the canvas island owns the
-         page's JavaScript budget, and this needs none. */
+      /* `details` rather than a scripted menu: this needs no JavaScript. */
       <details class="lang-picker">
         <summary aria-label={copy.topbar.language}>
           <svg
@@ -76,7 +70,6 @@ const { path } = splitLocalePath(Astro.url.pathname);
   <a
     href={`${localizePath('/', locale)}#download`}
     class="topbar-download"
-    data-download-platform-jump
   >
     {copy.topbar.download}
   </a>

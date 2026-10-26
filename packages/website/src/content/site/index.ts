@@ -15,13 +15,8 @@ export {
   siteLinks,
 } from './links';
 
-/**
- * Scenes of the scrollytelling canvas, in order. Layout (world coordinates)
- * lives in `src/canvas/scenes.ts` and the labels live in the locale files; this
- * is the shared vocabulary both index into.
- */
+/** Landing page sections that carry a kicker label, in page order. */
 export const SCENE_IDS = [
-  'hero',
   'ink',
   'pages',
   'audio-search',
@@ -56,15 +51,7 @@ export function linkHref(id: LinkId): string {
   return hrefs[id];
 }
 
-interface SearchResultMock {
-  kind: 'page' | 'audio';
-  title: string;
-  snippet: string;
-}
-
 interface SyncTier {
-  /** Drives the badge color, so it does not depend on the translated word. */
-  shipped: boolean;
   badge: string;
   title: string;
   body: string;
@@ -86,13 +73,6 @@ interface ImportSource {
   detail: string;
 }
 
-/** World-space geometry for one hand-drawn ink decoration. */
-interface Decoration {
-  dx: number;
-  dy: number;
-  width: number;
-}
-
 /**
  * Every word the site says, in one locale. `en.ts` is the reference; adding a
  * key here breaks `es.ts`, `fr.ts` and `zh-hans.ts` until they are translated too.
@@ -110,42 +90,30 @@ export interface SiteCopy {
   hero: {
     eyebrow: string;
     headline: string;
-    canvasHeadline?: string;
     subheadline: string;
     trustLine: string;
     ctaPrimary: string;
+    /** Links to the try-it canvas. */
     ctaSecondary: string;
   };
 
+  /** Page title and meta description of the try-it canvas. */
+  tryIt: { title: string; description: string };
+
   ink: {
-    annotation: string;
-    recognized: string;
     pdfHeading: string;
     pdfBody: string;
-    pdfAnnotation: string;
   };
 
   pages: {
     heading: string;
     body: string;
-    annotation: string;
-    pageTitle: string;
-    pageMarkdown: string;
   };
 
   audioSearch: {
     heading: string;
     audioBody: string;
     searchBody: string;
-    audioMock: {
-      title: string;
-      duration: string;
-      transcriptLabel: string;
-      transcript: string;
-      /** Must appear verbatim inside `transcript`: it is highlighted in place. */
-      match: string;
-    };
-    searchMock: { query: string; results: SearchResultMock[] };
   };
 
   linked: { heading: string; body: string };
@@ -153,7 +121,6 @@ export interface SiteCopy {
   importing: {
     heading: string;
     body: string;
-    annotation: string;
     /**
      * Ordered as the app's own import picker lists them, then Notion, which
      * has no picker row of its own: its Markdown and CSV export goes through
@@ -169,9 +136,6 @@ export interface SiteCopy {
   sync: {
     heading: string;
     kicker: string;
-    cursorYou: string;
-    cursorPeer: string;
-    sharedNote: string;
     tiers: SyncTier[];
   };
 
@@ -179,9 +143,7 @@ export interface SiteCopy {
     heading: string;
     body: string;
     cta: string;
-    autoUpdates: string;
     platforms: Platform[];
-    otherPlatforms: string;
     /** Heads the row of platforms that have no build yet. */
     comingSoon: string;
     mobileBadge: string;
@@ -195,7 +157,6 @@ export interface SiteCopy {
   footer: {
     nav: string;
     tagline: string;
-    download: string;
     platforms: string;
   };
 
@@ -208,27 +169,7 @@ export interface SiteCopy {
   };
 
   canvas: {
-    rail: {
-      label: string;
-      previous: string;
-      next: string;
-      scrollHint: string;
-    };
-    palette: {
-      label: string;
-      placeholder: string;
-      empty: string;
-      groupGoTo: string;
-      groupGetIt: string;
-      download: string;
-    };
     addCustomColor: string;
-  };
-
-  decorations: {
-    heroUnderline: Decoration;
-    localFirstHighlight: Decoration;
-    syncUnderline: Decoration;
   };
 }
 
@@ -249,10 +190,8 @@ export interface Faq {
 }
 
 /**
- * `download.faqMarkdown` as question/answer pairs. The canvas renders that
- * string as a page frame; the static page needs headings and paragraphs, and
- * the page needs it a third time as FAQ structured data. One source, three
- * renderings, so they cannot drift.
+ * `download.faqMarkdown` as question/answer pairs, for the FAQ section and its
+ * structured data. One source, so the two cannot drift.
  */
 export function getFaqs(locale: Locale = DEFAULT_LOCALE): Faq[] {
   return getCopy(locale)

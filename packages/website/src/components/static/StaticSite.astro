@@ -1,14 +1,6 @@
 ---
-// The no-canvas rendering of the site: every word the scrollytelling canvas
-// says, as ordinary scrolling markup. Served to crawlers, no-JS visitors, and
-// touch/narrow viewports. Sections follow the canvas scene order (see
-// `src/canvas/scenes.ts`) so the two tell the same story in the same sequence.
-// The FAQ is the one exception: the canvas renders it inside the download
-// scene, and here it sits just ahead of the download band so the page closes on
-// the CTA rather than on a question.
-//
-// The gate in `Base.astro` hides this before first paint wherever the canvas
-// will run, so desktop never renders a frame of it.
+// The landing page. The FAQ sits just ahead of the download band so the page
+// closes on the CTA rather than on a question.
 import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
 import Shot from './Shot.astro';
@@ -21,7 +13,7 @@ import {
   linkHref,
   siteLinks,
 } from '../../content/site';
-import type { Locale } from '../../lib/locale';
+import { type Locale, localizePath } from '../../lib/locale';
 
 interface Props {
   locale: Locale;
@@ -44,7 +36,7 @@ const ctaOutline = cn(
 );
 ---
 
-<div class="static-site relative z-10 pt-12">
+<div class="relative z-10 pt-12">
   <!-- Hero -->
   <section class={wrap}>
     <div class="pt-16 pb-20 lg:pt-24 lg:pb-24">
@@ -68,7 +60,9 @@ const ctaOutline = cn(
         <a href={siteLinks.releases} data-download="auto" class={cta}>
           {copy.hero.ctaPrimary}
         </a>
-        <a href="#pdfs" class={ctaOutline}>{copy.hero.ctaSecondary}</a>
+        <a href={localizePath('/try', locale)} class={ctaOutline}>
+          {copy.hero.ctaSecondary}
+        </a>
       </div>
       <p class="rise mt-7 text-sm text-text-muted" style="animation-delay:.28s">
         {copy.hero.trustLine}
@@ -225,10 +219,8 @@ const ctaOutline = cn(
       <p class:list={[kicker, 'lg:col-span-3']}>08 / {copy.faqKicker}</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
-    {/* Two columns from `sm` up, not `lg`: this page only ever renders below
-        the canvas breakpoint, so an `lg` column split would never fire and the
-        answers would read as one undifferentiated column. The rules keep the
-        entries separated at phone widths, where it is one column regardless. */}
+    {/* The rules keep the entries separated at phone widths, where it is one
+        column regardless. */}
     <dl class="mt-12 grid gap-x-10 sm:mt-16 sm:grid-cols-2">
       {
         faqs.map((faq) => (

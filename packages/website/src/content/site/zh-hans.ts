@@ -3,10 +3,6 @@ import type { SiteCopy } from './index';
 /**
  * Simplified Chinese site copy. Terminology follows the app's own catalog
  * (`@myelin/editor/i18n/messages/zh-Hans`): 画布, 笔记, 页面框, 资料库.
- *
- * Headlines are deliberately short: CJK glyphs are about one em wide, so a line
- * that reads compactly here is far wider on the canvas than its English
- * counterpart at the same character count.
  */
 const zhHans: SiteCopy = {
   meta: {
@@ -22,7 +18,6 @@ const zhHans: SiteCopy = {
   },
 
   sceneLabels: {
-    hero: 'Myelin',
     ink: 'PDF',
     pages: '页面',
     'audio-search': '音频与搜索',
@@ -41,50 +36,24 @@ const zhHans: SiteCopy = {
       'Myelin Notes 是一款原生、本地优先的笔记应用：在同一块画布上，笔迹、富文本、PDF、图片与音频共处一处。你的笔记留在自己的设备上，同时仍可与他人实时协作编辑，无需任何服务器。',
     trustLine: '个人使用完全免费 · 无需账号 · 你的笔记永不被付费墙锁住',
     ctaPrimary: '下载',
-    ctaSecondary: '看看实际效果',
+    ctaSecondary: '在浏览器中试用',
+  },
+
+  tryIt: {
+    title: '在浏览器中试用 Myelin Notes',
+    description:
+      '一块空白的 Myelin 画布，可直接在浏览器中绘画、书写和打字。内容不会保存：下载应用即可保留你的笔记。',
   },
 
   ink: {
-    annotation: '画个形状并按住，试试看！',
-    recognized: '识别成功！',
     pdfHeading: '直接在 PDF 上\n书写批注。',
     pdfBody:
       '把 PDF 拖到画布上，用与其他内容相同的笔迹批注：圈出公式、高亮某一行、在页边随手涂写。完成后，可以把带批注的 PDF 导出。',
-    pdfAnnotation: '笔迹直接落在页面上',
   },
 
   pages: {
     heading: '真正的文档，\n就在画布上。',
     body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可以直接运行的代码块。',
-    annotation: '一个真正可编辑的页面，点进去看看。',
-    pageTitle: '第 12 讲 · 动作电位',
-    pageMarkdown: `# 动作电位
-
-神经元的静息电位约为 **-70 mV**，由钠钾泵维持。
-
-## 今日内容
-
-- [x] 静息电位回顾
-- [ ] 去极化与 Na+ 通道级联
-- [ ] 髓鞘为何能加快传导
-
-| 阶段 | 通道 | 方向 |
-| --- | --- | --- |
-| 去极化 | Na+ 开放 | 内流 |
-| 复极化 | K+ 开放 | 外流 |
-
-膜电位遵循下式：
-
-$$V_m = \\frac{RT}{F} \\ln \\frac{[K^+]_{out}}{[K^+]_{in}}$$
-
-\`\`\`python
-tau = 2.0  # 膜时间常数，单位 ms
-v = -70.0
-for step in range(3):
-    v += (0 - v) / tau
-    print(round(v, 1))
-\`\`\`
-`,
   },
 
   audioSearch: {
@@ -93,29 +62,6 @@ for step in range(3):
       '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。',
     searchBody:
       '在资料库中搜索笔记标题、标签、已保存文字和音频转写内容；也可以在打开的画布中查找。',
-    audioMock: {
-      title: '第 12 讲 · 动作电位',
-      duration: '48:12',
-      transcriptLabel: '转写文本 · 本地生成',
-      transcript:
-        '……髓鞘包裹着轴突，因此信号在结与结之间跳跃传导，而不是缓慢爬行……',
-      match: '髓鞘',
-    },
-    searchMock: {
-      query: '第 12 讲',
-      results: [
-        {
-          kind: 'page',
-          title: '第 12 讲 · 动作电位',
-          snippet: '画布笔记',
-        },
-        {
-          kind: 'audio',
-          title: '录音 · 第 12 讲',
-          snippet: '画布笔记',
-        },
-      ],
-    },
   },
 
   linked: {
@@ -126,7 +72,6 @@ for step in range(3):
   importing: {
     heading: '把旧笔记\n一起带过来。',
     body: '从其他应用导入你的笔记',
-    annotation: '不用手动复制粘贴。',
     sources: [
       {
         id: 'goodnotes',
@@ -166,24 +111,18 @@ for step in range(3):
     heading: '同步与协作，\n中间没有服务器。',
     kicker:
       '实时协作编辑通常意味着由服务器保管你的笔记。Myelin 选择让设备之间直接连接。',
-    cursorYou: '你',
-    cursorPeer: 'ada',
-    sharedNote: '同一则笔记，\n两台设备',
     tiers: [
       {
-        shipped: true,
         badge: '现已支持',
         title: '实时协作',
         body: '打开同一则笔记的两台设备会自动找到彼此，随后通过两端之间直连的加密 QUIC 连接（iroh）同步编辑。',
       },
       {
-        shipped: true,
         badge: '现已支持',
         title: 'GitHub 同步',
         body: '为 Myelin 指定一个仓库和分支，你的工作区就会通过这个由你掌控的仓库在各设备间同步。',
       },
       {
-        shipped: false,
         badge: '即将推出',
         title: '邀请协作',
         body: '无需交出整个仓库，就能邀请他人加入单则笔记，并以所有者、编辑者和查看者的角色决定对方可以做什么。',
@@ -195,7 +134,6 @@ for step in range(3):
     heading: '下载',
     body: '提供简体中文、英文、西班牙文与法文版本。',
     cta: '下载 Myelin Notes',
-    autoUpdates: '支持\n自动更新',
     platforms: [
       {
         key: 'mac',
@@ -228,7 +166,6 @@ for step in range(3):
         sub: '手机与平板',
       },
     ],
-    otherPlatforms: '同时支持',
     comingSoon: '即将推出',
     mobileBadge:
       'iPhone、iPad 与 Android 版本正在开发中：同样的笔记，而不是功能缩水的阅读器',
@@ -277,7 +214,6 @@ for step in range(3):
   footer: {
     nav: '页脚',
     tagline: '手写、打字与 PDF，都在同一则笔记。',
-    download: '下载 Myelin',
     platforms: 'Mac · Windows · Linux · iPhone、iPad 与 Android 即将推出',
   },
 
@@ -291,27 +227,7 @@ for step in range(3):
   },
 
   canvas: {
-    rail: {
-      label: '章节',
-      previous: '上一节',
-      next: '下一节',
-      scrollHint: '滚动浏览',
-    },
-    palette: {
-      label: '命令面板',
-      placeholder: '跳转到笔记本的任何位置',
-      empty: '没有匹配项。试试场景名称或“下载”。',
-      groupGoTo: '跳转到',
-      groupGetIt: '获取',
-      download: '下载 Myelin Notes',
-    },
     addCustomColor: '添加自定义颜色（十六进制，例如 #3b82f6）',
-  },
-
-  decorations: {
-    heroUnderline: { dx: 4, dy: 290, width: 620 },
-    localFirstHighlight: { dx: 0, dy: 292, width: 408 },
-    syncUnderline: { dx: 0, dy: 310, width: 480 },
   },
 };
 

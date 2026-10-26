@@ -23,7 +23,6 @@ const es: SiteCopy = {
   },
 
   sceneLabels: {
-    hero: 'Myelin',
     ink: 'PDFs',
     pages: 'Páginas',
     'audio-search': 'Audio y búsqueda',
@@ -43,50 +42,24 @@ const es: SiteCopy = {
     trustLine:
       'Totalmente gratis para uso personal · Sin cuenta · Tus notas nunca quedan tras un muro de pago',
     ctaPrimary: 'Descargar',
-    ctaSecondary: 'Verlo en acción',
+    ctaSecondary: 'Pruébalo en el navegador',
+  },
+
+  tryIt: {
+    title: 'Prueba Myelin Notes en el navegador',
+    description:
+      'Un lienzo de Myelin en blanco para dibujar, escribir y tomar notas, directamente en el navegador. No se guarda nada: descarga la app para conservar tus notas.',
   },
 
   ink: {
-    annotation: 'dibuja una forma y mantén. ¡pruébalo!',
-    recognized: '¡reconocida!',
     pdfHeading: 'Escribe directamente\nsobre tus PDFs.',
     pdfBody:
       'Suelta un PDF en el lienzo y anótalo con la misma tinta que todo lo demás: rodea una ecuación, resalta una línea, garabatea en los márgenes. Cuando termines, exporta el PDF anotado.',
-    pdfAnnotation: 'la tinta va sobre la página',
   },
 
   pages: {
     heading: 'Documentos de verdad,\nsobre el lienzo.',
     body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar.',
-    annotation: 'una página real y editable. haz clic.',
-    pageTitle: 'Clase 12 · Potenciales de acción',
-    pageMarkdown: `# Potenciales de acción
-
-El potencial de reposo de la neurona ronda los **-70 mV**, sostenido por la bomba de sodio-potasio.
-
-## Hoy
-
-- [x] Repaso del potencial de reposo
-- [ ] Despolarización y la cascada del canal de Na+
-- [ ] Por qué la mielina acelera la conducción
-
-| Fase | Canal | Dirección |
-| --- | --- | --- |
-| Despolarización | Se abre Na+ | hacia dentro |
-| Repolarización | Se abre K+ | hacia fuera |
-
-El potencial de membrana sigue esta relación:
-
-$$V_m = \\frac{RT}{F} \\ln \\frac{[K^+]_{out}}{[K^+]_{in}}$$
-
-\`\`\`python
-tau = 2.0  # constante de tiempo de membrana, ms
-v = -70.0
-for step in range(3):
-    v += (0 - v) / tau
-    print(round(v, 1))
-\`\`\`
-`,
   },
 
   audioSearch: {
@@ -95,29 +68,6 @@ for step in range(3):
       'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera.',
     searchBody:
       'Busca en la biblioteca por título, etiquetas, texto guardado y transcripciones de audio. También puedes buscar dentro de un lienzo abierto.',
-    audioMock: {
-      title: 'Clase 12 · Potenciales de acción',
-      duration: '48:12',
-      transcriptLabel: 'Transcripción · en el dispositivo',
-      transcript:
-        '…la vaina de mielina aísla el axón, así que la señal salta de nódulo en nódulo en vez de avanzar despacio…',
-      match: 'vaina de mielina',
-    },
-    searchMock: {
-      query: 'Clase 12',
-      results: [
-        {
-          kind: 'page',
-          title: 'Clase 12 · Potenciales de acción',
-          snippet: 'Nota del lienzo',
-        },
-        {
-          kind: 'audio',
-          title: 'Grabación · Clase 12',
-          snippet: 'Nota del lienzo',
-        },
-      ],
-    },
   },
 
   linked: {
@@ -128,7 +78,6 @@ for step in range(3):
   importing: {
     heading: 'Trae contigo\ntus notas de siempre.',
     body: 'Importa tus notas desde otras apps',
-    annotation: 'nada de copiar y pegar.',
     sources: [
       {
         id: 'goodnotes',
@@ -172,24 +121,18 @@ for step in range(3):
     heading: 'Sincroniza y colabora,\nsin servidor por medio.',
     kicker:
       'Editar en tiempo real suele implicar un servidor que guarda tus notas. Myelin conecta los dispositivos directamente.',
-    cursorYou: 'tú',
-    cursorPeer: 'ada',
-    sharedNote: 'la misma nota,\ndos equipos',
     tiers: [
       {
-        shipped: true,
         badge: 'Ya disponible',
         title: 'Colaboración en directo',
         body: 'Dos dispositivos con la misma nota abierta se encuentran solos y editan a la vez por una conexión QUIC cifrada directa entre ambos (iroh).',
       },
       {
-        shipped: true,
         badge: 'Ya disponible',
         title: 'Sincronización con GitHub',
         body: 'Apunta Myelin a un repositorio y una rama, y tu espacio de trabajo se sincroniza entre dispositivos a través de un repositorio que controlas tú.',
       },
       {
-        shipped: false,
         badge: 'Muy pronto',
         title: 'Invitaciones',
         body: 'Suma a alguien a una sola nota sin entregarle el repositorio entero, con roles de propietario, editor y lector que deciden qué puede hacer.',
@@ -201,7 +144,6 @@ for step in range(3):
     heading: 'Descargar',
     body: 'Disponible en español, inglés, francés y chino simplificado.',
     cta: 'Descargar Myelin Notes',
-    autoUpdates: 'con actualizaciones\nautomáticas',
     platforms: [
       {
         key: 'mac',
@@ -234,7 +176,6 @@ for step in range(3):
         sub: 'Móvil y tablet',
       },
     ],
-    otherPlatforms: 'También disponible para',
     comingSoon: 'Muy pronto',
     mobileBadge:
       'iPhone, iPad y Android están en camino: las mismas notas, no un visor recortado',
@@ -283,7 +224,6 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   footer: {
     nav: 'Pie de página',
     tagline: 'Escritura a mano, texto y PDFs. Una sola nota.',
-    download: 'Descargar Myelin',
     platforms: 'Mac · Windows · Linux · iPhone, iPad y Android muy pronto',
   },
 
@@ -300,27 +240,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   },
 
   canvas: {
-    rail: {
-      label: 'Secciones',
-      previous: 'Sección anterior',
-      next: 'Sección siguiente',
-      scrollHint: 'Desplázate para explorar',
-    },
-    palette: {
-      label: 'Paleta de comandos',
-      placeholder: 'Ve a cualquier parte del cuaderno',
-      empty: 'Nada coincide. Prueba con el nombre de una escena o "descargar".',
-      groupGoTo: 'Ir a',
-      groupGetIt: 'Consíguelo',
-      download: 'Descargar Myelin Notes',
-    },
     addCustomColor: 'Añade un color personalizado (hex, p. ej. #3b82f6)',
-  },
-
-  decorations: {
-    heroUnderline: { dx: 4, dy: 290, width: 640 },
-    localFirstHighlight: { dx: 108, dy: 292, width: 400 },
-    syncUnderline: { dx: 0, dy: 310, width: 480 },
   },
 };
 

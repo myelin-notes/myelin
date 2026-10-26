@@ -19,30 +19,6 @@
 @source '../../../editor/src/**/*.{ts,tsx}';
 @source '../../../ui/src/**/*.{ts,tsx}';
 
-/* Handwriting font for the canvas annotations. Self-hosted (matching the
-   local-first pitch, no Google Fonts request): the editor's Google-font
-   pipeline can't fetch TTFs from a browser (the css2 User-Agent trick needs a
-   privileged fetch), so the site ships the face itself. */
-@font-face {
-  font-family: 'Caveat';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('/fonts/caveat-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
-    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
-    U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* The scenes frame content around 0.55x zoom, where the app's dot-grid
-   (1.5px dots at 35% alpha) resamples to invisible sub-pixel smudges. The
-   engine reads this token when it builds the pattern (canvas-theme.ts), so
-   boosting it here restores the app's dotted-canvas look at site zoom
-   levels without touching the engine. */
-:root {
-  --canvas-grid: rgba(140, 145, 151, 0.7);
-}
-
 /* The canvas engine renders a per-frame/PDF hamburger menu button into this
    layer, but the marketing site exposes no frame menu. Hide it while keeping
    the PDF add/delete-page buttons that share this same layer. */
@@ -52,21 +28,7 @@
 
 html,
 body {
-  height: 100%;
-}
-
-/* The canvas is a fixed, full-viewport surface, so it pins the page height.
-   The static fallback scrolls instead and needs to grow past the viewport. */
-html:not(.canvas-env),
-html:not(.canvas-env) body {
-  height: auto;
   min-height: 100%;
-}
-
-/* Set by the gate in Base.astro before first paint: exactly one of the two
-   renderings is ever shown, so there is no swap and nothing flashes. */
-.canvas-env .static-site {
-  display: none;
 }
 
 html {
@@ -109,7 +71,7 @@ html {
 }
 
 /* Site chrome. Sits above the canvas layers (z 0-12) but below the tool rail
-   (z 100) and the command palette, so nothing the visitor opens is covered. */
+   (z 100), so nothing the visitor opens is covered. */
 .site-topbar {
   align-items: center;
   backdrop-filter: blur(12px);
