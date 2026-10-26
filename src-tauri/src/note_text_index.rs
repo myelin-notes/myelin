@@ -11,6 +11,7 @@ const SCHEMA_VERSION: u32 = 1;
 const INDEX_DIR: &str = "NoteTextIndex";
 const TYPE_TEXT: i64 = 1;
 const TYPE_PAGE_FRAME: i64 = 3;
+const TYPE_PDF: i64 = 4;
 const TYPE_AUDIO: i64 = 7;
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
@@ -181,6 +182,12 @@ fn extract_text(bytes: &[u8]) -> Result<String, String> {
                     }
                 }
             }
+            // Written by the app after pdf.js extracts it; one string per original page.
+            Some(TYPE_PDF) => {
+                if let Some(Out::Any(Any::Array(pages))) = element.get(&txn, "pdfText") {
+                    parts.extend(pages.iter().filter_map(value_string).map(str::to_owned));
+                }
+            }
             Some(TYPE_AUDIO) => {
                 if let Some(Out::Any(Any::Array(segments))) =
                     element.get(&txn, "transcriptSegments")
@@ -270,6 +277,13 @@ mod tests {
                 .into(),
             ),
         );
+        let pdf = elements.push_back(&mut txn, MapPrelim::default());
+        pdf.insert(&mut txn, "type", TYPE_PDF);
+        pdf.insert(
+            &mut txn,
+            "pdfText",
+            Any::Array(vec![Any::String("pdf heron".into())].into()),
+        );
         fragment.push_back(&mut txn, yrs::XmlTextPrelim::new("page frame fox"));
         let bytes = txn.encode_state_as_update_v1(&StateVector::default());
         drop(txn);
@@ -277,6 +291,7 @@ mod tests {
         assert!(result.contains("standalone zebra"));
         assert!(result.contains("page frame fox"));
         assert!(result.contains("spoken otter"));
+        assert!(result.contains("pdf heron"));
     }
 
     #[test]

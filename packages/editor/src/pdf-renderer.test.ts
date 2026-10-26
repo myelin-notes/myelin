@@ -1,9 +1,33 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createDefaultPdfPageOrder,
+  getPdfPageTexts,
   getPdfRenderScale,
   normalizePdfPageOrder,
+  openPdfDocument,
 } from './pdf-renderer';
+
+// Node loads pdf.js's worker in-process from a file URL; Vite's `?url` path only resolves in a browser.
+vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', async () => {
+  const { createRequire } = await import('node:module');
+  const { pathToFileURL } = await import('node:url');
+  const workerPath = createRequire(import.meta.url).resolve(
+    'pdfjs-dist/legacy/build/pdf.worker.mjs',
+  );
+  return { default: pathToFileURL(workerPath).href };
+});
+
+const HELLO_PDF = `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R
+  /Resources << /Font << /F1 5 0 R >> >> >> endobj
+4 0 obj << /Length 42 >> stream
+BT /F1 12 Tf 20 100 Td (Hello heron) Tj ET
+endstream endobj
+5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
+trailer << /Root 1 0 R >>
+%%EOF`;
 
 describe('PDF page order metadata', () => {
   it('creates an entry for every page', () => {
@@ -136,5 +160,29 @@ describe('PDF render scale', () => {
     ).toBeLessThanOrEqual(16_000_000);
     expect(Math.ceil(pageSize.w * scale)).toBeLessThanOrEqual(16_384);
     expect(Math.ceil(pageSize.h * scale)).toBeLessThanOrEqual(16_384);
+  });
+});
+
+describe('PDF text extraction', () => {
+  it('reads page text without async-iterating streams, which WebKit lacks', async () => {
+    const asyncIterator = Object.getOwnPropertyDescriptor(
+      ReadableStream.prototype,
+      Symbol.asyncIterator,
+    );
+    Reflect.deleteProperty(ReadableStream.prototype, Symbol.asyncIterator);
+    try {
+      const document = await openPdfDocument(
+        new TextEncoder().encode(HELLO_PDF),
+      );
+      expect(await getPdfPageTexts(document)).toEqual(['Hello heron']);
+    } finally {
+      if (asyncIterator) {
+        Object.defineProperty(
+          ReadableStream.prototype,
+          Symbol.asyncIterator,
+          asyncIterator,
+        );
+      }
+    }
   });
 });

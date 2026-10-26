@@ -20,6 +20,7 @@
 @import "./text.css";
 @import "./canvas-audio.css";
 @import "./canvas-code-output.css";
+@import "./canvas-pdf.css";
 @import "./editor-inline.css";
 @import "./widgets.css";
 @import "./embeds.css";

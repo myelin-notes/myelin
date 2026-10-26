@@ -12,6 +12,7 @@ import { Logger } from '@myelin/shared/logger';
 import type { CanvasViewport } from '../../canvas-viewport';
 import {
   getPdfDocumentPageSizes,
+  getPdfPageTexts,
   openPdfDocument,
   type PdfPageRenderHandle,
   type PdfPageSize,
@@ -31,6 +32,7 @@ vi.mock('../../pdf-renderer', async () => {
   return {
     ...actual,
     getPdfDocumentPageSizes: vi.fn(),
+    getPdfPageTexts: vi.fn(async () => []),
     openPdfDocument: vi.fn(),
     renderPdfPageToCanvas: vi.fn(),
   };
@@ -118,6 +120,7 @@ beforeEach(() => {
   vi.mocked(openPdfDocument).mockReset();
   vi.mocked(getPdfDocumentPageSizes).mockReset();
   vi.mocked(renderPdfPageToCanvas).mockReset();
+  vi.mocked(getPdfPageTexts).mockClear();
 });
 
 afterEach(() => {
@@ -357,6 +360,47 @@ describe('PdfElement', () => {
     expect(element.pageCount).toBe(3);
     expect(element.getPageBounds(1)).toEqual(new DOMRect(412, 616, 600, 75));
     expect(element.getPageBounds(3)).toBeNull();
+  });
+
+  it('stores page text once, outside undo, and searches it in the edited page order', async () => {
+    const ydoc = new YDocManager();
+    const yMap = createPdfYMap(
+      ydoc,
+      [
+        { w: 612, h: 792 },
+        { w: 612, h: 792 },
+      ],
+      {
+        pageOrder: [
+          { kind: 'blank', size: { w: 300, h: 150 } },
+          { kind: 'pdf', originalIndex: 1 },
+        ],
+        pageOrderCustom: true,
+      },
+    );
+    mockOpenedPdf(2);
+    vi.mocked(getPdfPageTexts).mockResolvedValueOnce(['deleted', 'kept']);
+    let localUpdates = 0;
+    ydoc.doc.on('update', (_update: Uint8Array, origin: unknown) => {
+      if (origin === LOCAL_ORIGIN) {
+        localUpdates++;
+      }
+    });
+    const element = new PdfElement('pdf-uuid');
+    element.bindToYMap(yMap);
+    await flushPromises();
+
+    expect(yMap.get('pdfText')).toEqual(['deleted', 'kept']);
+    expect(localUpdates).toBe(0);
+    expect(element.getCanvasSearchContent()).toEqual({
+      kind: 'pdf',
+      pages: [{ position: 1, bounds: element.getPageBounds(1), text: 'kept' }],
+    });
+
+    mockOpenedPdf(2);
+    new PdfElement('pdf-uuid').bindToYMap(yMap);
+    await flushPromises();
+    expect(getPdfPageTexts).toHaveBeenCalledOnce();
   });
 
   it('keeps its persisted shape when initialized before binding', () => {

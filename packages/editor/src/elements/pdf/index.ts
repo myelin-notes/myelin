@@ -23,6 +23,7 @@ import {
 import { bytesToBase64 } from '../../pdf-export/contract';
 import {
   getPdfDocumentPageSizes,
+  getPdfPageTexts,
   getPdfRenderScale,
   isPdfRenderCancelled,
   normalizePdfPageSizes,
@@ -33,10 +34,15 @@ import {
 import { getPlatform } from '../../platform';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { setStyleIfChanged } from '../../utils/style-cache';
+import { ASYNC_RESULT_ORIGIN } from '../../ydoc-manager';
 import type {
   CanvasElementContext,
   CanvasUiServices,
 } from '../canvas-element-context';
+import type {
+  CanvasSearchContent,
+  SearchableElement,
+} from '../canvas-searchable-element';
 import { DrawableElement, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import {
@@ -63,13 +69,13 @@ import {
   getPositiveScale,
 } from './export-adapter';
 import { isPdfPageVisible, PDF_PAGE_RENDER_MARGIN } from './layout';
-import { PdfPageView } from './page-view';
+import { PdfPageView, type PdfSearchHighlight } from './page-view';
 
 const logger = new Logger('PdfElement');
 
 export class PdfElement
   extends DrawableElement
-  implements PdfExportableElement
+  implements PdfExportableElement, SearchableElement
 {
   private readonly model: PdfDocumentModel;
   private readonly pageView: PdfPageView;
@@ -86,11 +92,16 @@ export class PdfElement
     page: PdfElementExportPdfPage;
   }[] = [];
   private _pdfLoadPromise: Promise<void> | null = null;
+  // Indexed by original page; persisted as `pdfText` so library search can read it without pdf.js.
+  private _pageTexts: string[] = [];
+  private _editing = false;
+  private _searchHighlight: PdfSearchHighlight | null = null;
 
   public constructor(uuid: string, pageLayout: PageLayout = 'vertical') {
     super(uuid, ElementType.PDF);
     this.model = new PdfDocumentModel(pageLayout);
     this.pageView = new PdfPageView({
+      onTextLayerRendered: () => this.onRedrawNeeded?.(),
       onRenderError: ({
         error,
         pageIndex,
@@ -124,6 +135,37 @@ export class PdfElement
   public override configureCanvas(context: CanvasElementContext): void {
     this.setExportElementsProvider(context.getElements);
     this._uiServices = context.uiServices;
+  }
+
+  public override get editable(): boolean {
+    return this._pdfDocument !== null;
+  }
+
+  public override enterEditMode(): HTMLElement | null {
+    this._editing = true;
+    this.onRedrawNeeded?.();
+    return this._contentRoot;
+  }
+
+  public override exitEditMode(): void {
+    this._editing = false;
+    this.onRedrawNeeded?.();
+  }
+
+  public getCanvasSearchContent(): CanvasSearchContent | null {
+    const pages = this.model.layout.pages.flatMap((page, position) => {
+      const text =
+        page.kind === 'pdf' ? this._pageTexts[page.originalIndex] : undefined;
+      const bounds = this.getPageBounds(position);
+      return text && bounds ? [{ position, bounds, text }] : [];
+    });
+    return pages.length > 0 ? { kind: 'pdf', pages } : null;
+  }
+
+  /** Marks one canvas-search occurrence (and the rest on its page) in the page's text layer. */
+  public setSearchHighlight(highlight: PdfSearchHighlight | null): void {
+    this._searchHighlight = highlight;
+    this.onRedrawNeeded?.();
   }
 
   public override get resizeHandles(): ResizeHandles {
@@ -174,6 +216,11 @@ export class PdfElement
       fileName: (value) => {
         this.model.setFileName(typeof value === 'string' ? value : '');
         this._chrome?.setFileName(this.model.fileName || null);
+      },
+      pdfText: (value) => {
+        this._pageTexts = Array.isArray(value)
+          ? value.map((text) => (typeof text === 'string' ? text : ''))
+          : [];
       },
     });
   }
@@ -462,6 +509,10 @@ export class PdfElement
       scaleY,
       pageLayout: this.model.pageLayout,
       layout,
+      textLayer:
+        this._editing || this._searchHighlight
+          ? { selectable: this._editing, highlight: this._searchHighlight }
+          : null,
     });
     this.chromeController.sync({
       viewport,
@@ -669,6 +720,9 @@ export class PdfElement
       }
       this._pdfDocument = document;
       this.onRedrawNeeded?.();
+      if (forceMetadata || !this._yMap?.has('pdfText')) {
+        void this.storePageTexts(document, generation);
+      }
       if (
         !forceMetadata &&
         !this.model.shouldLoadPageMetadata({
@@ -688,6 +742,27 @@ export class PdfElement
     } catch (error) {
       if (generation === this._loadGeneration) {
         logger.error('Failed to load PDF', error, {
+          uuid: this.uuid,
+          fileName: this.model.fileName,
+        });
+      }
+    }
+  }
+
+  private async storePageTexts(
+    document: PDFDocumentProxy,
+    generation: number,
+  ): Promise<void> {
+    try {
+      const texts = await getPdfPageTexts(document);
+      if (generation !== this._loadGeneration) {
+        return;
+      }
+      this._pageTexts = texts;
+      this.syncToYMap({ pdfText: texts }, ASYNC_RESULT_ORIGIN);
+    } catch (error) {
+      if (generation === this._loadGeneration) {
+        logger.error('Failed to extract PDF text', error, {
           uuid: this.uuid,
           fileName: this.model.fileName,
         });

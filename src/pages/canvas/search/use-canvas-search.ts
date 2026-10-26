@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
+import { PdfElement } from '@myelin/editor/elements/pdf';
 import type { ActionBinding } from '@myelin/editor/keybinds';
 import {
   clearSearchHighlight,
@@ -61,7 +62,7 @@ export function useCanvasSearch(
   const [query, setQueryState] = useState('');
   const [sources, setSources] = useState<CanvasSearchSource[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  /** The page frame currently showing a match highlight, if any. */
+  /** The page frame or PDF currently showing a match highlight, if any. */
   const highlightedFrameRef = useRef<string | null>(null);
 
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
@@ -91,29 +92,50 @@ export function useCanvasSearch(
     [drawableCanvasRef],
   );
 
+  const clearFrameHighlight = useCallback(
+    (uuid: string) => {
+      const element = drawableCanvasRef.current?.getElementByUuid(uuid);
+      if (element instanceof PdfElement) {
+        element.setSearchHighlight(null);
+        return;
+      }
+      const view = frameView(uuid);
+      if (view) {
+        clearSearchHighlight(view);
+      }
+    },
+    [drawableCanvasRef, frameView],
+  );
+
   const clearActiveHighlight = useCallback(() => {
     const uuid = highlightedFrameRef.current;
     if (!uuid) {
       return;
     }
     highlightedFrameRef.current = null;
-    const view = frameView(uuid);
-    if (view) {
-      clearSearchHighlight(view);
-    }
-  }, [frameView]);
+    clearFrameHighlight(uuid);
+  }, [clearFrameHighlight]);
 
   const highlightFrame = useCallback(
-    (frameUuid: string, q: string, ordinal: number) => {
+    (match: CanvasMatch, frameUuid: string, q: string) => {
+      const ordinal = match.ordinalInFrame ?? 0;
       // Clear a different frame that was previously highlighted.
       const previous = highlightedFrameRef.current;
       if (previous && previous !== frameUuid) {
-        const previousView = frameView(previous);
-        if (previousView) {
-          clearSearchHighlight(previousView);
-        }
+        clearFrameHighlight(previous);
       }
       highlightedFrameRef.current = frameUuid;
+
+      const element = drawableCanvasRef.current?.getElementByUuid(frameUuid);
+      if (element instanceof PdfElement) {
+        // Applied by the PDF once that page's text layer has rendered.
+        element.setSearchHighlight({
+          position: match.pagePosition ?? 0,
+          query: q,
+          current: ordinal,
+        });
+        return;
+      }
 
       let frames = 0;
       const apply = () => {
@@ -133,7 +155,7 @@ export function useCanvasSearch(
       };
       apply();
     },
-    [frameView],
+    [drawableCanvasRef, frameView, clearFrameHighlight],
   );
 
   const navigateToMatch = useCallback(
@@ -142,8 +164,11 @@ export function useCanvasSearch(
       if (!dc) {
         return;
       }
-      if (match.kind === 'page-frame' && match.frameUuid) {
-        highlightFrame(match.frameUuid, q, match.ordinalInFrame ?? 0);
+      if (
+        (match.kind === 'page-frame' || match.kind === 'pdf') &&
+        match.frameUuid
+      ) {
+        highlightFrame(match, match.frameUuid, q);
       } else {
         clearActiveHighlight();
       }

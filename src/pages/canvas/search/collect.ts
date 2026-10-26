@@ -1,9 +1,10 @@
 import type { Node as PMNode } from 'prosemirror-model';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SearchableElement } from '@myelin/editor/elements/canvas-searchable-element';
+import { findPdfTextMatches } from '@myelin/editor/elements/pdf/text-layer';
 import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
 
-export type CanvasSearchKind = 'text' | 'page-frame' | 'transcript';
+export type CanvasSearchKind = 'text' | 'page-frame' | 'transcript' | 'pdf';
 
 export interface CanvasSearchRect {
   x: number;
@@ -13,25 +14,27 @@ export interface CanvasSearchRect {
 }
 
 /**
- * Page frames carry their reconstructed PM doc so occurrences can be enumerated with positions;
- * everything else carries plain text matched at the element/line level.
+ * Page frames carry their reconstructed PM doc and PDF pages their page text, so occurrences can be
+ * enumerated; everything else carries plain text matched at the element/line level.
  */
 export interface CanvasSearchSource {
   kind: CanvasSearchKind;
   rect: CanvasSearchRect;
   selectUuids: string[];
   frameUuid?: string;
+  pagePosition?: number;
   doc?: PMNode;
   text?: string;
 }
 
-/** One navigable match — an occurrence (page frame) or a whole element/line. */
+/** One navigable match — an occurrence (page frame, PDF page) or a whole element/line. */
 export interface CanvasMatch {
   kind: CanvasSearchKind;
   rect: CanvasSearchRect;
   selectUuids: string[];
   frameUuid?: string;
-  /** Occurrence index within the frame, in reading order (page frames only). */
+  pagePosition?: number;
+  /** Occurrence index within the frame or PDF page, in reading order. */
   ordinalInFrame?: number;
 }
 
@@ -60,6 +63,19 @@ export function collectCanvasSearchSources(
       });
       continue;
     }
+    if (content.kind === 'pdf') {
+      for (const page of content.pages) {
+        sources.push({
+          kind: 'pdf',
+          rect: rectOf(page.bounds),
+          selectUuids: [element.uuid],
+          frameUuid: element.uuid,
+          pagePosition: page.position,
+          text: page.text,
+        });
+      }
+      continue;
+    }
     sources.push({
       kind: content.kind,
       rect: rectOf(element.boundingBox),
@@ -71,8 +87,8 @@ export function collectCanvasSearchSources(
   return sources;
 }
 
-// Literal, case-insensitive. Page frames contribute one match per occurrence; other sources
-// contribute one match when their text contains the query.
+// Literal, case-insensitive. Page frames and PDF pages contribute one match per occurrence; other
+// sources contribute one match when their text contains the query.
 export function buildCanvasMatches(
   sources: CanvasSearchSource[],
   query: string,
@@ -92,6 +108,18 @@ export function buildCanvasMatches(
           rect: source.rect,
           selectUuids: source.selectUuids,
           frameUuid: source.frameUuid,
+          ordinalInFrame: index,
+        });
+      }
+    } else if (source.kind === 'pdf' && source.text) {
+      const count = findPdfTextMatches(source.text, needle).length;
+      for (let index = 0; index < count; index++) {
+        matches.push({
+          kind: 'pdf',
+          rect: source.rect,
+          selectUuids: source.selectUuids,
+          frameUuid: source.frameUuid,
+          pagePosition: source.pagePosition,
           ordinalInFrame: index,
         });
       }
