@@ -3,11 +3,26 @@ import { useEffect, useRef, useState } from 'react';
 // (src/index.css), so the editor's own styles.css does not carry it. Without
 // it the MathML fallback renders as duplicate plain text under each formula.
 import 'katex/dist/katex.min.css';
+import { AllSelection } from 'prosemirror-state';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import {
+  CHROME_BOTTOM_PADDING,
+  CHROME_HEADER_HEIGHT,
+  CHROME_SIDE_PADDING,
+} from '@myelin/editor/elements/frame/chrome';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  PageFrameElement,
+} from '@myelin/editor/elements/page-frame-element';
 import { I18nProvider } from '@myelin/editor/i18n';
+import { keybindings } from '@myelin/editor/keybinds';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
+import { TOOL_ACTIONS } from '@myelin/editor/tools/tool-keybinds';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { CanvasToolbar } from '@/components/canvas-toolbar';
 import { SelectionToolbar } from '@/components/selection-toolbar';
@@ -18,6 +33,101 @@ import type { Locale } from '@/lib/locale';
 import { initWebPlatform } from '@/lib/web-platform';
 
 const layerClass = 'absolute inset-0 h-full w-full';
+
+function startPageFramePlacement(canvas: DrawableCanvas): void {
+  canvas.startPlacement({
+    getBounds: () => ({
+      x: -CHROME_SIDE_PADDING,
+      y: -CHROME_HEADER_HEIGHT,
+      width: PAGE_WIDTH + CHROME_SIDE_PADDING * 2,
+      height: PAGE_HEIGHT + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+    }),
+    onPlace: (worldPos) => {
+      const frame = canvas.addElement(
+        (uuid) =>
+          new PageFrameElement(
+            uuid,
+            undefined,
+            UserPrefs.get('defaultPageLayout'),
+          ),
+      );
+      frame.setOffset(worldPos.x, worldPos.y);
+      frame.updateBounds();
+      frame.select();
+    },
+  });
+}
+
+// The app's canvas bindings (src/pages/canvas/hooks/use-engine.ts), minus the
+// insert-embed composer, which needs the app's media store.
+function registerCanvasKeybindings(canvas: DrawableCanvas): () => void {
+  return keybindings.register([
+    {
+      action: 'canvas:pan',
+      onDown: () => canvas.setSpaceDown(true),
+      onUp: () => canvas.setSpaceDown(false),
+    },
+    { action: 'canvas:undo', onDown: () => canvas.undo() },
+    { action: 'canvas:redo', onDown: () => canvas.redo() },
+    {
+      action: 'canvas:select-all',
+      onDown: (event) => {
+        event.preventDefault();
+        const editing = canvas.editingElement;
+        const view =
+          editing instanceof PageFrameElement ? editing.pmEditor?.view : null;
+        if (view) {
+          view.dispatch(
+            view.state.tr.setSelection(new AllSelection(view.state.doc)),
+          );
+          view.focus();
+          return;
+        }
+        canvas.selectAllElements();
+      },
+    },
+    { action: 'canvas:delete', onDown: () => canvas.deleteSelected() },
+    {
+      action: 'canvas:insert-frame',
+      onDown: () => startPageFramePlacement(canvas),
+    },
+    ...canvas.tools.map((tool, index) => ({
+      action: TOOL_ACTIONS[tool.id],
+      onDown: () => canvas.switchTool(index),
+    })),
+  ]);
+}
+
+// Enter on a single selected shape edits its label, as in the app.
+function handleShapeEnter(canvas: DrawableCanvas, event: KeyboardEvent): void {
+  if (
+    event.key !== 'Enter' ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  ) {
+    return;
+  }
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.matches('input, textarea, button, select, a[href]'))
+  ) {
+    return;
+  }
+  const selected = canvas.getSelectedElements();
+  if (
+    canvas.editingElement ||
+    selected.length !== 1 ||
+    selected[0].type !== ElementType.SHAPE
+  ) {
+    return;
+  }
+  event.preventDefault();
+  canvas.enterElementEdit(selected[0], event);
+}
 
 /**
  * The try-it page: the real Myelin canvas engine on a blank in-memory Y.Doc,
@@ -74,11 +184,18 @@ function CanvasEditorInner() {
     const handlePointerDown = () => hideOptions();
     fg.addEventListener('pointerdown', handlePointerDown);
 
+    const unregisterKeybindings = registerCanvasKeybindings(canvas);
+    const handleKeyDown = (event: KeyboardEvent) =>
+      handleShapeEnter(canvas, event);
+    document.addEventListener('keydown', handleKeyDown);
+
     const stopLoop = startDrawableCanvasAnimationLoop(canvas, () => {});
     setCanvas(canvas);
 
     return () => {
       fg.removeEventListener('pointerdown', handlePointerDown);
+      unregisterKeybindings();
+      document.removeEventListener('keydown', handleKeyDown);
       stopLoop();
       canvas.destroy();
       drawableCanvasRef.current = null;
