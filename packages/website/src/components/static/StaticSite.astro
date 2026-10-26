@@ -27,7 +27,7 @@ const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
 const kicker = 'kicker text-text-muted';
 const heading =
-  'font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] whitespace-pre-line text-text-primary';
+  'font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary';
 const lede = 'mt-7 text-text-secondary';
 const cta = cn(buttonVariants(), 'h-11 rounded-xl px-6 text-sm');
 const ctaOutline = cn(
@@ -42,7 +42,7 @@ const ctaOutline = cn(
     <div class="pt-16 pb-20 lg:pt-24 lg:pb-24">
       <p class:list={[kicker, 'rise']}>{copy.hero.eyebrow}</p>
       <h1
-        class="rise mt-6 max-w-4xl font-heading text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-medium tracking-[-0.02em] whitespace-pre-line text-text-primary"
+        class="rise mt-6 max-w-4xl font-heading text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
         style="animation-delay:.06s"
       >
         {copy.hero.headline}
@@ -221,7 +221,7 @@ const ctaOutline = cn(
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
     <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>08 / {copy.faqKicker}</p>
+      <p class:list={[kicker, 'lg:col-span-3']}>{copy.faqKicker}</p>
       <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
     </div>
     {/* The rules keep the entries separated at phone widths, where it is one
@@ -244,12 +244,12 @@ const ctaOutline = cn(
   <section id="download" class="bg-primary text-text-on-dark">
     <div class:list={[wrap, 'py-28 lg:py-36']}>
       <p class="kicker text-text-on-dark/55">
-        09 / {copy.sceneLabels.download}
+        {copy.sceneLabels.download}
       </p>
       <h2
-        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"
+        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance"
       >
-        {copy.download.heading}
+        {copy.footer.tagline}
       </h2>
       <p class="mt-7 max-w-2xl text-text-on-dark/75">{copy.download.body}</p>
       {/* One call to action, then the platforms as detail. This page is

@@ -31,7 +31,7 @@ const zhHans: SiteCopy = {
 
   hero: {
     eyebrow: 'Myelin Notes · 本地优先的笔记应用',
-    headline: '手写、打字与 PDF，\n都在同一则笔记。',
+    headline: '手写、打字与 PDF，都在同一则笔记。',
     subheadline:
       'Myelin Notes 是一款原生、本地优先的笔记应用：在同一块画布上，笔迹、富文本、PDF、图片与音频共处一处。你的笔记留在自己的设备上，同时仍可与他人实时协作编辑，无需任何服务器。',
     trustLine: '个人使用完全免费 · 无需账号 · 你的笔记永不被付费墙锁住',
@@ -46,18 +46,18 @@ const zhHans: SiteCopy = {
   },
 
   ink: {
-    pdfHeading: '直接在 PDF 上\n书写批注。',
+    pdfHeading: '直接在 PDF 上书写批注。',
     pdfBody:
       '把 PDF 拖到画布上，用与其他内容相同的笔迹批注：圈出公式、高亮某一行、在页边随手涂写。完成后，可以把带批注的 PDF 导出。',
   },
 
   pages: {
-    heading: '真正的文档，\n就在画布上。',
+    heading: '真正的文档，就在画布上。',
     body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可以直接运行的代码块。',
   },
 
   audioSearch: {
-    heading: '录下来，转成文字。\n在画布上找得到。',
+    heading: '录下来，转成文字。在画布上找得到。',
     audioBody:
       '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。',
     searchBody:
@@ -70,7 +70,7 @@ const zhHans: SiteCopy = {
   },
 
   importing: {
-    heading: '把旧笔记\n一起带过来。',
+    heading: '把旧笔记一起带过来。',
     body: '从其他应用导入你的笔记',
     sources: [
       {
@@ -97,7 +97,7 @@ const zhHans: SiteCopy = {
   },
 
   localFirst: {
-    heading: '一切都留在\n你自己的电脑上。',
+    heading: '一切都留在你自己的电脑上。',
     lede: '中间没有任何云端。你的笔记就是自己硬盘上的普通文件，Myelin 完全可以离线使用。',
     bullets: [
       '你的笔记是硬盘上的普通文件，采用开放、无冲突的格式（Yjs）。任何内容都不会被锁定。',
@@ -108,7 +108,7 @@ const zhHans: SiteCopy = {
   },
 
   sync: {
-    heading: '同步与协作，\n中间没有服务器。',
+    heading: '同步与协作，中间没有服务器。',
     kicker:
       '实时协作编辑通常意味着由服务器保管你的笔记。Myelin 选择让设备之间直接连接。',
     tiers: [
@@ -133,7 +133,6 @@ const zhHans: SiteCopy = {
   },
 
   download: {
-    heading: '下载',
     body: '提供简体中文、英文、西班牙文与法文版本。',
     cta: '下载 Myelin Notes',
     platforms: [

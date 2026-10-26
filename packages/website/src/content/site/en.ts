@@ -34,7 +34,7 @@ const en: SiteCopy = {
     // Names the product in the hero itself, so it reads as a standalone chunk,
     // which is how crawlers and answer engines lift it.
     eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
-    headline: 'Myelin Notes: handwriting, typing,\nand PDFs. One note.',
+    headline: 'Myelin Notes: handwriting, typing, and PDFs. One note.',
     subheadline:
       'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:
@@ -50,18 +50,18 @@ const en: SiteCopy = {
   },
 
   ink: {
-    pdfHeading: 'Write directly\non your PDFs.',
+    pdfHeading: 'Write directly on your PDFs.',
     pdfBody:
       'Drop a PDF onto the canvas and mark it up in the same ink as everything else: circle an equation, highlight a line, scribble in the margins. When you are done, export the annotated PDF back out.',
   },
 
   pages: {
-    heading: 'Real documents,\nright on the canvas.',
+    heading: 'Real documents, right on the canvas.',
     body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run.',
   },
 
   audioSearch: {
-    heading: 'Record it. Transcribe it.\nFind it on the canvas.',
+    heading: 'Record it. Transcribe it. Find it on the canvas.',
     audioBody:
       'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
@@ -74,7 +74,7 @@ const en: SiteCopy = {
   },
 
   importing: {
-    heading: 'Bring your old notes\nwith you.',
+    heading: 'Bring your old notes with you.',
     body: 'Import your notes from other apps',
     sources: [
       {
@@ -104,7 +104,7 @@ const en: SiteCopy = {
   },
 
   localFirst: {
-    heading: 'It all lives\non your machine.',
+    heading: 'It all lives on your machine.',
     lede: 'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
@@ -116,7 +116,7 @@ const en: SiteCopy = {
   },
 
   sync: {
-    heading: 'Sync and collaborate,\nno server in the middle.',
+    heading: 'Sync and collaborate, no server in the middle.',
     kicker:
       'Real-time editing normally means a server holding your notes. Myelin connects the devices directly instead.',
     tiers: [
@@ -141,7 +141,6 @@ const en: SiteCopy = {
   },
 
   download: {
-    heading: 'Download',
     body: 'Available in English, Spanish, French, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
     platforms: [

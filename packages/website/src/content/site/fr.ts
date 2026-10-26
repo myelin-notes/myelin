@@ -29,7 +29,7 @@ const fr: SiteCopy = {
   hero: {
     eyebrow:
       'Myelin Notes · une app de prise de notes qui vit sur votre machine',
-    headline: 'Écriture manuscrite, texte\net PDF. Une seule note.',
+    headline: 'Écriture manuscrite, texte et PDF. Une seule note.',
     subheadline:
       'Myelin Notes est une app de prise de notes native et locale : un seul canevas où encre, texte enrichi, PDF, images et audio cohabitent. Vos notes restent sur votre machine, et vous pouvez tout de même éditer en direct avec d’autres, sans serveur.',
     trustLine:
@@ -45,18 +45,18 @@ const fr: SiteCopy = {
   },
 
   ink: {
-    pdfHeading: 'Écrivez directement\nsur vos PDF.',
+    pdfHeading: 'Écrivez directement sur vos PDF.',
     pdfBody:
       'Déposez un PDF sur le canevas et annotez-le avec la même encre que tout le reste : entourez une équation, surlignez une ligne, griffonnez dans les marges. Quand vous avez terminé, exportez le PDF annoté.',
   },
 
   pages: {
-    heading: 'De vrais documents,\ndirectement sur le canevas.',
+    heading: 'De vrais documents, directement sur le canevas.',
     body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code exécutables.',
   },
 
   audioSearch: {
-    heading: 'Enregistrez. Transcrivez.\nRetrouvez sur le canevas.',
+    heading: 'Enregistrez. Transcrivez. Retrouvez sur le canevas.',
     audioBody:
       'Enregistrez cours ou réunions sur le canevas. Un modèle Whisper base intégré les transcrit sur l’appareil : vous pouvez retrouver des mots dans la transcription sans envoyer l’audio ailleurs.',
     searchBody:
@@ -69,7 +69,7 @@ const fr: SiteCopy = {
   },
 
   importing: {
-    heading: 'Emportez vos anciennes\nnotes avec vous.',
+    heading: 'Emportez vos anciennes notes avec vous.',
     body: 'Importez vos notes depuis d’autres apps',
     sources: [
       {
@@ -99,7 +99,7 @@ const fr: SiteCopy = {
   },
 
   localFirst: {
-    heading: 'Tout reste\nsur votre machine.',
+    heading: 'Tout reste sur votre machine.',
     lede: 'Aucun cloud au milieu. Vos notes sont des fichiers ordinaires sur votre propre disque, et Myelin fonctionne entièrement hors ligne.',
     bullets: [
       'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert et sans conflits (Yjs). Rien n’est jamais verrouillé.',
@@ -110,7 +110,7 @@ const fr: SiteCopy = {
   },
 
   sync: {
-    heading: 'Synchronisez et collaborez,\nsans serveur au milieu.',
+    heading: 'Synchronisez et collaborez, sans serveur au milieu.',
     kicker:
       'L’édition en temps réel suppose d’habitude un serveur qui détient vos notes. Myelin connecte plutôt les appareils directement.',
     tiers: [
@@ -135,7 +135,6 @@ const fr: SiteCopy = {
   },
 
   download: {
-    heading: 'Télécharger',
     body: 'Disponible en français, anglais, espagnol et chinois simplifié.',
     cta: 'Télécharger Myelin Notes',
     platforms: [

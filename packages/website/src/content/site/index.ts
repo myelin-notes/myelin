@@ -142,7 +142,6 @@ export interface SiteCopy {
   };
 
   download: {
-    heading: string;
     body: string;
     cta: string;
     platforms: Platform[];
