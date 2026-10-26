@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 // it the MathML fallback renders as duplicate plain text under each formula.
 import 'katex/dist/katex.min.css';
 import { AllSelection } from 'prosemirror-state';
+import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
+import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
 import { ElementType } from '@myelin/editor/elements/element-type';
@@ -98,6 +100,31 @@ function registerCanvasKeybindings(canvas: DrawableCanvas): () => void {
   ]);
 }
 
+// Copy, cut and paste of canvas elements, as in the app. Pasted media is not
+// embedded: that needs the app's media store.
+function bindCanvasClipboard(canvas: DrawableCanvas): () => void {
+  // The id only tells same-canvas pastes apart, so they land offset.
+  const adapter = new DrawableCanvasClipboardAdapter(
+    { current: canvas },
+    'try',
+  );
+  const controller = new CanvasClipboardController();
+  const handleCopy = (event: ClipboardEvent) =>
+    controller.handleCopy(event, adapter);
+  const handleCut = (event: ClipboardEvent) =>
+    controller.handleCut(event, adapter);
+  const handlePaste = (event: ClipboardEvent) =>
+    controller.handlePaste(event, adapter);
+  document.addEventListener('copy', handleCopy);
+  document.addEventListener('cut', handleCut);
+  document.addEventListener('paste', handlePaste, true);
+  return () => {
+    document.removeEventListener('copy', handleCopy);
+    document.removeEventListener('cut', handleCut);
+    document.removeEventListener('paste', handlePaste, true);
+  };
+}
+
 // Enter on a single selected shape edits its label, as in the app.
 function handleShapeEnter(canvas: DrawableCanvas, event: KeyboardEvent): void {
   if (
@@ -188,6 +215,7 @@ function CanvasEditorInner() {
     const handleKeyDown = (event: KeyboardEvent) =>
       handleShapeEnter(canvas, event);
     document.addEventListener('keydown', handleKeyDown);
+    const unbindClipboard = bindCanvasClipboard(canvas);
 
     const stopLoop = startDrawableCanvasAnimationLoop(canvas, () => {});
     setCanvas(canvas);
@@ -196,6 +224,7 @@ function CanvasEditorInner() {
       fg.removeEventListener('pointerdown', handlePointerDown);
       unregisterKeybindings();
       document.removeEventListener('keydown', handleKeyDown);
+      unbindClipboard();
       stopLoop();
       canvas.destroy();
       drawableCanvasRef.current = null;
