@@ -32,6 +32,7 @@ import { SiteCopyProvider } from '@/content/copy-context';
 import { useToolState } from '@/hooks/use-tool-state';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import type { Locale } from '@/lib/locale';
+import { persistTryCanvas } from '@/lib/try-canvas-storage';
 import { initWebPlatform } from '@/lib/web-platform';
 
 const layerClass = 'absolute inset-0 h-full w-full';
@@ -157,8 +158,8 @@ function handleShapeEnter(canvas: DrawableCanvas, event: KeyboardEvent): void {
 }
 
 /**
- * The try-it page: the real Myelin canvas engine on a blank in-memory Y.Doc,
- * with the app's tool rail. Nothing is persisted; a reload starts over.
+ * The try-it page: the real Myelin canvas engine with the app's tool rail, on
+ * a Y.Doc kept in localStorage.
  */
 export default function CanvasEditor({ locale }: { locale: Locale }) {
   // The locale is pinned from the URL: the site prerenders one page per
@@ -198,7 +199,9 @@ function CanvasEditorInner() {
     }
 
     initWebPlatform();
-    const canvas = new DrawableCanvas(fg, new YDocManager(), canvasTools);
+    const ydoc = new YDocManager();
+    const stopPersisting = persistTryCanvas(ydoc.doc);
+    const canvas = new DrawableCanvas(fg, ydoc, canvasTools);
     canvas.setBackgroundHost(bg);
     canvas.setOverlayCanvas(overlay);
     canvas.setDomOverlayHost(domHost);
@@ -226,6 +229,7 @@ function CanvasEditorInner() {
       document.removeEventListener('keydown', handleKeyDown);
       unbindClipboard();
       stopLoop();
+      stopPersisting();
       canvas.destroy();
       drawableCanvasRef.current = null;
       setCanvas(null);

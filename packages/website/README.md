@@ -5,9 +5,10 @@ French, and Simplified Chinese. Copy for every locale lives in
 `src/content/site/`.
 
 - `/` is a static landing page (`src/components/static/StaticSite.astro`).
-- `/try` mounts the real canvas engine from `@myelin/editor` on a blank
-  in-memory document (`src/canvas/CanvasEditor.tsx`). Nothing is saved. The
-  editor bundle is only requested by this page.
+- `/try` mounts the real canvas engine from `@myelin/editor`
+  (`src/canvas/CanvasEditor.tsx`). The document is saved to localStorage and
+  restored on the next visit (`src/lib/try-canvas-storage.ts`). The editor
+  bundle is only requested by this page.
 
 ```
 yarn website:dev      # dev server (from repo root)
