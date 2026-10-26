@@ -28,6 +28,8 @@ const band = 'py-24 lg:py-32';
 const kicker = 'kicker text-text-muted';
 const heading =
   'font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary';
+const tileHeading =
+  'font-heading text-[clamp(1.6rem,2.4vw,2.2rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary';
 const lede = 'mt-7 text-text-secondary';
 const cta = cn(buttonVariants(), 'h-11 rounded-xl px-6 text-sm');
 const ctaOutline = cn(
@@ -75,18 +77,18 @@ const ctaOutline = cn(
   </section>
 
   <!-- PDFs -->
-  <section id="pdfs" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
-          <p class={lede}>{copy.ink.pdfBody}</p>
-        </div>
-        <div class="md:col-span-6 md:pl-6 lg:col-span-7">
-          <Shot src="/pdf.png" alt={copy.shots.pdf} />
-        </div>
+  <section id="pdfs" class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+      <div class="lg:col-span-6">
+        <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
       </div>
+      <p class="text-text-secondary lg:col-span-5 lg:col-start-8 lg:pt-10">
+        {copy.ink.pdfBody}
+      </p>
+    </div>
+    <div class="mt-14 lg:mt-16">
+      <Shot src="/pdf.png" alt={copy.shots.pdf} />
     </div>
   </section>
 
@@ -104,116 +106,108 @@ const ctaOutline = cn(
     </div>
   </section>
 
-  <!-- Audio and search -->
-  <section class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
+  <!-- Audio and search, linked notes -->
+  <section class:list={[wrap, band]}>
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="flex flex-col gap-10 rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
           <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.audioSearch.heading}</h2>
+          <h2 class:list={[tileHeading, 'mt-6']}>{copy.audioSearch.heading}</h2>
           <p class={lede}>{copy.audioSearch.audioBody}</p>
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
+        <div class="mt-auto">
           <Shot src="/audio.png" alt={copy.shots.audio} />
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Linked notes -->
-  <section class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
-        <Shot src="/graph.png" alt={copy.shots.graph} />
-      </div>
-      <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
-        <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.linked.heading}</h2>
-        <p class={lede}>{copy.linked.body}</p>
+      <div class="flex flex-col gap-10 rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
+          <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
+          <h2 class:list={[tileHeading, 'mt-6']}>{copy.linked.heading}</h2>
+          <p class={lede}>{copy.linked.body}</p>
+        </div>
+        <div class="mt-auto">
+          <Shot src="/graph.png" alt={copy.shots.graph} />
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Sync and collaboration -->
-  <section id="sync" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
-          <p class={lede}>{copy.sync.kicker}</p>
-        </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
-          {
-            copy.sync.tiers.map((tier) => (
-              <div class="rounded-2xl bg-card p-7 shadow-elevated lg:p-8">
-                <span
-                  class:list={[
-                    'rounded-xl px-2.5 py-1 text-xs font-medium',
-                    tier.live ? 'bg-bg-success-soft text-text-success' : 'bg-tag text-text-tag',
-                  ]}
-                >
-                  {tier.badge}
-                </span>
-                <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
-                  {tier.title}
-                </h3>
-                <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
-                  {tier.body}
-                </p>
-              </div>
-            ))
-          }
-        </div>
+  <section id="sync" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="md:col-span-6 lg:col-span-5">
+        <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
+        <p class={lede}>{copy.sync.kicker}</p>
+      </div>
+      <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
+        {
+          copy.sync.tiers.map((tier) => (
+            <div class="rounded-2xl bg-card p-7 shadow-elevated lg:p-8">
+              <span
+                class:list={[
+                  'rounded-xl px-2.5 py-1 text-xs font-medium',
+                  tier.live ? 'bg-bg-success-soft text-text-success' : 'bg-tag text-text-tag',
+                ]}
+              >
+                {tier.badge}
+              </span>
+              <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
+                {tier.title}
+              </h3>
+              <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
+                {tier.body}
+              </p>
+            </div>
+          ))
+        }
       </div>
     </div>
   </section>
 
   <!-- Local-first -->
-  <section id="local" class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="md:col-span-6 lg:col-span-5">
-        <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
-        <p class={lede}>{copy.localFirst.lede}</p>
-      </div>
+  <section id="local" class="bg-secondary-container">
+    <div class:list={[wrap, band]}>
+      <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
+      <h2
+        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance text-text-primary"
+      >
+        {copy.localFirst.heading}
+      </h2>
+      <p class:list={[lede, 'max-w-2xl']}>{copy.localFirst.lede}</p>
       <CheckList
         items={copy.localFirst.bullets}
-        class="md:col-span-6 md:pl-6 lg:col-span-7"
+        class="mt-12 gap-x-10 gap-y-4 md:grid-cols-2"
       />
     </div>
   </section>
 
   <!-- Import -->
-  <section id="import" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>07 / {copy.sceneLabels.import}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
-          <p class={lede}>{copy.importing.body}</p>
-        </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
-          {
-            copy.importing.sources.map((source) => {
-              const Icon = IMPORT_SOURCE_ICONS[source.id];
-              return (
-                <div class="flex items-center gap-5 rounded-2xl bg-card p-7 shadow-elevated">
-                  <Icon className="size-10 shrink-0" />
-                  <div class="min-w-0">
-                    <h3 class="font-heading text-lg font-medium text-text-primary">
-                      {source.label}
-                    </h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-text-secondary">
-                      {source.detail}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          }
-        </div>
+  <section id="import" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="md:col-span-6 lg:col-span-5">
+        <p class={kicker}>07 / {copy.sceneLabels.import}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
+        <p class={lede}>{copy.importing.body}</p>
+      </div>
+      <div class="grid gap-5 sm:grid-cols-2 md:col-span-6 md:pl-6 lg:col-span-7">
+        {
+          copy.importing.sources.map((source) => {
+            const Icon = IMPORT_SOURCE_ICONS[source.id];
+            return (
+              <div class="rounded-2xl bg-card p-6 shadow-elevated">
+                <Icon className="size-9" />
+                <h3 class="mt-5 font-heading text-lg font-medium text-text-primary">
+                  {source.label}
+                </h3>
+                <p class="mt-1.5 text-sm leading-relaxed text-text-secondary">
+                  {source.detail}
+                </p>
+              </div>
+            );
+          })
+        }
       </div>
     </div>
   </section>

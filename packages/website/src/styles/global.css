@@ -89,3 +89,10 @@ html {
     'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   --font-heading: 'Newsreader', 'Songti SC', 'Noto Serif SC', 'SimSun', serif;
 }
+
+/* Chinese has no spaces, so text-balance would otherwise split headings
+   mid-phrase; keep-all breaks at punctuation, overflow-wrap is the phone fallback. */
+:root:lang(zh-Hans) :where(h1, h2, h3) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
