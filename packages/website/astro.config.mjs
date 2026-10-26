@@ -46,7 +46,14 @@ export default defineConfig({
       // Mermaid's script is loaded the same way, by `?url`.
       exclude: ['pdfjs-dist', 'mermaid'],
       include: [
+        '@myelin/editor/clipboard/controller',
+        '@myelin/editor/clipboard/drawable-canvas-adapter',
+        '@myelin/editor/clipboard/snapshot',
         '@myelin/editor/drawable-canvas',
+        '@myelin/editor/elements/element-type',
+        '@myelin/editor/elements/page-frame-element',
+        '@myelin/editor/keybinds',
+        '@myelin/editor/tools/tool-keybinds',
         '@myelin/editor/ydoc-manager',
         '@myelin/editor/render-loop',
         '@myelin/editor/tools/tool',
