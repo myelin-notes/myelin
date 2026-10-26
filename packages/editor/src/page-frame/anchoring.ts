@@ -79,6 +79,8 @@ function overlapPoint(
 
 export class PageFrameAnchoring {
   private origins = new Map<string, Vector2>();
+  // Render from their base offset so they stay under the pointer while their gaps reflow the text.
+  private dragging = new Set<AnchorableElement>();
 
   public constructor(
     private readonly canvas: DrawableCanvas,
@@ -171,24 +173,47 @@ export class PageFrameAnchoring {
     }
     const scale = bounds.width / content.offsetWidth;
     const box = element.boundingBox;
+    const localX = (point.x - frame.offset.x) / frame.scale.x;
+    const column =
+      frame.pageLayout === 'horizontal'
+        ? Math.max(0, Math.floor(localX / (frame.pageWidth + PAGE_GAP)))
+        : 0;
+    const left =
+      bounds.left +
+      (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
+    const right = left + (frame.pageWidth - PAGE_PADDING * 2) * scale - 1;
     const coords = {
-      left: bounds.left + ((point.x - frame.offset.x) / frame.scale.x) * scale,
+      left: element.makesSpace
+        ? left
+        : Math.min(Math.max(bounds.left + localX * scale, left), right),
       top:
         bounds.top +
         (((element.makesSpace ? box.top : point.y) - frame.offset.y) /
           frame.scale.y) *
           scale,
     };
-    if (element.makesSpace) {
-      const localX = (point.x - frame.offset.x) / frame.scale.x;
-      const column =
-        frame.pageLayout === 'horizontal'
-          ? Math.max(0, Math.floor(localX / (frame.pageWidth + PAGE_GAP)))
-          : 0;
-      coords.left =
-        bounds.left +
-        (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
+    const ownGap =
+      element.makesSpace &&
+      element.pageAnchor?.frameId === frame.uuid &&
+      !element.pageAnchor.sharedGap
+        ? Array.from(
+            view.dom.querySelectorAll<HTMLElement>('[data-page-anchor]'),
+          )
+            .find((dom) => dom.dataset.pageAnchor === element.uuid)
+            ?.getBoundingClientRect()
+        : undefined;
+    // Probe the layout without the element's own gap; otherwise a drop below it lands a gap-height early.
+    if (
+      ownGap &&
+      coords.top >= ownGap.top &&
+      ownGap.left <= coords.left + 1 &&
+      coords.left < ownGap.right
+    ) {
+      coords.top += ownGap.height;
     }
+    // posAtCoords is null outside the editor box, which anchors to the end of the document — right
+    // below the content, wrong above it.
+    coords.top = Math.max(coords.top, view.dom.getBoundingClientRect().top);
     const pos = view.posAtCoords(coords)?.pos ?? view.state.doc.content.size;
     return this.attachAtPosition(element, frame, pos);
   }
@@ -205,15 +230,32 @@ export class PageFrameAnchoring {
     }
     let pos = position;
     const resolved = view.state.doc.resolve(pos);
+    const isSource = (name: string) =>
+      name === 'codeBlock' || name === 'mathBlock';
     // Gaps inside tables, lists, and source editors would reserve only a cell or nested block.
     if (
       element.makesSpace &&
       (resolved.depth > 1 ||
         !resolved.parent.isTextblock ||
-        ['codeBlock', 'mathBlock'].includes(resolved.parent.type.name))
+        isSource(resolved.parent.type.name))
     ) {
       pos = resolved.depth > 0 ? resolved.before(1) : pos;
+    } else if (
+      element.makesSpace &&
+      resolved.parentOffset === resolved.parent.content.size
+    ) {
+      // A widget ending a textblock gets ProseMirror's trailing <br>: a blank line under the gap.
+      pos = resolved.after(1);
     }
+    // Between blocks a gap shares the next block's position, so pagination can only break above the
+    // gap; inside the next paragraph it can break between the gap and the text.
+    const next = element.makesSpace
+      ? view.state.doc.resolve(pos).nodeAfter
+      : null;
+    if (next?.isTextblock && !isSource(next.type.name)) {
+      pos += 1;
+    }
+    const block = view.state.doc.resolve(pos);
     const origin = this.origin(frame, pos);
     if (!origin) {
       return false;
@@ -224,33 +266,37 @@ export class PageFrameAnchoring {
         frame.offset.y + origin.y * frame.scale.y,
       );
     }
-    const box = element.boundingBox;
     const offset = element.offset;
+    const pinned = this.dragging.has(element);
     this.origins.set(element.uuid, origin);
-    element.anchorOrigin = () => this.worldOrigin(element, frame);
+    if (!pinned) {
+      element.anchorOrigin = () => this.worldOrigin(element, frame);
+    }
     element.setPageAnchor({
       frameId: frame.uuid,
       spaceBefore: 0,
       position: encodeAnchorPosition(view.state, pos),
       blockPosition: encodeAnchorPosition(
         view.state,
-        resolved.depth > 0 ? resolved.before(1) : pos,
+        block.depth > 0 ? block.before(1) : pos,
       ),
       x: offset.x - frame.offset.x - origin.x * frame.scale.x,
-      y: element.makesSpace
-        ? offset.y - box.top
-        : offset.y - frame.offset.y - origin.y * frame.scale.y,
+      y: offset.y - frame.offset.y - origin.y * frame.scale.y,
     });
     this.refresh();
     if (element.makesSpace) {
       const gapTop = this.worldOrigin(element, frame)?.y ?? offset.y;
-      element.setOffset(
-        offset.x,
-        Math.max(
-          offset.y,
-          gapTop - element.localBoundingBox.top * element.scale.y,
-        ),
-      );
+      element.setPageAnchor({ ...element.pageAnchor!, y: offset.y - gapTop });
+      // Text above the gap pushes the element down only once it is dropped.
+      if (!pinned) {
+        element.setOffset(
+          offset.x,
+          Math.max(
+            offset.y,
+            gapTop - element.localBoundingBox.top * element.scale.y,
+          ),
+        );
+      }
       element.setPageAnchor({
         ...element.pageAnchor!,
         spaceBefore: Math.max(
@@ -296,17 +342,48 @@ export class PageFrameAnchoring {
     }
   }
 
-  public finishTransform(elements: readonly DrawableElement[]): void {
+  private movedWithoutFrame(
+    elements: readonly DrawableElement[],
+  ): AnchorableElement[] {
     const moved = new Set(elements.map((element) => element.uuid));
+    return elements.filter(
+      (element): element is AnchorableElement =>
+        element instanceof AnchorableElement &&
+        !!element.pageAnchor &&
+        !moved.has(element.pageAnchor.frameId),
+    );
+  }
+
+  /** Re-anchors space-making elements on every move so text reflows live. `endDrag` must follow. */
+  public dragTransform(elements: readonly DrawableElement[]): void {
     this.canvas.transact(() => {
-      for (const element of elements) {
-        if (
-          !(element instanceof AnchorableElement) ||
-          !element.pageAnchor ||
-          moved.has(element.pageAnchor.frameId)
-        ) {
-          continue;
+      for (const element of this.movedWithoutFrame(elements)) {
+        if (!this.dragging.has(element)) {
+          // Syncs the base offset the pinned element renders from.
+          element.setOffset(element.offset.x, element.offset.y);
+          element.anchorOrigin = null;
+          this.dragging.add(element);
         }
+        const frame = this.frameFor(element);
+        const point = frame && overlapPoint(frame, element);
+        if (element.makesSpace && frame && point) {
+          this.attach(element, frame, point);
+        }
+      }
+    });
+  }
+
+  /** Releases elements pinned by `dragTransform` back to their anchors without re-anchoring them. */
+  public endDrag(): void {
+    this.dragging.clear();
+    this.refresh();
+  }
+
+  public finishTransform(elements: readonly DrawableElement[]): void {
+    this.canvas.transact(() => {
+      for (const element of this.movedWithoutFrame(elements)) {
+        // Still renders from the dropped position until attach rebinds its origin.
+        this.dragging.delete(element);
         const frame = this.frameFor(element);
         const point = frame && overlapPoint(frame, element);
         if (!frame || !point) {
@@ -403,7 +480,9 @@ export class PageFrameAnchoring {
             changed = true;
           }
         }
-        element.anchorOrigin = () => this.worldOrigin(element, frame);
+        if (!this.dragging.has(element)) {
+          element.anchorOrigin = () => this.worldOrigin(element, frame);
+        }
       }
     }
     if (changed) {

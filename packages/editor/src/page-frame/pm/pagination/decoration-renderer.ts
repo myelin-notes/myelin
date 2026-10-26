@@ -131,7 +131,7 @@ export function buildPaginationDecorations(
   }
   return DecorationSet.create(
     view.state.doc,
-    breaks.map(({ pos, spacer, kind }) =>
+    breaks.map(({ pos, spacer, kind, afterAnchorGap }) =>
       Decoration.widget(
         pos,
         () =>
@@ -141,9 +141,9 @@ export function buildPaginationDecorations(
               ? createTableCellInlineBreakWidget(spacer)
               : createStandardBreakWidget(spacer, kind),
         {
-          side: -1,
+          side: afterAnchorGap ? 1 : -1,
           ignoreSelection: true,
-          key: `pb-${kind}-${pos}-${spacer}`,
+          key: `pb-${kind}-${pos}-${spacer}${afterAnchorGap ? '-after' : ''}`,
         },
       ),
     ),

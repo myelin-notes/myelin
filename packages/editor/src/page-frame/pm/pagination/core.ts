@@ -12,6 +12,8 @@ export interface Break {
   pos: number;
   spacer: number;
   kind: BreakKind;
+  /** Renders after the anchor gap at the same position instead of before it. */
+  afterAnchorGap?: boolean;
 }
 
 export interface ParagraphPaginationResult {
@@ -120,12 +122,20 @@ export function paginateParagraph(
           cumulativeShift += spacer;
         } else {
           const pos = line.getPos();
+          // The line after a gap starts at the gap's position; breaking before the gap would push it
+          // a page minus its own height, straddling the boundary.
+          const afterAnchorGap = lines[lineIndex - 1].isAnchorGap === true;
           if (pos !== null) {
             const clamped = Math.max(
-              blockPos + (line.isAnchorGap ? 1 : 2),
+              blockPos + (line.isAnchorGap || afterAnchorGap ? 1 : 2),
               Math.min(pos, blockEnd - 1),
             );
-            breaks.push({ pos: clamped, spacer, kind: 'inline' });
+            breaks.push({
+              pos: clamped,
+              spacer,
+              kind: 'inline',
+              ...(afterAnchorGap && { afterAnchorGap }),
+            });
             cumulativeShift += spacer;
           }
         }
