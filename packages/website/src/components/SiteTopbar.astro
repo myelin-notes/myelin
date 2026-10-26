@@ -1,5 +1,6 @@
 ---
 // App-chrome style top bar, fixed above every page, the try-it canvas included.
+import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import { getCopy, linkHref, navLinks } from '../content/site';
 import {
   LOCALES,
@@ -23,21 +24,42 @@ const copy = getCopy(locale);
 const { path } = splitLocalePath(Astro.url.pathname);
 ---
 
-<header class="site-topbar">
-  <a href={localizePath('/', locale)} class="wordmark">Myelin Notes</a>
-  <nav class="topbar-nav" aria-label={copy.topbar.nav}>
+{/* z-40 sits above the canvas layers (z 0-12) but below the tool rail (z 100). */}
+<header
+  class="fixed inset-x-0 top-0 z-40 flex h-12 items-center gap-3 border-b border-border-divider bg-toolbar px-4 backdrop-blur-[12px]"
+>
+  {/* The auto margin sits on the wordmark so the rest forms one right-hand group,
+      whether or not the nav (hidden on phones) or picker (English-only pages) exist. */}
+  <a href={localizePath('/', locale)} class="mr-auto no-underline">
+    <Wordmark className="text-[1.1rem]" />
+  </a>
+  {/* Hidden on phones: five links plus picker and CTA overflow the bar, and the
+      footer carries the same links. */}
+  <nav
+    class="flex items-center gap-5 max-[640px]:hidden"
+    aria-label={copy.topbar.nav}
+  >
     {
       navLinks.map((id) => (
-        <a href={linkHref(id)}>{copy.linkLabels[id]}</a>
+        <a
+          href={linkHref(id)}
+          class="text-[0.8rem] text-text-secondary no-underline transition-colors hover:text-ink"
+        >
+          {copy.linkLabels[id]}
+        </a>
       ))
     }
   </nav>
   {
     translated && (
       /* `details` rather than a scripted menu: this needs no JavaScript. */
-      <details class="lang-picker">
-        <summary aria-label={copy.topbar.language}>
+      <details class="lang-picker group relative">
+        <summary
+          aria-label={copy.topbar.language}
+          class="flex cursor-pointer list-none items-center gap-[0.35rem] rounded-xl px-2 py-[0.35rem] text-[0.8rem] whitespace-nowrap text-text-secondary transition-colors group-open:bg-hover-tint group-open:text-text-primary hover:bg-hover-tint hover:text-text-primary [&::-webkit-details-marker]:hidden"
+        >
           <svg
+            class="size-[0.95rem]"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -49,14 +71,15 @@ const { path } = splitLocalePath(Astro.url.pathname);
             <circle cx="12" cy="12" r="9" />
             <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
           </svg>
-          <span>{localeNames[locale]}</span>
+          <span class="max-[640px]:hidden">{localeNames[locale]}</span>
         </summary>
-        <ul>
+        <ul class="absolute top-[calc(100%+0.4rem)] right-0 m-0 min-w-36 list-none rounded-2xl border border-border-subtle bg-card p-1 shadow-ambient">
           {LOCALES.map((code) => (
             <li>
               <a
                 href={localizePath(path, code)}
                 hreflang={code}
+                class="block rounded-xl px-[0.6rem] py-[0.4rem] text-[0.8rem] text-text-secondary no-underline hover:bg-hover-tint hover:text-text-primary aria-[current]:font-medium aria-[current]:text-text-primary"
                 aria-current={code === locale ? 'true' : undefined}
               >
                 {localeNames[code]}
@@ -69,7 +92,7 @@ const { path } = splitLocalePath(Astro.url.pathname);
   }
   <a
     href={`${localizePath('/', locale)}#download`}
-    class="topbar-download"
+    class={cn(buttonVariants(), 'h-8 px-3.5 text-[0.8rem]')}
   >
     {copy.topbar.download}
   </a>

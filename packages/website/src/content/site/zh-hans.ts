@@ -114,11 +114,13 @@ const zhHans: SiteCopy = {
     tiers: [
       {
         badge: '现已支持',
+        live: true,
         title: '实时协作',
         body: '打开同一则笔记的两台设备会自动找到彼此，随后通过两端之间直连的加密 QUIC 连接（iroh）同步编辑。',
       },
       {
         badge: '现已支持',
+        live: true,
         title: 'GitHub 同步',
         body: '为 Myelin 指定一个仓库和分支，你的工作区就会通过这个由你掌控的仓库在各设备间同步。',
       },

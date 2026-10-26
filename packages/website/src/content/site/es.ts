@@ -124,11 +124,13 @@ const es: SiteCopy = {
     tiers: [
       {
         badge: 'Ya disponible',
+        live: true,
         title: 'Colaboración en directo',
         body: 'Dos dispositivos con la misma nota abierta se encuentran solos y editan a la vez por una conexión QUIC cifrada directa entre ambos (iroh).',
       },
       {
         badge: 'Ya disponible',
+        live: true,
         title: 'Sincronización con GitHub',
         body: 'Apunta Myelin a un repositorio y una rama, y tu espacio de trabajo se sincroniza entre dispositivos a través de un repositorio que controlas tú.',
       },

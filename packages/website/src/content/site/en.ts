@@ -122,11 +122,13 @@ const en: SiteCopy = {
     tiers: [
       {
         badge: 'Today',
+        live: true,
         title: 'Live collaboration',
         body: 'Two devices with the same note open find each other automatically, then edit in step over an encrypted QUIC connection straight between them (iroh).',
       },
       {
         badge: 'Today',
+        live: true,
         title: 'GitHub sync',
         body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through a repo you control.',
       },

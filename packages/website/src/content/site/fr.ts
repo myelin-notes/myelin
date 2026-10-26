@@ -116,11 +116,13 @@ const fr: SiteCopy = {
     tiers: [
       {
         badge: 'Disponible',
+        live: true,
         title: 'Collaboration en direct',
         body: 'Deux appareils ayant la même note ouverte se trouvent automatiquement, puis éditent en parallèle via une connexion QUIC chiffrée directe entre eux (iroh).',
       },
       {
         badge: 'Disponible',
+        live: true,
         title: 'Synchronisation GitHub',
         body: 'Indiquez à Myelin un dépôt et une branche, et votre espace de travail se synchronise entre vos appareils via un dépôt que vous contrôlez.',
       },

@@ -53,6 +53,8 @@ export function linkHref(id: LinkId): string {
 
 interface SyncTier {
   badge: string;
+  /** Drives the badge colour; `badge` is translated so cannot be matched on. */
+  live?: boolean;
   title: string;
   body: string;
 }
