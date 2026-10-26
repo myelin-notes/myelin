@@ -230,11 +230,12 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
 
   /** Alt text for the static page's screenshots. */
   shots: {
-    pdf: 'A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it',
+    hero: 'A PDF and a typed page frame on one canvas, as a pen circles an equation, draws an arrow to the note, a line is typed in and "key result!" is handwritten',
+    pdf: 'A PDF where a sentence is highlighted, a line underlined and "E = mc²!" written in the margin, then the annotated PDF is exported',
     pageFrame:
-      'A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them',
+      'A page frame with a checklist and a TypeScript code block that runs and shows its output beside it',
     audio:
-      'A recording on the Myelin canvas, its waveform drawn as it captures',
+      'An audio recording placed on the canvas, recorded, transcribed, then found by searching "entropy"',
     graph:
       "The Myelin Notes graph view, showing a note's outgoing links and backlinks",
   },

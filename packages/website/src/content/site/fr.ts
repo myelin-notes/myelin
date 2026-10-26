@@ -222,11 +222,12 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
   },
 
   shots: {
-    pdf: 'Un PDF intégré sur le canevas Myelin, avec une équation encadrée et une flèche dessinée à l’encre à côté',
+    hero: 'Un PDF et un cadre de page saisi sur un même canevas : le stylet entoure une équation, trace une flèche vers la note, une ligne est tapée et « key result! » est écrit à la main',
+    pdf: 'Un PDF dont une phrase est surlignée, une ligne soulignée et « E = mc² ! » écrit dans la marge, puis le PDF annoté est exporté',
     pageFrame:
-      'Un cadre de page Myelin avec titres, liens de notes, liste de tâches, maths en ligne et blocs de code exécutés avec leur sortie à côté',
+      'Un cadre de page avec une liste de tâches et un bloc de code TypeScript qui s’exécute et affiche sa sortie à côté',
     audio:
-      'Un enregistrement sur le canevas Myelin, sa forme d’onde dessinée au fil de la capture',
+      'Un enregistrement audio placé sur le canevas, enregistré, transcrit, puis retrouvé en cherchant « entropy »',
     graph:
       'La vue graphe de Myelin Notes, montrant les liens sortants et entrants d’une note',
   },

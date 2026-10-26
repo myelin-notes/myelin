@@ -230,11 +230,12 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   },
 
   shots: {
-    pdf: 'Un PDF incrustado en el lienzo de Myelin, con una ecuación enmarcada y una flecha dibujada a mano al lado',
+    hero: 'Un PDF y un marco de página con texto en un mismo lienzo: el lápiz encierra una ecuación, dibuja una flecha hasta la nota, se escribe una línea y se anota a mano «¡resultado clave!»',
+    pdf: 'Un PDF con una frase resaltada, una línea subrayada y «¡E = mc²!» escrito en el margen, y después el PDF anotado se exporta',
     pageFrame:
-      'Un marco de página de Myelin con encabezados, enlaces entre notas, una lista de tareas, fórmulas en línea y bloques de código ejecutándose con su salida al lado',
+      'Un marco de página con una lista de tareas y un bloque de código TypeScript que se ejecuta y muestra su salida al lado',
     audio:
-      'Una grabación en el lienzo de Myelin, con su forma de onda dibujándose mientras captura',
+      'Una grabación de audio colocada en el lienzo, grabada, transcrita y luego encontrada buscando «entropy»',
     graph:
       'La vista de grafo de Myelin Notes, con los enlaces salientes y los retroenlaces de una nota',
   },
