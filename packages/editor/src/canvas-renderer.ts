@@ -1,3 +1,9 @@
+import type * as Y from 'yjs';
+import {
+  type CanvasStyle,
+  getCanvasStyle,
+  subscribeCanvasStyle,
+} from './canvas-style';
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
@@ -8,16 +14,9 @@ import { quantizeRasterZoom } from './raster-zoom';
 import type { Ruler } from './ruler';
 import type { SelectionController } from './selection-controller';
 import type { ITool } from './tools/tool';
-import { UserPrefs } from './user-prefs';
-
-type CanvasBackground = 'grid' | 'dots' | 'blank';
 
 /** Side length of one background pattern tile, in world units. */
 const BG_TILE_SIZE = 24;
-
-// Pan translates this layer by up to one tile, so it must already cover one tile
-// past each edge. Sizing for max zoom keeps its geometry constant across zooms.
-export const BG_OVERDRAW_PX = BG_TILE_SIZE * MAX_ZOOM;
 
 // Deliberately loose: strokes and glyphs paint outside their bounding box.
 const CULL_MARGIN_PX = 128;
@@ -73,7 +72,7 @@ export function backgroundPanShift(
 }
 
 export function buildBackgroundTile(
-  style: Exclude<CanvasBackground, 'blank'>,
+  style: 'grid' | 'dots' | 'lines',
   color: string,
   resolution: number,
 ): string {
@@ -96,8 +95,10 @@ export function buildBackgroundTile(
     ctx.strokeStyle = color;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(BG_TILE_SIZE, 0);
-    ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
+    if (style === 'grid') {
+      ctx.moveTo(BG_TILE_SIZE, 0);
+      ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
+    }
     ctx.moveTo(0, BG_TILE_SIZE);
     ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
     ctx.stroke();
@@ -116,7 +117,12 @@ export class CanvasRenderer {
   private overlayCtx: CanvasRenderingContext2D | null = null;
   private overlayCanvas: HTMLCanvasElement | null = null;
   private bgHost: HTMLElement | null = null;
-  private bgStyle: CanvasBackground;
+  private bgStyle: CanvasStyle;
+  private bgTileW = BG_TILE_SIZE;
+  private bgTileH = BG_TILE_SIZE;
+  // Pan translates this layer by up to one tile, so it must already cover one tile
+  // past each edge. Sizing for max zoom keeps its geometry constant across zooms.
+  private bgOverdraw = BG_TILE_SIZE * MAX_ZOOM;
   private unsubBgPref: (() => void) | null = null;
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
@@ -140,15 +146,16 @@ export class CanvasRenderer {
     foregroundCtx: CanvasRenderingContext2D,
     foregroundCanvas: HTMLCanvasElement,
     private readonly requestRedraw: () => void,
+    doc: Y.Doc,
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
     // Read before the sync below, which reaches setBackgroundStyle(this.bgStyle)
     // and would otherwise write the still-undefined value straight back.
-    this.bgStyle = UserPrefs.get('canvasBackground');
+    this.bgStyle = getCanvasStyle(doc);
     this.syncSizeToContainer();
-    this.unsubBgPref = UserPrefs.subscribe('canvasBackground', (bg) => {
-      this.setBackgroundStyle(bg);
+    this.unsubBgPref = subscribeCanvasStyle(doc, () => {
+      this.setBackgroundStyle(getCanvasStyle(doc));
     });
     // Theme toggle changes the grid color, but the tile is cached — rebuild.
     this.unsubTheme = onCanvasThemeChange(() => {
@@ -168,10 +175,7 @@ export class CanvasRenderer {
   public setBackgroundHost(host: HTMLElement): void {
     this.bgHost = host;
     host.style.position = 'absolute';
-    host.style.left = `${-BG_OVERDRAW_PX}px`;
-    host.style.top = `${-BG_OVERDRAW_PX}px`;
-    host.style.width = `calc(100% + ${BG_OVERDRAW_PX * 2}px)`;
-    host.style.height = `calc(100% + ${BG_OVERDRAW_PX * 2}px)`;
+    this.writeBackgroundOverdraw(host);
     host.style.pointerEvents = 'none';
     host.style.backgroundRepeat = 'repeat';
     host.style.backgroundPosition = '0 0';
@@ -197,17 +201,54 @@ export class CanvasRenderer {
     this.resizeOverlayCanvas(this.canvas.clientWidth, this.canvas.clientHeight);
   }
 
-  public setBackgroundStyle(style: CanvasBackground): void {
+  public setBackgroundStyle(style: CanvasStyle): void {
     this.bgStyle = style;
-    if (!this.bgHost) {
+    const host = this.bgHost;
+    if (!host) {
       return;
     }
     const dpr = window.devicePixelRatio || 1;
-    this.bgHost.style.backgroundImage =
-      style === 'blank'
-        ? 'none'
-        : `url(${buildBackgroundTile(style, getCanvasPalette().grid, dpr)})`;
+    const { pattern, image } = style;
+    if (pattern === 'image' && image) {
+      host.style.backgroundImage = `url("${image.src}")`;
+      this.setBackgroundTileSize(host, image.width, image.height);
+    } else {
+      const color =
+        style.patternColorMode === 'custom'
+          ? style.patternColor
+          : getCanvasPalette().grid;
+      host.style.backgroundImage =
+        pattern === 'blank' || pattern === 'image'
+          ? 'none'
+          : `url(${buildBackgroundTile(pattern, color, dpr)})`;
+      this.setBackgroundTileSize(host, BG_TILE_SIZE, BG_TILE_SIZE);
+    }
     this.bgTileDpr = dpr;
+  }
+
+  private setBackgroundTileSize(
+    host: HTMLElement,
+    width: number,
+    height: number,
+  ): void {
+    if (width === this.bgTileW && height === this.bgTileH) {
+      return;
+    }
+    this.bgTileW = width;
+    this.bgTileH = height;
+    this.bgOverdraw = Math.max(width, height) * MAX_ZOOM;
+    this.writeBackgroundOverdraw(host);
+    this.bgLastRasterZoom = Number.NaN;
+    this.bgLastTransform = '';
+    this.requestRedraw();
+  }
+
+  private writeBackgroundOverdraw(host: HTMLElement): void {
+    const overdraw = this.bgOverdraw;
+    host.style.left = `${-overdraw}px`;
+    host.style.top = `${-overdraw}px`;
+    host.style.width = `calc(100% + ${overdraw * 2}px)`;
+    host.style.height = `calc(100% + ${overdraw * 2}px)`;
   }
 
   public redraw(
@@ -316,17 +357,21 @@ export class CanvasRenderer {
 
     const rasterZoom = quantizeRasterZoom(zoom);
     if (rasterZoom !== this.bgLastRasterZoom) {
-      const painted = BG_TILE_SIZE * rasterZoom;
-      host.style.backgroundSize = `${painted}px ${painted}px`;
+      host.style.backgroundSize = `${this.bgTileW * rasterZoom}px ${this.bgTileH * rasterZoom}px`;
       this.bgLastRasterZoom = rasterZoom;
     }
 
-    // The layer's top-left starts BG_OVERDRAW_PX before the world origin, which is a whole number
-    // of tiles only when 3/zoom is an integer — so the overdraw is reduced along with the pan, or
+    // The layer's top-left starts one overdraw before the world origin, which is a whole number
+    // of tiles only at some zooms — so the overdraw is reduced along with the pan, or
     // the grid slides against the content as the zoom changes.
-    const tile = BG_TILE_SIZE * zoom;
-    const shiftX = backgroundPanShift(offset.x * zoom + BG_OVERDRAW_PX, tile);
-    const shiftY = backgroundPanShift(offset.y * zoom + BG_OVERDRAW_PX, tile);
+    const shiftX = backgroundPanShift(
+      offset.x * zoom + this.bgOverdraw,
+      this.bgTileW * zoom,
+    );
+    const shiftY = backgroundPanShift(
+      offset.y * zoom + this.bgOverdraw,
+      this.bgTileH * zoom,
+    );
     // The translate is listed first, so it applies in screen pixels and the
     // scale after it does not multiply the pan shift.
     const transform = `translate3d(${shiftX}px, ${shiftY}px, 0) scale(${zoom / rasterZoom})`;

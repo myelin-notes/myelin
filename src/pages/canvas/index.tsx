@@ -55,12 +55,13 @@ import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import type { TabId } from '@/lib/tabs/types';
-import { useUserPref } from '@/lib/use-user-pref';
+import { useCanvasStyle } from '@/lib/use-canvas-style';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
+import { CanvasStyleButton } from './components/canvas-style-button';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
@@ -367,10 +368,12 @@ function CanvasViewInner({
   }, []);
   // A custom canvas color overrides the theme's `bg-page` fill on the surface
   // behind the background pattern.
-  const bgColorMode = useUserPref('canvasBackgroundColorMode');
-  const customBgColor = useUserPref('canvasBackgroundColor');
+  const canvasDoc = engine.drawableCanvas?.ydoc.doc ?? null;
+  const { style: canvasStyle } = useCanvasStyle(canvasDoc);
   const surfaceStyle =
-    bgColorMode === 'custom' ? { backgroundColor: customBgColor } : undefined;
+    canvasStyle.backgroundColorMode === 'custom'
+      ? { backgroundColor: canvasStyle.backgroundColor }
+      : undefined;
   const loadNoteLinkPreview = useCallback(
     (target: NoteLinkPreviewTarget, signal: AbortSignal) =>
       getNoteLinkPreview(repository, target, signal),
@@ -494,6 +497,7 @@ function CanvasViewInner({
               </TooltipContent>
             </Tooltip>
           )}
+          <CanvasStyleButton doc={canvasDoc} />
           <Tooltip>
             <TooltipTrigger
               render={
@@ -521,6 +525,7 @@ function CanvasViewInner({
     onUndo,
     onRedo,
     canvasSearch.openSearch,
+    canvasDoc,
     id,
     engine.ready,
     liveDiscoveryPauseError,

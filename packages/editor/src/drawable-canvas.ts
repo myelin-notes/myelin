@@ -109,8 +109,11 @@ export class DrawableCanvas {
     }
     this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
-    this.renderer = new CanvasRenderer(this.ctx, canvas, () =>
-      this.requestRedraw(),
+    this.renderer = new CanvasRenderer(
+      this.ctx,
+      canvas,
+      () => this.requestRedraw(),
+      ydoc.doc,
     );
     this.viewport = new CanvasViewport(canvas);
     this.viewport.onViewChange(() => this.requestRedraw());

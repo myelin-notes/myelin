@@ -26,15 +26,23 @@ const PREFS = {
     {},
   ),
   theme: pref<'light' | 'dark' | 'system'>('theme', 'system'),
-  canvasBackground: pref<'grid' | 'dots' | 'blank'>(
+  canvasBackground: pref<import('./canvas-style').CanvasPattern>(
     'canvas-background',
     'dots',
   ),
-  canvasBackgroundColorMode: pref<'theme' | 'custom'>(
+  canvasBackgroundColorMode: pref<import('./canvas-style').CanvasColorMode>(
     'canvas-background-color-mode',
     'theme',
   ),
   canvasBackgroundColor: pref<string>('canvas-background-color', '#f7f9fb'),
+  canvasPatternColorMode: pref<import('./canvas-style').CanvasColorMode>(
+    'canvas-pattern-color-mode',
+    'theme',
+  ),
+  canvasPatternColor: pref<string>('canvas-pattern-color', '#a4a8ac'),
+  canvasBackgroundImage: pref<
+    import('./canvas-style').CanvasBackgroundImage | null
+  >('canvas-background-image', null),
   pageFrameEditFitWholePage: pref<boolean>(
     'page-frame-edit-fit-whole-page',
     true,

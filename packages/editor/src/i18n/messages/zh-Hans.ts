@@ -317,6 +317,8 @@ const zhHans: typeof en = {
         grid: '网格',
         dots: '点阵',
         blank: '空白',
+        lines: '横线',
+        image: '图片',
       },
       backgroundColor: {
         label: '背景颜色',
@@ -326,6 +328,24 @@ const zhHans: typeof en = {
           custom: '自定义',
         },
         confirm: '应用',
+      },
+      patternColor: {
+        label: '图案颜色',
+        description: '网格、点阵或横线的颜色。',
+      },
+      image: {
+        label: '背景图片',
+        description: '在画布上平铺。较大的图片会被缩小。',
+        choose: '选择图片',
+        failed: '无法加载该图片',
+      },
+      perCanvas: {
+        button: '画布样式',
+        title: '此画布',
+        followingDefault:
+          '正在使用设置中的默认样式。此处的更改仅应用于此画布。',
+        custom: '此画布使用自己的样式。',
+        reset: '使用默认',
       },
     },
     language: {
