@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const updated = '5 September 2026';
+const updated = '26 October 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -89,25 +89,31 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
     <section class="pt-14">
       <h2 class={h2}>This website</h2>
       <p class={p}>
-        trymyelin.app uses PostHog to count page views and to record JavaScript
-        errors, so we can tell whether the site works and which pages people
-        read.
+        trymyelin.app uses PostHog to count page views and download clicks and to
+        record JavaScript errors, so we can tell whether the site works, which
+        pages people read, and whether they go on to download the app.
       </p>
       <ul class={list}>
         <li>
-          <span class={term}>No cookies, and no storage on your device.</span> PostHog
-          is configured to keep its state in memory only, so the site writes no cookie,
+          <span class={term}>No cookies, and no tracking storage.</span> PostHog
+          is configured to keep its state in memory only, so analytics writes no cookie,
           no localStorage entry, and no sessionStorage entry. The identifier attached
           to your visit lasts as long as the page is open and is gone when you close
-          the tab. There is no consent banner because there is nothing stored to consent
-          to.
+          the tab. There is no consent banner because nothing is stored to track you.
+        </li>
+        <li>
+          <span class={term}>The try-it canvas.</span> What you draw and write on the
+          try-it page, the PDFs and images you add to it, and the tools and colors
+          you pick there, are kept in your browser's storage so they are still there
+          when you come back. They are never sent to us. Clearing this site's data in
+          your browser deletes them.
         </li>
         <li>
           <span class={term}>What is recorded.</span> The page you opened and when you
           left it, the page that referred you, your browser, operating system and screen
           size, and your IP address, from which PostHog derives an approximate location.
-          Autocapture
-          and session recording are both off, so clicks, keystrokes, form input, and
+          Clicking a download button records the platform it was for. Autocapture and
+          session recording are both off, so other clicks, keystrokes, form input, and
           screen contents are not recorded.
         </li>
         <li>

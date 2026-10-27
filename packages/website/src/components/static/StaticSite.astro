@@ -1,16 +1,9 @@
 ---
-// The no-canvas rendering of the site: every word the scrollytelling canvas
-// says, as ordinary scrolling markup. Served to crawlers, no-JS visitors, and
-// touch/narrow viewports. Sections follow the canvas scene order (see
-// `src/canvas/scenes.ts`) so the two tell the same story in the same sequence.
-// The FAQ is the one exception: the canvas renders it inside the download
-// scene, and here it sits just ahead of the download band so the page closes on
-// the CTA rather than on a question.
-//
-// The gate in `Base.astro` hides this before first paint wherever the canvas
-// will run, so desktop never renders a frame of it.
+// The landing page. The FAQ sits just ahead of the download band so the page
+// closes on the CTA rather than on a question.
 import { Wordmark, buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
+import InkMark from './InkMark.astro';
 import Shot from './Shot.astro';
 import { IMPORT_SOURCE_ICONS } from '../import-icons';
 import {
@@ -21,7 +14,7 @@ import {
   linkHref,
   siteLinks,
 } from '../../content/site';
-import type { Locale } from '../../lib/locale';
+import { type Locale, localizePath } from '../../lib/locale';
 
 interface Props {
   locale: Locale;
@@ -30,205 +23,240 @@ interface Props {
 const { locale } = Astro.props;
 const copy = getCopy(locale);
 const faqs = getFaqs(locale);
+const [headBefore, headAfter = ''] = copy.hero.headline.split(copy.hero.headlineMark);
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
-const kicker = 'kicker text-text-muted';
+const kicker = 'reveal kicker text-text-muted';
 const heading =
-  'font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] whitespace-pre-line text-text-primary';
-const lede = 'mt-7 text-text-secondary';
-const cta = cn(buttonVariants(), 'h-11 rounded-2xl px-6 text-sm');
+  'reveal font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
+const tileHeading =
+  'reveal font-heading text-[clamp(1.6rem,2.4vw,2.2rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
+const lede = 'reveal mt-7 text-text-secondary [--i:2]';
+const cta = cn(buttonVariants(), 'h-11 gap-2 rounded-xl px-6 text-sm');
 const ctaOutline = cn(
   buttonVariants({ variant: 'outline' }),
-  'h-11 rounded-2xl px-6 text-sm',
+  'h-11 gap-2 rounded-xl px-6 text-sm',
 );
 ---
 
-<div class="static-site relative z-10 pt-12">
+<div class="relative z-10 pt-12">
   <!-- Hero -->
-  <section class={wrap}>
-    <div class="pt-16 pb-20 lg:pt-24 lg:pb-24">
-      <p class:list={[kicker, 'rise']}>{copy.hero.eyebrow}</p>
-      <h1
-        class="rise mt-6 max-w-4xl font-heading text-[clamp(2.6rem,6vw,4.75rem)] leading-[1.02] font-medium tracking-[-0.02em] whitespace-pre-line text-text-primary"
-        style="animation-delay:.06s"
-      >
-        {copy.hero.headline}
-      </h1>
-      <p
-        class="rise mt-7 max-w-xl text-lg leading-relaxed text-text-secondary"
-        style="animation-delay:.14s"
-      >
-        {copy.hero.subheadline}
-      </p>
-      <div
-        class="rise mt-10 flex flex-wrap items-center gap-x-4 gap-y-4"
-        style="animation-delay:.22s"
-      >
-        <a href={siteLinks.releases} data-download="auto" class={cta}>
-          {copy.hero.ctaPrimary}
-        </a>
-        <a href="#pdfs" class={ctaOutline}>{copy.hero.ctaSecondary}</a>
-      </div>
-      <p class="rise mt-7 text-sm text-text-muted" style="animation-delay:.28s">
-        {copy.hero.trustLine}
-      </p>
+  <section class="overflow-x-clip">
+    <div class:list={[wrap, 'pt-16 pb-20 lg:pt-24 lg:pb-24']}>
+      <div class="grid items-center gap-x-10 gap-y-14 lg:grid-cols-12">
+        <div class="lg:col-span-5">
+          <p class="rise text-sm text-text-muted">{copy.hero.eyebrow}</p>
+          <h1
+            class="rise mt-6 font-heading text-[clamp(2.6rem,3.7vw,3.6rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
+            style="animation-delay:.06s"
+          >
+            {headBefore}<span class="relative inline-block whitespace-nowrap"
+              >{copy.hero.headlineMark}<svg
+                aria-hidden="true"
+                viewBox="0 0 200 14"
+                preserveAspectRatio="none"
+                class="pointer-events-none absolute -bottom-[0.14em] left-0 h-[0.26em] w-full overflow-visible text-ink ink-draw"
+                style="--ink-delay:.9s"
+              >
+                <path
+                  d="M3 8.5C28 4.5 58 3 92 5.5S156 8 197 3.6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  vector-effect="non-scaling-stroke"
+                ></path>
+              </svg></span
+            >{headAfter}
+          </h1>
+          <p
+            class="rise mt-6 max-w-md text-sm leading-relaxed text-text-muted"
+            style="animation-delay:.14s"
+          >
+            {copy.hero.subheadline}
+          </p>
+          <div
+            class="rise mt-9 flex flex-wrap items-center gap-x-4 gap-y-4"
+            style="animation-delay:.22s"
+          >
+            <a href={siteLinks.releases} data-download="auto" class={cta}>
+              {copy.hero.ctaPrimary}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nudge-y size-4"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
+            </a>
+            <a href={localizePath('/try', locale)} class={ctaOutline}>
+              {copy.hero.ctaSecondary}
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nudge-x size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+            </a>
+          </div>
+          <p class="rise mt-6 text-sm text-text-muted" style="animation-delay:.28s">
+            {copy.hero.trustLine}
+          </p>
+        </div>
 
-      <div class="rise mt-16 lg:mt-20" style="animation-delay:.36s">
-        <Shot src="/library.png" alt={copy.shots.library} eager />
+        <div
+          class="rise lg:col-span-7 lg:w-[calc(100%+max(2.5rem,50vw-33.5rem)+4rem)]"
+          style="animation-delay:.36s"
+        >
+          <Shot src="/media/web-hero.mp4" alt={copy.shots.hero} objectPosition="48% 50%" eager />
+        </div>
       </div>
     </div>
   </section>
 
   <!-- PDFs -->
-  <section id="pdfs" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
-          <p class={lede}>{copy.ink.pdfBody}</p>
-        </div>
-        <div class="md:col-span-6 md:pl-6 lg:col-span-7">
-          <Shot src="/pdf.png" alt={copy.shots.pdf} />
-        </div>
+  <section id="pdfs" class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+      <div class="lg:col-span-6">
+        <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
+        <InkMark variant={0} class="mt-5" />
       </div>
+      <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+        {copy.ink.pdfBody}
+      </p>
+    </div>
+    <div class="reveal-scale mt-14 lg:mt-16">
+      <Shot src="/media/web-pdf.mp4" alt={copy.shots.pdf} objectPosition="60% 50%" />
     </div>
   </section>
 
   <!-- Page frames -->
   <section class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
-        <Shot src="/page-frame.png" alt={copy.shots.pageFrame} />
+      <div class="reveal-scale order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
+        <Shot src="/media/web-code.mp4" objectPosition="50% 50%" alt={copy.shots.pageFrame} />
       </div>
       <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
         <p class={kicker}>02 / {copy.sceneLabels.pages}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.pages.heading}</h2>
+        <InkMark variant={1} class="mt-5" />
         <p class={lede}>{copy.pages.body}</p>
       </div>
     </div>
   </section>
 
-  <!-- Audio and search -->
-  <section class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
+  <!-- Audio and search, linked notes -->
+  <section class:list={[wrap, band]}>
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
           <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.audioSearch.heading}</h2>
+          <h2 class:list={[tileHeading, 'mt-6']}>{copy.audioSearch.heading}</h2>
+        <InkMark variant={2} class="mt-5" />
           <p class={lede}>{copy.audioSearch.audioBody}</p>
           <p class={lede}>{copy.audioSearch.searchBody}</p>
         </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
-          <Shot src="/audio.png" alt={copy.shots.audio} />
+        <div class="-mb-7 mt-auto lg:-mb-10">
+          <Shot src="/media/web-audio.mp4" alt={copy.shots.audio} objectPosition="67% 50%" class="rounded-b-none!" />
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Linked notes -->
-  <section class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
-        <Shot src="/graph.png" alt={copy.shots.graph} />
-      </div>
-      <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
-        <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.linked.heading}</h2>
-        <p class={lede}>{copy.linked.body}</p>
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
+          <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
+          <h2 class:list={[tileHeading, 'mt-6']}>{copy.linked.heading}</h2>
+        <InkMark variant={0} class="mt-5" />
+          <p class={lede}>{copy.linked.body}</p>
+        </div>
+        <div class="-mb-7 mt-auto lg:-mb-10">
+          <Shot src="/graph.png" alt={copy.shots.graph} objectPosition="55% 50%" class="rounded-b-none!" />
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Sync and collaboration -->
-  <section id="sync" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
-          <p class={lede}>{copy.sync.kicker}</p>
-        </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
-          {
-            copy.sync.tiers.map((tier) => (
-              <div class="rounded-3xl bg-card p-7 shadow-elevated lg:p-8">
-                <span class="rounded-full bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">
-                  {tier.badge}
-                </span>
-                <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
-                  {tier.title}
-                </h3>
-                <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
-                  {tier.body}
-                </p>
-              </div>
-            ))
-          }
-        </div>
+  <section id="sync" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="md:col-span-6 lg:col-span-5">
+        <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
+        <InkMark variant={1} class="mt-5" />
+        <p class={lede}>{copy.sync.kicker}</p>
+      </div>
+      <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
+        {
+          copy.sync.tiers.map((tier, i) => (
+            <div class="reveal-scale lift rounded-2xl bg-card p-7 shadow-elevated lg:p-8" style={`--i:${i + 1}`}>
+              <span
+                class:list={[
+                  'rounded-xl px-2.5 py-1 text-xs font-medium',
+                  tier.live ? 'bg-bg-success-soft text-text-success' : 'bg-tag text-text-tag',
+                ]}
+              >
+                {tier.badge}
+              </span>
+              <h3 class="mt-4 font-heading text-xl font-medium text-text-primary">
+                {tier.title}
+              </h3>
+              <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">
+                {tier.body}
+              </p>
+            </div>
+          ))
+        }
       </div>
     </div>
   </section>
 
   <!-- Local-first -->
-  <section id="local" class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="md:col-span-6 lg:col-span-5">
-        <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.localFirst.heading}</h2>
-        <p class={lede}>{copy.localFirst.lede}</p>
-      </div>
+  <section id="local" class="bg-secondary-container">
+    <div class:list={[wrap, band]}>
+      <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
+      <h2
+        class="reveal mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance text-text-primary [--i:1]"
+      >
+        {copy.localFirst.heading}
+      </h2>
+      <InkMark variant={2} class="mt-5" />
+      <p class:list={[lede, 'max-w-2xl']}>{copy.localFirst.lede}</p>
       <CheckList
         items={copy.localFirst.bullets}
-        class="md:col-span-6 md:pl-6 lg:col-span-7"
+        class="reveal mt-12 gap-x-10 gap-y-4 [--i:3] md:grid-cols-2"
       />
     </div>
   </section>
 
   <!-- Import -->
-  <section id="import" class="bg-surface">
-    <div class:list={[wrap, band]}>
-      <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
-        <div class="md:col-span-6 lg:col-span-5">
-          <p class={kicker}>07 / {copy.sceneLabels.import}</p>
-          <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
-          <p class={lede}>{copy.importing.body}</p>
-        </div>
-        <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
-          {
-            copy.importing.sources.map((source) => {
-              const Icon = IMPORT_SOURCE_ICONS[source.id];
-              return (
-                <div class="flex items-center gap-5 rounded-3xl bg-card p-7 shadow-elevated">
-                  <Icon className="size-10 shrink-0" />
-                  <div class="min-w-0">
-                    <h3 class="font-heading text-lg font-medium text-text-primary">
-                      {source.label}
-                    </h3>
-                    <p class="mt-1.5 text-sm leading-relaxed text-text-secondary">
-                      {source.detail}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          }
-        </div>
+  <section id="import" class:list={[wrap, band]}>
+    <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
+      <div class="md:col-span-6 lg:col-span-5">
+        <p class={kicker}>07 / {copy.sceneLabels.import}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
+        <InkMark variant={2} class="mt-5" />
+        <p class={lede}>{copy.importing.body}</p>
+      </div>
+      <div class="grid gap-5 sm:grid-cols-2 md:col-span-6 md:pl-6 lg:col-span-7">
+        {
+          copy.importing.sources.map((source, i) => {
+            const Icon = IMPORT_SOURCE_ICONS[source.id];
+            return (
+              <div class="reveal-scale lift rounded-2xl bg-card p-6 shadow-elevated" style={`--i:${i % 2 + 1}`}>
+                <Icon className="size-9" />
+                <h3 class="mt-5 font-heading text-lg font-medium text-text-primary">
+                  {source.label}
+                </h3>
+                <p class="mt-1.5 text-sm leading-relaxed text-text-secondary">
+                  {source.detail}
+                </p>
+              </div>
+            );
+          })
+        }
       </div>
     </div>
   </section>
 
   <!-- FAQ -->
   <section id="faq" class:list={[wrap, band]}>
-    <div class="grid gap-x-10 gap-y-6 lg:grid-cols-12">
-      <p class:list={[kicker, 'lg:col-span-3']}>08 / {copy.faqKicker}</p>
-      <h2 class:list={[heading, 'lg:col-span-9']}>{copy.download.faqTitle}</h2>
+    <div>
+      <p class={kicker}>{copy.faqKicker}</p>
+      <h2 class:list={[heading, 'mt-6']}>{copy.download.faqTitle}</h2>
+      <InkMark variant={2} class="mt-5" />
     </div>
-    {/* Two columns from `sm` up, not `lg`: this page only ever renders below
-        the canvas breakpoint, so an `lg` column split would never fire and the
-        answers would read as one undifferentiated column. The rules keep the
-        entries separated at phone widths, where it is one column regardless. */}
+    {/* The rules keep the entries separated at phone widths, where it is one
+        column regardless. */}
     <dl class="mt-12 grid gap-x-10 sm:mt-16 sm:grid-cols-2">
       {
         faqs.map((faq) => (
@@ -247,12 +275,12 @@ const ctaOutline = cn(
   <section id="download" class="bg-primary text-text-on-dark">
     <div class:list={[wrap, 'py-28 lg:py-36']}>
       <p class="kicker text-text-on-dark/55">
-        09 / {copy.sceneLabels.download}
+        {copy.sceneLabels.download}
       </p>
       <h2
-        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] whitespace-pre-line"
+        class="mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance"
       >
-        {copy.download.heading}
+        {copy.footer.tagline}
       </h2>
       <p class="mt-7 max-w-2xl text-text-on-dark/75">{copy.download.body}</p>
       {/* One call to action, then the platforms as detail. This page is
@@ -261,9 +289,10 @@ const ctaOutline = cn(
       <a
         href={siteLinks.releases}
         data-download="auto"
-        class="mt-12 inline-flex h-12 items-center rounded-2xl bg-white px-7 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85"
+        class="mt-12 inline-flex h-12 items-center gap-2 rounded-xl bg-white px-7 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85"
       >
         {copy.download.cta}
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nudge-y size-4"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
       </a>
       <div class="mt-8 flex flex-wrap gap-3">
         {
@@ -308,21 +337,18 @@ const ctaOutline = cn(
     <div class="grid gap-10 py-16 lg:grid-cols-12">
       <div class="lg:col-span-5">
         <Wordmark className="text-[1.35rem]" />
-        <p class="mt-4 max-w-xs text-sm leading-relaxed text-text-muted">
-          {copy.footer.tagline}
-        </p>
       </div>
       <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
         <ul class="flex flex-wrap gap-x-8 gap-y-3">
           {locale === 'en' && (
-            <li><a href={siteLinks.source} class="text-sm text-text-secondary transition-colors hover:text-text-primary">Myelin Notes on GitHub</a></li>
+            <li><a href={siteLinks.source} class="text-sm text-text-secondary transition-colors hover:text-ink">Myelin Notes on GitHub</a></li>
           )}
           {
             navLinks.map((id) => (
               <li>
                 <a
                   href={linkHref(id)}
-                  class="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                  class="text-sm text-text-secondary transition-colors hover:text-ink"
                 >
                   {copy.linkLabels[id]}
                 </a>
@@ -369,4 +395,21 @@ const ctaOutline = cn(
       }
     }
   });
+
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in');
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px' },
+    );
+    document
+      .querySelectorAll('.reveal, .reveal-scale, .ink-scroll')
+      .forEach((el) => observer.observe(el));
+  }
 </script>

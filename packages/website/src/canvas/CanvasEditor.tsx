@@ -1,51 +1,257 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 // KaTeX styles for math in page frames; the app imports this in its root CSS
 // (src/index.css), so the editor's own styles.css does not carry it. Without
 // it the MathML fallback renders as duplicate plain text under each formula.
 import 'katex/dist/katex.min.css';
+import { AllSelection } from 'prosemirror-state';
+import { CanvasClipboardController } from '@myelin/editor/clipboard/controller';
+import { DrawableCanvasClipboardAdapter } from '@myelin/editor/clipboard/drawable-canvas-adapter';
+import { handlePageFrameImagePaste } from '@myelin/editor/clipboard/page-frame-image-paste';
+import { InsertPopover } from '@myelin/editor/components/insert-popover';
 import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { DrawableElement } from '@myelin/editor/elements/drawable-element';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import {
+  CHROME_BOTTOM_PADDING,
+  CHROME_HEADER_HEIGHT,
+  CHROME_SIDE_PADDING,
+} from '@myelin/editor/elements/frame/chrome';
+import { LatexElement } from '@myelin/editor/elements/latex/element';
+import {
+  PAGE_HEIGHT,
+  PAGE_WIDTH,
+  PageFrameElement,
+} from '@myelin/editor/elements/page-frame-element';
 import { I18nProvider } from '@myelin/editor/i18n';
+import { keybindings } from '@myelin/editor/keybinds';
+import {
+  getMediaImportHandler,
+  type MediaImportOptions,
+} from '@myelin/editor/media';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import { startDrawableCanvasAnimationLoop } from '@myelin/editor/render-loop';
+import { TOOL_ACTIONS } from '@myelin/editor/tools/tool-keybinds';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { CanvasToolbar } from '@/components/canvas-toolbar';
-import {
-  CommandPalette,
-  type PaletteCommand,
-} from '@/components/command-palette';
-import { SceneRail, ScrollHint } from '@/components/scene-rail';
 import { SelectionToolbar } from '@/components/selection-toolbar';
-import { SiteCopyProvider, useCopy } from '@/content/copy-context';
-import { useFakeScroll } from '@/hooks/use-fake-scroll';
+import { SiteCopyProvider } from '@/content/copy-context';
 import { useToolState } from '@/hooks/use-tool-state';
 import { CustomColorsProvider } from '@/lib/custom-colors';
 import type { Locale } from '@/lib/locale';
+import {
+  persistTryCanvas,
+  persistTryCanvasView,
+} from '@/lib/try-canvas-storage';
 import { initWebPlatform } from '@/lib/web-platform';
-import { SceneOverlay, SceneUnderlay } from './scene-overlays';
-import { populateScenes, SCENES, type WorldRect } from './scenes';
 
 const layerClass = 'absolute inset-0 h-full w-full';
+const EMBED_ACCEPT = 'application/pdf,image/*';
 
-/** How much of the viewport a scene should fill once the camera lands. */
-const SCENE_FIT = { widthRatio: 0.88, heightRatio: 0.85 };
-
-function toDomRect(rect: WorldRect): DOMRect {
-  return new DOMRect(rect.x, rect.y, rect.width, rect.height);
+// PDFs and images keep their bytes in the document; audio and markdown need
+// the app's media store and note repository.
+function isEmbeddable(file: File): boolean {
+  return file.type === 'application/pdf' || file.type.startsWith('image/');
 }
 
-/** Place the camera on a scene instantly (no animation), for the first paint. */
-function jumpToScene(canvas: DrawableCanvas, rect: WorldRect): void {
-  canvas.viewport.setViewToFitRect(toDomRect(rect), SCENE_FIT);
+function embedFiles(
+  canvas: DrawableCanvas,
+  files: Iterable<File>,
+  options?: MediaImportOptions,
+): void {
+  for (const file of files) {
+    const handler = isEmbeddable(file) && getMediaImportHandler(file.type);
+    if (!handler) {
+      console.warn(`Can't embed ${file.name} (${file.type || 'unknown type'})`);
+      continue;
+    }
+    void Promise.resolve(handler(file, canvas, options)).catch((error) =>
+      console.warn(`Could not embed ${file.name}`, error),
+    );
+  }
+}
+
+function startPageFramePlacement(canvas: DrawableCanvas): void {
+  canvas.startPlacement({
+    getBounds: () => ({
+      x: -CHROME_SIDE_PADDING,
+      y: -CHROME_HEADER_HEIGHT,
+      width: PAGE_WIDTH + CHROME_SIDE_PADDING * 2,
+      height: PAGE_HEIGHT + CHROME_HEADER_HEIGHT + CHROME_BOTTOM_PADDING,
+    }),
+    onPlace: (worldPos) => {
+      const frame = canvas.addElement(
+        (uuid) =>
+          new PageFrameElement(
+            uuid,
+            undefined,
+            UserPrefs.get('defaultPageLayout'),
+          ),
+      );
+      frame.setOffset(worldPos.x, worldPos.y);
+      frame.updateBounds();
+      frame.select();
+    },
+  });
+}
+
+function startLatexPlacement(canvas: DrawableCanvas): void {
+  canvas.startPlacement({
+    getBounds: () => ({ x: 0, y: 0, width: 140, height: 44 }),
+    onPlace: (worldPos) => {
+      const latex = canvas.addElement((uuid) => {
+        const element = new LatexElement(uuid);
+        element.setOffset(worldPos.x, worldPos.y);
+        return element;
+      });
+      latex.updateBounds();
+      latex.select();
+      // Placement runs inside a canvas pointerdown; entering edit now would
+      // register a click-outside listener that the same event, still bubbling
+      // to document, immediately trips. Defer past this event.
+      requestAnimationFrame(() => canvas.enterElementEdit(latex));
+    },
+  });
+}
+
+// The app's canvas bindings (src/pages/canvas/hooks/use-engine.ts). Insert-embed
+// opens a file picker in place of the app's embed composer.
+function registerCanvasKeybindings(
+  canvas: DrawableCanvas,
+  openFilePicker: () => void,
+): () => void {
+  return keybindings.register([
+    {
+      action: 'canvas:pan',
+      onDown: () => canvas.setSpaceDown(true),
+      onUp: () => canvas.setSpaceDown(false),
+    },
+    { action: 'canvas:undo', onDown: () => canvas.undo() },
+    { action: 'canvas:redo', onDown: () => canvas.redo() },
+    {
+      action: 'canvas:select-all',
+      onDown: (event) => {
+        event.preventDefault();
+        const editing = canvas.editingElement;
+        const view =
+          editing instanceof PageFrameElement ? editing.pmEditor?.view : null;
+        if (view) {
+          view.dispatch(
+            view.state.tr.setSelection(new AllSelection(view.state.doc)),
+          );
+          view.focus();
+          return;
+        }
+        canvas.selectAllElements();
+      },
+    },
+    { action: 'canvas:delete', onDown: () => canvas.deleteSelected() },
+    {
+      action: 'canvas:insert-frame',
+      onDown: () => startPageFramePlacement(canvas),
+    },
+    { action: 'canvas:insert-embed', onDown: openFilePicker },
+    ...canvas.tools.map((tool, index) => ({
+      action: TOOL_ACTIONS[tool.id],
+      onDown: () => canvas.switchTool(index),
+    })),
+  ]);
+}
+
+// Copy, cut and paste of canvas elements, and pasting PDFs and images, as in the
+// app.
+function bindCanvasClipboard(canvas: DrawableCanvas): () => void {
+  // The id only tells same-canvas pastes apart, so they land offset.
+  const adapter = new DrawableCanvasClipboardAdapter(
+    { current: canvas },
+    'try',
+  );
+  const controller = new CanvasClipboardController();
+  const handleCopy = (event: ClipboardEvent) =>
+    controller.handleCopy(event, adapter);
+  const handleCut = (event: ClipboardEvent) =>
+    controller.handleCut(event, adapter);
+  const handlePaste = (event: ClipboardEvent) => {
+    if (
+      handlePageFrameImagePaste(event, canvas, (files, target) =>
+        embedFiles(canvas, files, { pageFramePaste: target }),
+      )
+    ) {
+      return;
+    }
+    controller.handlePaste(event, adapter, (pasted) => {
+      const files = Array.from(pasted.clipboardData?.files ?? []).filter(
+        isEmbeddable,
+      );
+      embedFiles(canvas, files);
+      return files.length > 0;
+    });
+  };
+  document.addEventListener('copy', handleCopy);
+  document.addEventListener('cut', handleCut);
+  document.addEventListener('paste', handlePaste, true);
+  return () => {
+    document.removeEventListener('copy', handleCopy);
+    document.removeEventListener('cut', handleCut);
+    document.removeEventListener('paste', handlePaste, true);
+  };
+}
+
+function bindFileDrop(
+  target: HTMLCanvasElement,
+  canvas: DrawableCanvas,
+): () => void {
+  const handleDragOver = (event: DragEvent) => event.preventDefault();
+  const handleDrop = (event: DragEvent) => {
+    event.preventDefault();
+    const rect = target.getBoundingClientRect();
+    embedFiles(canvas, event.dataTransfer?.files ?? [], {
+      screenX: event.clientX - rect.left,
+      screenY: event.clientY - rect.top,
+    });
+  };
+  target.addEventListener('dragover', handleDragOver);
+  target.addEventListener('drop', handleDrop);
+  return () => {
+    target.removeEventListener('dragover', handleDragOver);
+    target.removeEventListener('drop', handleDrop);
+  };
+}
+
+// Enter on a single selected shape edits its label, as in the app.
+function handleShapeEnter(canvas: DrawableCanvas, event: KeyboardEvent): void {
+  if (
+    event.key !== 'Enter' ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey
+  ) {
+    return;
+  }
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.matches('input, textarea, button, select, a[href]'))
+  ) {
+    return;
+  }
+  const selected = canvas.getSelectedElements();
+  if (
+    canvas.editingElement ||
+    selected.length !== 1 ||
+    selected[0].type !== ElementType.SHAPE
+  ) {
+    return;
+  }
+  event.preventDefault();
+  canvas.enterElementEdit(selected[0], event);
 }
 
 /**
- * The landing experience: the real Myelin canvas engine mounted on an
- * in-memory Y.Doc, pre-populated with the whole content plan as canvas
- * elements laid out in world space. A fake scroll (wheel/keys/rail, no real
- * scrollbar) steps through preset scenes, and the engine's own view animation
- * flies the camera between them. Visitors can still draw, select, and type
- * on everything.
+ * The try-it page: the real Myelin canvas engine with the app's tool rail, on
+ * a Y.Doc kept in IndexedDB.
  */
 export default function CanvasEditor({ locale }: { locale: Locale }) {
   // The locale is pinned from the URL: the site prerenders one page per
@@ -62,21 +268,18 @@ export default function CanvasEditor({ locale }: { locale: Locale }) {
 }
 
 function CanvasEditorInner() {
-  const copy = useCopy();
   const bgRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const domHostRef = useRef<HTMLDivElement>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
-  // Once the visitor scrolls/navigates they own the camera; until then we keep
-  // re-framing the hero as the canvas settles to its real size (see below).
-  const userNavigatedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const toolState = useToolState(drawableCanvasRef);
   const [canvas, setCanvas] = useState<DrawableCanvas | null>(null);
   const [editingElement, setEditingElement] = useState<DrawableElement | null>(
     null,
   );
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [insertOpen, setInsertOpen] = useState(false);
 
   const { canvasTools, setSelectedToolIndex, hideOptions } = toolState;
 
@@ -91,7 +294,9 @@ function CanvasEditorInner() {
 
     initWebPlatform();
     const ydoc = new YDocManager();
+    const stopPersisting = persistTryCanvas(ydoc.doc);
     const canvas = new DrawableCanvas(fg, ydoc, canvasTools);
+    const stopPersistingView = persistTryCanvasView(canvas.viewport);
     canvas.setBackgroundHost(bg);
     canvas.setOverlayCanvas(overlay);
     canvas.setDomOverlayHost(domHost);
@@ -104,148 +309,54 @@ function CanvasEditorInner() {
     const handlePointerDown = () => hideOptions();
     fg.addEventListener('pointerdown', handlePointerDown);
 
+    const unregisterKeybindings = registerCanvasKeybindings(canvas, () =>
+      fileInputRef.current?.click(),
+    );
+    const handleKeyDown = (event: KeyboardEvent) =>
+      handleShapeEnter(canvas, event);
+    document.addEventListener('keydown', handleKeyDown);
+    const unbindClipboard = bindCanvasClipboard(canvas);
+    const unbindFileDrop = bindFileDrop(fg, canvas);
+
     const stopLoop = startDrawableCanvasAnimationLoop(canvas, () => {});
-
-    // Seed the whole landing document, then drop it from undo history so a
-    // visitor's Ctrl+Z can't erase the site (only their own edits).
-    let disposed = false;
-    void populateScenes(canvas, copy)
-      .then(() => {
-        if (!disposed) {
-          ydoc.undoManager.clear();
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to build landing scenes', error);
-      });
-    // Land on the hero without an animation. The camera must be framed against
-    // the canvas's real laid-out size, but on first paint that size is not
-    // settled: the element mounts smaller than its final pane and the
-    // renderer's own ResizeObserver grows it a beat later. Framing once against
-    // that stale size leaves the hero off-center, so re-frame on every resize
-    // until the visitor first navigates and takes the camera over. Our observer
-    // is created after the renderer's, so its size sync runs first each tick.
-    userNavigatedRef.current = false;
-    const frameHero = () => {
-      if (!userNavigatedRef.current) {
-        jumpToScene(canvas, SCENES[0].rect);
-      }
-    };
-    const heroFramer = new ResizeObserver(frameHero);
-    heroFramer.observe(fg);
-
-    // Text boxes measure their height with fallback metrics until the
-    // handwriting font (Caveat) finishes loading; re-measure so nothing stays
-    // clipped to the pre-swap line count.
-    const handleFontsLoaded = () => {
-      for (const element of canvas.elements) {
-        element.updateBounds();
-      }
-    };
-    document.fonts.addEventListener('loadingdone', handleFontsLoaded);
-
     setCanvas(canvas);
 
     return () => {
-      disposed = true;
-      heroFramer.disconnect();
-      document.fonts.removeEventListener('loadingdone', handleFontsLoaded);
       fg.removeEventListener('pointerdown', handlePointerDown);
+      unregisterKeybindings();
+      document.removeEventListener('keydown', handleKeyDown);
+      unbindClipboard();
+      unbindFileDrop();
       stopLoop();
+      stopPersisting();
+      stopPersistingView();
       canvas.destroy();
       drawableCanvasRef.current = null;
       setCanvas(null);
       setEditingElement(null);
     };
-  }, [canvasTools, setSelectedToolIndex, hideOptions, copy]);
-
-  const { index, goTo } = useFakeScroll({
-    sceneCount: SCENES.length,
-    isBlocked: () => {
-      const c = drawableCanvasRef.current;
-      // While an element is being edited the engine owns the wheel (page
-      // frames scroll along their page axis).
-      return !c || c.editingElement !== null;
-    },
-    onIndexChange: (i) => {
-      userNavigatedRef.current = true;
-      drawableCanvasRef.current?.viewport.animateViewToFitRect(
-        toDomRect(SCENES[i].rect),
-        SCENE_FIT,
-      );
-    },
-  });
-
-  // Cmd/Ctrl+P toggles the palette. The fake scroll ignores modified keys, so
-  // this can't collide with scene stepping. preventDefault is load-bearing
-  // here: it suppresses the browser's Print dialog.
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p') {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // The topbar is static Astro markup outside this island, so its Download
-  // link is wired here: the canvas is the whole page, so there is no anchor to
-  // follow, only a scene to fly to.
-  useEffect(() => {
-    const link = document.querySelector('[data-download-platform-jump]');
-    if (!link) {
-      return;
-    }
-    const handleClick = (event: Event) => {
-      event.preventDefault();
-      goTo(SCENES.length - 1);
-    };
-    link.addEventListener('click', handleClick);
-    return () => link.removeEventListener('click', handleClick);
-  }, [goTo]);
-
-  const paletteCommands: PaletteCommand[] = [
-    {
-      id: 'download',
-      group: 'getIt' as const,
-      label: copy.canvas.palette.download,
-      run: () => goTo(SCENES.length - 1),
-    },
-    ...SCENES.map((scene, i) => ({
-      id: `scene-${scene.id}`,
-      group: 'goTo' as const,
-      label: copy.sceneLabels[scene.id],
-      run: () => goTo(i),
-    })),
-  ];
-
-  // Keep the active scene framed across window resizes.
-  const refitScene = useEffectEvent(() => {
-    drawableCanvasRef.current?.viewport.animateViewToFitRect(
-      toDomRect(SCENES[index].rect),
-      SCENE_FIT,
-    );
-  });
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const handleResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(refitScene, 150);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
+  }, [canvasTools, setSelectedToolIndex, hideOptions]);
 
   return (
     <div
       data-canvas-root
       className="fixed inset-0 touch-none overflow-hidden bg-page"
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={EMBED_ACCEPT}
+        multiple
+        className="hidden"
+        onChange={(event) => {
+          const input = event.currentTarget;
+          if (canvas && input.files) {
+            embedFiles(canvas, Array.from(input.files));
+          }
+          // Lets the same file be picked again.
+          input.value = '';
+        }}
+      />
       {/* Canvas layers live in their own stage. The viewport attaches its
           wheel listener to the foreground canvas's parent and preventDefaults
           scrolling, so the toolbar must be a sibling of this stage (not a
@@ -254,14 +365,10 @@ function CanvasEditorInner() {
       <div className="absolute inset-0">
         <div ref={bgRef} style={{ zIndex: 0 }} />
 
-        {/* Mock app surfaces render under the ink so annotations draw on top
-            of them. */}
-        {canvas && <SceneUnderlay canvas={canvas} />}
-
         {/* Page-frame chrome + ProseMirror editors (z 5, self-positioned). */}
         {canvas && (
           <PageFrameDomLayer
-            canvasRef={drawableCanvasRef}
+            drawableCanvas={canvas}
             editingElement={editingElement}
           />
         )}
@@ -286,11 +393,6 @@ function CanvasEditorInner() {
         style={{ zIndex: 20 }}
       />
 
-      {/* Interactive CTAs/links anchored in world space, above the canvas. */}
-      {canvas && (
-        <SceneOverlay canvas={canvas} onSeeItInAction={() => goTo(1)} />
-      )}
-
       {canvas && (
         <div data-canvas-ui>
           <SelectionToolbar drawableCanvasRef={drawableCanvasRef} />
@@ -302,18 +404,28 @@ function CanvasEditorInner() {
             hasOptions={toolState.hasOptions}
             onSelectTool={toolState.selectTool}
             onToggleOptions={toolState.toggleOptions}
+            insertOpen={insertOpen}
+            onToggleInsert={() => setInsertOpen((open) => !open)}
+            insertPopover={
+              <InsertPopover
+                onInsertFrame={() => {
+                  setInsertOpen(false);
+                  startPageFramePlacement(canvas);
+                }}
+                onInsertEmbed={() => {
+                  setInsertOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                onInsertLatex={() => {
+                  setInsertOpen(false);
+                  startLatexPlacement(canvas);
+                }}
+                onClose={() => setInsertOpen(false)}
+              />
+            }
           />
         </div>
       )}
-
-      <SceneRail scenes={SCENES} index={index} onSelect={goTo} />
-      <ScrollHint visible={index === 0} />
-
-      <CommandPalette
-        open={paletteOpen}
-        commands={paletteCommands}
-        onClose={() => setPaletteOpen(false)}
-      />
     </div>
   );
 }
