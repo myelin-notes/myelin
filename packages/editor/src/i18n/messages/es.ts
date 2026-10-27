@@ -347,6 +347,10 @@ const es: typeof en = {
         },
         confirm: 'Aplicar',
       },
+      sections: {
+        pattern: 'Patrón',
+        colors: 'Colores',
+      },
       patternColor: {
         label: 'Color del patrón',
         description: 'Color de la cuadrícula, los puntos o las líneas.',
@@ -360,7 +364,6 @@ const es: typeof en = {
       },
       perCanvas: {
         button: 'Estilo del lienzo',
-        title: 'Este lienzo',
         followingDefault:
           'Sigue el estilo predeterminado de Ajustes. Los cambios aquí solo afectan a este lienzo.',
         custom: 'Este lienzo tiene su propio estilo.',

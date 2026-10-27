@@ -32,48 +32,62 @@ export function OptionsRow<T extends string>({
           {description}
         </span>
       </span>
-      <span
-        className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 ring-1 ring-border-ghost sm:w-auto"
-        style={{
-          gridTemplateColumns: `repeat(${options.length}, minmax(max-content, 1fr))`,
-        }}
-      >
-        {options.map(
-          ({ value: optionValue, label: optionLabel, Icon, swatch }) => {
-            const selected = value === optionValue;
-            return (
-              <button
-                key={optionValue}
-                type="button"
-                aria-pressed={selected}
-                onClick={() => onChange(optionValue)}
-                className={cn(
-                  'flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 font-medium text-xs transition-colors',
-                  selected
-                    ? 'bg-accent-dark text-text-on-dark shadow-sm'
-                    : 'text-text-muted hover:text-text-primary',
-                )}
-              >
-                {swatch ? (
-                  <span
-                    className="size-3.5 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: swatch,
-                      // currentColor so the ring stays visible against both the
-                      // dark selected pill and the light track.
-                      boxShadow:
-                        '0 0 0 1px color-mix(in srgb, currentColor 35%, transparent)',
-                    }}
-                  />
-                ) : (
-                  Icon && <Icon className="size-3.5" />
-                )}
-                <span>{optionLabel}</span>
-              </button>
-            );
-          },
-        )}
-      </span>
+      <OptionsSegmented value={value} onChange={onChange} options={options} />
     </div>
+  );
+}
+
+export function OptionsSegmented<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: ReadonlyArray<OptionsRowOption<T>>;
+}) {
+  return (
+    <span
+      className="grid w-full shrink-0 gap-1 rounded-lg bg-card/70 p-1 ring-1 ring-border-ghost sm:w-auto"
+      style={{
+        gridTemplateColumns: `repeat(${options.length}, minmax(max-content, 1fr))`,
+      }}
+    >
+      {options.map(
+        ({ value: optionValue, label: optionLabel, Icon, swatch }) => {
+          const selected = value === optionValue;
+          return (
+            <button
+              key={optionValue}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(optionValue)}
+              className={cn(
+                'flex cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2 py-1.5 font-medium text-xs transition-colors',
+                selected
+                  ? 'bg-accent-dark text-text-on-dark shadow-sm'
+                  : 'text-text-muted hover:text-text-primary',
+              )}
+            >
+              {swatch ? (
+                <span
+                  className="size-3.5 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor: swatch,
+                    // currentColor so the ring stays visible against both the
+                    // dark selected pill and the light track.
+                    boxShadow:
+                      '0 0 0 1px color-mix(in srgb, currentColor 35%, transparent)',
+                  }}
+                />
+              ) : (
+                Icon && <Icon className="size-3.5" />
+              )}
+              <span>{optionLabel}</span>
+            </button>
+          );
+        },
+      )}
+    </span>
   );
 }

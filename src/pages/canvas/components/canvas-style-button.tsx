@@ -3,7 +3,6 @@ import { Palette, X } from 'lucide-react';
 import type * as Y from 'yjs';
 import { clearCanvasStyle, setCanvasStyle } from '@myelin/editor/canvas-style';
 import { useMessages } from '@myelin/editor/i18n';
-import { cn } from '@myelin/editor/utils';
 import { usePresence } from '@myelin/ui';
 import { Button } from '@myelin/ui/button';
 import {
@@ -80,40 +79,40 @@ export function CanvasStyleButton({ doc }: { doc: Y.Doc | null }) {
           aria-label={perCanvas.button}
           className="data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute top-full right-0 z-[110] mt-2 flex max-h-[80vh] w-[28rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
         >
-          <div className="flex items-center gap-2 px-4 pt-3 pb-1">
-            <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">
-              {perCanvas.title}
-            </h2>
-            {overridden && (
+          <div className="px-4 pt-3 pb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="m-0 flex-1 font-semibold text-sm text-text-primary">
+                {perCanvas.button}
+              </h2>
               <button
                 type="button"
-                onClick={() => clearCanvasStyle(doc)}
-                className="cursor-pointer rounded-md px-2 py-1 font-medium text-[11px] text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary"
+                onClick={() => setOpen(false)}
+                aria-label={strings.common.close}
+                className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
               >
-                {perCanvas.reset}
+                <X className="size-3.5" />
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label={strings.common.close}
-              className="flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
-            >
-              <X className="size-3.5" />
-            </button>
+            </div>
+            <div className="mt-1 flex items-baseline gap-3 text-[11px] leading-relaxed">
+              <p className="m-0 flex-1 text-text-muted">
+                {overridden ? perCanvas.custom : perCanvas.followingDefault}
+              </p>
+              {overridden && (
+                <button
+                  type="button"
+                  onClick={() => clearCanvasStyle(doc)}
+                  className="shrink-0 cursor-pointer font-medium text-text-brand hover:underline"
+                >
+                  {perCanvas.reset}
+                </button>
+              )}
+            </div>
           </div>
-          <p
-            className={cn(
-              'm-0 px-4 pb-3 text-[11px] leading-relaxed',
-              overridden ? 'text-text-secondary' : 'text-text-muted',
-            )}
-          >
-            {overridden ? perCanvas.custom : perCanvas.followingDefault}
-          </p>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto border-border-subtle/70 border-t px-4 pt-3 pb-4">
             <CanvasStyleEditor
               style={style}
               onChange={(patch) => setCanvasStyle(doc, patch)}
+              compact
             />
           </div>
         </div>

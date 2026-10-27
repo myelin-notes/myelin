@@ -341,6 +341,10 @@ const en = {
         },
         confirm: 'Apply',
       },
+      sections: {
+        pattern: 'Pattern',
+        colors: 'Colors',
+      },
       patternColor: {
         label: 'Pattern color',
         description: 'Color of the grid, dots, or lines.',
@@ -353,7 +357,6 @@ const en = {
       },
       perCanvas: {
         button: 'Canvas style',
-        title: 'This canvas',
         followingDefault:
           'Following the default from Settings. Any change here applies to this canvas only.',
         custom: 'This canvas has its own style.',

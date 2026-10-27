@@ -329,6 +329,10 @@ const zhHans: typeof en = {
         },
         confirm: '应用',
       },
+      sections: {
+        pattern: '图案',
+        colors: '颜色',
+      },
       patternColor: {
         label: '图案颜色',
         description: '网格、点阵或横线的颜色。',
@@ -341,7 +345,6 @@ const zhHans: typeof en = {
       },
       perCanvas: {
         button: '画布样式',
-        title: '此画布',
         followingDefault:
           '正在使用设置中的默认样式。此处的更改仅应用于此画布。',
         custom: '此画布使用自己的样式。',

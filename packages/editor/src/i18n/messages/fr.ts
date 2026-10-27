@@ -352,6 +352,10 @@ const fr: typeof en = {
         },
         confirm: 'Appliquer',
       },
+      sections: {
+        pattern: 'Motif',
+        colors: 'Couleurs',
+      },
       patternColor: {
         label: 'Couleur du motif',
         description: 'Couleur de la grille, des points ou des lignes.',
@@ -365,7 +369,6 @@ const fr: typeof en = {
       },
       perCanvas: {
         button: 'Style du canevas',
-        title: 'Ce canevas',
         followingDefault:
           'Suit le style par défaut des Réglages. Toute modification ici s’applique uniquement à ce canevas.',
         custom: 'Ce canevas a son propre style.',
