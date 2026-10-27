@@ -848,6 +848,10 @@ const en = {
       goToPage: 'Go to page',
       pageNumber: 'Page number',
     },
+    pdfQuote: {
+      quote: 'Quote',
+      sourceMissing: 'The quoted PDF isn’t in this note.',
+    },
     insert: {
       title: 'Insert',
       soon: 'Soon',

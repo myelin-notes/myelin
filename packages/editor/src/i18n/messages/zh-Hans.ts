@@ -825,6 +825,10 @@ const zhHans: typeof en = {
       goToPage: '跳转到页面',
       pageNumber: '页码',
     },
+    pdfQuote: {
+      quote: '引用',
+      sourceMissing: '引用的 PDF 不在此笔记中。',
+    },
     insert: {
       title: '插入',
       soon: '即将推出',

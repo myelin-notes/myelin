@@ -28,12 +28,14 @@ import {
 const FAST_SCROLL_PX_PER_FRAME = 24;
 const logger = new Logger('PdfPageView');
 
-/** One canvas-search occurrence, addressed by layout position and its ordinal on that page. */
-export interface PdfSearchHighlight {
-  position: number;
-  query: string;
-  current: number;
-}
+/**
+ * A canvas-search occurrence (its ordinal on the page) or a quoted range of the page text, addressed
+ * by layout position.
+ */
+export type PdfSearchHighlight = { position: number } & (
+  | { query: string; current: number }
+  | { from: number; to: number }
+);
 
 export interface PdfTextLayerOptions {
   selectable: boolean;
@@ -314,6 +316,7 @@ export class PdfPageView {
       this.removeTextLayer(pageDom);
       const div = document.createElement('div');
       div.className = 'textLayer';
+      div.dataset.pageIndex = String(pageIndex);
       pageDom.root.appendChild(div);
       const created: PdfTextLayerDom = {
         div,
@@ -353,15 +356,13 @@ export class PdfPageView {
     }
     const highlight =
       options.highlight?.position === position ? options.highlight : null;
-    const highlightKey = highlight
-      ? `${position}\n${highlight.query}\n${highlight.current}`
-      : '';
+    const highlightKey = highlight ? JSON.stringify(highlight) : '';
     if (highlightKey === layer.highlightKey) {
       return;
     }
     layer.highlightKey = highlightKey;
     if (highlight) {
-      highlightPdfTextLayer(layer.div, highlight.query, highlight.current);
+      highlightPdfTextLayer(layer.div, highlight);
     } else {
       clearPdfTextLayerHighlight(layer.div);
     }

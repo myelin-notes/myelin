@@ -197,37 +197,45 @@ export class PageFrameAnchoring {
     if (frame instanceof PdfElement) {
       return this.attachToPdf(element, frame, point);
     }
-    const view = frame.pmEditor?.view;
-    const content = frame.contentDiv;
-    if (!view || !content) {
-      return false;
-    }
-    const bounds = content.getBoundingClientRect();
-    if (!content.offsetWidth || !bounds.width) {
-      return false;
-    }
-    const scale = bounds.width / content.offsetWidth;
-    const box = element.boundingBox;
-    const coords = {
-      left: bounds.left + ((point.x - frame.offset.x) / frame.scale.x) * scale,
-      top:
-        bounds.top +
-        (((element.makesSpace ? box.top : point.y) - frame.offset.y) /
-          frame.scale.y) *
-          scale,
-    };
+    let target = point;
     if (element.makesSpace) {
       const localX = (point.x - frame.offset.x) / frame.scale.x;
       const column =
         frame.pageLayout === 'horizontal'
           ? Math.max(0, Math.floor(localX / (frame.pageWidth + PAGE_GAP)))
           : 0;
-      coords.left =
-        bounds.left +
-        (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
+      target = {
+        x:
+          frame.offset.x +
+          (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) *
+            frame.scale.x,
+        y: element.boundingBox.top,
+      };
     }
-    const pos = view.posAtCoords(coords)?.pos ?? view.state.doc.content.size;
-    return this.attachAtPosition(element, frame, pos);
+    const pos = this.textPositionAt(frame, target);
+    return pos !== null && this.attachAtPosition(element, frame, pos);
+  }
+
+  /** The frame's text position at the world `point`; `null` while its editor isn't laid out. */
+  public textPositionAt(
+    frame: PageFrameElement,
+    point: Vector2,
+  ): number | null {
+    const view = frame.pmEditor?.view;
+    const content = frame.contentDiv;
+    if (!view || !content) {
+      return null;
+    }
+    const bounds = content.getBoundingClientRect();
+    if (!content.offsetWidth || !bounds.width) {
+      return null;
+    }
+    const scale = bounds.width / content.offsetWidth;
+    const coords = {
+      left: bounds.left + ((point.x - frame.offset.x) / frame.scale.x) * scale,
+      top: bounds.top + ((point.y - frame.offset.y) / frame.scale.y) * scale,
+    };
+    return view.posAtCoords(coords)?.pos ?? view.state.doc.content.size;
   }
 
   public attachAtPosition(

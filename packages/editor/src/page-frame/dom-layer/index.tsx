@@ -12,7 +12,16 @@ import {
   PAGE_PADDING,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
-import { NOTE_LINK_OPEN_REQUEST_EVENT, PM_UPDATE_EVENT } from '../../events';
+import {
+  PDF_QUOTE_LINK_SELECTOR,
+  type PdfQuoteTarget,
+  parsePdfQuoteHref,
+} from '../../elements/pdf/quote';
+import {
+  NOTE_LINK_OPEN_REQUEST_EVENT,
+  PDF_QUOTE_OPEN_REQUEST_EVENT,
+  PM_UPDATE_EVENT,
+} from '../../events';
 import { getMessages } from '../../i18n';
 import { quantizeRasterZoom } from '../../raster-zoom';
 import { UserPrefs } from '../../user-prefs';
@@ -382,11 +391,12 @@ function unionRects(rects: DOMRect[]): DOMRect {
   return new DOMRect(left, top, right - left, bottom - top);
 }
 
-function getNoteLinkPreviewTargetAtPoint(
+function findLinkAtPoint(
   frameMap: ReadonlyMap<string, FrameRefs>,
+  selector: string,
   clientX: number,
   clientY: number,
-): PageFrameNoteLinkHit | null {
+): { link: HTMLElement; rects: DOMRect[] } | null {
   for (const refs of frameMap.values()) {
     const contentRect = getVisualRectForContentRect(
       refs,
@@ -397,38 +407,43 @@ function getNoteLinkPreviewTargetAtPoint(
     }
 
     for (const link of refs.contentDiv.querySelectorAll<HTMLElement>(
-      NOTE_LINK_SELECTOR,
+      selector,
     )) {
-      const linkRects = Array.from(link.getClientRects()).map((rect) =>
+      const rects = Array.from(link.getClientRects()).map((rect) =>
         getVisualRectForContentRect(refs, rect),
       );
-      if (
-        !linkRects.some((rect) => rectContainsPoint(rect, clientX, clientY))
-      ) {
-        continue;
+      if (rects.some((rect) => rectContainsPoint(rect, clientX, clientY))) {
+        return { link, rects };
       }
-
-      const title = link.getAttribute('data-note-link-title');
-      if (title === null) {
-        continue;
-      }
-
-      const target: NoteLinkPreviewTarget = {
-        title,
-        noteId: link.getAttribute('data-note-id') || null,
-      };
-      return {
-        target,
-        rect: unionRects(linkRects),
-        openRequest: {
-          ...target,
-          pageFrameId: link.getAttribute('data-page-frame-id') || null,
-        },
-      };
     }
   }
 
   return null;
+}
+
+function getNoteLinkPreviewTargetAtPoint(
+  frameMap: ReadonlyMap<string, FrameRefs>,
+  clientX: number,
+  clientY: number,
+): PageFrameNoteLinkHit | null {
+  const hit = findLinkAtPoint(frameMap, NOTE_LINK_SELECTOR, clientX, clientY);
+  const title = hit?.link.getAttribute('data-note-link-title') ?? null;
+  if (!hit || title === null) {
+    return null;
+  }
+
+  const target: NoteLinkPreviewTarget = {
+    title,
+    noteId: hit.link.getAttribute('data-note-id') || null,
+  };
+  return {
+    target,
+    rect: unionRects(hit.rects),
+    openRequest: {
+      ...target,
+      pageFrameId: hit.link.getAttribute('data-page-frame-id') || null,
+    },
+  };
 }
 
 interface PageFrameDomLayerProps {
@@ -473,23 +488,44 @@ export function PageFrameDomLayer({
         return;
       }
 
-      const hit = getPreviewTargetAtPoint(event.clientX, event.clientY);
       if (
-        !hit ||
-        (UserPrefs.get('linkRequireModifier') &&
-          !event.metaKey &&
-          !event.ctrlKey)
+        UserPrefs.get('linkRequireModifier') &&
+        !event.metaKey &&
+        !event.ctrlKey
       ) {
         return;
       }
 
-      event.preventDefault();
-      document.dispatchEvent(
-        new CustomEvent<NoteLinkOpenRequestDetail>(
-          NOTE_LINK_OPEN_REQUEST_EVENT,
-          { detail: hit.openRequest },
-        ),
+      const hit = getPreviewTargetAtPoint(event.clientX, event.clientY);
+      if (hit) {
+        event.preventDefault();
+        document.dispatchEvent(
+          new CustomEvent<NoteLinkOpenRequestDetail>(
+            NOTE_LINK_OPEN_REQUEST_EVENT,
+            { detail: hit.openRequest },
+          ),
+        );
+        return;
+      }
+
+      const quoteLink = findLinkAtPoint(
+        frameMap.current,
+        PDF_QUOTE_LINK_SELECTOR,
+        event.clientX,
+        event.clientY,
       );
+      const quote = parsePdfQuoteHref(
+        quoteLink?.link.getAttribute('href') ?? '',
+      );
+      if (quote) {
+        event.preventDefault();
+        event.target.dispatchEvent(
+          new CustomEvent<PdfQuoteTarget>(PDF_QUOTE_OPEN_REQUEST_EVENT, {
+            bubbles: true,
+            detail: quote,
+          }),
+        );
+      }
     };
 
     document.addEventListener('click', handleClick);

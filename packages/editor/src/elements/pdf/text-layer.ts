@@ -33,16 +33,13 @@ export function findPdfTextMatches(
  */
 export function planPdfTextMarks(
   pieces: readonly string[],
-  query: string,
+  matches: readonly { from: number; to: number }[],
   current: number | null,
 ): PdfTextMark[] {
   const marks: PdfTextMark[] = [];
   let piece = 0;
   let pieceStart = 0;
-  for (const [index, match] of findPdfTextMatches(
-    pieces.join(''),
-    query,
-  ).entries()) {
+  for (const [index, match] of matches.entries()) {
     while (pieceStart + pieces[piece].length <= match.from) {
       pieceStart += pieces[piece].length;
       piece++;
@@ -59,13 +56,12 @@ export function planPdfTextMarks(
   return marks.reverse();
 }
 
-export function highlightPdfTextLayer(
-  layer: HTMLElement,
-  query: string,
-  current: number | null,
-): void {
-  clearPdfTextLayerHighlight(layer);
-  const nodes: (Text | null)[] = [];
+// The layer's text as `getPdfPageText` produces it, so offsets into either agree.
+function textLayerPieces(layer: HTMLElement): {
+  nodes: (Text | HTMLBRElement)[];
+  pieces: string[];
+} {
+  const nodes: (Text | HTMLBRElement)[] = [];
   const pieces: string[] = [];
   const walker = document.createTreeWalker(
     layer,
@@ -75,14 +71,31 @@ export function highlightPdfTextLayer(
     if (node instanceof Text) {
       nodes.push(node);
       pieces.push(node.data);
-    } else if (node.nodeName === 'BR') {
-      nodes.push(null);
+    } else if (node instanceof HTMLBRElement) {
+      nodes.push(node);
       pieces.push('\n');
     }
   }
-  for (const mark of planPdfTextMarks(pieces, query, current)) {
+  return { nodes, pieces };
+}
+
+/** Marks every `query` match, or exactly the `from`–`to` offsets of the page text. */
+export function highlightPdfTextLayer(
+  layer: HTMLElement,
+  highlight: { query: string; current: number } | { from: number; to: number },
+): void {
+  clearPdfTextLayerHighlight(layer);
+  const { nodes, pieces } = textLayerPieces(layer);
+  const [matches, current] =
+    'query' in highlight
+      ? [
+          findPdfTextMatches(pieces.join(''), highlight.query),
+          highlight.current,
+        ]
+      : [[highlight], 0];
+  for (const mark of planPdfTextMarks(pieces, matches, current)) {
     const node = nodes[mark.piece];
-    if (!node) {
+    if (!(node instanceof Text)) {
       continue;
     }
     const matched = mark.from > 0 ? node.splitText(mark.from) : node;
@@ -94,6 +107,34 @@ export function highlightPdfTextLayer(
     matched.replaceWith(element);
     element.append(matched);
   }
+}
+
+/** The part of `range` from its start, which must lie in `layer`, to the end of `layer`'s page text. */
+export function pdfTextLayerRange(
+  layer: HTMLElement,
+  range: Range,
+): { from: number; to: number; text: string } {
+  const { nodes, pieces } = textLayerPieces(layer);
+  const offsetOf = (node: Node, offset: number): number => {
+    const before = document.createRange();
+    before.setStart(layer, 0);
+    before.setEnd(node, offset);
+    let total = 0;
+    for (const [index, piece] of nodes.entries()) {
+      if (!before.intersectsNode(piece)) {
+        break;
+      }
+      total += piece === node ? offset : pieces[index].length;
+    }
+    return total;
+  };
+  const text = pieces.join('');
+  const from = offsetOf(range.startContainer, range.startOffset);
+  // shortcut: a selection running onto later pages quotes only its first; split per page if missed.
+  const to = layer.contains(range.endContainer)
+    ? offsetOf(range.endContainer, range.endOffset)
+    : text.length;
+  return { from, to, text: text.slice(from, to) };
 }
 
 export function clearPdfTextLayerHighlight(layer: HTMLElement): void {

@@ -866,6 +866,10 @@ const fr: typeof en = {
       goToPage: 'Aller à la page',
       pageNumber: 'Numéro de page',
     },
+    pdfQuote: {
+      quote: 'Citer',
+      sourceMissing: 'Le PDF cité n’est pas dans cette note.',
+    },
     insert: {
       title: 'Insérer',
       soon: 'Bientôt',

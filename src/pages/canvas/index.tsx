@@ -24,7 +24,12 @@ import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
-import { NOTE_LINK_OPEN_REQUEST_EVENT } from '@myelin/editor/events';
+import { PdfElement } from '@myelin/editor/elements/pdf';
+import type { PdfQuoteTarget } from '@myelin/editor/elements/pdf/quote';
+import {
+  NOTE_LINK_OPEN_REQUEST_EVENT,
+  PDF_QUOTE_OPEN_REQUEST_EVENT,
+} from '@myelin/editor/events';
 import type { ExportTarget } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
@@ -65,6 +70,7 @@ import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
+import { PdfQuoteButton } from './components/pdf-quote-button';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
@@ -354,6 +360,32 @@ function CanvasViewInner({
         handleOpenRequest,
       );
     };
+  }, []);
+  const openPdfQuote = useEffectEvent((target: PdfQuoteTarget) => {
+    const dc = drawableCanvasRef.current;
+    const pdf = dc?.getElementByUuid(target.pdfId);
+    const bounds = pdf instanceof PdfElement ? pdf.flashQuote(target) : null;
+    if (!(dc && bounds)) {
+      toast.error(strings.canvas.pdfQuote.sourceMissing);
+      return;
+    }
+    dc.clearSelection();
+    dc.viewport.animateViewToFitRect(bounds, {
+      widthRatio: 0.72,
+      heightRatio: 0.82,
+    });
+  });
+  useEffect(() => {
+    const root = thumbnailRootRef.current;
+    if (!root) {
+      return;
+    }
+    const handleQuoteOpen = (event: Event) => {
+      openPdfQuote((event as CustomEvent<PdfQuoteTarget>).detail);
+    };
+    root.addEventListener(PDF_QUOTE_OPEN_REQUEST_EVENT, handleQuoteOpen);
+    return () =>
+      root.removeEventListener(PDF_QUOTE_OPEN_REQUEST_EVENT, handleQuoteOpen);
   }, []);
   const pageFrameAutocomplete = usePageFrameAutocomplete({
     repository,
@@ -665,6 +697,7 @@ function CanvasViewInner({
           onCut={engine.clipboard.cut}
         />
       )}
+      {engine.ready && <PdfQuoteButton drawableCanvasRef={drawableCanvasRef} />}
       {IS_DEV && (
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}

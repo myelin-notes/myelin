@@ -83,8 +83,12 @@ import {
   type PdfLayout,
 } from './layout';
 import { PdfPageView, type PdfSearchHighlight } from './page-view';
+import type { PdfQuote, PdfQuoteTarget } from './quote';
+import { pdfTextLayerRange } from './text-layer';
 
 const logger = new Logger('PdfElement');
+// Long enough to outlast the pan to the page and its text layer rendering.
+const QUOTE_FLASH_MS = 4000;
 
 export class PdfElement
   extends DrawableElement
@@ -188,6 +192,49 @@ export class PdfElement
   public setSearchHighlight(highlight: PdfSearchHighlight | null): void {
     this._searchHighlight = highlight;
     this.onRedrawNeeded?.();
+  }
+
+  /** The DOM text selection on this PDF, from the page it starts on; `null` when there is none. */
+  public getSelectedQuote(): PdfQuote | null {
+    const selection = document.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const start = range?.startContainer;
+    const layer = (
+      start instanceof Element ? start : start?.parentElement
+    )?.closest<HTMLElement>('.textLayer');
+    if (!(range && layer && this._contentRoot?.contains(layer))) {
+      return null;
+    }
+    const { from, to, text } = pdfTextLayerRange(layer, range);
+    const quoted = text.replace(/\s+/g, ' ').trim();
+    if (!quoted) {
+      return null;
+    }
+    const page = Number(layer.dataset.pageIndex);
+    return {
+      target: { pdfId: this.uuid, page, from, to },
+      text: quoted,
+      label: `${this.fileName.replace(/\.pdf$/i, '')}, p.${page + 1}`,
+    };
+  }
+
+  /** Highlights the quoted range for a few seconds; returns its page's world bounds, or `null` if gone. */
+  public flashQuote(target: PdfQuoteTarget): DOMRect | null {
+    const position = this.model.layout.pages.findIndex(
+      (page) => page.kind === 'pdf' && page.originalIndex === target.page,
+    );
+    const bounds = this.getPageBounds(position);
+    if (!bounds) {
+      return null;
+    }
+    const highlight = { position, from: target.from, to: target.to };
+    this.setSearchHighlight(highlight);
+    setTimeout(() => {
+      if (this._searchHighlight === highlight) {
+        this.setSearchHighlight(null);
+      }
+    }, QUOTE_FLASH_MS);
+    return bounds;
   }
 
   public override get resizeHandles(): ResizeHandles {
