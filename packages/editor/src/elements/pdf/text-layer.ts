@@ -160,6 +160,15 @@ export function trackPdfTextSelection(layer: HTMLElement): () => void {
   end.className = 'endOfContent';
   layer.append(end);
   layer.addEventListener('mousedown', () => layer.classList.add('selecting'));
+  // As pdf.js does: the default copy carries the spans' inline `color: transparent`, so the
+  // pasted rich text is invisible.
+  layer.addEventListener('copy', (event) => {
+    event.preventDefault();
+    event.clipboardData?.setData(
+      'text/plain',
+      document.getSelection()?.toString() ?? '',
+    );
+  });
   endOfContentByLayer.set(layer, end);
   selectionListeners ??= listenForSelection();
   return () => {
