@@ -148,7 +148,7 @@ export async function exportObsidianVault({
   const vaultPath = await writeVault({
     destDir,
     vaultName: sanitizeName(vaultName) || 'Vault',
-    folders: plan.folders,
+    folders: plan.folders.map((folder) => folder.path),
     files: entries,
   });
 

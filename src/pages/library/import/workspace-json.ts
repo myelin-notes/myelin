@@ -14,12 +14,19 @@ import {
   type NativeRepository,
   type VFSNodeId,
 } from '@/lib/sync';
+import { MAX_PEN_PRESETS } from '@/lib/sync/repo/config';
+import { normalizeCustomColor } from '@/lib/sync/repo/shared';
 import {
   BYTES_MARKER,
   base64DecodeBytes,
+  CUSTOM_COLOR_TOOLS,
   isEncodedBytes,
   NOTE_JSON_VERSION,
+  type NodeMetaJson,
   type NoteJson,
+  WORKSPACE_JSON_FILE,
+  WORKSPACE_JSON_VERSION,
+  type WorkspaceJson,
 } from '@/pages/library/export/workspace-json-format';
 import type { ImportProgress } from './dialog';
 import { importStoragePath } from './files';
@@ -69,6 +76,8 @@ export interface ScannedWorkspace {
   folderPaths: Set<string>;
   notes: ScannedNote[];
   media: ScannedMedia[];
+  /** The {@link WORKSPACE_JSON_FILE}; null for exports that predate it. */
+  workspacePath: string | null;
   skippedFiles: number;
 }
 
@@ -200,6 +209,14 @@ async function scanDirectory(
   const entries = await reader.readDir(sourcePath);
 
   for (const entry of entries) {
+    if (
+      entry.name === WORKSPACE_JSON_FILE &&
+      entry.isFile &&
+      relativeSegments.length === 0
+    ) {
+      scanned.workspacePath = await reader.join(sourcePath, entry.name);
+      continue;
+    }
     if (entry.name.startsWith('.') || entry.isSymlink) {
       if (entry.isSymlink) {
         scanned.skippedFiles += 1;
@@ -255,6 +272,85 @@ function parseNote(raw: string, sourcePath: string): NoteJson {
   return note;
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
+}
+
+function isColor(value: unknown): boolean {
+  return typeof value === 'string' && normalizeCustomColor(value) !== null;
+}
+
+// Rejects anything the repository would throw on mid-import, which would roll back the whole
+// import. Timestamps are checked where they are applied, since notes carry their own.
+function parseWorkspace(raw: string, sourcePath: string): WorkspaceJson {
+  const workspace = JSON.parse(raw) as WorkspaceJson;
+  if (workspace.version !== WORKSPACE_JSON_VERSION) {
+    throw new Error(
+      `Unsupported workspace version ${workspace.version} in ${sourcePath}`,
+    );
+  }
+  const valid =
+    [
+      ...Object.values(workspace.folders),
+      ...Object.values(workspace.media),
+    ].every(
+      (meta) =>
+        isStringArray(meta.tags) &&
+        (meta.color === undefined || isColor(meta.color)),
+    ) &&
+    CUSTOM_COLOR_TOOLS.every(
+      (tool) =>
+        Array.isArray(workspace.customColors[tool]) &&
+        workspace.customColors[tool].every(isColor),
+    ) &&
+    workspace.penPresets.every(
+      (preset) =>
+        (preset.tool === 'pen' || preset.tool === 'highlighter') &&
+        isColor(preset.color) &&
+        Number.isFinite(preset.size),
+    ) &&
+    isStringArray(workspace.tagRegistry);
+  if (!valid) {
+    throw new Error(`Malformed workspace metadata in ${sourcePath}`);
+  }
+  return workspace;
+}
+
+async function restoreNodeMeta(
+  repository: NativeRepository,
+  nodeId: VFSNodeId,
+  meta: NodeMetaJson,
+): Promise<void> {
+  if (meta.tags.length > 0) {
+    await repository.setTags(nodeId, meta.tags);
+  }
+  if (meta.color) {
+    await repository.setFolderColor(nodeId, meta.color);
+  }
+}
+
+// Merges into the destination's settings, which are kept; presets stop at the cap.
+async function mergeWorkspaceSettings(
+  repository: NativeRepository,
+  workspace: WorkspaceJson,
+): Promise<void> {
+  for (const tool of CUSTOM_COLOR_TOOLS) {
+    for (const color of workspace.customColors[tool]) {
+      await repository.addCustomColor(color, tool);
+    }
+  }
+  await repository.addRegistryTags(workspace.tagRegistry);
+  let presets = await repository.getPenPresets();
+  for (const { tool, color, size } of workspace.penPresets) {
+    if (presets.length >= MAX_PEN_PRESETS) {
+      break;
+    }
+    presets = await repository.addPenPreset({ tool, color, size });
+  }
+}
+
 interface PreparedNote {
   note: NoteJson;
   nodeId: VFSNodeId;
@@ -278,8 +374,6 @@ async function createImportedNote({
   fallbackName: string;
 }): Promise<PreparedNote> {
   const baseName = note.name?.trim() || fallbackName;
-  // VFS timestamps can't be set on create, so the original createdAt/modifiedAt
-  // survive only inside the JSON, not as the new node's dates.
   const name = await repository.getUniqueFileName(baseName, parentId);
   const nodeId = await repository.createFile(name, 'mcanvas', parentId);
   return { note, nodeId, baseName, folderPath };
@@ -347,6 +441,7 @@ export async function scanWorkspaceJson(
     folderPaths: new Set(),
     notes: [],
     media: [],
+    workspacePath: null,
     skippedFiles: 0,
   };
   const reader = createFolderReader(dirPath);
@@ -376,6 +471,31 @@ export async function importWorkspaceJson({
   let failedFiles = 0;
   const total = scanned.notes.length + scanned.media.length;
 
+  // Bad metadata costs only the metadata: the notes and media still import.
+  let workspace: WorkspaceJson | null = null;
+  if (scanned.workspacePath) {
+    try {
+      workspace = parseWorkspace(
+        await reader.readTextFile(scanned.workspacePath),
+        scanned.workspacePath,
+      );
+    } catch (error) {
+      failedFiles += 1;
+      logger.warn('Skipping workspace metadata that failed to parse', {
+        path: scanned.workspacePath,
+        error,
+      });
+    }
+  }
+  // Maps, not the parsed records, so a folder named e.g. "constructor" can't hit the prototype.
+  const folderMeta = new Map(Object.entries(workspace?.folders ?? {}));
+  const mediaMeta = new Map(Object.entries(workspace?.media ?? {}));
+  // Restored last, since tag, color and content writes all reset `modifiedAt`.
+  const timestamps = new Map<
+    VFSNodeId,
+    { createdAt: number; modifiedAt: number }
+  >();
+
   // Every folder and note lands on one manifest, saved once when the batch closes. Fatal setup
   // aborts and rolls back; per-file failures are isolated so one bad file can't discard the rest.
   try {
@@ -387,6 +507,16 @@ export async function importWorkspaceJson({
         root,
         scanned.folderPaths,
       );
+      for (const [path, folderId] of folderIds) {
+        const meta = folderMeta.get(path);
+        if (meta) {
+          await restoreNodeMeta(repository, folderId, meta);
+          timestamps.set(folderId, meta);
+        }
+      }
+      if (workspace) {
+        await mergeWorkspaceSettings(repository, workspace);
+      }
 
       // Two passes: create every file first so note-link ids can be remapped to the new nodes (links
       // may point forward), then rebuild content.
@@ -433,6 +563,7 @@ export async function importWorkspaceJson({
         });
         try {
           await rebuildImportedNote(repository, preparedNote, resolveNoteId);
+          timestamps.set(preparedNote.nodeId, preparedNote.note);
           notesImported += 1;
         } catch (error) {
           failedFiles += 1;
@@ -446,7 +577,7 @@ export async function importWorkspaceJson({
       for (const file of scanned.media) {
         onProgress?.({ current: ++current, total, fileName: file.name });
         try {
-          await importStoragePath({
+          const mediaId = await importStoragePath({
             path: file.sourcePath,
             name: file.name,
             fileType: file.fileType,
@@ -454,6 +585,13 @@ export async function importWorkspaceJson({
             repository,
             reader,
           });
+          const meta = mediaMeta.get(
+            file.folderPath ? `${file.folderPath}/${file.name}` : file.name,
+          );
+          if (meta) {
+            await restoreNodeMeta(repository, mediaId, meta);
+            timestamps.set(mediaId, meta);
+          }
           mediaImported += 1;
         } catch (error) {
           failedFiles += 1;

@@ -1,4 +1,9 @@
-import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
+import type {
+  ReadableRepository,
+  VFSFileNode,
+  VFSFolderNode,
+  VFSNodeId,
+} from '@/lib/sync';
 
 const ILLEGAL_NAME_CHARS = '/\\:*?"<>|';
 
@@ -22,8 +27,14 @@ export interface PlannedFile {
   fileName: string;
 }
 
+export interface PlannedFolder {
+  node: VFSFolderNode;
+  /** '/'-separated path relative to the vault root. */
+  path: string;
+}
+
 export interface ExportPlan {
-  folders: string[];
+  folders: PlannedFolder[];
   files: PlannedFile[];
 }
 
@@ -74,7 +85,7 @@ export async function planFolder(
   for (const folder of folders) {
     const name = dedupeName(sanitizeName(folder.name) || 'Folder', used);
     const segments = [...parentSegments, name];
-    plan.folders.push(segments.join('/'));
+    plan.folders.push({ node: folder, path: segments.join('/') });
     await planFolder(repository, folder.id, segments, plan, noteExtension);
   }
 
