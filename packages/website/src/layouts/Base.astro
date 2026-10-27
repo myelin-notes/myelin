@@ -13,6 +13,8 @@ interface Props {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** False on pages published in one language only (the privacy policy). */
   translated?: boolean;
+  /** Badges the top bar as a limited web version (the try-it canvas). */
+  limitedPreview?: boolean;
 }
 
 const {
@@ -22,6 +24,7 @@ const {
   image,
   jsonLd,
   translated = true,
+  limitedPreview = false,
 } = Astro.props;
 
 const organization = {
@@ -44,23 +47,7 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
-    <link
-      rel="preload"
-      href="/fonts/caveat-latin.woff2"
-      as="font"
-      type="font/woff2"
-      crossorigin
-    />
     <title>{title}</title>
-    <!-- Marks environments the canvas will run in, before the body is parsed,
-         so the static page is hidden without ever painting a frame of it.
-         `is:inline` is required: a processed script is deferred and would run
-         after the first paint, which is the flash this exists to prevent. -->
-    <script is:inline>
-      if (matchMedia('(pointer: fine)').matches && innerWidth >= 1024) {
-        document.documentElement.classList.add('canvas-env');
-      }
-    </script>
     <Seo
       title={title}
       description={description}
@@ -69,7 +56,8 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       jsonLd={[organization, ...pageJsonLd]}
     />
     <script>
-      import { initWebAnalytics } from '../lib/posthog';
+      import { detectPlatform } from '../lib/downloads';
+      import { initWebAnalytics, trackWebEvent } from '../lib/posthog';
 
       // Hold analytics until the main thread is free, so PostHog neither
       // downloads nor executes while the canvas bundle is still landing. The
@@ -79,10 +67,32 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       } else {
         setTimeout(() => void initWebAnalytics(), 2000);
       }
+
+      // Capture phase, so a handler that stops propagation cannot hide a click.
+      document.addEventListener(
+        'click',
+        (event) => {
+          const link = (event.target as Element).closest<HTMLAnchorElement>(
+            'a[data-download]',
+          );
+          if (!link) {
+            return;
+          }
+          const platform = link.dataset.download;
+          trackWebEvent('download_clicked', {
+            platform: platform === 'auto' ? detectPlatform() : platform,
+          });
+        },
+        true,
+      );
     </script>
   </head>
   <body>
-    <SiteTopbar locale={locale} translated={translated} />
+    <SiteTopbar
+      locale={locale}
+      translated={translated}
+      limitedPreview={limitedPreview}
+    />
     <slot />
   </body>
 </html>

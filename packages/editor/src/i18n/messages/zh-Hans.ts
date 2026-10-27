@@ -796,6 +796,7 @@ const zhHans: typeof en = {
       clickForOptions: '点击查看选项',
       customizeWheel: '工具与预设',
       insert: '插入',
+      ruler: '直尺',
     },
     selectionToolbar: {
       anchor: '锚定到页面',

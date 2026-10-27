@@ -596,3 +596,106 @@ describe('SelectTool', () => {
     expect(free.scale).toEqual({ x: 2, y: 2 });
   });
 });
+
+describe('SelectTool rotation', () => {
+  const event = { pointerType: 'mouse' } as PointerEvent;
+
+  function turnAboutCenter(image: ImageElement, rotation: number) {
+    image.setRotation(rotation);
+    const center = image.localToWorld(50, 40);
+    image.translate(50 - center.x, 40 - center.y);
+  }
+
+  it('turns a selected image about its center from the knob above it, and undoes to unrotated', () => {
+    const { image, ydoc } = makeImageElement();
+    ydoc.undoManager.stopCapturing();
+    image.select();
+    // 100x80 image: the knob sits centered above the selection's top edge.
+    const { canvas } = makeCanvas([image], { x: 50, y: -24 });
+    const tool = new SelectTool(() => catalogs.en);
+
+    tool.start(canvas, event);
+    tool.update(canvas, event, { x: 150, y: 40 });
+    tool.finish(canvas, event);
+
+    expect(image.rotation).toBeCloseTo(Math.PI / 2);
+    const center = image.localToWorld(50, 40);
+    expect(center.x).toBeCloseTo(50);
+    expect(center.y).toBeCloseTo(40);
+
+    ydoc.undoManager.undo();
+    image.syncFromYMap(['rotation', 'offsetX', 'offsetY']);
+    expect(image.rotation).toBe(0);
+    expect(image.offset).toEqual({ x: 0, y: 0 });
+  });
+
+  it('snaps the knob drag to 15° steps with shift held', () => {
+    const { image } = makeImageElement();
+    image.select();
+    const { canvas } = makeCanvas([image], { x: 50, y: -24 });
+    const tool = new SelectTool(() => catalogs.en);
+
+    tool.start(canvas, event);
+    // 40° clockwise of straight up from the center.
+    const angle = (40 * Math.PI) / 180;
+    tool.update(canvas, { ...event, shiftKey: true } as PointerEvent, {
+      x: 50 + Math.sin(angle) * 100,
+      y: 40 - Math.cos(angle) * 100,
+    });
+    tool.finish(canvas, event);
+
+    expect(image.rotation).toBeCloseTo((45 * Math.PI) / 180);
+  });
+
+  it('stretches a rotated image along its own axes from a side handle inside its world bounds', () => {
+    const resizeRightHandle = (rotation: number) => {
+      const { image } = makeImageElement();
+      turnAboutCenter(image, rotation);
+      image.select();
+      const handle = image
+        .getHandles()
+        .find((h) => h.anchorFx === 0 && h.anchorFy === 0.5)!;
+      const pinned = image.localToWorld(0, 40);
+      const { canvas } = makeCanvas([image], handle.position);
+      const tool = new SelectTool(() => catalogs.en);
+
+      // 50 along the element's x axis, 30 across it; a side handle ignores the latter.
+      const along = { x: Math.cos(rotation), y: Math.sin(rotation) };
+      tool.start(canvas, event);
+      tool.update(canvas, event, {
+        x: handle.position.x + along.x * 50 - along.y * 30,
+        y: handle.position.y + along.y * 50 + along.x * 30,
+      });
+      tool.finish(canvas, event);
+      return { image, pinned };
+    };
+
+    const straight = resizeRightHandle(0).image;
+    const { image: turned, pinned } = resizeRightHandle(Math.PI / 4);
+
+    expect(straight.scale.x).toBeGreaterThan(1);
+    expect(turned.scale.x).toBeCloseTo(straight.scale.x);
+    expect(turned.scale.y).toBeCloseTo(1);
+    expect(turned.rotation).toBe(Math.PI / 4);
+    const stillPinned = turned.localToWorld(0, 40);
+    expect(stillPinned.x).toBeCloseTo(pinned.x);
+    expect(stillPinned.y).toBeCloseTo(pinned.y);
+  });
+
+  it('does not select a rotated image from the empty corner of its world bounds', () => {
+    const { image } = makeImageElement();
+    turnAboutCenter(image, Math.PI / 4);
+    const tool = new SelectTool(() => catalogs.en);
+
+    // Inside the turned image's axis-aligned bounds, but outside the image itself.
+    const corner = makeCanvas([image], { x: -10, y: -20 }).canvas;
+    tool.start(corner, event);
+    tool.finish(corner, event);
+    expect(image.isSelected).toBe(false);
+
+    const center = makeCanvas([image], { x: 50, y: 40 }).canvas;
+    tool.start(center, event);
+    tool.finish(center, event);
+    expect(image.isSelected).toBe(true);
+  });
+});

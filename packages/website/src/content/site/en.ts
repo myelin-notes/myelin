@@ -16,9 +16,8 @@ const en: SiteCopy = {
     language: 'Language',
   },
 
-  /** Rail dots on the canvas, and the section kickers on the static page. */
+  /** Section kickers on the landing page. */
   sceneLabels: {
-    hero: 'Myelin',
     ink: 'PDFs',
     pages: 'Pages',
     'audio-search': 'Audio & search',
@@ -32,94 +31,45 @@ const en: SiteCopy = {
   faqKicker: 'Questions',
 
   hero: {
-    // The canvas names the product in the topbar wordmark it flies over; the
-    // static page has no such anchor, so it labels the hero directly. Keeps the
-    // hero readable as a standalone chunk, which is how crawlers and answer
-    // engines lift it.
+    // Names the product in the hero itself, so it reads as a standalone chunk,
+    // which is how crawlers and answer engines lift it.
     eyebrow: 'Cross-platform note-taking app for Mac, Windows, and Linux',
-    headline: 'Myelin Notes: handwriting, typing,\nand PDFs. One note.',
+    headline: 'Myelin Notes: handwriting, typing, and PDFs. One note.',
+    headlineMark: 'One note.',
     subheadline:
       'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:
       'Completely free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
-    ctaSecondary: 'See it in action',
+    ctaSecondary: 'Try it in your browser',
+  },
+
+  tryIt: {
+    title: 'Try Myelin Notes in your browser',
+    description:
+      'A Myelin canvas to draw, type, and write on, right in your browser, saved in this browser. Download the app for every feature.',
+    badge: 'Limited web preview',
+    limited:
+      'This is a limited web preview. The app also has a notes library, search, audio recording, PDF export, and sync.',
   },
 
   ink: {
-    annotation: 'draw a shape + hold. try it!',
-    recognized: 'recognized!',
-    pdfHeading: 'Write directly\non your PDFs.',
+    pdfHeading: 'Write directly on your PDFs.',
     pdfBody:
       'Drop a PDF onto the canvas and mark it up in the same ink as everything else: circle an equation, highlight a line, scribble in the margins. When you are done, export the annotated PDF back out.',
-    pdfAnnotation: 'ink goes right on the page',
   },
 
   pages: {
-    heading: 'Real documents,\nright on the canvas.',
+    heading: 'Real documents, right on the canvas.',
     body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run.',
-    annotation: 'a real, editable page. click into it.',
-    pageTitle: 'Lecture 12 · Action potentials',
-    pageMarkdown: `# Action potentials
-
-The neuron's resting potential sits near **-70 mV**, held by the sodium-potassium pump.
-
-## Today
-
-- [x] Resting potential recap
-- [ ] Depolarization and the Na+ channel cascade
-- [ ] Why myelin makes conduction fast
-
-| Phase | Channel | Direction |
-| --- | --- | --- |
-| Depolarize | Na+ opens | inward |
-| Repolarize | K+ opens | outward |
-
-The membrane potential follows:
-
-$$V_m = \\frac{RT}{F} \\ln \\frac{[K^+]_{out}}{[K^+]_{in}}$$
-
-\`\`\`python
-tau = 2.0  # membrane time constant, ms
-v = -70.0
-for step in range(3):
-    v += (0 - v) / tau
-    print(round(v, 1))
-\`\`\`
-`,
   },
 
   audioSearch: {
-    heading: 'Record it. Transcribe it.\nFind it on the canvas.',
+    heading: 'Record it. Transcribe it. Find it on the canvas.',
     audioBody:
       'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
     searchBody:
       'Search your library by note title, tags, and saved text or audio transcripts. Find matches within an open canvas, too.',
-    // Content of the mock app cards standing in for real screenshots
-    // (see world-layer.tsx).
-    audioMock: {
-      title: 'Lecture 12 · Action potentials',
-      duration: '48:12',
-      transcriptLabel: 'Transcript · on-device',
-      transcript:
-        '…the myelin sheath insulates the axon, so the signal jumps from node to node instead of crawling…',
-      match: 'myelin sheath',
-    },
-    searchMock: {
-      query: 'Lecture 12',
-      results: [
-        {
-          kind: 'page',
-          title: 'Lecture 12 · Action potentials',
-          snippet: 'Canvas note',
-        },
-        {
-          kind: 'audio',
-          title: 'Recording · Lecture 12',
-          snippet: 'Canvas note',
-        },
-      ],
-    },
   },
 
   linked: {
@@ -128,9 +78,8 @@ for step in range(3):
   },
 
   importing: {
-    heading: 'Bring your old notes\nwith you.',
+    heading: 'Bring your old notes with you.',
     body: 'Import your notes from other apps',
-    annotation: 'no copying and pasting.',
     sources: [
       {
         id: 'goodnotes',
@@ -159,7 +108,7 @@ for step in range(3):
   },
 
   localFirst: {
-    heading: 'It all lives\non your machine.',
+    heading: 'It all lives on your machine.',
     lede: 'No cloud in the middle. Your notes are ordinary files on your own disk, and Myelin works completely offline.',
     bullets: [
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
@@ -171,27 +120,23 @@ for step in range(3):
   },
 
   sync: {
-    heading: 'Sync and collaborate,\nno server in the middle.',
+    heading: 'Sync and collaborate, no server in the middle.',
     kicker:
       'Real-time editing normally means a server holding your notes. Myelin connects the devices directly instead.',
-    cursorYou: 'you',
-    cursorPeer: 'ada',
-    sharedNote: 'same note,\ntwo machines',
     tiers: [
       {
-        shipped: true,
         badge: 'Today',
+        live: true,
         title: 'Live collaboration',
         body: 'Two devices with the same note open find each other automatically, then edit in step over an encrypted QUIC connection straight between them (iroh).',
       },
       {
-        shipped: true,
         badge: 'Today',
+        live: true,
         title: 'GitHub sync',
         body: 'Point Myelin at a repo and branch, and your workspace syncs across devices through a repo you control.',
       },
       {
-        shipped: false,
         badge: 'Coming soon',
         title: 'Invites',
         body: 'Bring someone into a single note without handing over the whole repo, with owner, editor, and viewer roles deciding what they can do.',
@@ -200,10 +145,8 @@ for step in range(3):
   },
 
   download: {
-    heading: 'Download',
     body: 'Available in English, Spanish, French, and Simplified Chinese.',
     cta: 'Download Myelin Notes',
-    autoUpdates: 'auto-updates\nincluded',
     platforms: [
       {
         key: 'mac',
@@ -236,7 +179,6 @@ for step in range(3):
         sub: 'Phone and tablet',
       },
     ],
-    otherPlatforms: 'Also available for',
     comingSoon: 'Coming soon',
     mobileBadge:
       'iPhone, iPad, and Android are on the way: the same notes, not a cut-down viewer',
@@ -286,59 +228,24 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   footer: {
     nav: 'Footer',
     tagline: 'Handwriting, typing, and PDFs. One note.',
-    download: 'Download Myelin',
     platforms: 'Mac · Windows · Linux · iPhone, iPad, and Android coming soon',
   },
 
   /** Alt text for the static page's screenshots. */
   shots: {
-    library:
-      'The Myelin Notes library with folders, note cards, tags, and search',
-    pdf: 'A PDF embedded on the Myelin canvas, with an equation boxed and an arrow drawn in ink beside it',
+    hero: 'A PDF and a typed page frame on one canvas, as a pen circles an equation, draws an arrow to the note, a line is typed in and "key result!" is handwritten',
+    pdf: 'A PDF where a sentence is highlighted, a line underlined and "E = mc²!" written in the margin, then the annotated PDF is exported',
     pageFrame:
-      'A Myelin page frame with headings, note links, a checklist, inline math, and code blocks running with their output beside them',
+      'A page frame with a checklist and a TypeScript code block that runs and shows its output beside it',
     audio:
-      'A recording on the Myelin canvas, its waveform drawn as it captures',
+      'An audio recording placed on the canvas, recorded, transcribed, then found by searching "entropy"',
     graph:
       "The Myelin Notes graph view, showing a note's outgoing links and backlinks",
   },
 
-  /** Canvas-only chrome: the scene rail, the palette, and the color prompt. */
+  /** Chrome on the try-it canvas. */
   canvas: {
-    rail: {
-      label: 'Sections',
-      previous: 'Previous section',
-      next: 'Next section',
-      scrollHint: 'Scroll to explore',
-    },
-    palette: {
-      label: 'Command palette',
-      placeholder: 'Jump anywhere in the notebook',
-      empty: 'Nothing matches. Try a scene name or "download".',
-      groupGoTo: 'Go to',
-      groupGetIt: 'Get it',
-      download: 'Download Myelin Notes',
-    },
     addCustomColor: 'Add a custom color (hex, e.g. #3b82f6)',
-  },
-
-  /**
-   * Hand-drawn ink that decorates specific words in a headline, so its geometry
-   * depends on how long that headline is in this language. Offsets are world
-   * units from each scene's own text origin (see `src/canvas/scenes.ts`).
-   *
-   * These are the one thing here that cannot be checked by reading: they are
-   * tuned against rendered glyph widths. Load the canvas in the locale you
-   * changed and look, rather than trusting the numbers to carry over. The
-   * values below are the ones the English canvas was designed around.
-   */
-  decorations: {
-    /** Under line 2 of the hero headline. */
-    heroUnderline: { dx: 4, dy: 290, width: 540 },
-    /** Highlighter over "your machine." in the local-first headline. */
-    localFirstHighlight: { dx: 120, dy: 292, width: 382 },
-    /** Under the last line of the sync kicker. */
-    syncUnderline: { dx: 0, dy: 310, width: 480 },
   },
 };
 

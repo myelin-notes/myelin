@@ -28,6 +28,7 @@ import { PageFrameAnchoring } from './page-frame/anchoring';
 import type { ResolveMediaSrc } from './page-frame/pm/embed/renderer';
 import type { ResolveNoteLink } from './page-frame/pm/markdown/note-links';
 import { PlacementController } from './placement-controller';
+import { Ruler } from './ruler';
 import { SelectionController } from './selection-controller';
 import type { LivePeersSnapshot } from './sync/live/peers';
 import { createDefaultTools } from './tools/default-tool-registry';
@@ -72,6 +73,7 @@ export class DrawableCanvas {
   public readonly ctx: CanvasRenderingContext2D;
   public readonly viewport: CanvasViewport;
   public readonly tools: ITool[];
+  public readonly ruler = new Ruler();
 
   private readonly renderer: CanvasRenderer;
   private readonly documentBinding: CanvasDocumentBinding;
@@ -336,6 +338,7 @@ export class DrawableCanvas {
       this.placement,
       this.editSession.domHost,
       this.selection,
+      this.ruler,
     );
     for (const listener of this.frameListeners) {
       listener();
@@ -449,6 +452,15 @@ export class DrawableCanvas {
       return;
     }
     this.documentBinding.deleteElements(this.selection.selectedElements);
+  }
+
+  public setRulerVisible(visible: boolean): void {
+    if (visible) {
+      this.ruler.show(this.viewport.getWorldRect());
+    } else {
+      this.ruler.hide();
+    }
+    this.requestRedraw();
   }
 
   public setCursor(cursor: string): void {

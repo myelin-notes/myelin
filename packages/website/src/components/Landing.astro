@@ -2,7 +2,6 @@
 // The home page, in one language. `src/pages/index.astro` renders this for
 // English and `src/pages/[locale]/index.astro` for every other locale, so the
 // two renderings and their structured data cannot drift apart.
-import CanvasIsland from '../canvas/CanvasIsland';
 import StaticSite from './static/StaticSite.astro';
 import Base from '../layouts/Base.astro';
 import { getCopy, getFaqs } from '../content/site';
@@ -67,10 +66,5 @@ const websiteJsonLd = {
   description={copy.meta.description}
   jsonLd={[websiteJsonLd, softwareJsonLd, faqJsonLd]}
 >
-  <!-- Both renderings ship in the HTML; the gate in Base.astro picks one before
-       first paint. Static first so it is what a crawler reads. -->
   <StaticSite locale={locale} />
-  <!-- The live editor: the real Myelin canvas engine, full screen, with the
-       app's tool rail. Client-only so React Fast Refresh works in dev. -->
-  <CanvasIsland client:only="react" locale={locale} />
 </Base>

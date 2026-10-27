@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { buildCanvasPdfExportTarget } from '@myelin/editor/canvas-pdf-export';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
 import { useCanvasCommandContext } from '@myelin/editor/command-context';
+import { InsertPopover } from '@myelin/editor/components/insert-popover';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
 import { ElementType } from '@myelin/editor/elements/element-type';
@@ -64,7 +65,6 @@ import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
-import { InsertPopover } from './components/insert-popover';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
@@ -202,6 +202,18 @@ function CanvasViewInner({
     uiServices: canvasUiServices,
   });
   const liveDiscoveryPauseError = useLivePeerDiscovery(engine.noteSession);
+  // Keyed by canvas so a canvas swapped in for another note starts with the ruler off.
+  const [rulerCanvas, setRulerCanvas] = useState<DrawableCanvas | null>(null);
+  const rulerVisible =
+    rulerCanvas !== null && rulerCanvas === engine.drawableCanvas;
+  const onToggleRuler = useCallback(() => {
+    const canvas = engine.drawableCanvas;
+    if (!canvas) {
+      return;
+    }
+    canvas.setRulerVisible(!rulerVisible);
+    setRulerCanvas(rulerVisible ? null : canvas);
+  }, [engine.drawableCanvas, rulerVisible]);
   const onExportCanvasPdf = useCallback(() => {
     const canvas = drawableCanvasRef.current;
     if (!canvas) {
@@ -683,6 +695,8 @@ function CanvasViewInner({
         onToggleShelf={toolState.toggleShelf}
         onCloseShelf={toolState.closeShelf}
         onToggleInsert={inserts.toggleInsert}
+        rulerVisible={rulerVisible}
+        onToggleRuler={onToggleRuler}
         onToggleWheelTool={toolState.handleToggleWheelTool}
         insertPopover={insertPopover}
         embedComposer={embedComposer}

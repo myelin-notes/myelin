@@ -1,0 +1,26 @@
+---
+// The try-it page, in one language. `src/pages/try.astro` renders this for
+// English and `src/pages/[locale]/try.astro` for every other locale.
+import CanvasEditor from '../canvas/CanvasEditor';
+import Base from '../layouts/Base.astro';
+import { getCopy } from '../content/site';
+import type { Locale } from '../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+---
+
+<Base
+  locale={locale}
+  title={copy.tryIt.title}
+  description={copy.tryIt.description}
+  limitedPreview
+>
+  <!-- Client-only so React Fast Refresh works in dev; the editor bundle is
+       requested by this page alone, never by the landing page. -->
+  <CanvasEditor client:only="react" locale={locale} />
+</Base>

@@ -88,6 +88,7 @@ export class EraserTool implements ITool {
         }, originalIndex + strokes.length);
         stroke.setOffset(offset.x, offset.y);
         stroke.setScale(scale.x, scale.y);
+        stroke.setRotation(shape.rotation);
         stroke.setMakesSpace(shape.makesSpace);
         stroke.setPageAnchor(anchor);
         stroke.anchorOrigin = shape.anchorOrigin;
@@ -140,6 +141,7 @@ export class EraserTool implements ITool {
         }, originalIndex + i);
         fragment.setOffset(offset.x, offset.y);
         fragment.setScale(scale.x, scale.y);
+        fragment.setRotation(stroke.rotation);
         fragment.setMakesSpace(stroke.makesSpace);
         fragment.setPageAnchor(anchor);
         fragment.anchorOrigin = stroke.anchorOrigin;

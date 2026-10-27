@@ -819,6 +819,7 @@ const en = {
       clickForOptions: 'click for options',
       customizeWheel: 'Tools & presets',
       insert: 'Insert',
+      ruler: 'Ruler',
     },
     selectionToolbar: {
       anchor: 'Anchor to page',

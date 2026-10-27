@@ -43,9 +43,19 @@ export default defineConfig({
       // pdfjs is loaded lazily at runtime (only when a PDF renders) and uses a
       // `?url` worker import esbuild's optimizer can't process, so keep it out
       // of the pre-bundle. It's absent from the editor's static graph anyway.
-      exclude: ['pdfjs-dist'],
+      // Mermaid's script is loaded the same way, by `?url`.
+      exclude: ['pdfjs-dist', 'mermaid'],
       include: [
+        '@myelin/editor/clipboard/controller',
+        '@myelin/editor/clipboard/drawable-canvas-adapter',
+        '@myelin/editor/clipboard/page-frame-image-paste',
         '@myelin/editor/drawable-canvas',
+        '@myelin/editor/elements/element-type',
+        '@myelin/editor/elements/latex/element',
+        '@myelin/editor/elements/page-frame-element',
+        '@myelin/editor/keybinds',
+        '@myelin/editor/media',
+        '@myelin/editor/tools/tool-keybinds',
         '@myelin/editor/ydoc-manager',
         '@myelin/editor/render-loop',
         '@myelin/editor/tools/tool',

@@ -7,6 +7,7 @@ import {
   StrokeElement,
 } from '../elements/stroke-element';
 import type { MessageGetter } from '../i18n';
+import type { RulerSide } from '../ruler';
 import { recognizeShape } from '../shape-recognizer';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -47,6 +48,8 @@ export class PenTool implements ITool {
   private snapDrag: SnapDrag | null = null;
   private dwellTimer: ReturnType<typeof setTimeout> | null = null;
   private dwellDueAt = 0;
+  // Decided on the stroke's first point; `undefined` until then.
+  private rulerSide: RulerSide | null | undefined = undefined;
 
   get id(): ToolId {
     return 'pen';
@@ -76,6 +79,23 @@ export class PenTool implements ITool {
   ): void {
     if (this.snapped) {
       this.dragSnappedShape(canvas, position);
+      return;
+    }
+    if (this.rulerSide === undefined) {
+      this.rulerSide = canvas.ruler.edgeAt(position, canvas.viewport.zoom);
+    }
+    if (this.rulerSide !== null) {
+      // Inset by half the stroke width so the ink lies against the edge, not under it.
+      const point = canvas.ruler.projectToEdge(
+        position,
+        this.rulerSide,
+        this.size / 2,
+      );
+      this.currentStroke?.addPoint(
+        point.x,
+        point.y,
+        this.usePressure ? event.pressure : undefined,
+      );
       return;
     }
     this.currentStroke?.addPoint(
@@ -216,6 +236,7 @@ export class PenTool implements ITool {
     this.snapDrag = null;
     this.dwellAnchor = null;
     this.recognitionAttemptedForAnchor = false;
+    this.rulerSide = undefined;
   }
 
   private clearDwellTimer(): void {

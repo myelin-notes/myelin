@@ -3,8 +3,10 @@ import type * as Y from 'yjs';
 import { getCanvasPalette } from '../canvas-theme';
 import type { CanvasViewport } from '../canvas-viewport';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { rotateVector } from '../geometry';
 import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
+import { CollisionHelper } from '../utils/collision-helper';
 import { applyYFields, writeYMap, type YFieldMap } from '../y-fields';
 import type { SyncOrigin, YDocManager } from '../ydoc-manager';
 import type { CanvasElementContext } from './canvas-element-context';
@@ -24,6 +26,9 @@ export interface SelectionToolbarItem {
 const HANDLE_SIZE = 6;
 const SELECTION_PADDING = 4;
 const SELECTION_RADIUS = 4;
+// World units, like the resize handles drawn beside it.
+const ROTATE_KNOB_DISTANCE = 20;
+export const ROTATE_KNOB_RADIUS = 4;
 
 // Screen-space radius (px) for grabbing a resize handle, divided by zoom for world tolerance.
 const HANDLE_HIT_RADIUS = 10;
@@ -65,8 +70,11 @@ export interface ResizeHandle {
   scaleX: boolean;
   scaleY: boolean;
   cursor: string;
-  /** Shape-owned control point; absent for ordinary bounding-box handles. */
-  control?: { kind: 'vertex'; index: number } | { kind: 'radius' };
+  /** Shape-owned control point or the rotate knob; absent for ordinary bounding-box handles. */
+  control?:
+    | { kind: 'vertex'; index: number }
+    | { kind: 'radius' }
+    | { kind: 'rotate' };
 }
 
 interface HandleSpec {
@@ -94,6 +102,7 @@ export function drawSelectionBounds(
   progress: number,
   isEditing: boolean,
   resizeHandles: ResizeHandles,
+  rotateKnob = false,
 ): void {
   const eased = 1 - (1 - progress) * (1 - progress);
   const pad = SELECTION_PADDING * eased;
@@ -119,6 +128,20 @@ export function drawSelectionBounds(
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
   ctx.stroke();
+
+  if (rotateKnob) {
+    const knobY = y - ROTATE_KNOB_DISTANCE * eased;
+    const knobR = ROTATE_KNOB_RADIUS * eased;
+    ctx.beginPath();
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w / 2, knobY + knobR);
+    ctx.stroke();
+    ctx.fillStyle = palette.surface;
+    ctx.beginPath();
+    ctx.arc(x + w / 2, knobY, knobR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 
   const size = HANDLE_SIZE * eased;
   const half = size / 2;
@@ -225,6 +248,56 @@ export function getResizeHandles(
   return result;
 }
 
+/** The rotate knob above a selection envelope, in the same space as `box`. */
+export function getRotateKnobHandle(box: DOMRect): ResizeHandle {
+  const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  return {
+    position: {
+      x: center.x,
+      y: box.y - SELECTION_PADDING - ROTATE_KNOB_DISTANCE,
+    },
+    anchor: center,
+    anchorPad: { x: 0, y: 0 },
+    anchorFx: 0.5,
+    anchorFy: 0.5,
+    scaleX: false,
+    scaleY: false,
+    cursor: 'grab',
+    control: { kind: 'rotate' },
+  };
+}
+
+export const RESIZE_CURSORS = [
+  'ew-resize',
+  'nwse-resize',
+  'ns-resize',
+  'nesw-resize',
+];
+
+/** Maps a handle built on an element's own axes into world space by turning it `angle` radians. */
+export function rotateHandle(
+  handle: ResizeHandle,
+  angle: number,
+): ResizeHandle {
+  if (angle === 0) {
+    return handle;
+  }
+  // Direction the handle drags in, from the box center, picks one of the four two-way cursors.
+  const dir = rotateVector(
+    { x: 1 - 2 * handle.anchorFx, y: 1 - 2 * handle.anchorFy },
+    angle,
+  );
+  const octant = Math.round(Math.atan2(dir.y, dir.x) / (Math.PI / 4));
+  return {
+    ...handle,
+    position: rotateVector(handle.position, angle),
+    anchor: rotateVector(handle.anchor, angle),
+    cursor: handle.control
+      ? handle.cursor
+      : RESIZE_CURSORS[((octant % 4) + 4) % 4],
+  };
+}
+
 /** Return the nearest resize handle within the pointer-specific screen-space radius. */
 export function hitResizeHandle(
   handles: readonly ResizeHandle[],
@@ -248,9 +321,13 @@ export function hitResizeHandle(
   return best;
 }
 
+const extent = [0, 0, 0, 0];
+
 export abstract class DrawableElement {
   protected _scale: Vector2 = { x: 1, y: 1 };
   private _offset: Vector2 = { x: 0, y: 0 };
+  // Radians about the local origin: world = offset + rotate(scale * local).
+  private _rotation = 0;
   private selected: boolean = false;
   private worldBounds: DOMRect | null = null;
   private _hidden: boolean = false;
@@ -284,6 +361,9 @@ export abstract class DrawableElement {
   public get scale(): Vector2 {
     return this._scale;
   }
+  public get rotation(): number {
+    return this._rotation;
+  }
 
   // Future remote changes arrive via syncFromYMap.
   public bindToYMap(yMap: Y.Map<unknown>): void {
@@ -303,6 +383,9 @@ export abstract class DrawableElement {
       scaleY: (v) => {
         this._scale.y = v as number;
         this.updateBoundingBox();
+      },
+      rotation: (v) => {
+        this._rotation = v as number;
       },
       locked: (v) => {
         const locked = v === true;
@@ -331,6 +414,13 @@ export abstract class DrawableElement {
       ) {
         this._locked = false;
         this.onLockChanged?.();
+      }
+      // Undoing an element's first rotation deletes the key rather than writing 0.
+      if (
+        changedKeys.includes('rotation') &&
+        this._yMap.get('rotation') === undefined
+      ) {
+        this._rotation = 0;
       }
     }
   }
@@ -365,6 +455,36 @@ export abstract class DrawableElement {
     this.onTransformChanged?.();
   }
 
+  // Turns about the local origin, so `offset` is unchanged. Callers pivoting elsewhere re-translate.
+  public setRotation(rotation: number) {
+    this._rotation = rotation;
+    this.syncToYMap({ rotation });
+    this.onTransformChanged?.();
+  }
+
+  public localToWorld(x: number, y: number): Vector2 {
+    const scale = this.scale;
+    const offset = this.offset;
+    const p = rotateVector({ x: x * scale.x, y: y * scale.y }, this._rotation);
+    return { x: p.x + offset.x, y: p.y + offset.y };
+  }
+
+  public worldToLocal(point: Vector2): Vector2 {
+    const scale = this.scale;
+    const offset = this.offset;
+    const p = rotateVector(
+      { x: point.x - offset.x, y: point.y - offset.y },
+      -this._rotation,
+    );
+    return { x: p.x / scale.x, y: p.y / scale.y };
+  }
+
+  // Resize math runs along the element's own axes; this sets an offset expressed in them.
+  protected setOffsetAlongAxes(x: number, y: number): void {
+    const offset = rotateVector({ x, y }, this._rotation);
+    this.setOffset(offset.x, offset.y);
+  }
+
   public get hidden(): boolean {
     return this._hidden;
   }
@@ -396,6 +516,7 @@ export abstract class DrawableElement {
     }
     ctx.save();
     ctx.translate(this.offset.x, this.offset.y);
+    ctx.rotate(this._rotation);
     ctx.scale(this.scale.x, this.scale.y);
     this.draw2D(ctx, deltaTime);
     ctx.restore();
@@ -436,6 +557,14 @@ export abstract class DrawableElement {
 
   /** Whether this element supports inline editing (double-click to edit). */
   public get editable(): boolean {
+    return false;
+  }
+
+  /**
+   * Whether a sole selection of this element shows the rotate knob right now. DOM-backed elements
+   * keep this off: `syncDOM` positions their overlay unrotated.
+   */
+  public get rotatable(): boolean {
     return false;
   }
 
@@ -501,19 +630,62 @@ export abstract class DrawableElement {
     return this.selected;
   }
 
-  /** Read-only world-space bounds; reused until the geometry changes. */
-  public get boundingBox(): DOMRect {
+  /**
+   * The element's box along its own axes: world space turned by `-rotation` about the origin, so
+   * rotating it by `rotation` lays it over the element. Equals `boundingBox` when unrotated.
+   */
+  public get orientedBox(): DOMRect {
     const raw = this.localBoundingBox;
     const scale = this.scale;
-    const offset = this.offset;
-    const x1 = raw.x * scale.x + offset.x;
-    const y1 = raw.y * scale.y + offset.y;
-    const x2 = (raw.x + raw.width) * scale.x + offset.x;
-    const y2 = (raw.y + raw.height) * scale.y + offset.y;
-    const x = Math.min(x1, x2);
-    const y = Math.min(y1, y2);
-    const width = Math.abs(x2 - x1);
-    const height = Math.abs(y2 - y1);
+    const origin = rotateVector(this.offset, -this._rotation);
+    const x1 = raw.x * scale.x + origin.x;
+    const y1 = raw.y * scale.y + origin.y;
+    const x2 = (raw.x + raw.width) * scale.x + origin.x;
+    const y2 = (raw.y + raw.height) * scale.y + origin.y;
+    return new DOMRect(
+      Math.min(x1, x2),
+      Math.min(y1, y2),
+      Math.abs(x2 - x1),
+      Math.abs(y2 - y1),
+    );
+  }
+
+  // Writes the world-axis extent [minX, minY, maxX, maxY] into `out` so the per-frame cull allocates
+  // nothing for unrotated elements.
+  private worldExtent(out: number[]): void {
+    const raw = this.localBoundingBox;
+    if (this._rotation === 0) {
+      const scale = this.scale;
+      const offset = this.offset;
+      const x1 = raw.x * scale.x + offset.x;
+      const y1 = raw.y * scale.y + offset.y;
+      const x2 = (raw.x + raw.width) * scale.x + offset.x;
+      const y2 = (raw.y + raw.height) * scale.y + offset.y;
+      out[0] = Math.min(x1, x2);
+      out[1] = Math.min(y1, y2);
+      out[2] = Math.max(x1, x2);
+      out[3] = Math.max(y1, y2);
+      return;
+    }
+    const corners = [
+      this.localToWorld(raw.x, raw.y),
+      this.localToWorld(raw.right, raw.y),
+      this.localToWorld(raw.right, raw.bottom),
+      this.localToWorld(raw.x, raw.bottom),
+    ];
+    out[0] = Math.min(...corners.map((p) => p.x));
+    out[1] = Math.min(...corners.map((p) => p.y));
+    out[2] = Math.max(...corners.map((p) => p.x));
+    out[3] = Math.max(...corners.map((p) => p.y));
+  }
+
+  /** Read-only world-axis bounds (of the turned box when rotated); reused until the geometry changes. */
+  public get boundingBox(): DOMRect {
+    this.worldExtent(extent);
+    const x = extent[0];
+    const y = extent[1];
+    const width = extent[2] - extent[0];
+    const height = extent[3] - extent[1];
     const cached = this.worldBounds;
     if (
       !cached ||
@@ -530,18 +702,20 @@ export abstract class DrawableElement {
   // Same geometry as intersecting `boundingBox`, but without the DOMRect it allocates — the
   // renderer asks this of every element, every frame.
   public intersectsWorldRect(rect: DOMRect, margin: number): boolean {
-    const raw = this.localBoundingBox;
-    const scale = this.scale;
-    const offset = this.offset;
-    const x1 = raw.x * scale.x + offset.x;
-    const y1 = raw.y * scale.y + offset.y;
-    const x2 = (raw.x + raw.width) * scale.x + offset.x;
-    const y2 = (raw.y + raw.height) * scale.y + offset.y;
+    this.worldExtent(extent);
     return (
-      Math.max(x1, x2) >= rect.x - margin &&
-      Math.min(x1, x2) <= rect.right + margin &&
-      Math.max(y1, y2) >= rect.y - margin &&
-      Math.min(y1, y2) <= rect.bottom + margin
+      extent[2] >= rect.x - margin &&
+      extent[0] <= rect.right + margin &&
+      extent[3] >= rect.y - margin &&
+      extent[1] <= rect.bottom + margin
+    );
+  }
+
+  /** Whether a world point falls inside the element's (possibly rotated) box. */
+  public containsPoint(point: Vector2): boolean {
+    return CollisionHelper.inBox(
+      this.worldToLocal(point),
+      this.localBoundingBox,
     );
   }
 
@@ -553,10 +727,9 @@ export abstract class DrawableElement {
     ctx: CanvasRenderingContext2D,
   ): boolean {
     const scale = this.scale;
-    const localX = (x - this.offset.x) / scale.x;
-    const localY = (y - this.offset.y) / scale.y;
+    const local = this.worldToLocal({ x, y });
     const localRadius = radius / Math.min(Math.abs(scale.x), Math.abs(scale.y));
-    return this.isOverLocal(localX, localY, localRadius, ctx);
+    return this.isOverLocal(local.x, local.y, localRadius, ctx);
   }
 
   // Override to disable axes that don't make sense (e.g. page frames don't scale vertically).
@@ -574,9 +747,11 @@ export abstract class DrawableElement {
     return false;
   }
 
-  /** Enabled resize handles in world space, with anchor & axis info. */
+  /** Enabled resize handles in world space, with anchor & axis info. `anchorPad` is along the element's axes. */
   public getHandles(): ResizeHandle[] {
-    return getResizeHandles(this.boundingBox, this.resizeHandles);
+    return getResizeHandles(this.orientedBox, this.resizeHandles).map(
+      (handle) => rotateHandle(handle, this._rotation),
+    );
   }
 
   // Pass `touch` for finger input, which grabs with the larger radius.
@@ -630,13 +805,15 @@ export abstract class DrawableElement {
     const local = this.localBoundingBox;
     const localAnchorX = local.x + local.width * h.anchorFx;
     const localAnchorY = local.y + local.height * h.anchorFy;
+    const anchor = rotateVector(anchorWorld, -this._rotation);
+    const original = rotateVector(originalOffset, -this._rotation);
     const newOffsetX = h.scaleX
-      ? anchorWorld.x - h.anchorPad.x - localAnchorX * newScaleX
-      : originalOffset.x;
+      ? anchor.x - h.anchorPad.x - localAnchorX * newScaleX
+      : original.x;
     const newOffsetY = h.scaleY
-      ? anchorWorld.y - h.anchorPad.y - localAnchorY * newScaleY
-      : originalOffset.y;
-    this.setOffset(newOffsetX, newOffsetY);
+      ? anchor.y - h.anchorPad.y - localAnchorY * newScaleY
+      : original.y;
+    this.setOffsetAlongAxes(newOffsetX, newOffsetY);
   }
 
   /** Called once when a resize drag ends (commit or interrupt). */

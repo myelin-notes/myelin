@@ -4,6 +4,7 @@ import type { DrawableElement } from '../elements/drawable-element';
 import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { catalogs } from '../i18n/messages';
+import { Ruler } from '../ruler';
 import { YDocManager } from '../ydoc-manager';
 import { HighlighterTool } from './highlighter-tool';
 
@@ -72,6 +73,8 @@ function makeCanvas() {
     addElement,
     removeElement,
     transact,
+    ruler: new Ruler(),
+    viewport: { zoom: 1 },
   } as unknown as DrawableCanvas;
 
   return { canvas, ydoc, created, addElement, removeElement, transact };

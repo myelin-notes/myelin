@@ -827,6 +827,7 @@ const es: typeof en = {
       clickForOptions: 'clic para opciones',
       customizeWheel: 'Herramientas y ajustes',
       insert: 'Insertar',
+      ruler: 'Regla',
     },
     selectionToolbar: {
       anchor: 'Anclar a la página',

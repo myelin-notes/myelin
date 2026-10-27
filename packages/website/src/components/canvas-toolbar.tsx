@@ -22,9 +22,7 @@ interface CanvasToolbarProps {
   hasOptions: boolean;
   onSelectTool: (index: number) => void;
   onToggleOptions: () => void;
-  // Insert brings in page frames, PDFs, audio, and LaTeX — features backed by
-  // the app's document/media store. Omit it (as the marketing site does) to
-  // hide the insert button and its popovers entirely.
+  // Omit it to hide the insert button and its popovers entirely.
   onToggleInsert?: () => void;
   insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;

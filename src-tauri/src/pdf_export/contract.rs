@@ -75,6 +75,9 @@ pub enum PageItem {
         h: f32,
         /// Index into `PdfExportRequest::images_b64`.
         image_ref: usize,
+        /// Clockwise degrees about the rect's center.
+        #[serde(default)]
+        rotation: f32,
     },
     PdfPage {
         x: f32,

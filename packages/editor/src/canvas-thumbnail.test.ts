@@ -35,6 +35,7 @@ const context = {
   imageSmoothingQuality: 'low' as ImageSmoothingQuality,
   scale: vi.fn(),
   translate: vi.fn(),
+  rotate: vi.fn(),
   save: vi.fn(),
   restore: vi.fn(),
 };
@@ -46,6 +47,7 @@ vi.mock('./scratch-canvas', () => ({
 interface FakeElement {
   offset: { x: number; y: number };
   scale: { x: number; y: number };
+  rotation: number;
   hidden: boolean;
   boundingBox: DOMRect;
   prepareThumbnail: ReturnType<typeof vi.fn>;
@@ -56,6 +58,7 @@ function makeElement(overrides: Partial<FakeElement> = {}): FakeElement {
   return {
     offset: { x: 0, y: 0 },
     scale: { x: 1, y: 1 },
+    rotation: 0,
     hidden: false,
     boundingBox: new DOMRect(0, 0, 100, 100),
     prepareThumbnail: vi.fn(async () => {}),

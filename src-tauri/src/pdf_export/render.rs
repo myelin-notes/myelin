@@ -215,14 +215,21 @@ fn draw_item(
             w,
             h,
             image_ref,
+            rotation,
         } => {
             let image = images
                 .get(*image_ref)
                 .ok_or("image_ref out of range")?
                 .clone();
             let size = Size::from_wh(*w, *h).ok_or("invalid image size")?;
+            surface.push_transform(&Transform::from_rotate_at(
+                *rotation,
+                x + w / 2.0,
+                y + h / 2.0,
+            ));
             surface.push_transform(&Transform::from_translate(*x, *y));
             surface.draw_image(image, size);
+            surface.pop();
             surface.pop();
         }
         PageItem::PdfPage {
