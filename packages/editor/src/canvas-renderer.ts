@@ -5,6 +5,7 @@ import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
 import { quantizeRasterZoom } from './raster-zoom';
+import type { Ruler } from './ruler';
 import type { SelectionController } from './selection-controller';
 import type { ITool } from './tools/tool';
 import { UserPrefs } from './user-prefs';
@@ -219,6 +220,7 @@ export class CanvasRenderer {
     placementController: PlacementController,
     domOverlayHost: HTMLElement | null,
     selection: SelectionController,
+    ruler: Ruler,
   ): boolean {
     const dpr = window.devicePixelRatio || 1;
     const logicalW = this.canvas.width / dpr;
@@ -258,7 +260,7 @@ export class CanvasRenderer {
     this.ctx.restore();
 
     selection.advanceOverlay(deltaTime);
-    const overlayHasContent = selection.hasOverlay;
+    const overlayHasContent = selection.hasOverlay || ruler.visible;
     if (
       this.overlayCtx &&
       this.overlayCanvas &&
@@ -272,6 +274,7 @@ export class CanvasRenderer {
       this.overlayCtx.scale(zoom, zoom);
       this.overlayCtx.translate(offset.x, offset.y);
       selection.drawOverlay(this.overlayCtx, editingElement, zoom);
+      ruler.draw(this.overlayCtx, zoom);
       this.overlayCtx.restore();
       this.overlayHasContent = overlayHasContent;
     }

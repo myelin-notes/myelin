@@ -50,6 +50,7 @@ export async function renderCanvasRegion(
     for (const el of visible) {
       ctx.save();
       ctx.translate(el.offset.x, el.offset.y);
+      ctx.rotate(el.rotation);
       ctx.scale(el.scale.x, el.scale.y);
       el.drawThumbnail(ctx, 0);
       ctx.restore();

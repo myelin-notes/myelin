@@ -2,6 +2,7 @@ import { PenToolIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
+import { rotateVector } from '../geometry';
 import type { Messages } from '../i18n/messages';
 import { parseCssColor } from '../pdf-export/color';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
@@ -197,6 +198,10 @@ export class ShapeElement extends AnchorableElement {
       : ResizeHandles.All;
   }
 
+  public override get rotatable(): boolean {
+    return true;
+  }
+
   public override get hasControlPoints(): boolean {
     return this.editingPoints;
   }
@@ -335,13 +340,15 @@ export class ShapeElement extends AnchorableElement {
     const local = this.localBoundingBox;
     const localAnchorX = local.x + local.width * h.anchorFx;
     const localAnchorY = local.y + local.height * h.anchorFy;
+    const anchor = rotateVector(anchorWorld, -this.rotation);
+    const original = rotateVector(originalOffset, -this.rotation);
     const newOffsetX = h.scaleX
-      ? anchorWorld.x - h.anchorPad.x - localAnchorX
-      : originalOffset.x;
+      ? anchor.x - h.anchorPad.x - localAnchorX
+      : original.x;
     const newOffsetY = h.scaleY
-      ? anchorWorld.y - h.anchorPad.y - localAnchorY
-      : originalOffset.y;
-    this.setOffset(newOffsetX, newOffsetY);
+      ? anchor.y - h.anchorPad.y - localAnchorY
+      : original.y;
+    this.setOffsetAlongAxes(newOffsetX, newOffsetY);
   }
 
   public override endResize(): void {
@@ -466,14 +473,10 @@ export class ShapeElement extends AnchorableElement {
   /** Local→world outline as an ordered list of vertices (open for line). */
   private toWorldOutline(): [number, number][] {
     const g = this.geom;
-    const sx = this.scale.x;
-    const sy = this.scale.y;
-    const ox = this.offset.x;
-    const oy = this.offset.y;
-    const toWorld = (lx: number, ly: number): [number, number] => [
-      lx * sx + ox,
-      ly * sy + oy,
-    ];
+    const toWorld = (lx: number, ly: number): [number, number] => {
+      const p = this.localToWorld(lx, ly);
+      return [p.x, p.y];
+    };
     switch (this.shapeType) {
       case 'line':
         return [toWorld(g[0], g[1]), toWorld(g[2], g[3])];
@@ -494,20 +497,6 @@ export class ShapeElement extends AnchorableElement {
         return out;
       }
     }
-  }
-
-  private localToWorld(x: number, y: number): Vector2 {
-    return {
-      x: x * this.scale.x + this.offset.x,
-      y: y * this.scale.y + this.offset.y,
-    };
-  }
-
-  private worldToLocal(point: Vector2): Vector2 {
-    return {
-      x: (point.x - this.offset.x) / this.scale.x,
-      y: (point.y - this.offset.y) / this.scale.y,
-    };
   }
 
   private oppositeVertex(index: number): Vector2 {

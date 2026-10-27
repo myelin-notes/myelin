@@ -310,9 +310,11 @@ export function useCanvasInserts({
       }
       const screenPos = dc.viewport.getScreenPoint(event);
       const worldPos = dc.viewport.screenToWorld(screenPos);
-      const hit = dc.elements.some(
-        (el) => !el.hidden && CollisionHelper.inBox(worldPos, el.boundingBox),
-      );
+      const hit =
+        dc.ruler.hit(worldPos, dc.viewport.zoom) !== null ||
+        dc.elements.some(
+          (el) => !el.hidden && CollisionHelper.inBox(worldPos, el.boundingBox),
+        );
       if (hit) {
         return;
       }

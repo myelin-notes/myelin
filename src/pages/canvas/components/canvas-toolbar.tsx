@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Plus as PlusIcon,
+  Ruler as RulerIcon,
   SlidersHorizontal as SlidersIcon,
   Trash2 as TrashIcon,
   X as XIcon,
@@ -50,6 +51,8 @@ interface CanvasToolbarProps {
   onToggleShelf: () => void;
   onCloseShelf: () => void;
   onToggleInsert: () => void;
+  rulerVisible: boolean;
+  onToggleRuler: () => void;
   onToggleWheelTool: (index: number) => void;
   insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;
@@ -95,6 +98,8 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   onToggleShelf,
   onCloseShelf,
   onToggleInsert,
+  rulerVisible,
+  onToggleRuler,
   onToggleWheelTool,
   insertPopover,
   embedComposer,
@@ -487,6 +492,24 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               </Tooltip>
             );
           })}
+
+          <Tooltip>
+            <TooltipTrigger
+              aria-label={strings.canvas.toolbar.ruler}
+              aria-pressed={rulerVisible}
+              className={`shrink-0 cursor-pointer rounded-lg ${buttonPadClass} transition-colors ${
+                rulerVisible
+                  ? 'bg-accent-dark text-text-on-dark'
+                  : 'bg-transparent text-text-secondary hover:bg-hover-tint'
+              }`}
+              onClick={onToggleRuler}
+            >
+              <RulerIcon className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent side={tooltipSide}>
+              <p>{strings.canvas.toolbar.ruler}</p>
+            </TooltipContent>
+          </Tooltip>
 
           {presets.length > 0 && <div className={`shrink-0 ${dividerClass}`} />}
 

@@ -4,6 +4,7 @@ import type { DrawableElement } from '../elements/drawable-element';
 import { ShapeElement } from '../elements/shape-element';
 import { StrokeElement } from '../elements/stroke-element';
 import { catalogs } from '../i18n/messages';
+import { Ruler } from '../ruler';
 import { YDocManager } from '../ydoc-manager';
 import { PenTool } from './pen-tool';
 
@@ -111,6 +112,7 @@ function makeCanvas(
   const bind = opts.bind ?? true;
   const ydoc = new YDocManager();
   const created: DrawableElement[] = [];
+  const ruler = new Ruler();
   let n = 0;
 
   const removeElement = vi.fn((el: DrawableElement) => {
@@ -149,6 +151,7 @@ function makeCanvas(
     addElement,
     removeElement,
     transact,
+    ruler,
     viewport: { zoom: opts.zoom ?? 1 },
   } as unknown as DrawableCanvas;
 
@@ -156,6 +159,7 @@ function makeCanvas(
     canvas,
     ydoc,
     created,
+    ruler,
     addElement,
     removeElement,
     transact,
@@ -672,5 +676,40 @@ describe('PenTool draw-and-hold recognition', () => {
     // undo step brings the stroke's Y.Map back rather than wiping both.
     expect(ydoc.elements.length).toBe(1);
     expect(ydoc.elements.get(0).get('type')).toBe(created[0].type);
+  });
+});
+
+describe('PenTool against the ruler', () => {
+  it('lays a stroke started at the edge straight along it, and only that stroke', () => {
+    const { canvas, created, ruler } = makeCanvas();
+    ruler.show(new DOMRect(0, 0, 1000, 500));
+    // Unrotated 2 cm ruler centred at y=250: top edge at 250 - 1 cm.
+    const topEdge = 250 - 96 / 2.54;
+    const tool = makeTool();
+
+    tool.start(canvas, {} as PointerEvent);
+    feed(tool, canvas, [
+      [300, topEdge - 6],
+      [350, topEdge - 15],
+      [400, topEdge - 2],
+      [450, topEdge - 20],
+    ]);
+    tool.finish(canvas, {} as PointerEvent);
+    const ruled = (created[0] as StrokeElement).xyPoints;
+    expect(ruled.length).toBeGreaterThan(1);
+    for (const [, y] of ruled) {
+      // Pen size 8: the ink's centreline sits half a width outside the edge.
+      expect(y).toBeCloseTo(topEdge - 4);
+    }
+
+    tool.start(canvas, {} as PointerEvent);
+    feed(tool, canvas, [
+      [300, 50],
+      [350, 80],
+    ]);
+    tool.finish(canvas, {} as PointerEvent);
+    expect((created[1] as StrokeElement).xyPoints.map(([, y]) => y)).toEqual([
+      50, 80,
+    ]);
   });
 });

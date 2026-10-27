@@ -1,7 +1,6 @@
 import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableCanvas, Vector2 } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
-import { CollisionHelper } from './utils/collision-helper';
 
 export interface EditSessionHost {
   drawableCanvas: DrawableCanvas;
@@ -169,10 +168,7 @@ export class EditSessionController {
     const elements = this.host.getElements();
     for (let i = elements.length - 1; i >= 0; i--) {
       const element = elements[i];
-      if (
-        !CollisionHelper.inBox(point, element.boundingBox) ||
-        !element.editable
-      ) {
+      if (!element.containsPoint(point) || !element.editable) {
         continue;
       }
       this.host.clearSelection();
