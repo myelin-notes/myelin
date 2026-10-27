@@ -198,16 +198,18 @@ export function ToolShelf({
   );
 }
 
-export function loadWheelToolIndices(toolCount: number): Set<number> {
+export function loadWheelToolIndices(tools: readonly ITool[]): Set<number> {
   const stored = UserPrefs.get('wheelTools');
   if (stored.length > 0) {
-    const valid = stored.filter((i) => i >= 0 && i < toolCount);
+    const valid = stored.filter((i) => i >= 0 && i < tools.length);
     if (valid.length > 0) {
       return new Set(valid);
     }
   }
-  // Default: all tools enabled
-  return new Set(Array.from({ length: toolCount }, (_, i) => i));
+  // Bookmarking is occasional; leave its wheel slot to a pen preset.
+  return new Set(
+    tools.flatMap((tool, i) => (tool.id === 'bookmark' ? [] : [i])),
+  );
 }
 
 export function saveWheelToolIndices(indices: Set<number>) {

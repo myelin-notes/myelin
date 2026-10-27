@@ -59,6 +59,7 @@ import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
+import { BookmarksChip } from './components/bookmarks-chip';
 import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasToolbar } from './components/canvas-toolbar';
@@ -88,6 +89,7 @@ interface CanvasViewProps {
   recordingOwnerId: TabId;
   initialPageFrameName?: string | null;
   initialPageFrameId?: string | null;
+  initialBookmarkId?: string | null;
 }
 
 export function CanvasView({
@@ -95,6 +97,7 @@ export function CanvasView({
   recordingOwnerId,
   initialPageFrameName,
   initialPageFrameId,
+  initialBookmarkId,
 }: CanvasViewProps) {
   return (
     <PenPresetsProvider>
@@ -103,6 +106,7 @@ export function CanvasView({
         recordingOwnerId={recordingOwnerId}
         initialPageFrameName={initialPageFrameName}
         initialPageFrameId={initialPageFrameId}
+        initialBookmarkId={initialBookmarkId}
       />
     </PenPresetsProvider>
   );
@@ -113,6 +117,7 @@ function CanvasViewInner({
   recordingOwnerId,
   initialPageFrameName: initialPageFrameNameProp,
   initialPageFrameId: initialPageFrameIdProp,
+  initialBookmarkId,
 }: CanvasViewProps) {
   const tabController = useTabController();
   const paneId = usePaneId();
@@ -303,6 +308,14 @@ function CanvasViewInner({
     targetPageFrameId,
     targetPageFrameName,
   ]);
+
+  useEffect(() => {
+    // Same session-lag guard as the page frame target above.
+    if (!engine.ready || engine.noteSession?.id !== id || !initialBookmarkId) {
+      return;
+    }
+    drawableCanvasRef.current?.focusBookmark(initialBookmarkId);
+  }, [engine.ready, engine.noteSession, id, initialBookmarkId]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {
@@ -512,6 +525,7 @@ function CanvasViewInner({
             <TooltipContent>{strings.versionHistory.title}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <BookmarksChip canvas={engine.ready ? engine.drawableCanvas : null} />
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
       </>
     );
@@ -523,6 +537,7 @@ function CanvasViewInner({
     canvasSearch.openSearch,
     id,
     engine.ready,
+    engine.drawableCanvas,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
     strings.canvas.export.exportCanvasPdf,

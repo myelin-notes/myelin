@@ -16,6 +16,7 @@ import {
   type ElementReorderDirection,
   moveElementOrderForSelection,
 } from './element-ordering';
+import { BookmarkElement } from './elements/bookmark-element';
 import type { CanvasUiServices } from './elements/canvas-element-context';
 import type {
   DrawableElement,
@@ -88,6 +89,7 @@ export class DrawableCanvas {
   private readonly handleDocUpdate = () => this.requestRedraw();
   private contentBoundsCache: DOMRect | null = null;
   private contentBoundsValid = false;
+  private lastBookmarkId: string | null = null;
   private toolSelected: ITool;
 
   public constructor(
@@ -119,6 +121,7 @@ export class DrawableCanvas {
     this.elementFactory = new CanvasElementFactory({
       ydoc,
       getElements: () => this.elements,
+      getZoom: () => this.viewport.zoom,
       onChange: () => this.notifyChange(),
       invalidateContentBounds: () => this.invalidateContentBounds(),
       requestRedraw: () => this.requestRedraw(),
@@ -282,6 +285,55 @@ export class DrawableCanvas {
 
   public focusPageFrameById(uuid: string): boolean {
     return this.focusFrameElement(this.selection.findPageFrameById(uuid));
+  }
+
+  /** Flags in reading order: top to bottom, then left to right. */
+  public get bookmarks(): BookmarkElement[] {
+    return this.elements
+      .filter((element) => element instanceof BookmarkElement)
+      .sort((a, b) => a.offset.y - b.offset.y || a.offset.x - b.offset.x);
+  }
+
+  // Centers the flag, zooming in to at least 100% so the marked spot is legible.
+  public focusBookmark(uuid: string): boolean {
+    const flag = this.elements.find(
+      (element) => element instanceof BookmarkElement && element.uuid === uuid,
+    );
+    if (!flag) {
+      return false;
+    }
+    this.lastBookmarkId = uuid;
+    const view = this.viewport.getWorldRect();
+    const scale = this.viewport.zoom / Math.max(this.viewport.zoom, 1);
+    const width = view.width * scale;
+    const height = view.height * scale;
+    this.viewport.animateViewToFitRect(
+      new DOMRect(
+        flag.offset.x - width / 2,
+        flag.offset.y - height / 2,
+        width,
+        height,
+      ),
+      1,
+    );
+    return true;
+  }
+
+  public stepBookmark(direction: 1 | -1): void {
+    const flags = this.bookmarks;
+    if (flags.length === 0) {
+      return;
+    }
+    const current = flags.findIndex(
+      (flag) => flag.uuid === this.lastBookmarkId,
+    );
+    const next =
+      current === -1
+        ? direction === 1
+          ? 0
+          : flags.length - 1
+        : (current + direction + flags.length) % flags.length;
+    this.focusBookmark(flags[next].uuid);
   }
 
   public get editingElement(): DrawableElement | null {

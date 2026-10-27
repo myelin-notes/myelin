@@ -14,6 +14,7 @@ export interface NoteRouteTarget {
   id: VFSNodeId;
   pageFrameName?: string | null;
   pageFrameId?: string | null;
+  bookmarkId?: string | null;
 }
 
 export interface NoteLinkRouteTarget {
@@ -30,6 +31,7 @@ function noteTargetToTabTarget(target: NoteRouteTarget): TabTarget {
         id: target.id,
         pageFrameName: target.pageFrameName ?? null,
         pageFrameId: target.pageFrameId ?? null,
+        bookmarkId: target.bookmarkId ?? null,
       };
     case 'csv':
       return { type: 'csv', id: target.id };

@@ -7,6 +7,7 @@ export const TOOL_ACTIONS: Record<ToolId, Action> = {
   highlighter: 'canvas:tool-highlighter',
   eraser: 'canvas:tool-eraser',
   text: 'canvas:tool-text',
+  bookmark: 'canvas:tool-bookmark',
 };
 
 export function getToolHotkey(toolId: ToolId): string {

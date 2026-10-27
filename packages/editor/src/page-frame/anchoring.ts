@@ -1,6 +1,7 @@
 import { Anchor, Rows3, Unlink } from 'lucide-react';
 import type { DrawableCanvas } from '../drawable-canvas';
 import { AnchorableElement } from '../elements/anchorable-element';
+import { BookmarkElement } from '../elements/bookmark-element';
 import type {
   DrawableElement,
   SelectionToolbarItem,
@@ -427,7 +428,7 @@ export class PageFrameAnchoring {
           overlapPoint(candidate, element) !== null,
       );
     const labels = strings.canvas.selectionToolbar;
-    return [
+    const items: SelectionToolbarItem[] = [
       {
         id: 'page-anchor',
         label: element.pageAnchor ? labels.unanchor : labels.anchor,
@@ -465,5 +466,7 @@ export class PageFrameAnchoring {
           }),
       },
     ];
+    // A flag is a point marker; reserving text space for it is meaningless.
+    return element instanceof BookmarkElement ? items.slice(0, 1) : items;
   }
 }

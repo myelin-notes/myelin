@@ -312,7 +312,7 @@ export function useToolState(
   );
 
   const [wheelEnabledIndices, setWheelEnabledIndices] = useState<Set<number>>(
-    () => loadWheelToolIndices(canvasTools.length),
+    () => loadWheelToolIndices(canvasTools),
   );
 
   const applyPreset = useCallback(

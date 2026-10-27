@@ -247,6 +247,7 @@ const zhHans: typeof en = {
 
       rename: '重命名',
       manageTags: '管理标签',
+      bookmarks: '书签',
       color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
@@ -259,6 +260,11 @@ const zhHans: typeof en = {
       always: '始终更新，不再询问',
       yes: '更新',
       no: '跳过',
+    },
+    bookmarksDialog: {
+      title: '书签',
+      empty: '此文件夹中还没有书签。',
+      loadFailed: '无法加载书签',
     },
     tagDialog: {
       title: '管理标签',
@@ -625,6 +631,18 @@ const zhHans: typeof en = {
           label: '文本工具',
           description: '创建新的文本节点',
         },
+        'canvas:tool-bookmark': {
+          label: '书签工具',
+          description: '放置书签旗标',
+        },
+        'canvas:bookmark-previous': {
+          label: '上一个书签',
+          description: '跳到此画布中的上一个书签',
+        },
+        'canvas:bookmark-next': {
+          label: '下一个书签',
+          description: '跳到此画布中的下一个书签',
+        },
         'canvas:insert-frame': {
           label: '插入页面框',
           description: '在画布上放置新的页面框',
@@ -792,6 +810,16 @@ const zhHans: typeof en = {
       title: '反向链接',
       linkedMentions: '链接提及',
     },
+    bookmarks: {
+      title: '书签',
+      untitled: '书签',
+      pdfPage: (fileName: string, page: number) =>
+        `${fileName} · 第 ${page} 页`,
+      rename: '重命名',
+      remove: '删除',
+      previous: '上一个书签',
+      next: '下一个书签',
+    },
     toolbar: {
       clickForOptions: '点击查看选项',
       customizeWheel: '工具与预设',
@@ -906,6 +934,7 @@ const zhHans: typeof en = {
       highlighter: '荧光笔',
       eraser: '橡皮擦',
       text: '文本',
+      bookmark: '书签',
     },
     toolOptions: {
       color: '颜色',
