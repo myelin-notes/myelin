@@ -23,6 +23,7 @@ import { UserPrefs } from '@myelin/editor/user-prefs';
 import { CollisionHelper } from '@myelin/editor/utils/collision-helper';
 import { MOBILE_PLATFORM } from '@/lib/env';
 import { prepareCapturedPhoto } from '../photo-capture';
+import type { EmbedFilesFn } from './use-embed-files';
 
 export interface ContextInsertAnchor {
   screenX: number;
@@ -39,11 +40,7 @@ interface UseCanvasInsertsArgs {
   drawableCanvasRef: RefObject<DrawableCanvas | null>;
   canvasTools: ITool[];
   selectedToolIndex: number;
-  embedFiles: (
-    files: FileList | File[],
-    screenX?: number,
-    screenY?: number,
-  ) => void;
+  embedFiles: EmbedFilesFn;
 }
 
 export function useCanvasInserts({
@@ -330,8 +327,14 @@ export function useCanvasInserts({
   );
 
   const submitEmbed = useCallback(
-    (files: File[]) => {
-      embedFiles(files, embedAnchor?.screenX, embedAnchor?.screenY);
+    (files: File[], sourceUrl?: string) => {
+      embedFiles(
+        files,
+        embedAnchor?.screenX,
+        embedAnchor?.screenY,
+        undefined,
+        sourceUrl,
+      );
       setEmbedOpen(false);
       setEmbedAnchor(null);
     },

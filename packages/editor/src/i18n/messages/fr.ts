@@ -906,6 +906,7 @@ const fr: typeof en = {
       unlock: 'Déverrouiller',
       crop: 'Rogner',
       applyCrop: 'Appliquer le rognage',
+      openSource: 'Ouvrir le lien source',
       editPoints: 'Modifier les points',
       finishEditingPoints: 'Terminer la modification des points',
       bold: 'Gras',

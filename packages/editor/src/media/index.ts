@@ -11,6 +11,8 @@ export interface MediaImportOptions {
   screenX?: number;
   screenY?: number;
   pageFramePaste?: PageFramePasteTarget;
+  /** The URL the blob was fetched from, kept on the element as its source link. */
+  sourceUrl?: string;
 }
 
 export type MediaImportHandler = (

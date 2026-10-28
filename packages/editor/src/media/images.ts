@@ -15,7 +15,7 @@ export async function imageImportHandler(
 ) {
   const data = await blob.arrayBuffer();
   const img = canvas.addElement((uuid) => new ImageElement(uuid));
-  await img.setImageData(data);
+  await img.setImageData(data, options.sourceUrl);
 
   if (options.pageFramePaste) {
     const target = options.pageFramePaste;
