@@ -1,6 +1,7 @@
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
 import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
+import { isBackgroundElement } from './elements/element-type';
 import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
@@ -285,7 +286,7 @@ export class CanvasRenderer {
       }
       // DOM roots share canvas order with page-frame chrome, so keep both z-index and sibling order
       // in sync. `syncDOM` only appends on create, so only out-of-position nodes move.
-      reorderDomOverlay(domOverlayHost, elements);
+      reorderDomOverlay(domOverlayHost, this.canvas, elements, visibleElements);
     }
 
     // The background comes back only once a frame sees the zoom settle.
@@ -389,9 +390,13 @@ export class CanvasRenderer {
   }
 }
 
+// DOM roots and page-frame chrome stack at `index + 1`, and the foreground canvas above all of them,
+// except DOM elements that cover earlier canvas content, which stack above the canvas instead.
 export function reorderDomOverlay(
   host: HTMLElement,
-  elements: readonly Pick<DrawableElement, 'uuid' | 'setDomZIndex'>[],
+  canvas: HTMLElement,
+  elements: readonly DrawableElement[],
+  visibleElements: readonly DrawableElement[],
 ): void {
   const nodes = new Map<string, HTMLElement>();
   for (const child of host.children) {
@@ -401,6 +406,11 @@ export function reorderDomOverlay(
       nodes.set(uuid, node);
     }
   }
+  const canvasZIndex = String(elements.length + 1);
+  if (canvas.style.zIndex !== canvasZIndex) {
+    canvas.style.zIndex = canvasZIndex;
+  }
+  const aboveCanvas = domElementsAboveCanvas(visibleElements, nodes);
   let prev: HTMLElement | null = null;
   for (let index = 0; index < elements.length; index++) {
     const element = elements[index];
@@ -408,7 +418,9 @@ export function reorderDomOverlay(
     if (!node) {
       continue;
     }
-    const zIndex = String(index + 1);
+    const zIndex = String(
+      aboveCanvas.has(element.uuid) ? elements.length + 2 + index : index + 1,
+    );
     if (node.style.zIndex !== zIndex) {
       node.style.zIndex = zIndex;
     }
@@ -421,4 +433,31 @@ export function reorderDomOverlay(
     }
     prev = node;
   }
+}
+
+// One canvas paints all non-DOM content, so a DOM element with canvas content on both sides of it
+// in the order can't be stacked exactly. It stays above, so earlier ink and images can't hide it.
+// Backdrops never count: they're DOM, and the order keeps them below everything else.
+function domElementsAboveCanvas(
+  visibleElements: readonly DrawableElement[],
+  domNodes: ReadonlyMap<string, HTMLElement>,
+): Set<string> {
+  const above = new Set<string>();
+  const canvasContent: DrawableElement[] = [];
+  for (const element of visibleElements) {
+    if (element.hidden) {
+      continue;
+    }
+    if (domNodes.has(element.uuid)) {
+      const box = element.boundingBox;
+      if (
+        canvasContent.some((content) => content.intersectsWorldRect(box, 0))
+      ) {
+        above.add(element.uuid);
+      }
+    } else if (!isBackgroundElement(element.type)) {
+      canvasContent.push(element);
+    }
+  }
+  return above;
 }

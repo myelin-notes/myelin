@@ -605,10 +605,12 @@ function CanvasViewInner({
           onClose={inserts.closeCamera}
         />
       )}
+      {/* Isolated: element layers take z-indexes from element order, which must never climb over
+          the selection overlay, chrome controls or UI siblings that follow. */}
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
-        className="absolute inset-0 overflow-clip bg-page"
+        className="absolute inset-0 isolate overflow-clip bg-page"
         style={surfaceStyle}
       >
         {/* Background layer: dot grid, as a repeating CSS background rather

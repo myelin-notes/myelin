@@ -7,6 +7,11 @@ import {
   reorderDomOverlay,
 } from './canvas-renderer';
 import { MAX_ZOOM, MIN_ZOOM } from './canvas-viewport';
+import { LatexElement } from './elements/latex/element';
+import { PageFrameElement } from './elements/page-frame-element';
+import { PdfElement } from './elements/pdf';
+import { ShapeElement } from './elements/shape-element';
+import type { StrokeStyle } from './elements/stroke-element';
 
 interface OverlayNode {
   dataset: { elementUuid: string };
@@ -172,34 +177,93 @@ describe('cullMarginWorld', () => {
   });
 });
 
+function createCanvasLayer(): HTMLElement {
+  return { style: { zIndex: '' } } as unknown as HTMLElement;
+}
+
+function zIndexOf(target: { style: { zIndex: string } }): number {
+  return Number(target.style.zIndex);
+}
+
+const SHAPE_STYLE: StrokeStyle = { color: '#191c1e', size: 8 };
+
 describe('reorderDomOverlay', () => {
   it('uses the shared canvas position when a page frame occupies another DOM layer', () => {
     const { host, nodes } = createOverlayHost(['pdf']);
-    const setPdfZIndex = vi.fn();
-    const elements = [
-      { uuid: 'page-frame', setDomZIndex: vi.fn() },
-      { uuid: 'pdf', setDomZIndex: setPdfZIndex },
-    ];
+    const pdf = new PdfElement('pdf');
+    const setPdfZIndex = vi.spyOn(pdf, 'setDomZIndex');
+    const elements = [new PageFrameElement('page-frame'), pdf];
 
-    reorderDomOverlay(host, elements);
+    reorderDomOverlay(host, createCanvasLayer(), elements, elements);
 
     expect(nodes[0].style.zIndex).toBe('2');
     expect(setPdfZIndex).toHaveBeenCalledWith('2');
   });
 
   it('keeps DOM siblings in their shared canvas order', () => {
-    const { host, nodes } = createOverlayHost(['pdf', 'text']);
-    const elements = [
-      { uuid: 'text', setDomZIndex: vi.fn() },
-      { uuid: 'pdf', setDomZIndex: vi.fn() },
-    ];
+    const { host, nodes } = createOverlayHost(['latex', 'pdf']);
+    const elements = [new PdfElement('pdf'), new LatexElement('latex')];
 
-    reorderDomOverlay(host, elements);
+    reorderDomOverlay(host, createCanvasLayer(), elements, elements);
 
     expect(nodes.map((node) => node.dataset.elementUuid)).toEqual([
-      'text',
       'pdf',
+      'latex',
     ]);
     expect(nodes.map((node) => node.style.zIndex)).toEqual(['1', '2']);
+  });
+
+  it('stacks canvas content over backdrops however many precede it', () => {
+    const { host, nodes } = createOverlayHost(['pdf']);
+    const canvas = createCanvasLayer();
+    const frames = Array.from(
+      { length: 12 },
+      (_, i) => new PageFrameElement(`frame-${i}`),
+    );
+    const shape = new ShapeElement(
+      'shape',
+      'rect',
+      [0, 0, 200, 100],
+      SHAPE_STYLE,
+    );
+    const elements = [...frames, new PdfElement('pdf'), shape];
+
+    reorderDomOverlay(host, canvas, elements, elements);
+
+    expect(zIndexOf(canvas)).toBeGreaterThan(zIndexOf(nodes[0]));
+  });
+
+  it('stacks a DOM element under overlapping canvas content that follows it', () => {
+    const { host, nodes } = createOverlayHost(['latex']);
+    const canvas = createCanvasLayer();
+    const latex = new LatexElement('latex');
+    latex.setOffset(10, 20);
+    const shape = new ShapeElement(
+      'shape',
+      'rect',
+      [0, 0, 200, 100],
+      SHAPE_STYLE,
+    );
+    const elements = [latex, shape];
+
+    reorderDomOverlay(host, canvas, elements, elements);
+
+    expect(zIndexOf(nodes[0])).toBeLessThan(zIndexOf(canvas));
+  });
+
+  it('keeps a DOM element over overlapping canvas content that precedes it, even with more after it', () => {
+    const { host, nodes } = createOverlayHost(['latex']);
+    const canvas = createCanvasLayer();
+    const latex = new LatexElement('latex');
+    latex.setOffset(10, 20);
+    const elements = [
+      new ShapeElement('below', 'rect', [0, 0, 200, 100], SHAPE_STYLE),
+      latex,
+      new ShapeElement('above', 'rect', [0, 0, 200, 100], SHAPE_STYLE),
+    ];
+
+    reorderDomOverlay(host, canvas, elements, elements);
+
+    expect(zIndexOf(nodes[0])).toBeGreaterThan(zIndexOf(canvas));
   });
 });

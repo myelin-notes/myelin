@@ -93,7 +93,7 @@ export class DrawableCanvas {
   private toolSelected: ITool;
 
   public constructor(
-    private readonly canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement,
     ydoc: YDocManager,
     tools?: ITool[],
     resolveNoteLink?: ResolveNoteLink,
@@ -109,7 +109,6 @@ export class DrawableCanvas {
     if (!ctx) {
       logger.error('Failed to get canvas context');
     }
-    this.canvas.style.zIndex = '10';
     this.ctx = ctx!;
     this.renderer = new CanvasRenderer(this.ctx, canvas, () =>
       this.requestRedraw(),
