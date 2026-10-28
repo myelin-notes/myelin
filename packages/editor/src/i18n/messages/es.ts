@@ -896,6 +896,7 @@ const es: typeof en = {
       unlock: 'Desbloquear',
       crop: 'Recortar',
       applyCrop: 'Aplicar recorte',
+      openSource: 'Abrir enlace de origen',
       editPoints: 'Editar puntos',
       finishEditingPoints: 'Terminar de editar puntos',
       bold: 'Negrita',

@@ -1,9 +1,13 @@
-import { Crop as CropIcon } from 'lucide-react';
+import {
+  Crop as CropIcon,
+  ExternalLink as ExternalLinkIcon,
+} from 'lucide-react';
 import type * as Y from 'yjs';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { rotateVector } from '../geometry';
 import type { Messages } from '../i18n/messages';
 import type { PdfHarvestContext } from '../pdf-export/harvest';
+import { getPlatform } from '../platform';
 import type { YDocManager } from '../ydoc-manager';
 import { AnchorableElement } from './anchorable-element';
 import type { ResizeHandle, SelectionToolbarItem } from './drawable-element';
@@ -46,6 +50,7 @@ export class ImageElement extends AnchorableElement {
   private _cropEntrySnapshot: CropEntrySnapshot | null = null;
   private _ydoc: YDocManager | null = null;
   private _editingCropCanvas: DrawableCanvas | null = null;
+  private _sourceUrl: string | null = null;
 
   public constructor(uuid: string) {
     super(uuid, ElementType.IMAGE);
@@ -87,6 +92,11 @@ export class ImageElement extends AnchorableElement {
         this._cropH = v as number;
         this.updateBox();
       },
+      // Synced docs are untrusted, and this URL goes to openExternal.
+      sourceUrl: (v) => {
+        this._sourceUrl =
+          typeof v === 'string' && /^https?:\/\//i.test(v) ? v : null;
+      },
       imageData: (v) => {
         const blob = new Blob([(v as Uint8Array).slice()]);
         this._bitmapDecode = createImageBitmap(blob).then(
@@ -121,7 +131,7 @@ export class ImageElement extends AnchorableElement {
     return !this._cropMode;
   }
 
-  public async setImageData(data: ArrayBuffer) {
+  public async setImageData(data: ArrayBuffer, sourceUrl?: string) {
     const blob = new Blob([data]);
     this._bitmap = await createImageBitmap(blob);
     this._naturalWidth = this._bitmap.width;
@@ -130,9 +140,11 @@ export class ImageElement extends AnchorableElement {
     this._cropY = 0;
     this._cropW = this._naturalWidth;
     this._cropH = this._naturalHeight;
+    this._sourceUrl = sourceUrl ?? null;
     this.updateBox();
     this.syncToYMap({
       imageData: new Uint8Array(data),
+      ...(sourceUrl ? { sourceUrl } : {}),
       naturalWidth: this._naturalWidth,
       naturalHeight: this._naturalHeight,
       cropX: 0,
@@ -352,7 +364,7 @@ export class ImageElement extends AnchorableElement {
     if (!this._bitmap || this._naturalWidth === 0) {
       return [];
     }
-    return [
+    const items: SelectionToolbarItem[] = [
       {
         id: 'crop',
         label: this._cropMode
@@ -363,6 +375,16 @@ export class ImageElement extends AnchorableElement {
         onClick: () => this.toggleCropMode(),
       },
     ];
+    const sourceUrl = this._sourceUrl;
+    if (sourceUrl) {
+      items.push({
+        id: 'source',
+        label: strings.canvas.selectionToolbar.openSource,
+        icon: ExternalLinkIcon,
+        onClick: () => void getPlatform().openExternal(sourceUrl),
+      });
+    }
+    return items;
   }
 
   public override unselect(): void {

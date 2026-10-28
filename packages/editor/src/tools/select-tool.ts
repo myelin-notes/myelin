@@ -13,6 +13,7 @@ import {
   type ResizeHandle,
 } from '../elements/drawable-element';
 import { ElementType, isBackgroundElement } from '../elements/element-type';
+import { ImageElement } from '../elements/image-element';
 import { rotateVector } from '../geometry';
 import type { MessageGetter } from '../i18n';
 import { CollisionHelper } from '../utils/collision-helper';
@@ -244,6 +245,20 @@ export class SelectTool implements ITool {
     const isDoubleClick =
       now - this.lastClickTime < 400 &&
       dx * dx + dy * dy < doubleClickSlop * doubleClickSlop;
+
+    const editing = canvas.editingElement;
+    // enterEditAtPoint would clear the selection, and unselecting an image cancels its crop.
+    if (
+      isDoubleClick &&
+      !additive &&
+      editing instanceof ImageElement &&
+      editing.cropMode &&
+      editing.containsPoint(point)
+    ) {
+      editing.toggleCropMode();
+      this.lastClickTime = 0;
+      return;
+    }
 
     if (isDoubleClick && !additive && canvas.enterEditAtPoint(point, event)) {
       this.lastClickTime = 0;

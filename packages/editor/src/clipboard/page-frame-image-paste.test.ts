@@ -64,7 +64,10 @@ function fixture() {
     transact: (fn: () => void) => fn(),
     anchoring: { attachAtPosition },
     ctx: { canvas: { width: 1000, height: 800 } },
-    viewport: { screenToWorld: (point: { x: number; y: number }) => point },
+    viewport: {
+      zoom: 1,
+      screenToWorld: (point: { x: number; y: number }) => point,
+    },
   } as unknown as DrawableCanvas;
   function event(type: string, target: EventTarget | null = null) {
     const file = new File(['image'], 'clipboard.webp', { type });
@@ -252,5 +255,20 @@ describe('page-frame image MIME paste', () => {
     expect(images[0].offset).toEqual({ x: 400, y: 350 });
     expect(images[0].pageAnchor).toBeNull();
     expect(attachAtPosition).not.toHaveBeenCalled();
+  });
+
+  it('shrinks oversized canvas image imports to fit the current view', async () => {
+    const { canvas, images } = fixture();
+    (canvas.viewport as { zoom: number }).zoom = 2;
+    vi.spyOn(ImageElement.prototype, 'setImageData').mockResolvedValue();
+    vi.spyOn(ImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(
+      2000,
+    );
+    vi.spyOn(ImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(
+      400,
+    );
+    await imageImportHandler(new Blob(['image']), canvas);
+    // 1000px-wide view at zoom 2 shows 500 world units; 80% of that is 400 = 2000 * 0.2.
+    expect(images[0].scale).toEqual({ x: 0.2, y: 0.2 });
   });
 });

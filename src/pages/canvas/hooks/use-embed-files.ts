@@ -11,6 +11,7 @@ export type EmbedFilesFn = (
   screenX?: number,
   screenY?: number,
   pageFramePaste?: PageFramePasteTarget,
+  sourceUrl?: string,
 ) => void;
 
 export function useEmbedFiles(
@@ -20,7 +21,7 @@ export function useEmbedFiles(
   const repository = useRepository();
 
   return useCallback(
-    (files, screenX, screenY, pageFramePaste) => {
+    (files, screenX, screenY, pageFramePaste, sourceUrl) => {
       const dc = drawableCanvasRef.current;
       if (!dc) {
         return;
@@ -35,7 +36,13 @@ export function useEmbedFiles(
           });
         } else {
           void Promise.resolve(
-            handler(file, dc, { repository, screenX, screenY, pageFramePaste }),
+            handler(file, dc, {
+              repository,
+              screenX,
+              screenY,
+              pageFramePaste,
+              sourceUrl,
+            }),
           ).catch((error) => {
             toast.error(messages.canvas.embedComposer.errors.embedFailed, {
               description:

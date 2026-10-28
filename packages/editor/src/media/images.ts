@@ -5,6 +5,9 @@ import { resolveAnchorPosition } from '../page-frame/pm/anchoring';
 import { getDevicePixelRatio } from '../utils';
 import type { MediaImportOptions } from './index';
 
+// Fraction of the visible canvas a pasted image may fill, leaving a margin around it.
+const VIEWPORT_FIT = 0.8;
+
 export async function imageImportHandler(
   blob: Blob,
   canvas: DrawableCanvas,
@@ -12,7 +15,7 @@ export async function imageImportHandler(
 ) {
   const data = await blob.arrayBuffer();
   const img = canvas.addElement((uuid) => new ImageElement(uuid));
-  await img.setImageData(data);
+  await img.setImageData(data, options.sourceUrl);
 
   if (options.pageFramePaste) {
     const target = options.pageFramePaste;
@@ -46,12 +49,20 @@ export async function imageImportHandler(
 
   // Place at given screen position (or center of viewport)
   const dpr = getDevicePixelRatio();
-  const cx = options.screenX ?? canvas.ctx.canvas.width / dpr / 2;
-  const cy = options.screenY ?? canvas.ctx.canvas.height / dpr / 2;
+  const viewW = canvas.ctx.canvas.width / dpr;
+  const viewH = canvas.ctx.canvas.height / dpr;
+  const scale = Math.min(
+    1,
+    (VIEWPORT_FIT * viewW) / canvas.viewport.zoom / img.naturalWidth,
+    (VIEWPORT_FIT * viewH) / canvas.viewport.zoom / img.naturalHeight,
+  );
+  img.setScale(scale, scale);
+  const cx = options.screenX ?? viewW / 2;
+  const cy = options.screenY ?? viewH / 2;
   const world = canvas.viewport.screenToWorld({ x: cx, y: cy });
   img.setOffset(
-    world.x - img.naturalWidth / 2,
-    world.y - img.naturalHeight / 2,
+    world.x - (img.naturalWidth * scale) / 2,
+    world.y - (img.naturalHeight * scale) / 2,
   );
   img.updateBounds();
 }

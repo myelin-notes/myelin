@@ -10,7 +10,7 @@ import { useMessages } from '@myelin/editor/i18n';
 import type { Presence } from '@myelin/ui';
 
 interface EmbedComposerProps {
-  onEmbedFiles: (files: File[]) => void;
+  onEmbedFiles: (files: File[], sourceUrl?: string) => void;
   onClose: () => void;
   /** Presence wiring from the parent, so the panel animates in and out. */
   presenceState: Presence['state'];
@@ -104,11 +104,11 @@ export function EmbedComposer({
     };
   }, []);
 
-  const embedBlobs = (blobs: File[]) => {
+  const embedBlobs = (blobs: File[], sourceUrl?: string) => {
     if (blobs.length === 0) {
       return;
     }
-    onEmbedFiles(blobs);
+    onEmbedFiles(blobs, sourceUrl);
     setPulseKey((k) => k + 1);
     closeComposer();
   };
@@ -197,7 +197,7 @@ export function EmbedComposer({
       const ext = isPdf ? 'pdf' : blob.type.split('/')[1] || 'png';
       const name = isPdf ? `embed.pdf` : `embed.${ext}`;
       const file = new File([blob], name, { type: blob.type });
-      embedBlobs([file]);
+      embedBlobs([file], urlState.url);
       setUrlInput('');
       setUrlState({ kind: 'idle' });
     } catch {

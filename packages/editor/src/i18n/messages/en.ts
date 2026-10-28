@@ -887,6 +887,7 @@ const en = {
       unlock: 'Unlock',
       crop: 'Crop',
       applyCrop: 'Apply crop',
+      openSource: 'Open source link',
       editPoints: 'Edit points',
       finishEditingPoints: 'Finish editing points',
       bold: 'Bold',
