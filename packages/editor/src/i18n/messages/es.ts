@@ -1088,16 +1088,35 @@ const es: typeof en = {
     dismiss: 'Entendido',
     back: 'Atrás',
     next: 'Siguiente',
-    sync: {
-      title:
-        'Actualiza Myelin en todos tus dispositivos o no podrán sincronizarse.',
+    pdfQuote: {
+      title: 'Cita texto de tus PDF',
       description:
-        'La sincronización se rehízo y las versiones anteriores ya no son compatibles.',
+        'Selecciona texto en un PDF y elige Citar; luego toca una página para insertarlo con un enlace a su origen.',
     },
-    anchoring: {
-      title: 'Ancla elementos a tus páginas',
+    pdfAnchoring: {
+      title: 'Ancla notas a las páginas de un PDF',
       description:
-        'Selecciona una imagen, forma o dibujo en una página y elige Anclar a la página. Se moverá con el texto mientras escribes, y las imágenes pegadas se anclan automáticamente.',
+        'Lo que dibujas en una página de un PDF se queda en esa página, y Anclar a la página fija en ella imágenes y formas. Siguen a la página cuando mueves el PDF o lo cambias a Columnas.',
+    },
+    bookmarks: {
+      title: 'Marca lugares en tu lienzo',
+      description:
+        'Usa la herramienta Marcador (B) para poner una bandera. Abre la lista de banderas en la parte superior del lienzo o pulsa [ y ] para saltar entre ellas.',
+    },
+    canvasStyle: {
+      title: 'Un estilo para cada lienzo',
+      description:
+        'Elige cuadrícula, puntos, líneas o tu propia imagen, y ajusta los colores. Estilo del lienzo cambia solo el lienzo actual; en Ajustes defines el predeterminado.',
+    },
+    ruler: {
+      title: 'Traza líneas rectas con la regla',
+      description:
+        'Activa la Regla en la barra de herramientas, arrastra su control para fijar el ángulo y dibuja a lo largo de su borde.',
+    },
+    rotate: {
+      title: 'Gira imágenes, formas y dibujos',
+      description:
+        'Selecciona uno y arrastra el control que aparece encima. Mantén Mayús para girar en pasos de 15°.',
     },
   },
   onboarding: {

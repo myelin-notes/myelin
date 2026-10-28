@@ -1098,16 +1098,35 @@ const fr: typeof en = {
     dismiss: 'Compris',
     back: 'Retour',
     next: 'Suivant',
-    sync: {
-      title:
-        'Mettez à jour Myelin sur tous vos appareils, sinon ils ne pourront plus se synchroniser.',
+    pdfQuote: {
+      title: 'Citez vos PDF',
       description:
-        'La synchronisation a été refaite et les anciennes versions ne sont plus compatibles.',
+        'Sélectionnez du texte dans un PDF et choisissez Citer, puis touchez une page pour l’y insérer avec un lien vers sa source.',
     },
-    anchoring: {
-      title: 'Ancrez des éléments à vos pages',
+    pdfAnchoring: {
+      title: 'Ancrez vos notes aux pages d’un PDF',
       description:
-        'Sélectionnez une image, une forme ou un dessin sur une page et choisissez Ancrer à la page. Il suit votre texte pendant la saisie, et les images collées sont ancrées automatiquement.',
+        'Ce que vous dessinez sur une page d’un PDF reste sur cette page, et Ancrer à la page y fixe images et formes. Elles suivent la page quand vous déplacez le PDF ou passez en Colonnes.',
+    },
+    bookmarks: {
+      title: 'Placez des signets sur le canevas',
+      description:
+        'Utilisez l’outil Signet (B) pour poser un drapeau. Ouvrez la liste des drapeaux en haut du canevas, ou appuyez sur [ et ] pour passer de l’un à l’autre.',
+    },
+    canvasStyle: {
+      title: 'Un style pour chaque canevas',
+      description:
+        'Choisissez une grille, des points, des lignes ou votre propre image, et réglez les couleurs. Style du canevas ne modifie que le canevas ouvert ; les Réglages définissent le style par défaut.',
+    },
+    ruler: {
+      title: 'Tracez des lignes droites avec la règle',
+      description:
+        'Activez la Règle dans la barre d’outils, faites glisser sa poignée pour régler l’angle et dessinez le long de son bord.',
+    },
+    rotate: {
+      title: 'Faites pivoter images, formes et dessins',
+      description:
+        'Sélectionnez-en un et faites glisser la poignée au-dessus. Maintenez Maj pour pivoter par pas de 15°.',
     },
   },
   onboarding: {

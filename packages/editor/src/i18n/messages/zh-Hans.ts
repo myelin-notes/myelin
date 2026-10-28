@@ -1054,14 +1054,34 @@ const zhHans: typeof en = {
     dismiss: '知道了',
     back: '上一步',
     next: '下一步',
-    sync: {
-      title: '请在所有设备上更新 Myelin，否则将无法同步。',
-      description: '同步功能已重建，旧版本不再兼容。',
-    },
-    anchoring: {
-      title: '将内容锚定到页面',
+    pdfQuote: {
+      title: '引用 PDF 内容',
       description:
-        '在页面上选中图片、形状或手绘内容，然后选择“锚定到页面”。它会随文字一起移动，粘贴的图片也会自动锚定。',
+        '在 PDF 中选中文字并选择“引用”，再点按页面即可插入，并附带指向原文的链接。',
+    },
+    pdfAnchoring: {
+      title: '将笔记锚定到 PDF 页面',
+      description:
+        '在 PDF 页面上手绘的内容会固定在该页，“锚定到页面”也能把图片和形状固定上去。移动 PDF 或切换为“分栏”时，它们会跟随页面。',
+    },
+    bookmarks: {
+      title: '在画布上添加书签',
+      description:
+        '使用书签工具（B）插上旗标。在画布顶部打开旗标列表，或按 [ 和 ] 在旗标之间跳转。',
+    },
+    canvasStyle: {
+      title: '为每个画布设置样式',
+      description:
+        '选择网格、点、线条或自定义图片，并设置颜色。“画布样式”只更改当前画布，默认样式在设置中修改。',
+    },
+    ruler: {
+      title: '用直尺画直线',
+      description: '在工具栏中打开“直尺”，拖动旋钮调整角度，然后沿边缘绘制。',
+    },
+    rotate: {
+      title: '旋转图片、形状和手绘',
+      description:
+        '选中后拖动上方的手柄即可旋转。按住 Shift 可按 15° 步进旋转。',
     },
   },
   onboarding: {
