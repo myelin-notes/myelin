@@ -408,6 +408,7 @@ export class SelectTool implements ITool {
             }
             e.translate(dx, dy);
           }
+          canvas.anchoring?.dragTransform(this.movingElements);
         });
         this.lastPoint = position;
         break;
@@ -550,6 +551,7 @@ export class SelectTool implements ITool {
         if (this.totalDelta.x !== 0 || this.totalDelta.y !== 0) {
           canvas.anchoring?.finishTransform(this.movingElements);
         }
+        canvas.anchoring?.endDrag();
         // Yjs captures translate() mutations automatically — no command needed
         break;
       }
@@ -606,6 +608,9 @@ export class SelectTool implements ITool {
       (this.totalDelta.x !== 0 || this.totalDelta.y !== 0)
     ) {
       canvas.undo();
+    }
+    if (this.mode === SelectMode.Moving) {
+      canvas.anchoring?.endDrag();
     }
     if (this.mode === SelectMode.Scaling && this.scaleInteraction) {
       const interaction = this.scaleInteraction;
