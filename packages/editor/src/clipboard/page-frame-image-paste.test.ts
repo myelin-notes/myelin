@@ -8,6 +8,7 @@ import {
 } from 'y-prosemirror';
 import * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
+import type { PageFrameAnchor } from '../elements/anchorable-element';
 import { ImageElement } from '../elements/image-element';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { getMediaImportHandler } from '../media';
@@ -176,9 +177,12 @@ describe('page-frame image MIME paste', () => {
     const image = new ImageElement('image');
     expect(anchors.attachAtPosition(image, frame, 3, true)).toBe(true);
     expect(image.pageAnchor?.frameId).toBe(frame.uuid);
-    expect(resolveAnchorPosition(view.state, image.pageAnchor!.position)).toBe(
-      3,
-    );
+    expect(
+      resolveAnchorPosition(
+        view.state,
+        (image.pageAnchor as PageFrameAnchor).position,
+      ),
+    ).toBe(3);
     expect(image.offset.y).toBe(70);
     expect(view.posAtCoords).not.toHaveBeenCalled();
   });

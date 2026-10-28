@@ -1,4 +1,5 @@
-import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
+import type { TextContent } from 'pdfjs-dist/types/src/display/api';
 
 export interface PdfPageSize {
   w: number;
@@ -12,6 +13,8 @@ export interface PdfPageOrderPdfEntry {
 
 export interface PdfPageOrderBlankEntry {
   kind: 'blank';
+  /** Anchors reference blank pages by id; pages inserted before ids existed get one on first anchor. */
+  id?: string;
   size: PdfPageSize;
 }
 
@@ -136,6 +139,57 @@ export async function getPdfDocumentPageSizes(
   return pageSizes;
 }
 
+/** Plain text per original page, in the form `highlightPdfTextLayer` reads back from the text layer. */
+export async function getPdfPageTexts(
+  document: PDFDocumentProxy,
+): Promise<string[]> {
+  const texts: string[] = [];
+  for (let i = 1; i <= document.numPages; i++) {
+    const page = await document.getPage(i);
+    texts.push(await getPdfPageText(page));
+    page.cleanup();
+  }
+  return texts;
+}
+
+// Laid out at scale 1: the container's `--total-scale-factor` sizes it, so zooming never re-renders.
+export async function renderPdfTextLayer(
+  document: PDFDocumentProxy,
+  pageIndex: number,
+  container: HTMLElement,
+): Promise<void> {
+  const [pdfjs, page] = await Promise.all([
+    getPdfJs(),
+    document.getPage(pageIndex + 1),
+  ]);
+  await new pdfjs.TextLayer({
+    // Not getTextContent(): see getPdfPageText.
+    textContentSource: page.streamTextContent(),
+    container,
+    viewport: page.getViewport({ scale: 1 }),
+  }).render();
+}
+
+// TextLayer renders each item as a span and an end-of-line as `<br>`; this is that DOM's text.
+// pdf.js's getTextContent() uses `for await` over a ReadableStream, which WebKit can't iterate.
+async function getPdfPageText(page: PDFPageProxy): Promise<string> {
+  const reader = page.streamTextContent().getReader();
+  let text = '';
+  for (
+    let chunk = await reader.read();
+    !chunk.done;
+    chunk = await reader.read()
+  ) {
+    const { items }: TextContent = chunk.value;
+    for (const item of items) {
+      if ('str' in item) {
+        text += item.hasEOL ? `${item.str}\n` : item.str;
+      }
+    }
+  }
+  return text;
+}
+
 export function normalizePdfPageSizes(value: unknown): PdfPageSize[] {
   if (!Array.isArray(value)) {
     return [];
@@ -176,9 +230,11 @@ export function normalizePdfPageOrder(
     const kind = (entry as { kind: unknown }).kind;
     if (kind === 'blank') {
       const size = parsePageSize((entry as { size?: unknown }).size);
+      const id = (entry as { id?: unknown }).id;
       return [
         {
           kind: 'blank',
+          ...(typeof id === 'string' ? { id } : {}),
           size: size ?? { ...blankPageFallback },
         },
       ];

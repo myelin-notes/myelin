@@ -6,6 +6,11 @@ import {
   TextSelection,
 } from 'prosemirror-state';
 import { Mapping } from 'prosemirror-transform';
+import {
+  type PdfQuoteTarget,
+  parsePdfQuoteHref,
+} from '../../../elements/pdf/quote';
+import { PDF_QUOTE_OPEN_REQUEST_EVENT } from '../../../events';
 import { getPlatform } from '../../../platform';
 import { UserPrefs } from '../../../user-prefs';
 import {
@@ -369,6 +374,17 @@ function handleModifiedLinkInteraction(event: MouseEvent): boolean {
 
   const anchor = findAnchorElement(event.target);
   const href = anchor?.getAttribute('href');
+  const quote = href ? parsePdfQuoteHref(href) : null;
+  if (quote) {
+    event.preventDefault();
+    event.target?.dispatchEvent(
+      new CustomEvent<PdfQuoteTarget>(PDF_QUOTE_OPEN_REQUEST_EVENT, {
+        bubbles: true,
+        detail: quote,
+      }),
+    );
+    return true;
+  }
   const openableHref = href ? getOpenableHref(href) : null;
   if (!openableHref) {
     return false;

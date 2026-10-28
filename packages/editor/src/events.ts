@@ -5,6 +5,9 @@ export const PM_UPDATE_EVENT = 'pm-update';
 
 export const NOTE_LINK_OPEN_REQUEST_EVENT = 'myelin:note-link-open-request';
 
+/** Detail is the link's `PdfQuoteTarget`; bubbles from the clicked link so only its canvas answers. */
+export const PDF_QUOTE_OPEN_REQUEST_EVENT = 'myelin:pdf-quote-open-request';
+
 export const CODE_BLOCK_EXTERNAL_SELECTION_EVENT =
   'myelin:code-block-external-selection';
 export const CODE_BLOCK_CLEAR_SELECTION_EVENT =

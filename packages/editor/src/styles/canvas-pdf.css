@@ -1,0 +1,96 @@
+/*
+ * The part of pdf.js's web/pdf_viewer.css that its TextLayer needs. TextLayer sets --min-font-size,
+ * --font-height and --scale-x inline; the PDF element sets --total-scale-factor per page.
+ */
+.textLayer {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  text-align: initial;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 0;
+}
+
+.textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+    scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+/* Same specificity as `.textLayer > :not(.markedContent)`; comes later so z-index 0 wins. */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
+.textLayer ::selection {
+  background: rgb(0 0 255 / 0.25);
+  background: color-mix(in srgb, AccentColor, transparent 50%);
+  color: transparent;
+}
+
+.textLayer br::selection {
+  background: transparent;
+}
+
+.textLayer[data-main-rotation="90"] {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.textLayer[data-main-rotation="180"] {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.textLayer[data-main-rotation="270"] {
+  transform: rotate(270deg) translateX(-100%);
+}
+
+/* Text stays transparent: the rasterized page underneath shows the glyphs. */
+.textLayer .pdf-search-match {
+  color: transparent;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 3px;
+}
+
+.textLayer .pdf-search-match-current {
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}

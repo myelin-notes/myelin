@@ -9,12 +9,16 @@ import {
 import * as Y from 'yjs';
 import type { DrawableCanvas } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
+import { ElementType } from '../elements/element-type';
 import {
   PAGE_GAP,
   PAGE_PADDING,
   PageFrameElement,
 } from '../elements/page-frame-element';
+import { PdfElement } from '../elements/pdf';
 import { StrokeElement } from '../elements/stroke-element';
+import type { PdfPageOrderEntry } from '../pdf-renderer';
+import { YDocManager } from '../ydoc-manager';
 import { PageFrameAnchoring, pageContainsPoint } from './anchoring';
 import {
   anchorGapsKey,
@@ -326,5 +330,126 @@ describe('page frame anchoring', () => {
     anchors.finishTransform([element]);
     expect(element.pageAnchor).toBeNull();
     expect(element.offset.x).toBe(-1000);
+  });
+});
+
+describe('PDF anchoring', () => {
+  // Two 100x200 pages stacked vertically: page 1 starts at y = 200 + PAGE_GAP.
+  function pdf(
+    pageOrder: PdfPageOrderEntry[] = [
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'pdf', originalIndex: 1 },
+    ],
+  ) {
+    const ydoc = new YDocManager();
+    const yMap = ydoc.createElementMap(ElementType.PDF, 'pdf', {
+      offsetX: 0,
+      offsetY: 0,
+      scaleX: 1,
+      scaleY: 1,
+      pageSizes: [
+        { w: 100, h: 200 },
+        { w: 100, h: 200 },
+      ],
+      pageOrder,
+      pageOrderCustom: true,
+    });
+    const element = new PdfElement('pdf');
+    element.bindToYMap(yMap);
+    return { element, yMap };
+  }
+  const insertBlankPage = (element: PdfElement, position: number) =>
+    (
+      element as unknown as { insertBlankPage(position: number): void }
+    ).insertBlankPage(position);
+
+  it('anchors margin strokes beside a page and keeps them on that page as the PDF changes', () => {
+    const { element: document } = pdf();
+    const pageTop = 200 + PAGE_GAP;
+    const margin = stroke([120, pageTop + 50, 0.5, 130, pageTop + 60, 0.5]);
+    const far = stroke([400, pageTop + 50, 0.5, 410, pageTop + 60, 0.5]);
+    const anchors = controller([document, margin, far]);
+    anchors.autoAnchorStroke(margin);
+    anchors.autoAnchorStroke(far);
+    expect(margin.pageAnchor).toMatchObject({ kind: 'pdf', page: 1 });
+    expect(far.pageAnchor).toBeNull();
+
+    const start = margin.boundingBox;
+    document.setOffset(50, 10);
+    document.setScale(2, 2);
+    // Annotations stay glued to the content: scaled about the PDF's origin.
+    const box = margin.boundingBox;
+    expect(box.x).toBeCloseTo(50 + start.x * 2);
+    expect(box.y).toBeCloseTo(10 + start.y * 2);
+    expect(box.width).toBeCloseTo(start.width * 2);
+    expect(box.height).toBeCloseTo(start.height * 2);
+
+    const scaled = margin.boundingBox;
+    insertBlankPage(document, 1);
+    expect(margin.boundingBox.y).toBeCloseTo(scaled.y + (200 + PAGE_GAP) * 2);
+    expect(margin.boundingBox.x).toBe(scaled.x);
+
+    margin.translate(0, -(200 + PAGE_GAP) * 4);
+    anchors.finishTransform([margin]);
+    expect(margin.pageAnchor).toMatchObject({ kind: 'pdf', page: 0 });
+
+    margin.translate(1000, 0);
+    anchors.finishTransform([margin]);
+    expect(margin.pageAnchor).toBeNull();
+    const loose = margin.boundingBox;
+    document.setScale(1, 1);
+    expect(margin.boundingBox).toEqual(loose);
+  });
+
+  it('persists an id on a blank page from before ids so anchors survive reordering', () => {
+    const { element: document, yMap } = pdf([
+      { kind: 'pdf', originalIndex: 0 },
+      { kind: 'blank', size: { w: 100, h: 200 } },
+    ]);
+    const pageTop = 200 + PAGE_GAP;
+    const note = stroke([10, pageTop + 10, 0.5, 20, pageTop + 20, 0.5]);
+    controller([document, note]).autoAnchorStroke(note);
+    const id = (yMap.get('pageOrder') as PdfPageOrderEntry[])[1];
+    expect(id).toMatchObject({ kind: 'blank', id: expect.any(String) });
+    expect(note.pageAnchor).toMatchObject({
+      page: (id as { id: string }).id,
+    });
+
+    const before = note.boundingBox.y;
+    insertBlankPage(document, 0);
+    expect(note.boundingBox.y).toBeCloseTo(before + 200 + PAGE_GAP);
+  });
+
+  it("deletes only the deleted page's anchored elements, restoring them on undo", () => {
+    const ydoc = new YDocManager();
+    const pdfMap = ydoc.createElementMap(ElementType.PDF, 'pdf', {
+      pageSizes: [
+        { w: 100, h: 200 },
+        { w: 100, h: 200 },
+      ],
+      pageOrder: [
+        { kind: 'pdf', originalIndex: 0 },
+        { kind: 'pdf', originalIndex: 1 },
+      ],
+    });
+    const anchor = (page: number) => ({
+      pageAnchor: { kind: 'pdf', frameId: 'pdf', page, x: 0, y: 0 },
+    });
+    ydoc.createElementMap(ElementType.STROKE, 'on-first', anchor(0));
+    ydoc.createElementMap(ElementType.STROKE, 'on-second', anchor(1));
+    const document = new PdfElement('pdf');
+    document.bindToYMap(pdfMap);
+    document.bindSharedYState(ydoc);
+    ydoc.undoManager.stopCapturing();
+
+    (document as unknown as { deletePage(position: number): void }).deletePage(
+      0,
+    );
+    const uuids = () => ydoc.elements.map((map) => map.get('uuid'));
+    expect(uuids()).toEqual(['pdf', 'on-second']);
+
+    ydoc.undoManager.undo();
+    expect(uuids()).toEqual(expect.arrayContaining(['on-first', 'on-second']));
+    expect(pdfMap.get('pageOrder')).toHaveLength(2);
   });
 });

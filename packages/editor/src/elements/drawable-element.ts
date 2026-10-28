@@ -463,19 +463,20 @@ export abstract class DrawableElement {
   }
 
   public localToWorld(x: number, y: number): Vector2 {
-    const p = rotateVector(
-      { x: x * this._scale.x, y: y * this._scale.y },
-      this._rotation,
-    );
-    return { x: p.x + this.offset.x, y: p.y + this.offset.y };
+    const scale = this.scale;
+    const offset = this.offset;
+    const p = rotateVector({ x: x * scale.x, y: y * scale.y }, this._rotation);
+    return { x: p.x + offset.x, y: p.y + offset.y };
   }
 
   public worldToLocal(point: Vector2): Vector2 {
+    const scale = this.scale;
+    const offset = this.offset;
     const p = rotateVector(
-      { x: point.x - this.offset.x, y: point.y - this.offset.y },
+      { x: point.x - offset.x, y: point.y - offset.y },
       -this._rotation,
     );
-    return { x: p.x / this._scale.x, y: p.y / this._scale.y };
+    return { x: p.x / scale.x, y: p.y / scale.y };
   }
 
   // Resize math runs along the element's own axes; this sets an offset expressed in them.
@@ -516,7 +517,7 @@ export abstract class DrawableElement {
     ctx.save();
     ctx.translate(this.offset.x, this.offset.y);
     ctx.rotate(this._rotation);
-    ctx.scale(this._scale.x, this._scale.y);
+    ctx.scale(this.scale.x, this.scale.y);
     this.draw2D(ctx, deltaTime);
     ctx.restore();
   }
@@ -635,11 +636,12 @@ export abstract class DrawableElement {
    */
   public get orientedBox(): DOMRect {
     const raw = this.localBoundingBox;
+    const scale = this.scale;
     const origin = rotateVector(this.offset, -this._rotation);
-    const x1 = raw.x * this._scale.x + origin.x;
-    const y1 = raw.y * this._scale.y + origin.y;
-    const x2 = (raw.x + raw.width) * this._scale.x + origin.x;
-    const y2 = (raw.y + raw.height) * this._scale.y + origin.y;
+    const x1 = raw.x * scale.x + origin.x;
+    const y1 = raw.y * scale.y + origin.y;
+    const x2 = (raw.x + raw.width) * scale.x + origin.x;
+    const y2 = (raw.y + raw.height) * scale.y + origin.y;
     return new DOMRect(
       Math.min(x1, x2),
       Math.min(y1, y2),
@@ -653,10 +655,12 @@ export abstract class DrawableElement {
   private worldExtent(out: number[]): void {
     const raw = this.localBoundingBox;
     if (this._rotation === 0) {
-      const x1 = raw.x * this._scale.x + this.offset.x;
-      const y1 = raw.y * this._scale.y + this.offset.y;
-      const x2 = (raw.x + raw.width) * this._scale.x + this.offset.x;
-      const y2 = (raw.y + raw.height) * this._scale.y + this.offset.y;
+      const scale = this.scale;
+      const offset = this.offset;
+      const x1 = raw.x * scale.x + offset.x;
+      const y1 = raw.y * scale.y + offset.y;
+      const x2 = (raw.x + raw.width) * scale.x + offset.x;
+      const y2 = (raw.y + raw.height) * scale.y + offset.y;
       out[0] = Math.min(x1, x2);
       out[1] = Math.min(y1, y2);
       out[2] = Math.max(x1, x2);
@@ -722,9 +726,9 @@ export abstract class DrawableElement {
     radius: number,
     ctx: CanvasRenderingContext2D,
   ): boolean {
+    const scale = this.scale;
     const local = this.worldToLocal({ x, y });
-    const localRadius =
-      radius / Math.min(Math.abs(this._scale.x), Math.abs(this._scale.y));
+    const localRadius = radius / Math.min(Math.abs(scale.x), Math.abs(scale.y));
     return this.isOverLocal(local.x, local.y, localRadius, ctx);
   }
 

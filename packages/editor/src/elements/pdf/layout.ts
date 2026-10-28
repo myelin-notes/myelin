@@ -1,5 +1,7 @@
+import type { Vector2 } from '../../geometry';
 import type { PdfElementExportPage } from '../../pdf-element-export';
 import type { PdfPageOrderEntry, PdfPageSize } from '../../pdf-renderer';
+import type { PdfPageKey } from '../anchorable-element';
 import { PAGE_GAP, type PageLayout } from '../page-frame-constants';
 
 export const PDF_PAGE_RENDER_MARGIN = PAGE_GAP * 2;
@@ -53,6 +55,7 @@ export function buildPdfLayout(params: {
           }
         : {
             kind: 'blank',
+            ...(entry.id ? { id: entry.id } : {}),
             size,
             localLeft: horizontal ? totalWidth : 0,
             localTop: horizontal ? 0 : totalHeight,
@@ -76,6 +79,36 @@ export function buildPdfLayout(params: {
   }
 
   return { pages, totalWidth, totalHeight };
+}
+
+export function getPdfPageKey(
+  page: PdfElementExportPage,
+): PdfPageKey | undefined {
+  return page.kind === 'pdf' ? page.originalIndex : page.id;
+}
+
+/**
+ * Index of the page holding `point` (layout units), or -1. With `band`, a page also holds the
+ * margin beside it: half the gap along the stacking axis and one page-size out across it.
+ */
+export function findPdfPageAt(
+  layout: PdfLayout,
+  pageLayout: PageLayout,
+  point: Vector2,
+  band: boolean,
+): number {
+  const horizontal = pageLayout === 'horizontal';
+  return layout.pages.findIndex((page) => {
+    const stackPad = band ? PAGE_GAP / 2 : 0;
+    const padX = band ? (horizontal ? stackPad : page.size.w) : 0;
+    const padY = band ? (horizontal ? page.size.h : stackPad) : 0;
+    return (
+      point.x >= page.localLeft - padX &&
+      point.x <= page.localLeft + page.size.w + padX &&
+      point.y >= page.localTop - padY &&
+      point.y <= page.localTop + page.size.h + padY
+    );
+  });
 }
 
 export function isPdfLayoutVisible(params: {

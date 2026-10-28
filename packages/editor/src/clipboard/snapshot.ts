@@ -132,6 +132,10 @@ export function buildCanvasClipboardSnapshot(
         map.set('offsetX', item.offset.x);
         map.set('offsetY', item.offset.y);
       }
+      if (item.scale) {
+        map.set('scaleX', item.scale.x);
+        map.set('scaleY', item.scale.y);
+      }
       clipboardDoc.elements.push([map]);
       if (item.pageFrameFragment) {
         copyXmlFragmentInto(

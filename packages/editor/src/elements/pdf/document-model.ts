@@ -157,10 +157,25 @@ export class PdfDocumentModel {
     const nextOrder = this.pageEntries;
     nextOrder.splice(insertPosition, 0, {
       kind: 'blank',
+      id: crypto.randomUUID(),
       size: { ...reference.size },
     });
     this.setCustomPageOrder(nextOrder);
     return true;
+  }
+
+  /** Returns the id of the blank page at `position`, or null if it isn't one. */
+  public ensureBlankPageId(position: number): string | null {
+    const nextOrder = this.pageEntries;
+    const entry = nextOrder[position];
+    if (entry?.kind !== 'blank') {
+      return null;
+    }
+    if (!entry.id) {
+      entry.id = crypto.randomUUID();
+      this.setCustomPageOrder(nextOrder);
+    }
+    return entry.id;
   }
 
   public deletePage(position: number): boolean {
@@ -253,7 +268,11 @@ export function clonePageOrder(
   return pageOrder.map((entry) =>
     entry.kind === 'pdf'
       ? { kind: 'pdf', originalIndex: entry.originalIndex }
-      : { kind: 'blank', size: { ...entry.size } },
+      : {
+          kind: 'blank',
+          ...(entry.id ? { id: entry.id } : {}),
+          size: { ...entry.size },
+        },
   );
 }
 
@@ -286,6 +305,7 @@ function arePageOrdersEqual(
       return (
         entry.kind === 'blank' &&
         other.kind === 'blank' &&
+        entry.id === other.id &&
         entry.size.w === other.size.w &&
         entry.size.h === other.size.h
       );

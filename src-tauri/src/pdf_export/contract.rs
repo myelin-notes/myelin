@@ -97,6 +97,17 @@ pub struct ExportPage {
     pub width_pt: f32,
     pub height_pt: f32,
     pub items: Vec<PageItem>,
+    /// `pdfElement` only: where the original page is drawn. `None` fills the page.
+    #[serde(default)]
+    pub background: Option<PageRect>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct PageRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

@@ -1,5 +1,5 @@
 import * as Y from 'yjs';
-import type { PageFrameAnchor } from './elements/anchorable-element';
+import type { PageAnchor, PdfPageKey } from './elements/anchorable-element';
 import { ElementType } from './elements/element-type';
 
 /** Origins used to label Yjs updates flowing through the canvas sync layer. */
@@ -105,18 +105,13 @@ export class YDocManager {
   // undo of the deletion restores both the element and its content.
   removeElementMap(yMap: Y.Map<unknown>): void {
     this.doc.transact(() => {
-      if (yMap.get('type') === ElementType.PAGE_FRAME) {
-        const uuid = yMap.get('uuid');
-        for (let index = this.elements.length - 1; index >= 0; index--) {
-          const child = this.elements.get(index);
-          const anchor = child.get('pageAnchor') as
-            | PageFrameAnchor
-            | null
-            | undefined;
-          if (anchor && anchor.frameId === uuid) {
-            this.elements.delete(index, 1);
-          }
-        }
+      const type = yMap.get('type');
+      const uuid = yMap.get('uuid');
+      if (
+        (type === ElementType.PAGE_FRAME || type === ElementType.PDF) &&
+        typeof uuid === 'string'
+      ) {
+        this.removeAnchoredElements(uuid);
       }
       for (let i = 0; i < this.elements.length; i++) {
         if (this.elements.get(i) === yMap) {
@@ -132,6 +127,25 @@ export class YDocManager {
           }
           this.elements.delete(i, 1);
           return;
+        }
+      }
+    }, LOCAL_ORIGIN);
+  }
+
+  /** Deletes elements anchored to `frameId`; with `page`, only those on that PDF page. */
+  removeAnchoredElements(frameId: string, page?: PdfPageKey): void {
+    this.doc.transact(() => {
+      for (let index = this.elements.length - 1; index >= 0; index--) {
+        const anchor = this.elements.get(index).get('pageAnchor') as
+          | PageAnchor
+          | null
+          | undefined;
+        if (
+          anchor?.frameId === frameId &&
+          (page === undefined ||
+            (anchor.kind === 'pdf' && anchor.page === page))
+        ) {
+          this.elements.delete(index, 1);
         }
       }
     }, LOCAL_ORIGIN);

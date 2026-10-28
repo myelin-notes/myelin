@@ -183,4 +183,54 @@ describe('buildPdfElementRequest', () => {
       { t: 'path', pts: [10, 10], closed: true, fill: [0, 0, 0] },
     ]);
   });
+
+  it('grows a page to fit elements anchored to it and offsets the original page inside', () => {
+    // Anchored to page 0 but left of and above it, and outside the PDF's own bounds.
+    const note: PdfExportOverlayElement = {
+      ...overlayElement('note', rect(-30, 5, 20, 20), false, (ctx) => {
+        const p = ctx.worldToPagePt(-30, 5);
+        ctx.push({ t: 'path', pts: [p.x, p.y], closed: true });
+      }),
+      pageAnchor: {
+        kind: 'pdf',
+        frameId: 'pdf-target',
+        page: 0,
+        x: 0,
+        y: 0,
+        scaleX: 1,
+        scaleY: 1,
+      },
+    };
+
+    const request = buildPdfElementRequest(
+      exportSource({
+        pages: [
+          {
+            kind: 'pdf',
+            originalIndex: 0,
+            size: { w: 100, h: 50 },
+            localLeft: 0,
+            localTop: 0,
+          },
+          {
+            kind: 'blank',
+            id: 'blank',
+            size: { w: 100, h: 50 },
+            localLeft: 0,
+            localTop: 60,
+          },
+        ],
+      }),
+      [note],
+    );
+
+    // Page world bounds (10,20,200,150) grow to (-30,5)-(210,170); scale (2,3) → points.
+    expect(request.pages[0]).toEqual({
+      widthPt: 120,
+      heightPt: 55,
+      background: { x: 20, y: 5, w: 100, h: 50 },
+      items: [{ t: 'path', pts: [0, 0], closed: true }],
+    });
+    expect(request.pages[1]).toEqual({ widthPt: 100, heightPt: 50, items: [] });
+  });
 });

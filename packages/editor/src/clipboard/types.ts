@@ -27,6 +27,7 @@ export interface CanvasClipboardSelectionItem {
   bounds: CanvasRect;
   yMap: Y.Map<unknown>;
   offset?: CanvasPoint;
+  scale?: CanvasPoint;
   pageFrameFragment?: Y.XmlFragment | null;
 }
 

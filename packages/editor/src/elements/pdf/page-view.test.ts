@@ -46,7 +46,10 @@ function createLayout(pageOrder: PdfPageOrderEntry[]): PdfLayout {
 }
 
 function testablePageView() {
-  return new PdfPageView({ onRenderError: vi.fn() }) as unknown as {
+  return new PdfPageView({
+    onTextLayerRendered: vi.fn(),
+    onRenderError: vi.fn(),
+  }) as unknown as {
     pageDoms: Map<number, TestPageDom>;
     reconcileOrder(
       previousPages: PdfLayout['pages'],

@@ -85,7 +85,15 @@ fn render_page(
     let mut surface = pg.surface();
 
     if let (Some(pdf), Some(idx)) = (pdf_doc, bg_idx) {
-        surface.draw_pdf_page(pdf, size, idx);
+        match page.background {
+            Some(bg) => {
+                let bg_size = Size::from_wh(bg.w, bg.h).ok_or("invalid background size")?;
+                surface.push_transform(&Transform::from_translate(bg.x, bg.y));
+                surface.draw_pdf_page(pdf, bg_size, idx);
+                surface.pop();
+            }
+            None => surface.draw_pdf_page(pdf, size, idx),
+        }
     }
 
     for item in &page.items {
@@ -335,4 +343,36 @@ fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
     base64::engine::general_purpose::STANDARD
         .decode(s)
         .map_err(|e| format!("invalid base64: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pdf_element_page_grows_around_its_original() {
+        let original = render(
+            serde_json::from_value(serde_json::json!({
+                "kind": "canvas",
+                "pages": [{"widthPt": 100, "heightPt": 100, "items": []}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let request: PdfExportRequest = serde_json::from_value(serde_json::json!({
+            "kind": "pdfElement",
+            "pages": [{
+                "widthPt": 150,
+                "heightPt": 120,
+                "items": [],
+                "background": {"x": 50, "y": 20, "w": 100, "h": 100}
+            }],
+            "pageMap": [0],
+            "originalPdfB64": base64::engine::general_purpose::STANDARD.encode(&original),
+        }))
+        .unwrap();
+        let bytes = render(request).unwrap();
+        let text = String::from_utf8_lossy(&bytes);
+        assert!(text.contains("/MediaBox[0 0 150 120]"), "{text}");
+    }
 }

@@ -1,6 +1,11 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { Logger } from '@myelin/shared/logger';
 import type { CanvasViewport } from '../../canvas-viewport';
-import { cleanupPdfPage, getPdfRenderScale } from '../../pdf-renderer';
+import {
+  cleanupPdfPage,
+  getPdfRenderScale,
+  renderPdfTextLayer,
+} from '../../pdf-renderer';
 import { setStyleIfChanged } from '../../utils/style-cache';
 import type { PageLayout } from '../page-frame-constants';
 import {
@@ -14,19 +19,51 @@ import {
   PdfPageRenderScheduler,
   type PdfPageSurface,
 } from './render-scheduler';
+import {
+  clearPdfTextLayerHighlight,
+  highlightPdfTextLayer,
+  trackPdfTextSelection,
+} from './text-layer';
 
 const FAST_SCROLL_PX_PER_FRAME = 24;
+const logger = new Logger('PdfPageView');
+
+/**
+ * A canvas-search occurrence (its ordinal on the page) or a quoted range of the page text, addressed
+ * by layout position.
+ */
+export type PdfSearchHighlight = { position: number } & (
+  | { query: string; current: number }
+  | { from: number; to: number }
+);
+
+export interface PdfTextLayerOptions {
+  selectable: boolean;
+  highlight: PdfSearchHighlight | null;
+}
+
+interface PdfTextLayerDom {
+  div: HTMLDivElement;
+  pageIndex: number;
+  ready: boolean;
+  // Identifies the marks applied to `div`; '' when there are none.
+  highlightKey: string;
+  untrackSelection: (() => void) | null;
+}
 
 interface PdfPageDom extends PdfPageSurface {
   root: HTMLDivElement;
+  textLayer: PdfTextLayerDom | null;
 }
 
 export class PdfPageView {
   private readonly scheduler: PdfPageRenderScheduler;
   private pageDoms = new Map<number, PdfPageDom>();
   private lastScreenOffset: { x: number; y: number } | null = null;
+  private readonly onTextLayerRendered: () => void;
 
   public constructor(params: {
+    onTextLayerRendered: () => void;
     onRenderError: (params: {
       error: unknown;
       pageIndex: number;
@@ -35,6 +72,7 @@ export class PdfPageView {
       renderScale: number;
     }) => void;
   }) {
+    this.onTextLayerRendered = params.onTextLayerRendered;
     this.scheduler = new PdfPageRenderScheduler({
       onError: ({ error, pageIndex, pageSize, renderScale }) => {
         params.onRenderError({
@@ -59,6 +97,8 @@ export class PdfPageView {
     scaleY: number;
     pageLayout: PageLayout;
     layout: PdfLayout;
+    /** Null leaves pages without a text layer. */
+    textLayer: PdfTextLayerOptions | null;
   }): void {
     if (!params.contentRoot) {
       return;
@@ -167,8 +207,16 @@ export class PdfPageView {
           zoom: params.zoom,
           fastScroll,
         });
+        this.syncTextLayer(pageDom, {
+          position: pagePosition,
+          pageIndex: page.originalIndex,
+          document: params.document,
+          options: params.textLayer,
+          scale: params.scaleX * params.rasterZoom,
+        });
       } else {
         this.scheduler.release(pageDom, true);
+        this.removeTextLayer(pageDom);
       }
     }
     this.removeInactivePageDoms(activePagePositions, params.document);
@@ -215,6 +263,7 @@ export class PdfPageView {
   public dispose(document: PDFDocumentProxy | null): void {
     this.scheduler.dispose(this.pageDoms.values());
     for (const pageDom of this.pageDoms.values()) {
+      this.removeTextLayer(pageDom);
       pageDom.root.remove();
     }
     this.pageDoms.clear();
@@ -240,6 +289,89 @@ export class PdfPageView {
     );
     setStyleIfChanged(pageDom.root, 'width', `${width}px`);
     setStyleIfChanged(pageDom.root, 'height', `${height}px`);
+  }
+
+  private syncTextLayer(
+    pageDom: PdfPageDom,
+    {
+      position,
+      pageIndex,
+      document: pdfDocument,
+      options,
+      scale,
+    }: {
+      position: number;
+      pageIndex: number;
+      document: PDFDocumentProxy | null;
+      options: PdfTextLayerOptions | null;
+      scale: number;
+    },
+  ): void {
+    if (!options || !pdfDocument) {
+      this.removeTextLayer(pageDom);
+      return;
+    }
+    let layer = pageDom.textLayer;
+    if (layer?.pageIndex !== pageIndex) {
+      this.removeTextLayer(pageDom);
+      const div = document.createElement('div');
+      div.className = 'textLayer';
+      div.dataset.pageIndex = String(pageIndex);
+      pageDom.root.appendChild(div);
+      const created: PdfTextLayerDom = {
+        div,
+        pageIndex,
+        ready: false,
+        highlightKey: '',
+        untrackSelection: null,
+      };
+      layer = created;
+      pageDom.textLayer = created;
+      renderPdfTextLayer(pdfDocument, pageIndex, div).then(
+        () => {
+          if (pageDom.textLayer !== created) {
+            return;
+          }
+          created.ready = true;
+          created.untrackSelection = trackPdfTextSelection(div);
+          this.onTextLayerRendered();
+        },
+        (error: unknown) => {
+          if (div.isConnected) {
+            logger.error('Failed to render PDF text layer', error, {
+              pageIndex,
+            });
+          }
+        },
+      );
+    }
+    setStyleIfChanged(layer.div, '--total-scale-factor', `${scale}`);
+    setStyleIfChanged(
+      layer.div,
+      'pointer-events',
+      options.selectable ? 'auto' : 'none',
+    );
+    if (!layer.ready) {
+      return;
+    }
+    const highlight =
+      options.highlight?.position === position ? options.highlight : null;
+    const highlightKey = highlight ? JSON.stringify(highlight) : '';
+    if (highlightKey === layer.highlightKey) {
+      return;
+    }
+    layer.highlightKey = highlightKey;
+    if (highlight) {
+      highlightPdfTextLayer(layer.div, highlight);
+    } else {
+      clearPdfTextLayerHighlight(layer.div);
+    }
+  }
+
+  private removeTextLayer(pageDom: PdfPageDom): void {
+    pageDom.textLayer?.untrackSelection?.();
+    pageDom.textLayer?.div.remove();
+    pageDom.textLayer = null;
   }
 
   private removeInactivePageDoms(
@@ -275,6 +407,7 @@ export class PdfPageView {
     const cachedPageIndex =
       pageDom.rendered?.pageIndex ?? pageDom.rendering?.pageIndex;
     this.scheduler.release(pageDom, true);
+    this.removeTextLayer(pageDom);
     pageDom.root.remove();
     if (
       document &&
@@ -314,6 +447,7 @@ export class PdfPageView {
     return {
       root,
       canvas,
+      textLayer: null,
       renderHandle: null,
       rendered: null,
       rendering: null,
