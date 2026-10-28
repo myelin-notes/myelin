@@ -174,6 +174,8 @@ export interface McpImageContent extends McpImageSummary {
 
 export interface McpPdfContent extends McpPdfSummary {
   noteId: VFSNodeId;
+  /** One string per page of the original file, in file order; empty until the app has extracted it. */
+  pageTexts: string[];
 }
 
 export interface McpNoteFullReadModel extends McpNoteReadModel {

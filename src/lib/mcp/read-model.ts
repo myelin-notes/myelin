@@ -251,6 +251,12 @@ function getPdfPageSizes(yMap: Y.Map<unknown>): { w: number; h: number }[] {
     .filter((entry): entry is { w: number; h: number } => entry !== null);
 }
 
+// Written by the app after pdf.js extracts it.
+function getPdfPageTexts(yMap: Y.Map<unknown>): string[] {
+  const raw = yMap.get('pdfText');
+  return Array.isArray(raw) ? raw.map((text) => asString(text) ?? '') : [];
+}
+
 function imageResourceUri(noteId: VFSNodeId, elementId: string): string {
   return `myelin://notes/${encodeURIComponent(noteId)}/images/${encodeURIComponent(elementId)}`;
 }
@@ -394,7 +400,7 @@ function summarizePdf(noteId: VFSNodeId, yMap: Y.Map<unknown>): McpPdfSummary {
     fileName: asString(yMap.get('fileName')),
     pageCount: pageSizes.length > 0 ? pageSizes.length : null,
     byteLength: data?.byteLength ?? null,
-    textAvailable: false,
+    textAvailable: getPdfPageTexts(yMap).some((text) => text.trim() !== ''),
     resourceUri: pdfResourceUri(noteId, id),
   };
 }
@@ -682,6 +688,7 @@ export async function readMcpPdf(
   return {
     noteId,
     ...summarizePdf(noteId, yMap),
+    pageTexts: getPdfPageTexts(yMap),
   };
 }
 

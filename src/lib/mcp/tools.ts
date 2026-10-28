@@ -465,7 +465,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_pdf',
     description:
-      "Read metadata for one PDF embedded on the canvas: file name, page count, byte size, and bounds. The PDF text is not extractable through this server (textAvailable is always false), so do not claim knowledge of its contents from this alone. To read a page, call screenshot_canvas over the part of this element's bounds that covers it - pages are laid out down or across the element according to its layout, so a single page is roughly the element height divided by pageCount.",
+      "Read one PDF embedded on the canvas: file name, page count, byte size, bounds, and its text as pageTexts, one string per page of the original file in file order. Myelin extracts the text when it opens the PDF, so a PDF added with create_pdf has no text until its note has been opened in Myelin; scanned PDFs have no text layer at all. When textAvailable is false, do not claim knowledge of its contents; instead call screenshot_canvas over the part of this element's bounds that covers a page - pages are laid out down or across the element according to its layout, so a single page is roughly the element height divided by pageCount.",
     inputSchema: textSchema(
       { noteId: NOTE_ID_PROPERTY, elementId: elementIdProperty('pdf') },
       ['noteId', 'elementId'],
@@ -549,7 +549,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'read_note_full',
     description:
-      'Read everything textual in one note at once: the same inventory as read_note, plus the complete Markdown of every page frame and the full text of every canvas text and LaTeX element. Images, strokes, and PDF pages contribute no text and are absent from the result. Prefer read_note plus a targeted reader when the note is large, since this response is not paginated or truncated and can be very long.',
+      'Read everything textual in one note at once: the same inventory as read_note, plus the complete Markdown of every page frame and the full text of every canvas text and LaTeX element. Images and strokes contribute no text, and PDF text is left to read_pdf; none of them add content here. Prefer read_note plus a targeted reader when the note is large, since this response is not paginated or truncated and can be very long.',
     inputSchema: textSchema({ noteId: NOTE_ID_PROPERTY }, ['noteId']),
   },
   {
@@ -789,7 +789,7 @@ export const MCP_TOOL_DEFINITIONS: McpToolDefinition[] = [
   {
     name: 'create_pdf',
     description:
-      "Embed a PDF file from this computer in a canvas note and return it. Pages are laid out in the user's default page layout, each about 612x792 pixels for US Letter, so leave room below or beside the position. Requires direct MCP writes to be enabled in Myelin settings.",
+      "Embed a PDF file from this computer in a canvas note and return it. Pages are laid out in the user's default page layout, each about 612x792 pixels for US Letter, so leave room below or beside the position. Its text is not readable through read_pdf or search_notes until the note has been opened in Myelin. Requires direct MCP writes to be enabled in Myelin settings.",
     inputSchema: textSchema(
       {
         noteId: NOTE_ID_PROPERTY,

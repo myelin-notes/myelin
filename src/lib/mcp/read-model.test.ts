@@ -13,7 +13,7 @@ import {
   readMcpPdf,
 } from './read-model';
 
-async function createRepositoryNote() {
+async function createRepositoryNote(pdfText?: string[]) {
   const repository = new TestRepository();
   await repository.initialize();
   const ydoc = new YDocManager();
@@ -58,6 +58,7 @@ async function createRepositoryNote() {
       { w: 600, h: 800 },
     ],
     pdfData: new Uint8Array([5, 6, 7]),
+    ...(pdfText ? { pdfText } : {}),
   });
   ydoc.createElementMap(ElementType.LATEX, 'latex-1', {
     offsetX: 80,
@@ -213,6 +214,21 @@ describe('MCP read model', () => {
       fileName: 'Paper.pdf',
       textAvailable: false,
     });
+  });
+
+  it('reads extracted PDF text per page, and none for a PDF without a text layer', async () => {
+    const extracted = await createRepositoryNote(['Page one', '']);
+    await expect(
+      readMcpPdf(extracted.repository, extracted.noteId, 'pdf-1'),
+    ).resolves.toMatchObject({
+      textAvailable: true,
+      pageTexts: ['Page one', ''],
+    });
+
+    const scanned = await createRepositoryNote(['', ' ']);
+    await expect(
+      readMcpPdf(scanned.repository, scanned.noteId, 'pdf-1'),
+    ).resolves.toMatchObject({ textAvailable: false });
   });
 
   it('reads the full note model in one pass', async () => {
