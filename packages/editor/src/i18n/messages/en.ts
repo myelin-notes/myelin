@@ -328,6 +328,8 @@ const en = {
         grid: 'Grid',
         dots: 'Dots',
         blank: 'Blank',
+        lines: 'Lines',
+        image: 'Image',
       },
       backgroundColor: {
         label: 'Background color',
@@ -338,6 +340,27 @@ const en = {
           custom: 'Custom',
         },
         confirm: 'Apply',
+      },
+      sections: {
+        pattern: 'Pattern',
+        colors: 'Colors',
+      },
+      patternColor: {
+        label: 'Pattern color',
+        description: 'Color of the grid, dots, or lines.',
+      },
+      image: {
+        label: 'Background image',
+        description: 'Tiled across the canvas. Large images are scaled down.',
+        choose: 'Choose image',
+        failed: 'Could not load that image',
+      },
+      perCanvas: {
+        button: 'Canvas style',
+        followingDefault:
+          'Following the default from Settings. Any change here applies to this canvas only.',
+        custom: 'This canvas has its own style.',
+        reset: 'Use default',
       },
     },
     language: {

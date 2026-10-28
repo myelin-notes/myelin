@@ -334,6 +334,8 @@ const es: typeof en = {
         grid: 'Cuadrícula',
         dots: 'Puntos',
         blank: 'En blanco',
+        lines: 'Líneas',
+        image: 'Imagen',
       },
       backgroundColor: {
         label: 'Color de fondo',
@@ -344,6 +346,28 @@ const es: typeof en = {
           custom: 'Personalizado',
         },
         confirm: 'Aplicar',
+      },
+      sections: {
+        pattern: 'Patrón',
+        colors: 'Colores',
+      },
+      patternColor: {
+        label: 'Color del patrón',
+        description: 'Color de la cuadrícula, los puntos o las líneas.',
+      },
+      image: {
+        label: 'Imagen de fondo',
+        description:
+          'Se repite por todo el lienzo. Las imágenes grandes se reducen.',
+        choose: 'Elegir imagen',
+        failed: 'No se pudo cargar la imagen',
+      },
+      perCanvas: {
+        button: 'Estilo del lienzo',
+        followingDefault:
+          'Sigue el estilo predeterminado de Ajustes. Los cambios aquí solo afectan a este lienzo.',
+        custom: 'Este lienzo tiene su propio estilo.',
+        reset: 'Usar predeterminado',
       },
     },
     language: {

@@ -339,6 +339,8 @@ const fr: typeof en = {
         grid: 'Grille',
         dots: 'Points',
         blank: 'Vide',
+        lines: 'Lignes',
+        image: 'Image',
       },
       backgroundColor: {
         label: 'Couleur d’arrière-plan',
@@ -349,6 +351,28 @@ const fr: typeof en = {
           custom: 'Personnalisée',
         },
         confirm: 'Appliquer',
+      },
+      sections: {
+        pattern: 'Motif',
+        colors: 'Couleurs',
+      },
+      patternColor: {
+        label: 'Couleur du motif',
+        description: 'Couleur de la grille, des points ou des lignes.',
+      },
+      image: {
+        label: 'Image d’arrière-plan',
+        description:
+          'Répétée sur tout le canevas. Les grandes images sont réduites.',
+        choose: 'Choisir une image',
+        failed: 'Impossible de charger cette image',
+      },
+      perCanvas: {
+        button: 'Style du canevas',
+        followingDefault:
+          'Suit le style par défaut des Réglages. Toute modification ici s’applique uniquement à ce canevas.',
+        custom: 'Ce canevas a son propre style.',
+        reset: 'Utiliser le style par défaut',
       },
     },
     language: {
