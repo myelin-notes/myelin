@@ -100,7 +100,12 @@ function makeShape() {
 }
 
 function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
+  let editingElement: DrawableElement | null = null;
   const enterElementEdit = vi.fn();
+  const exitElementEdit = vi.fn(() => {
+    editingElement?.exitEditMode();
+    editingElement = null;
+  });
   const selection = new SelectionController(() => elements);
   // Mirrors DrawableCanvas.enterEditAtPoint: hit-test the topmost editable
   // element under the point, select it exclusively, and enter its edit mode.
@@ -123,7 +128,11 @@ function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
   });
   const canvas = {
     elements,
+    get editingElement() {
+      return editingElement;
+    },
     enterElementEdit,
+    exitElementEdit,
     enterEditAtPoint,
     getSelectedElements: () => selection.selectedElements,
     getSelectedElementBounds: () => selection.getBounds(),
@@ -138,10 +147,11 @@ function makeCanvas(elements: DrawableElement[], point: Vector2, zoom = 1) {
     transact: (fn: () => void) => fn(),
   } as unknown as DrawableCanvas;
   enterElementEdit.mockImplementation((element: DrawableElement) => {
+    editingElement = element;
     element.enterEditMode(canvas);
   });
 
-  return { canvas, enterElementEdit };
+  return { canvas, enterElementEdit, exitElementEdit };
 }
 
 afterEach(() => {
@@ -213,6 +223,40 @@ describe('SelectTool', () => {
     expect(image.isSelected).toBe(true);
     expect(enterCropMode).toHaveBeenCalledTimes(1);
     expect(enterElementEdit).toHaveBeenCalledWith(image, event);
+  });
+
+  it('applies the crop and exits crop mode on a second double-click', () => {
+    vi.stubGlobal('document', {
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    const { image } = makeImageElement();
+    const { canvas, exitElementEdit } = makeCanvas([image], { x: 10, y: 10 });
+    const tool = new SelectTool(() => catalogs.en);
+    const event = {} as PointerEvent;
+    vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1000)
+      .mockReturnValueOnce(1100)
+      .mockReturnValueOnce(2000)
+      .mockReturnValueOnce(2000)
+      .mockReturnValueOnce(2100);
+
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+    expect(image.cropMode).toBe(true);
+
+    const cancelCropMode = vi.spyOn(image, 'cancelCropMode');
+    tool.start(canvas, event);
+    tool.finish(canvas, event);
+    tool.start(canvas, event);
+
+    expect(image.cropMode).toBe(false);
+    expect(exitElementEdit).toHaveBeenCalledTimes(1);
+    expect(cancelCropMode).not.toHaveBeenCalled();
+    expect(image.isSelected).toBe(true);
   });
 
   it('uses a screen-space tolerance for double-clicks', () => {
