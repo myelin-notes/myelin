@@ -98,6 +98,7 @@ pub fn run() {
             repository_engine::repository_release,
             repository_engine::repository_auth_response,
             note_text_index::index_note_text,
+            note_text_index::list_note_bookmarks,
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
             pdf_export::export_pdf_ios,

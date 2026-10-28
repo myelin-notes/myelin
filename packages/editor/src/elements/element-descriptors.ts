@@ -1,4 +1,5 @@
 import { AudioElement } from './audio/element';
+import { BookmarkElement } from './bookmark-element';
 import { CodeOutputElement } from './code-output/element';
 import type { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
@@ -84,6 +85,12 @@ export const ELEMENT_DESCRIPTORS = [
     type: ElementType.CODE_OUTPUT,
     name: 'code-output',
     create: (uuid) => new CodeOutputElement(uuid),
+    externalSummary: 'unknown-compatible',
+  },
+  {
+    type: ElementType.BOOKMARK,
+    name: 'bookmark',
+    create: (uuid) => new BookmarkElement(uuid),
     externalSummary: 'unknown-compatible',
   },
 ] as const satisfies readonly ElementDescriptor[];

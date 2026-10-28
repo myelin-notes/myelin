@@ -160,6 +160,14 @@ export function useCanvasEngine({
         action: 'canvas:insert-embed',
         onDown: () => onInsertEmbed(),
       },
+      {
+        action: 'canvas:bookmark-previous',
+        onDown: () => drawableCanvasRef.current?.stepBookmark(-1),
+      },
+      {
+        action: 'canvas:bookmark-next',
+        onDown: () => drawableCanvasRef.current?.stepBookmark(1),
+      },
       ...toolBindings,
     ],
     [

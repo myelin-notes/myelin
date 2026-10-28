@@ -13,6 +13,7 @@ import type { YDocManager } from './ydoc-manager';
 export interface CanvasElementFactoryOptions {
   ydoc: YDocManager;
   getElements: () => readonly DrawableElement[];
+  getZoom?: () => number;
   onChange: () => void;
   invalidateContentBounds: () => void;
   requestRedraw: () => void;
@@ -92,6 +93,7 @@ export class CanvasElementFactory {
   private createContext(): CanvasElementContext {
     return {
       getElements: this.options.getElements,
+      getZoom: this.options.getZoom,
       resolveNoteLink: this.options.resolveNoteLink,
       resolveMedia: this.options.resolveMedia,
       onPageFrameRenamed: (uuid, newName, oldName) => {

@@ -7,6 +7,14 @@ export interface NoteIndexItem {
   path: string;
 }
 
+export interface NoteBookmark {
+  noteId: VFSNodeId;
+  noteName: string;
+  id: string;
+  /** Empty when the flag was placed away from any PDF page or page frame. */
+  label: string;
+}
+
 export interface RenameReferencesRequest {
   sourceIds: readonly VFSNodeId[];
   targetId: string;

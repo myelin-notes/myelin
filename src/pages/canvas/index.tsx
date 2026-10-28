@@ -59,6 +59,7 @@ import { useCanvasStyle } from '@/lib/use-canvas-style';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
+import { BookmarksChip } from './components/bookmarks-chip';
 import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasStyleButton } from './components/canvas-style-button';
@@ -89,6 +90,7 @@ interface CanvasViewProps {
   recordingOwnerId: TabId;
   initialPageFrameName?: string | null;
   initialPageFrameId?: string | null;
+  initialBookmarkId?: string | null;
 }
 
 export function CanvasView({
@@ -96,6 +98,7 @@ export function CanvasView({
   recordingOwnerId,
   initialPageFrameName,
   initialPageFrameId,
+  initialBookmarkId,
 }: CanvasViewProps) {
   return (
     <PenPresetsProvider>
@@ -104,6 +107,7 @@ export function CanvasView({
         recordingOwnerId={recordingOwnerId}
         initialPageFrameName={initialPageFrameName}
         initialPageFrameId={initialPageFrameId}
+        initialBookmarkId={initialBookmarkId}
       />
     </PenPresetsProvider>
   );
@@ -114,6 +118,7 @@ function CanvasViewInner({
   recordingOwnerId,
   initialPageFrameName: initialPageFrameNameProp,
   initialPageFrameId: initialPageFrameIdProp,
+  initialBookmarkId,
 }: CanvasViewProps) {
   const tabController = useTabController();
   const paneId = usePaneId();
@@ -304,6 +309,14 @@ function CanvasViewInner({
     targetPageFrameId,
     targetPageFrameName,
   ]);
+
+  useEffect(() => {
+    // Same session-lag guard as the page frame target above.
+    if (!engine.ready || engine.noteSession?.id !== id || !initialBookmarkId) {
+      return;
+    }
+    drawableCanvasRef.current?.focusBookmark(initialBookmarkId);
+  }, [engine.ready, engine.noteSession, id, initialBookmarkId]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {
@@ -516,6 +529,7 @@ function CanvasViewInner({
             <TooltipContent>{strings.versionHistory.title}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
+        <BookmarksChip canvas={engine.ready ? engine.drawableCanvas : null} />
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
       </>
     );
@@ -528,6 +542,7 @@ function CanvasViewInner({
     canvasDoc,
     id,
     engine.ready,
+    engine.drawableCanvas,
     liveDiscoveryPauseError,
     strings.canvas.peerSync.livePaused,
     strings.canvas.export.exportCanvasPdf,
@@ -595,10 +610,12 @@ function CanvasViewInner({
           onClose={inserts.closeCamera}
         />
       )}
+      {/* Isolated: element layers take z-indexes from element order, which must never climb over
+          the selection overlay, chrome controls or UI siblings that follow. */}
       <div
         ref={thumbnailRootRef}
         data-thumbnail-root="true"
-        className="absolute inset-0 overflow-clip bg-page"
+        className="absolute inset-0 isolate overflow-clip bg-page"
         style={surfaceStyle}
       >
         {/* Background layer: dot grid, as a repeating CSS background rather

@@ -12,6 +12,7 @@ const INDEX_DIR: &str = "NoteTextIndex";
 const TYPE_TEXT: i64 = 1;
 const TYPE_PAGE_FRAME: i64 = 3;
 const TYPE_AUDIO: i64 = 7;
+const TYPE_BOOKMARK: i64 = 9;
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize, Deserialize)]
@@ -207,6 +208,87 @@ fn extract_text(bytes: &[u8]) -> Result<String, String> {
         .join("\n\n"))
 }
 
+fn extract_bookmarks(bytes: &[u8]) -> Result<Vec<(String, String)>, String> {
+    if bytes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let doc = Doc::new();
+    let update = Update::decode_v1(bytes).map_err(|error| error.to_string())?;
+    doc.transact_mut()
+        .apply_update(update)
+        .map_err(|error| error.to_string())?;
+    let elements = doc.get_or_insert_array("elements");
+    let txn = doc.transact();
+    let mut flags = Vec::new();
+    for item in elements.iter(&txn) {
+        let Out::YMap(element) = item else { continue };
+        let field = |key: &str| match element.get(&txn, key) {
+            Some(Out::Any(value)) => Some(value),
+            _ => None,
+        };
+        if field("type").as_ref().and_then(value_i64) != Some(TYPE_BOOKMARK) {
+            continue;
+        }
+        let Some(id) = field("uuid")
+            .as_ref()
+            .and_then(value_string)
+            .map(str::to_owned)
+        else {
+            continue;
+        };
+        let label = field("label")
+            .as_ref()
+            .and_then(value_string)
+            .unwrap_or_default()
+            .to_owned();
+        flags.push((id, label));
+    }
+    Ok(flags)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookmarkSource {
+    node_id: String,
+    path: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteBookmark {
+    node_id: String,
+    id: String,
+    label: String,
+}
+
+// shortcut: decodes every note on each call, no cache; add one to the text index cache if large
+// folders get slow.
+#[tauri::command]
+pub async fn list_note_bookmarks(
+    sources: Vec<BookmarkSource>,
+) -> Result<Vec<NoteBookmark>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut bookmarks = Vec::new();
+        for source in sources {
+            // An unreadable note contributes no flags rather than failing the whole folder.
+            let Ok(flags) = std::fs::read(&source.path)
+                .map_err(|error| error.to_string())
+                .and_then(|bytes| extract_bookmarks(&bytes))
+            else {
+                continue;
+            };
+            bookmarks.extend(flags.into_iter().map(|(id, label)| NoteBookmark {
+                node_id: source.node_id.clone(),
+                id,
+                label,
+            }));
+        }
+        bookmarks
+    })
+    .await
+    .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn index_note_text(
     app: AppHandle,
@@ -277,6 +359,32 @@ mod tests {
         assert!(result.contains("standalone zebra"));
         assert!(result.contains("page frame fox"));
         assert!(result.contains("spoken otter"));
+    }
+
+    #[test]
+    fn extracts_bookmark_flags_only() {
+        let doc = Doc::new();
+        let elements = doc.get_or_insert_array("elements");
+        let mut txn = doc.transact_mut();
+        let text = elements.push_back(&mut txn, MapPrelim::default());
+        text.insert(&mut txn, "type", TYPE_TEXT);
+        text.insert(&mut txn, "uuid", "text");
+        let named = elements.push_back(&mut txn, MapPrelim::default());
+        named.insert(&mut txn, "type", 9.0);
+        named.insert(&mut txn, "uuid", "named");
+        named.insert(&mut txn, "label", "Lecture 4 · p.12");
+        let unnamed = elements.push_back(&mut txn, MapPrelim::default());
+        unnamed.insert(&mut txn, "type", 9.0);
+        unnamed.insert(&mut txn, "uuid", "unnamed");
+        let bytes = txn.encode_state_as_update_v1(&StateVector::default());
+        drop(txn);
+        assert_eq!(
+            extract_bookmarks(&bytes).unwrap(),
+            vec![
+                ("named".to_owned(), "Lecture 4 · p.12".to_owned()),
+                ("unnamed".to_owned(), String::new()),
+            ]
+        );
     }
 
     #[test]

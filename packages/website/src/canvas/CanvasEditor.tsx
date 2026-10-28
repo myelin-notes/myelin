@@ -361,11 +361,12 @@ function CanvasEditorInner() {
           wheel listener to the foreground canvas's parent and preventDefaults
           scrolling, so the toolbar must be a sibling of this stage (not a
           descendant) or its scrollable menus (e.g. the font picker) can't
-          scroll. */}
-      <div className="absolute inset-0">
+          scroll. Isolated so the element-order z-indexes stay below the
+          selection overlay and chrome controls. */}
+      <div className="absolute inset-0 isolate">
         <div ref={bgRef} style={{ zIndex: 0 }} />
 
-        {/* Page-frame chrome + ProseMirror editors (z 5, self-positioned). */}
+        {/* Page-frame chrome + ProseMirror editors (self-positioned). */}
         {canvas && (
           <PageFrameDomLayer
             drawableCanvas={canvas}
@@ -373,18 +374,14 @@ function CanvasEditorInner() {
           />
         )}
 
-        <div
-          ref={domHostRef}
-          className={`${layerClass} pointer-events-none`}
-          style={{ zIndex: 5 }}
-        />
-        <canvas ref={fgRef} className={layerClass} style={{ zIndex: 10 }} />
-        <canvas
-          ref={overlayRef}
-          className={`${layerClass} pointer-events-none`}
-          style={{ zIndex: 12 }}
-        />
+        <div ref={domHostRef} className={`${layerClass} pointer-events-none`} />
+        <canvas ref={fgRef} className={layerClass} />
       </div>
+      <canvas
+        ref={overlayRef}
+        className={`${layerClass} pointer-events-none`}
+        style={{ zIndex: 12 }}
+      />
 
       {/* Page-frame hamburger buttons opt into pointer events individually. */}
       <div

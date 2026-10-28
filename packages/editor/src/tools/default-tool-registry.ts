@@ -1,4 +1,5 @@
 import type { MessageGetter } from '../i18n/messages';
+import { BookmarkTool } from './bookmark-tool';
 import { EraserTool } from './eraser-tool';
 import { HighlighterTool } from './highlighter-tool';
 import { PenTool } from './pen-tool';
@@ -13,5 +14,6 @@ export function createDefaultTools(getStrings: MessageGetter): ITool[] {
     new HighlighterTool(getStrings),
     new EraserTool(getStrings),
     new TextTool(getStrings),
+    new BookmarkTool(getStrings),
   ];
 }
