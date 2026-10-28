@@ -8,6 +8,7 @@ import {
   insertPdfQuote,
   type PdfQuote,
 } from '@myelin/editor/elements/pdf/quote';
+import { TextElement } from '@myelin/editor/elements/text/element';
 import { useMessages } from '@myelin/editor/i18n';
 
 const SELECTION_GAP = 8;
@@ -31,6 +32,17 @@ function placeQuote(
 ): void {
   const frame = canvas.anchoring.findFrame(point);
   if (!(frame instanceof PageFrameElement)) {
+    // Plain text box: canvas text has no links, so the label stays unlinked.
+    canvas.addElement((uuid) => {
+      const element = new TextElement(
+        uuid,
+        `${quote.text}\n— ${quote.label}`,
+        {},
+        GHOST_SIZE.width,
+      );
+      element.setOffset(point.x, point.y);
+      return element;
+    });
     return;
   }
   const view = frame.pmEditor?.view;
