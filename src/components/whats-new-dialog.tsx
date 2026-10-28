@@ -3,7 +3,12 @@ import { useMessages } from '@myelin/editor/i18n';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { cn } from '@myelin/editor/utils';
 import { Button } from '@myelin/ui/button';
-import anchoringDemo from '@/assets/whats-new/anchoring.webp';
+import bookmarksDemo from '@/assets/whats-new/bookmarks.webp';
+import canvasStyleDemo from '@/assets/whats-new/canvas-style.webp';
+import pdfAnchoringDemo from '@/assets/whats-new/pdf-anchoring.webp';
+import pdfQuoteDemo from '@/assets/whats-new/pdf-quote.webp';
+import rotateDemo from '@/assets/whats-new/rotate.webp';
+import rulerDemo from '@/assets/whats-new/ruler.webp';
 import {
   Dialog,
   DialogClose,
@@ -14,14 +19,15 @@ import {
 import { useUserPref } from '@/lib/use-user-pref';
 
 // Bump whenever the pages change: anyone who dismissed an older id sees the panel again.
-export const WHATS_NEW_RELEASE = 'native-sync';
+export const WHATS_NEW_RELEASE = 'pdf-quotes-bookmarks';
 
 interface WhatsNewPage {
   title: string;
   description: string;
   /**
    * Looping demo shown above the text; animated WebP, since MP4 may lack a codec on Linux.
-   * Encode with `img2webp -mixed -q 90`: ffmpeg's lossy libwebp_anim leaves ghosting behind motion.
+   * Encode 896×578 at 30fps with `img2webp -d 33 -near_lossless 60 -q 75 -m 4`: lossy animation
+   * (ffmpeg's libwebp_anim or `-mixed`) skips small per-frame changes, so fades leave ghosts behind.
    */
   image?: string;
 }
@@ -31,8 +37,12 @@ export function WhatsNewDialog() {
   const seen = useUserPref('whatsNewSeen');
   const [index, setIndex] = useState(0);
   const pages: WhatsNewPage[] = [
-    strings.whatsNew.sync,
-    { ...strings.whatsNew.anchoring, image: anchoringDemo },
+    { ...strings.whatsNew.pdfQuote, image: pdfQuoteDemo },
+    { ...strings.whatsNew.pdfAnchoring, image: pdfAnchoringDemo },
+    { ...strings.whatsNew.bookmarks, image: bookmarksDemo },
+    { ...strings.whatsNew.canvasStyle, image: canvasStyleDemo },
+    { ...strings.whatsNew.ruler, image: rulerDemo },
+    { ...strings.whatsNew.rotate, image: rotateDemo },
   ];
   const page = pages[index];
   const last = index === pages.length - 1;

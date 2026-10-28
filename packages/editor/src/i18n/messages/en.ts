@@ -1076,15 +1076,35 @@ const en = {
     dismiss: 'Got it',
     back: 'Back',
     next: 'Next',
-    sync: {
-      title: 'Update Myelin on all your devices, or they will fail to sync.',
+    pdfQuote: {
+      title: 'Quote from PDFs',
       description:
-        'Syncing was rebuilt and older versions are no longer compatible.',
+        'Select text in a PDF and choose Quote, then tap a page to drop it in with a link back to where it came from.',
     },
-    anchoring: {
-      title: 'Anchor things to your pages',
+    pdfAnchoring: {
+      title: 'Anchor notes to PDF pages',
       description:
-        'Select an image, shape or drawing on a page and choose Anchor to page. It moves with your text as you type, and pasted images are anchored automatically.',
+        'Drawings on a PDF page stay on that page, and Anchor to page pins images and shapes to it. They follow the page when you move the PDF or switch it to Columns.',
+    },
+    bookmarks: {
+      title: 'Bookmark spots on your canvas',
+      description:
+        'Use the Bookmark tool (B) to drop a flag. Open the list of flags at the top of the canvas, or press [ and ] to jump between them.',
+    },
+    canvasStyle: {
+      title: 'Give each canvas its own style',
+      description:
+        'Pick a grid, dots, lines or your own image, and set the colors. Canvas style changes only the canvas you are on; Settings sets the default.',
+    },
+    ruler: {
+      title: 'Draw straight lines with the ruler',
+      description:
+        'Turn on the Ruler in the toolbar, drag its knob to set the angle, and draw along its edge.',
+    },
+    rotate: {
+      title: 'Rotate images, shapes and drawings',
+      description:
+        'Select one and drag the handle above it. Hold Shift to snap in 15° steps.',
     },
   },
   onboarding: {
