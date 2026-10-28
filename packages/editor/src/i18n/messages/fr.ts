@@ -269,6 +269,7 @@ const fr: typeof en = {
 
       rename: 'Renommer',
       manageTags: 'Gérer les étiquettes',
+      bookmarks: 'Signets',
       color: 'Couleur',
       versionHistory: 'Historique des versions',
       revealInFileManager: 'Afficher dans le gestionnaire de fichiers',
@@ -281,6 +282,11 @@ const fr: typeof en = {
       always: 'Toujours mettre à jour sans demander',
       yes: 'Mettre à jour',
       no: 'Ignorer',
+    },
+    bookmarksDialog: {
+      title: 'Signets',
+      empty: 'Aucun signet dans ce dossier pour le moment.',
+      loadFailed: 'Impossible de charger les signets',
     },
     tagDialog: {
       title: 'Gérer les étiquettes',
@@ -339,6 +345,8 @@ const fr: typeof en = {
         grid: 'Grille',
         dots: 'Points',
         blank: 'Vide',
+        lines: 'Lignes',
+        image: 'Image',
       },
       backgroundColor: {
         label: 'Couleur d’arrière-plan',
@@ -349,6 +357,28 @@ const fr: typeof en = {
           custom: 'Personnalisée',
         },
         confirm: 'Appliquer',
+      },
+      sections: {
+        pattern: 'Motif',
+        colors: 'Couleurs',
+      },
+      patternColor: {
+        label: 'Couleur du motif',
+        description: 'Couleur de la grille, des points ou des lignes.',
+      },
+      image: {
+        label: 'Image d’arrière-plan',
+        description:
+          'Répétée sur tout le canevas. Les grandes images sont réduites.',
+        choose: 'Choisir une image',
+        failed: 'Impossible de charger cette image',
+      },
+      perCanvas: {
+        button: 'Style du canevas',
+        followingDefault:
+          'Suit le style par défaut des Réglages. Toute modification ici s’applique uniquement à ce canevas.',
+        custom: 'Ce canevas a son propre style.',
+        reset: 'Utiliser le style par défaut',
       },
     },
     language: {
@@ -664,6 +694,18 @@ const fr: typeof en = {
           label: 'Outil Texte',
           description: 'Créer un nouveau bloc de texte',
         },
+        'canvas:tool-bookmark': {
+          label: 'Outil Signet',
+          description: 'Placer un drapeau de signet',
+        },
+        'canvas:bookmark-previous': {
+          label: 'Signet précédent',
+          description: 'Aller au signet précédent de ce canevas',
+        },
+        'canvas:bookmark-next': {
+          label: 'Signet suivant',
+          description: 'Aller au signet suivant de ce canevas',
+        },
         'canvas:insert-frame': {
           label: 'Insérer un cadre de page',
           description: 'Placer un nouveau cadre de page sur le canevas',
@@ -833,6 +875,15 @@ const fr: typeof en = {
       title: 'Liens entrants',
       linkedMentions: 'Mentions liées',
     },
+    bookmarks: {
+      title: 'Signets',
+      untitled: 'Signet',
+      pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
+      rename: 'Renommer',
+      remove: 'Supprimer',
+      previous: 'Signet précédent',
+      next: 'Signet suivant',
+    },
     toolbar: {
       clickForOptions: 'cliquez pour les options',
       customizeWheel: 'Outils et préréglages',
@@ -953,6 +1004,7 @@ const fr: typeof en = {
       highlighter: 'Surligneur',
       eraser: 'Gomme',
       text: 'Texte',
+      bookmark: 'Signet',
     },
     toolOptions: {
       color: 'Couleur',

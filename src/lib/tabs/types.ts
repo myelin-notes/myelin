@@ -12,6 +12,7 @@ export type TabTarget =
       id: VFSNodeId;
       pageFrameName?: string | null;
       pageFrameId?: string | null;
+      bookmarkId?: string | null;
     }
   | { type: 'image'; id: VFSNodeId; fileType: FileType }
   | { type: 'csv'; id: VFSNodeId }

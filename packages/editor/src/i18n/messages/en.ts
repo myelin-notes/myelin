@@ -258,6 +258,7 @@ const en = {
 
       rename: 'Rename',
       manageTags: 'Manage Tags',
+      bookmarks: 'Bookmarks',
       color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
@@ -270,6 +271,11 @@ const en = {
       always: 'Always update without asking',
       yes: 'Update',
       no: 'Skip',
+    },
+    bookmarksDialog: {
+      title: 'Bookmarks',
+      empty: 'No bookmarks in this folder yet.',
+      loadFailed: 'Could not load bookmarks',
     },
     tagDialog: {
       title: 'Manage Tags',
@@ -328,6 +334,8 @@ const en = {
         grid: 'Grid',
         dots: 'Dots',
         blank: 'Blank',
+        lines: 'Lines',
+        image: 'Image',
       },
       backgroundColor: {
         label: 'Background color',
@@ -338,6 +346,27 @@ const en = {
           custom: 'Custom',
         },
         confirm: 'Apply',
+      },
+      sections: {
+        pattern: 'Pattern',
+        colors: 'Colors',
+      },
+      patternColor: {
+        label: 'Pattern color',
+        description: 'Color of the grid, dots, or lines.',
+      },
+      image: {
+        label: 'Background image',
+        description: 'Tiled across the canvas. Large images are scaled down.',
+        choose: 'Choose image',
+        failed: 'Could not load that image',
+      },
+      perCanvas: {
+        button: 'Canvas style',
+        followingDefault:
+          'Following the default from Settings. Any change here applies to this canvas only.',
+        custom: 'This canvas has its own style.',
+        reset: 'Use default',
       },
     },
     language: {
@@ -648,6 +677,18 @@ const en = {
           label: 'Text Tool',
           description: 'Create a new text node',
         },
+        'canvas:tool-bookmark': {
+          label: 'Bookmark Tool',
+          description: 'Place a bookmark flag',
+        },
+        'canvas:bookmark-previous': {
+          label: 'Previous Bookmark',
+          description: 'Jump to the previous bookmark in this canvas',
+        },
+        'canvas:bookmark-next': {
+          label: 'Next Bookmark',
+          description: 'Jump to the next bookmark in this canvas',
+        },
         'canvas:insert-frame': {
           label: 'Insert Page Frame',
           description: 'Place a new page frame on the canvas',
@@ -815,6 +856,15 @@ const en = {
       title: 'Backlinks',
       linkedMentions: 'Linked mentions',
     },
+    bookmarks: {
+      title: 'Bookmarks',
+      untitled: 'Bookmark',
+      pdfPage: (fileName: string, page: number) => `${fileName} · p.${page}`,
+      rename: 'Rename',
+      remove: 'Remove',
+      previous: 'Previous bookmark',
+      next: 'Next bookmark',
+    },
     toolbar: {
       clickForOptions: 'click for options',
       customizeWheel: 'Tools & presets',
@@ -934,6 +984,7 @@ const en = {
       highlighter: 'Highlighter',
       eraser: 'Eraser',
       text: 'Text',
+      bookmark: 'Bookmark',
     },
     toolOptions: {
       color: 'Color',

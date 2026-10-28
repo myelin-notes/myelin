@@ -1,14 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
-import { serializeNoteElements } from '@/pages/library/export/workspace-json';
+import { invoke } from '@tauri-apps/api/core';
+import { MAX_PEN_PRESETS } from '@/lib/sync/repo/config';
+import {
+  exportWorkspaceJson,
+  serializeNoteElements,
+} from '@/pages/library/export/workspace-json';
 import {
   NOTE_JSON_VERSION,
   type NoteJson,
 } from '@/pages/library/export/workspace-json-format';
+import type { VaultFileEntry } from '@/pages/library/export/workspace-plan';
+import {
+  getRepositoryTestStorage,
+  resetRepositoryTestDoubles,
+} from '@/test/repository-test-utils';
+import { TestRepository } from '@/test/test-repository';
 import { resolveImportRootName } from './import-tree';
-import { rebuildNote } from './workspace-json';
+import { importWorkspaceJson, rebuildNote } from './workspace-json';
+
+vi.mock('@tauri-apps/api/core', () => ({
+  convertFileSrc: (path: string) => path,
+  isTauri: () => false,
+  invoke: vi.fn(),
+}));
 
 /** Find the first note-link mark's attrs anywhere in a page frame's PM content. */
 function findNoteLinkAttrs(
@@ -179,6 +196,97 @@ describe('workspace JSON round-trip', () => {
     expect(image?.get('imageData')).toEqual(
       new Uint8Array([0, 1, 2, 200, 254, 255]),
     );
+  });
+
+  it('restores folder, media and workspace settings into an existing workspace', async () => {
+    resetRepositoryTestDoubles();
+    const storage = getRepositoryTestStorage();
+    // Stands in for the Rust vault writer.
+    vi.mocked(invoke).mockImplementation(async (_command, args) => {
+      const { request } = args as {
+        request: {
+          destDir: string;
+          vaultName: string;
+          folders: string[];
+          files: VaultFileEntry[];
+        };
+      };
+      const root = `${request.destDir}/${request.vaultName}`;
+      for (const folder of request.folders) {
+        await storage.mkdir(`${root}/${folder}`, { recursive: true });
+      }
+      for (const file of request.files) {
+        const path = `${root}/${file.relPath}`;
+        if (file.text !== undefined) {
+          await storage.writeTextFile(path, file.text);
+        } else {
+          await storage.writeFile(path, await storage.readFile(file.copyFrom!));
+        }
+      }
+      return root;
+    });
+
+    const source = new TestRepository('repositories/export-source');
+    const folderId = await source.createFolder('Projects', null);
+    const photoId = await source.createFile(
+      'photo.png',
+      'png',
+      folderId,
+      new Uint8Array([1, 2, 3]),
+    );
+    await source.setFolderColor(folderId, '#ff8800');
+    await source.setTags(folderId, ['work']);
+    await source.setTags(photoId, ['img']);
+    await source.addCustomColor('#123456', 'pen');
+    await source.addPenPreset({ tool: 'pen', color: '#123456', size: 3 });
+    await source.addPenPreset({
+      tool: 'highlighter',
+      color: '#ffee00',
+      size: 9,
+    });
+    await source.addRegistryTags(['archive']);
+
+    const destination = new TestRepository('repositories/import-destination');
+    await destination.addCustomColor('#abcdef', 'pen');
+    for (let size = 1; size < MAX_PEN_PRESETS; size++) {
+      await destination.addPenPreset({ tool: 'pen', color: '#000000', size });
+    }
+
+    const { vaultPath } = await exportWorkspaceJson({
+      repository: source,
+      destDir: { kind: 'native', path: '/exports' },
+      exportName: 'Backup',
+    });
+    const result = await importWorkspaceJson({
+      repository: destination,
+      parentId: null,
+      dirPath: vaultPath,
+    });
+
+    expect(result.skippedFiles).toBe(0);
+    const [[folder]] = await destination.listDirectory(result.rootFolderId);
+    expect(folder).toMatchObject({
+      name: 'Projects',
+      color: '#ff8800',
+      tags: ['work'],
+    });
+    const [, files] = await destination.listDirectory(folder.id);
+    expect(files.find((file) => file.name === 'photo.png')).toMatchObject({
+      tags: ['img'],
+    });
+    expect(await destination.getCustomColors('pen')).toEqual([
+      '#abcdef',
+      '#123456',
+    ]);
+    // Merging stops at the cap rather than failing the import.
+    const presets = await destination.getPenPresets();
+    expect(presets).toHaveLength(MAX_PEN_PRESETS);
+    expect(presets.at(-1)).toMatchObject({
+      tool: 'pen',
+      color: '#123456',
+      size: 3,
+    });
+    expect(await destination.getRegistryTags()).toContain('archive');
   });
 });
 

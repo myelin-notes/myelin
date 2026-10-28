@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../../utils';
 import type { NoteLinkPreview, NoteLinkPreviewTarget } from './preview';
 import { NoteLinkPreviewCard } from './preview-card';
@@ -263,7 +264,9 @@ export function NoteLinkPreviewPopover({
   const noteId = state.status === 'ready' ? state.preview.noteId : null;
   const body = state.status === 'ready' ? state.preview.body : null;
 
-  return (
+  // Portaled like the other page-frame popups: the canvas layer it mounts in is an isolated
+  // stacking context, where elements and the selection overlay would cover it.
+  return createPortal(
     <div
       data-thumbnail-exclude="true"
       data-page-frame-preserve-focus
@@ -281,6 +284,7 @@ export function NoteLinkPreviewPopover({
       }}
     >
       <NoteLinkPreviewCard title={title} body={body} noteId={noteId} />
-    </div>
+    </div>,
+    document.body,
   );
 }

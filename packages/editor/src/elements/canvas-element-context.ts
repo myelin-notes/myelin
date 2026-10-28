@@ -14,6 +14,7 @@ export interface CanvasUiServices {
 
 export interface CanvasElementContext {
   getElements: () => readonly DrawableElement[];
+  getZoom?: () => number;
   resolveNoteLink?: ResolveNoteLink;
   resolveMedia?: ResolveMediaSrc;
   onPageFrameRenamed?: (uuid: string, newName: string, oldName: string) => void;

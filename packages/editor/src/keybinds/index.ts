@@ -31,6 +31,9 @@ declare module './registry' {
     'canvas:tool-highlighter': true;
     'canvas:tool-eraser': true;
     'canvas:tool-text': true;
+    'canvas:tool-bookmark': true;
+    'canvas:bookmark-previous': true;
+    'canvas:bookmark-next': true;
     'canvas:insert-frame': true;
     'canvas:insert-embed': true;
     'editor:bold': true;
@@ -87,6 +90,15 @@ registry.defineDefaults({
   },
   'canvas:tool-text': {
     key: 't',
+  },
+  'canvas:tool-bookmark': {
+    key: 'b',
+  },
+  'canvas:bookmark-previous': {
+    key: '[',
+  },
+  'canvas:bookmark-next': {
+    key: ']',
   },
   'canvas:insert-frame': {
     key: 'f',

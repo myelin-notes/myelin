@@ -435,3 +435,20 @@ it('moves a full-width anchored gap and its following text together to the next 
   expect(result.breaks).toEqual([{ pos: 15, spacer: 160, kind: 'inline' }]);
   expect(result.pageAdvances).toBe(1);
 });
+
+it('breaks after a gap that fits when the line following it overflows', () => {
+  const result = paginateParagraph(
+    [
+      { ...line(690, 770, () => 11), isAnchorGap: true },
+      line(770, 796, () => 11),
+    ],
+    10,
+    30,
+    0,
+    CONTENT_HEIGHT,
+    0,
+  );
+  expect(result.breaks).toEqual([
+    { pos: 11, spacer: 150, kind: 'inline', afterAnchorGap: true },
+  ]);
+});

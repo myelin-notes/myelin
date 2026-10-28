@@ -52,6 +52,7 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
+  isNodeWithinFolder,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -70,6 +71,7 @@ import type {
   FileVersion,
   NodeSearchResult,
   NoteBacklink,
+  NoteBookmark,
   NoteIndexItem,
   PenPreset,
   PenPresetChanges,
@@ -934,6 +936,35 @@ export class NativeRepository implements Repository {
   async getBacklinks(noteId: VFSNodeId): Promise<NoteBacklink[]> {
     const { manifest } = await this.loadMetadata();
     return getBacklinks(manifest, noteId);
+  }
+
+  /** Bookmark flags in every canvas under the folder, read from saved files. */
+  async listBookmarks(folderId: VFSNodeId): Promise<NoteBookmark[]> {
+    const { manifest } = await this.loadMetadata();
+    const sources: NoteIndexItem[] = [];
+    for (const node of Object.values(manifest.nodes)) {
+      if (
+        node.type !== 'file' ||
+        node.fileType !== 'mcanvas' ||
+        node.system ||
+        !isNodeWithinFolder(manifest, node, folderId)
+      ) {
+        continue;
+      }
+      const path = await this.getStoredAbsolutePath(node.id);
+      if (path) {
+        sources.push({ nodeId: node.id, path });
+      }
+    }
+    const flags = await invoke<
+      { nodeId: VFSNodeId; id: string; label: string }[]
+    >('list_note_bookmarks', { sources });
+    return flags.map(({ nodeId, id, label }) => ({
+      noteId: nodeId,
+      noteName: manifest.nodes[nodeId]?.name ?? '',
+      id,
+      label,
+    }));
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {

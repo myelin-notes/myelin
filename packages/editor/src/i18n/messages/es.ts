@@ -264,6 +264,7 @@ const es: typeof en = {
 
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
+      bookmarks: 'Marcadores',
       color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
@@ -276,6 +277,11 @@ const es: typeof en = {
       always: 'Actualizar siempre sin preguntar',
       yes: 'Actualizar',
       no: 'Omitir',
+    },
+    bookmarksDialog: {
+      title: 'Marcadores',
+      empty: 'Aún no hay marcadores en esta carpeta.',
+      loadFailed: 'No se pudieron cargar los marcadores',
     },
     tagDialog: {
       title: 'Administrar etiquetas',
@@ -334,6 +340,8 @@ const es: typeof en = {
         grid: 'Cuadrícula',
         dots: 'Puntos',
         blank: 'En blanco',
+        lines: 'Líneas',
+        image: 'Imagen',
       },
       backgroundColor: {
         label: 'Color de fondo',
@@ -344,6 +352,28 @@ const es: typeof en = {
           custom: 'Personalizado',
         },
         confirm: 'Aplicar',
+      },
+      sections: {
+        pattern: 'Patrón',
+        colors: 'Colores',
+      },
+      patternColor: {
+        label: 'Color del patrón',
+        description: 'Color de la cuadrícula, los puntos o las líneas.',
+      },
+      image: {
+        label: 'Imagen de fondo',
+        description:
+          'Se repite por todo el lienzo. Las imágenes grandes se reducen.',
+        choose: 'Elegir imagen',
+        failed: 'No se pudo cargar la imagen',
+      },
+      perCanvas: {
+        button: 'Estilo del lienzo',
+        followingDefault:
+          'Sigue el estilo predeterminado de Ajustes. Los cambios aquí solo afectan a este lienzo.',
+        custom: 'Este lienzo tiene su propio estilo.',
+        reset: 'Usar predeterminado',
       },
     },
     language: {
@@ -655,6 +685,18 @@ const es: typeof en = {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
         },
+        'canvas:tool-bookmark': {
+          label: 'Herramienta de marcador',
+          description: 'Colocar una bandera de marcador',
+        },
+        'canvas:bookmark-previous': {
+          label: 'Marcador anterior',
+          description: 'Ir al marcador anterior de este lienzo',
+        },
+        'canvas:bookmark-next': {
+          label: 'Marcador siguiente',
+          description: 'Ir al siguiente marcador de este lienzo',
+        },
         'canvas:insert-frame': {
           label: 'Insertar marco de página',
           description: 'Colocar un nuevo marco de página en el lienzo',
@@ -823,6 +865,15 @@ const es: typeof en = {
       title: 'Backlinks',
       linkedMentions: 'Menciones enlazadas',
     },
+    bookmarks: {
+      title: 'Marcadores',
+      untitled: 'Marcador',
+      pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
+      rename: 'Renombrar',
+      remove: 'Eliminar',
+      previous: 'Marcador anterior',
+      next: 'Marcador siguiente',
+    },
     toolbar: {
       clickForOptions: 'clic para opciones',
       customizeWheel: 'Herramientas y ajustes',
@@ -942,6 +993,7 @@ const es: typeof en = {
       highlighter: 'Resaltador',
       eraser: 'Borrador',
       text: 'Texto',
+      bookmark: 'Marcador',
     },
     toolOptions: {
       color: 'Color',

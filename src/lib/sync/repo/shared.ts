@@ -311,7 +311,7 @@ export function getNodesByAnyTag(
 }
 
 // A null `folderId` means the repository root, so every node qualifies.
-function isNodeWithinFolder(
+export function isNodeWithinFolder(
   manifest: VFSManifest,
   node: VFSNode,
   folderId: string | null,

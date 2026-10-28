@@ -43,7 +43,10 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     if (Math.abs(a[i].spacer - b[i].spacer) > SPACER_EPSILON) {
       return false;
     }
-    if (a[i].kind !== b[i].kind) {
+    if (
+      a[i].kind !== b[i].kind ||
+      a[i].afterAnchorGap !== b[i].afterAnchorGap
+    ) {
       return false;
     }
   }

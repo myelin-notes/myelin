@@ -5,12 +5,16 @@ import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
 import type { PickedFolder } from '@/lib/folder-picker';
-import type { ReadableRepository, VFSFileNode } from '@/lib/sync';
+import type { ReadableRepository, VFSFileNode, VFSNode } from '@/lib/sync';
 import {
   BYTES_MARKER,
   base64EncodeBytes,
   NOTE_JSON_VERSION,
+  type NodeMetaJson,
   type NoteJson,
+  WORKSPACE_JSON_FILE,
+  WORKSPACE_JSON_VERSION,
+  type WorkspaceJson,
 } from './workspace-json-format';
 import {
   type ExportPlan,
@@ -120,6 +124,46 @@ async function noteJson(
   return `${JSON.stringify(note, null, 2)}\n`;
 }
 
+function nodeMeta(node: VFSNode): NodeMetaJson {
+  return {
+    tags: node.tags,
+    createdAt: node.createdAt,
+    modifiedAt: node.modifiedAt,
+    color: node.type === 'folder' ? node.color : undefined,
+  };
+}
+
+async function workspaceJson(
+  repository: ReadableRepository,
+  plan: ExportPlan,
+  media: Record<string, NodeMetaJson>,
+): Promise<string> {
+  const [pen, highlighter, text, folder, penPresets, tagRegistry] =
+    await Promise.all([
+      repository.getCustomColors('pen'),
+      repository.getCustomColors('highlighter'),
+      repository.getCustomColors('text'),
+      repository.getCustomColors('folder'),
+      repository.getPenPresets(),
+      repository.getRegistryTags(),
+    ]);
+  const workspace: WorkspaceJson = {
+    version: WORKSPACE_JSON_VERSION,
+    folders: Object.fromEntries(
+      plan.folders.map((planned) => [planned.path, nodeMeta(planned.node)]),
+    ),
+    media,
+    customColors: { pen, highlighter, text, folder },
+    penPresets: penPresets.map(({ tool, color, size }) => ({
+      tool,
+      color,
+      size,
+    })),
+    tagRegistry,
+  };
+  return `${JSON.stringify(workspace, null, 2)}\n`;
+}
+
 /** Build the JSON body / source path a single file contributes, or null to skip. */
 async function buildFileEntry(
   repository: ReadableRepository,
@@ -157,6 +201,7 @@ export async function exportWorkspaceJson({
   await planFolder(repository, null, [], plan, 'json');
 
   const entries: VaultFileEntry[] = [];
+  const media: Record<string, NodeMetaJson> = {};
   let notesExported = 0;
   let filesCopied = 0;
   const total = plan.files.length;
@@ -172,16 +217,21 @@ export async function exportWorkspaceJson({
     if (built.isNote) {
       notesExported += 1;
     } else {
+      media[built.entry.relPath] = nodeMeta(file.node);
       filesCopied += 1;
     }
   }
+  entries.push({
+    relPath: WORKSPACE_JSON_FILE,
+    text: await workspaceJson(repository, plan, media),
+  });
 
   // Reuses the Obsidian vault writer: it creates the folders, writes `text`
   // files and copies `copyFrom` media into the user-picked destination.
   const vaultPath = await writeVault({
     destDir,
     vaultName: sanitizeName(exportName) || 'Workspace',
-    folders: plan.folders,
+    folders: plan.folders.map((folder) => folder.path),
     files: entries,
   });
 

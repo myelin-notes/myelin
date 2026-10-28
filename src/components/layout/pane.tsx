@@ -26,6 +26,7 @@ export const PaneContent = memo(function PaneContent({
           recordingOwnerId={tab.id}
           initialPageFrameName={tab.target.pageFrameName}
           initialPageFrameId={tab.target.pageFrameId}
+          initialBookmarkId={tab.target.bookmarkId}
         />
       );
     case 'image':
