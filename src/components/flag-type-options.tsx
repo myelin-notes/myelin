@@ -11,8 +11,9 @@ import { Logger } from '@myelin/shared/logger';
 
 const logger = new Logger('FlagTypeOptions');
 
+// No hover tint: it would stack on the row's own hover tint.
 const rowButtonClass =
-  'flex pointer-coarse:size-8 size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary';
+  'flex pointer-coarse:size-8 size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-muted transition-colors hover:text-text-primary';
 
 export function FlagTypeOptions({
   option,

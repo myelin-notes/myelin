@@ -132,16 +132,18 @@ export function FlagsChip({ canvas }: FlagsChipProps) {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-2 pb-3">
             {groups.map((group) => (
               <section key={group.type.id}>
-                <h3 className="m-0 mb-0.5 flex items-center gap-1.5 px-2 font-semibold text-[11px] text-text-muted uppercase tracking-[0.06em]">
+                <h3 className="m-0 flex items-center gap-2 px-2 py-1 font-semibold text-text-primary text-xs">
                   <Flag
-                    className="size-3 shrink-0"
-                    style={{ color: group.type.color }}
+                    className="size-3.5 shrink-0"
+                    style={{ color: group.type.color, fill: group.type.color }}
                   />
-                  <span className="truncate">{group.type.name}</span>
-                  <span className="tabular-nums">
+                  <span className="min-w-0 flex-1 truncate">
+                    {group.type.name}
+                  </span>
+                  <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
                     {formatNumber(group.flags.length, locale)}
                   </span>
                 </h3>
@@ -202,56 +204,66 @@ function FlagRow({
           }
         }}
         placeholder={labels.untitled}
-        className="w-full rounded-md bg-surface px-2 py-1.5 text-text-primary text-xs outline-none"
+        className="w-full rounded-md bg-surface py-1.5 pr-2 pl-7.5 text-text-primary text-xs outline-none"
       />
     );
   }
 
+  // No hover tint: it would stack on the row's own hover tint.
   const rowButtonClass =
-    'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary';
+    'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:text-text-primary';
   const type = resolveFlagType(types, flag.flagTypeId);
 
+  // pl-7.5 lines the name up with the group header's name, past its flag icon.
   return (
-    <div className="rounded-md transition-colors hover:bg-hover-tint">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setPicking((value) => !value)}
-          aria-label={labels.changeType}
-          aria-expanded={picking}
-          title={labels.changeType}
-          className={cn(rowButtonClass, 'ml-0.5')}
-        >
-          <Flag className="size-3" style={{ color: type?.color }} />
-        </button>
+    <div className="group rounded-md transition-colors hover:bg-hover-tint">
+      <div className="flex items-center pr-1">
         <button
           type="button"
           onClick={() => canvas.focusFlag(flag.uuid)}
-          className="min-w-0 flex-1 cursor-pointer truncate py-1.5 pr-2 text-left text-text-secondary text-xs"
+          className="min-w-0 flex-1 cursor-pointer truncate py-1.5 pr-2 pl-7.5 text-left text-text-secondary text-xs transition-colors hover:text-text-primary"
         >
           {flag.label || labels.untitled}
         </button>
-        <button
-          type="button"
-          onClick={() => setDraft(flag.label)}
-          aria-label={labels.rename}
-          title={labels.rename}
-          className={rowButtonClass}
+        <div
+          className={cn(
+            'flex items-center gap-0.5 transition-opacity',
+            !picking &&
+              'pointer-fine:opacity-0 pointer-fine:group-focus-within:opacity-100 pointer-fine:group-hover:opacity-100',
+          )}
         >
-          <Pencil className="size-3" />
-        </button>
-        <button
-          type="button"
-          onClick={() => canvas.removeElement(flag)}
-          aria-label={labels.remove}
-          title={labels.remove}
-          className={rowButtonClass}
-        >
-          <Trash2 className="size-3" />
-        </button>
+          <button
+            type="button"
+            onClick={() => setPicking((value) => !value)}
+            aria-label={labels.changeType}
+            aria-expanded={picking}
+            title={labels.changeType}
+            className={rowButtonClass}
+          >
+            <Flag className="size-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDraft(flag.label)}
+            aria-label={labels.rename}
+            title={labels.rename}
+            className={rowButtonClass}
+          >
+            <Pencil className="size-3" />
+          </button>
+          <button
+            type="button"
+            onClick={() => canvas.removeElement(flag)}
+            aria-label={labels.remove}
+            title={labels.remove}
+            className={rowButtonClass}
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
       </div>
       {picking && (
-        <div className="flex flex-wrap gap-1 px-1.5 pb-1.5">
+        <div className="flex flex-wrap gap-1 pr-1.5 pb-1.5 pl-6">
           {types.map((option) => (
             <button
               key={option.id}
