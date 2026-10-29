@@ -1085,7 +1085,7 @@ const en = {
     pdfAnchoring: {
       title: 'Anchor notes to PDF pages',
       description:
-        'Drawings on a PDF page stay on that page, and Anchor to page pins images and shapes to it. They follow the page when you move the PDF or switch it to Columns.',
+        'What you write on a PDF page is attached to that page. Move the PDF or change its layout, and your notes stay in the same spot on the page. Anchor to page pins images and shapes the same way.',
     },
     bookmarks: {
       title: 'Bookmark spots on your canvas',
