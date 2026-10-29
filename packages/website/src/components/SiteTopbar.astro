@@ -40,6 +40,12 @@ const { path } = splitLocalePath(Astro.url.pathname);
       <img src="/favicon.svg" alt="" width="24" height="24" class="size-6" />
       <Wordmark className="text-[1.1rem]" />
     </a>
+    <span
+      title={copy.topbar.betaNote}
+      class="shrink-0 rounded-md bg-surface px-1.5 py-0.5 text-[0.7rem] text-text-muted"
+    >
+      {copy.topbar.beta}
+    </span>
     {
       limitedPreview && (
         /* Hidden on phones, where it would push the Download button off screen. */

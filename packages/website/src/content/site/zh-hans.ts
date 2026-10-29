@@ -15,6 +15,8 @@ const zhHans: SiteCopy = {
     nav: '站点',
     download: '下载',
     language: '语言',
+    beta: '测试版',
+    betaNote: 'Myelin Notes 目前处于测试阶段，价格方案可能会调整。',
   },
 
   sceneLabels: {
@@ -179,7 +181,7 @@ const zhHans: SiteCopy = {
 
 ## 真的免费吗？
 
-是的，个人使用完全免费。
+是的，个人使用完全免费。Myelin Notes 目前处于测试阶段，价格方案可能会调整。
 
 ## 我的笔记保存在哪里？
 

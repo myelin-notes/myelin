@@ -127,7 +127,14 @@ interface ImportSource {
 export interface SiteCopy {
   meta: { title: string; description: string };
 
-  topbar: { nav: string; download: string; language: string };
+  topbar: {
+    nav: string;
+    download: string;
+    language: string;
+    beta: string;
+    /** Tooltip on the beta badge. */
+    betaNote: string;
+  };
 
   sceneLabels: Record<SceneId, string>;
   faqKicker: string;

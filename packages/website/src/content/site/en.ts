@@ -14,6 +14,8 @@ const en: SiteCopy = {
     nav: 'Site',
     download: 'Download',
     language: 'Language',
+    beta: 'Beta',
+    betaNote: 'Myelin Notes is in beta, and pricing plans may change.',
   },
 
   /** Section kickers on the landing page. */
@@ -187,7 +189,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes, completely free for personal use.
+Yes, completely free for personal use. Myelin Notes is in beta, so pricing plans may change.
 
 ## Where are my notes stored?
 

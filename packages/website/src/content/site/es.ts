@@ -20,6 +20,9 @@ const es: SiteCopy = {
     nav: 'Sitio',
     download: 'Descargar',
     language: 'Idioma',
+    beta: 'Beta',
+    betaNote:
+      'Myelin Notes está en beta y los planes de precios pueden cambiar.',
   },
 
   sceneLabels: {
@@ -189,7 +192,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí, totalmente gratis para uso personal.
+Sí, totalmente gratis para uso personal. Myelin Notes está en beta, así que los planes de precios pueden cambiar.
 
 ## ¿Dónde se guardan mis notas?
 
