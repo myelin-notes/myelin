@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
+import { penButtonBit } from '@myelin/editor/pen-buttons';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -10,9 +11,6 @@ const PEN_HOLD_MS = 500;
 const PEN_HOLD_SLOP = 3;
 const TOUCH_HOLD_MS = 450;
 const TOUCH_HOLD_SLOP = 10;
-// PointerEvent.buttons bit for a second barrel button, which reports as the middle button. The
-// primary barrel erases while held (the canvas owns that), so the wheel gets the one above it.
-const PEN_WHEEL_BUTTONS = 4;
 
 interface UsePageCanvasBindingsArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -56,7 +54,10 @@ export function usePageCanvasBindings({
       }
       return;
     }
-    if (event.pointerType === 'pen' && event.buttons & PEN_WHEEL_BUTTONS) {
+    if (
+      event.pointerType === 'pen' &&
+      event.buttons & penButtonBit('toolWheel')
+    ) {
       openToolWheel(event);
     }
   });

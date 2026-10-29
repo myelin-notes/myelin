@@ -1,5 +1,9 @@
 import { PenTool as PenIcon } from 'lucide-react';
-import { ADAPTIVE_INK } from '../canvas-theme';
+import {
+  ADAPTIVE_INK,
+  getCanvasPalette,
+  withCanvasAlpha,
+} from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
 import { ShapeElement } from '../elements/shape-element';
 import {
@@ -9,6 +13,7 @@ import {
 import type { MessageGetter } from '../i18n';
 import type { RulerSide } from '../ruler';
 import { recognizeShape } from '../shape-recognizer';
+import { getDevicePixelRatio } from '../utils';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 export const PEN_COLORS = [
@@ -50,6 +55,7 @@ export class PenTool implements ITool {
   private dwellDueAt = 0;
   // Decided on the stroke's first point; `undefined` until then.
   private rulerSide: RulerSide | null | undefined = undefined;
+  private penHovering = false;
 
   get id(): ToolId {
     return 'pen';
@@ -246,7 +252,26 @@ export class PenTool implements ITool {
     }
   }
 
-  public drawCursor(_ctx: CanvasRenderingContext2D, _position: Vector2): void {}
+  // Only a hovering pen: the last contact point of a pen that can't hover would keep an outline.
+  public hover(
+    _canvas: DrawableCanvas,
+    _position: Vector2,
+    event: PointerEvent,
+  ): void {
+    this.penHovering = event.pointerType === 'pen' && event.buttons === 0;
+  }
+
+  public drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void {
+    if (!this.penHovering) {
+      return;
+    }
+    ctx.strokeStyle = withCanvasAlpha(getCanvasPalette().selectionStroke, 0.7);
+    // 1 CSS px at any zoom: the transform's scale is devicePixelRatio × zoom.
+    ctx.lineWidth = getDevicePixelRatio() / ctx.getTransform().a;
+    ctx.beginPath();
+    ctx.arc(position.x, position.y, this.size / 2, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
 
   get icon(): SvgIcon {
     return PenIcon;

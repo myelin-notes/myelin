@@ -58,7 +58,7 @@ export interface ITool {
    */
   abort?(canvas: DrawableCanvas): void;
   drawCursor(ctx: CanvasRenderingContext2D, position: Vector2): void;
-  hover?(canvas: DrawableCanvas, position: Vector2): void;
+  hover?(canvas: DrawableCanvas, position: Vector2, event: PointerEvent): void;
   get icon(): SvgIcon;
   get label(): string;
   getOptions?(): ToolOption[];

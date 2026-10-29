@@ -378,6 +378,24 @@ const zhHans: typeof en = {
         description:
           '按下手写笔按钮后立即切换到橡皮擦。关闭后，抬起手写笔时才应用切换。',
       },
+      penButtons: {
+        label: '笔按钮',
+        description:
+          '点击一个操作，然后按下要使用的笔按钮。如果没有反应，请在数位板驱动中将该按钮设为“中键单击”。',
+        actions: {
+          eraser: '按住时擦除',
+          toolWheel: '打开工具轮盘',
+          pan: '按住时平移',
+        },
+        buttons: {
+          1: '中键',
+          2: '右键',
+          3: '后退',
+          4: '前进',
+        },
+        pressButton: '按下笔按钮…',
+        notPen: '这是鼠标，不是笔',
+      },
     },
     pageFrameEditing: {
       title: '页面框编辑',

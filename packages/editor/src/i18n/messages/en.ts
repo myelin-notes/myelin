@@ -390,6 +390,24 @@ const en = {
         description:
           'Switch to the eraser as soon as the pen button is pressed. When off, apply the switch after the pen lifts.',
       },
+      penButtons: {
+        label: 'Pen buttons',
+        description:
+          'Click an action, then press the pen button for it. If nothing happens, set that button to Middle Click in your tablet driver.',
+        actions: {
+          eraser: 'Erase while held',
+          toolWheel: 'Open tool wheel',
+          pan: 'Pan while held',
+        },
+        buttons: {
+          1: 'Middle click',
+          2: 'Right click',
+          3: 'Back',
+          4: 'Forward',
+        },
+        pressButton: 'Press a pen button...',
+        notPen: 'That was a mouse, not a pen',
+      },
     },
     pageFrameEditing: {
       title: 'Page Frame Editing',
