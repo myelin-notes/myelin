@@ -10,6 +10,7 @@ import type {
   CustomColorTool,
   FileType,
   FileVersion,
+  FlagType,
   NodeSearchResult,
   NoteBacklink,
   PenPreset,
@@ -31,6 +32,7 @@ export interface VFSManifest {
   colors: Record<CustomColorTool, string[]>;
   tagRegistry: string[];
   penPresets: PenPreset[];
+  flagTypes: FlagType[];
 }
 
 export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
@@ -53,6 +55,7 @@ export function createEmptyManifest(): VFSManifest {
     colors: { pen: [], highlighter: [], text: [], folder: [] },
     tagRegistry: [],
     penPresets: [],
+    flagTypes: [],
   };
 }
 

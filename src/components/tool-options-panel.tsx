@@ -8,6 +8,7 @@ import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
+import { FlagTypeOptions } from '@/components/flag-type-options';
 import { FontSizeField } from '@/components/font-size-field';
 import { Switch } from '@/components/ui/switch';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
@@ -267,6 +268,10 @@ export function ToolOptionsPanel({
               </div>
             </div>
           );
+        }
+
+        if (option.type === 'flag') {
+          return <FlagTypeOptions key={option.key} option={option} />;
         }
 
         if (option.type === 'toggle') {

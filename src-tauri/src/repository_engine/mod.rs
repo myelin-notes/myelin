@@ -79,6 +79,7 @@ struct RepositoryPreferences {
     colors: Value,
     tag_registry: Vec<String>,
     pen_presets: Vec<Value>,
+    flag_types: Vec<Value>,
 }
 
 #[derive(Deserialize)]
@@ -597,6 +598,7 @@ impl RepositoryOperation {
                         ("colors", "sync-custom-colors"),
                         ("tagRegistry", "sync-tag-registry"),
                         ("penPresets", "sync-pen-presets"),
+                        ("flagTypes", "sync-flag-types"),
                     ] {
                         if state.manifest[field] != settings[field] {
                             state.manifest[field] = settings[field].clone();

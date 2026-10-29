@@ -59,7 +59,7 @@ fn metadata_patch(previous: &Value, next: &Value) -> MetadataPatch {
         "nodes":next["nodes"].as_object().unwrap().iter().filter(|(id,node)| previous["nodes"][*id] != **node || previous["linksBySource"][*id] != next["linksBySource"][*id])
             .map(|(id,node)|json!({"node":node,"links":next["linksBySource"][id].as_array().cloned().unwrap_or_default()})).collect::<Vec<_>>(),
         "deletedNodeIds":previous["nodes"].as_object().unwrap().keys().filter(|id|next["nodes"][*id].is_null()).collect::<Vec<_>>(),
-        "settings":{"colors":next["colors"],"tagRegistry":next["tagRegistry"],"penPresets":next["penPresets"]}
+        "settings":{"colors":next["colors"],"tagRegistry":next["tagRegistry"],"penPresets":next["penPresets"],"flagTypes":next["flagTypes"]}
     })).unwrap()
 }
 
@@ -766,6 +766,28 @@ async fn failed_durability_blocks_more_writes_then_replays_the_delta_on_reopen()
 }
 
 #[tokio::test]
+async fn flag_types_persist_normalized_and_stay_queued_across_reopen() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["flagTypes"] = json!([
+        {"id": "todo", "name": "To-do", "color": "EF4444"},
+        {"id": "bad", "name": "Bad", "color": "red"}
+    ]);
+    save_manifest(&engine, manifest).await;
+    let reopened = Store::open(directory.0.join("data"), true).unwrap();
+    assert_eq!(
+        reopened.manifest["flagTypes"],
+        json!([{"id": "todo", "name": "To-do", "color": "#ef4444"}])
+    );
+    assert!(reopened
+        .outbox
+        .iter()
+        .any(|op| op["kind"] == "sync-flag-types"));
+}
+
+#[tokio::test]
 async fn corrupt_outbox_is_quarantined_and_pauses_cloud_without_losing_local_files() {
     let directory = TestDirectory::new();
     let engine = directory.engine(true);
@@ -1091,6 +1113,7 @@ async fn native_metadata_deletes_and_head_conflict_retry_preserve_remote_nodes_a
     let mut manifest = saved["manifest"].clone();
     manifest["nodes"]["folder"]["name"] = json!("Renamed");
     manifest["tagRegistry"] = json!(["native/tag"]);
+    manifest["flagTypes"] = json!([{"id": "todo", "name": "Exam", "color": "#22c55e"}]);
     save_manifest(&engine, manifest).await;
     {
         let mut remote = state.lock().unwrap();
@@ -1124,6 +1147,10 @@ async fn native_metadata_deletes_and_head_conflict_retry_preserve_remote_nodes_a
     assert_eq!(
         state.lock().unwrap().manifest["tagRegistry"],
         json!(["native/tag"])
+    );
+    assert_eq!(
+        state.lock().unwrap().manifest["flagTypes"],
+        json!([{"id": "todo", "name": "Exam", "color": "#22c55e"}])
     );
     let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     let mut manifest = saved["manifest"].clone();

@@ -8,7 +8,7 @@ export type ToolId =
   | 'highlighter'
   | 'eraser'
   | 'text'
-  | 'bookmark';
+  | 'flag';
 
 export interface FontEntry {
   family: string;
@@ -43,7 +43,9 @@ export type ToolOption =
   | (ToolOptionBase<'choice', string> & {
       choices: { value: string; label: string; icon?: LucideIcon }[];
     })
-  | ToolOptionBase<'toggle', boolean>;
+  | ToolOptionBase<'toggle', boolean>
+  /** The active flag type id; the host lists and edits the user's flag types itself. */
+  | ToolOptionBase<'flag', string>;
 
 export interface ITool {
   get id(): ToolId;
@@ -78,6 +80,7 @@ export function setToolOptionValue(
     case 'color':
     case 'font':
     case 'choice':
+    case 'flag':
       if (typeof value !== 'string') {
         return false;
       }

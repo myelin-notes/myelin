@@ -1,20 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Flag, Pencil, Trash2, X } from 'lucide-react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
-import type { BookmarkElement } from '@myelin/editor/elements/bookmark-element';
+import {
+  type FlagElement,
+  resolveFlagType,
+} from '@myelin/editor/elements/flag-element';
+import { useFlagTypes } from '@myelin/editor/flag-types';
 import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
+import type { FlagType } from '@myelin/editor/sync/repo/types';
 import { cn } from '@myelin/editor/utils';
 import { usePresence } from '@myelin/ui';
 
-interface BookmarksChipProps {
+interface FlagsChipProps {
   canvas: DrawableCanvas | null;
 }
 
-export function BookmarksChip({ canvas }: BookmarksChipProps) {
+export function FlagsChip({ canvas }: FlagsChipProps) {
   const strings = useMessages();
   const locale = useLocale();
-  const [flags, setFlags] = useState<BookmarkElement[]>([]);
+  const { types } = useFlagTypes();
+  const [flags, setFlags] = useState<FlagElement[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const presence = usePresence(open);
@@ -24,8 +30,8 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
       setFlags([]);
       return;
     }
-    setFlags(canvas.bookmarks);
-    return canvas.onChange(() => setFlags(canvas.bookmarks));
+    setFlags(canvas.flags);
+    return canvas.onChange(() => setFlags(canvas.flags));
   }, [canvas]);
 
   useEffect(() => {
@@ -56,10 +62,18 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
     return null;
   }
 
-  const labels = strings.canvas.bookmarks;
+  const labels = strings.canvas.flags;
   const countLabel = formatNumber(flags.length, locale);
   const navButtonClass =
     'flex size-6 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary';
+  const groups = types
+    .map((type) => ({
+      type,
+      flags: flags.filter(
+        (flag) => resolveFlagType(types, flag.flagTypeId) === type,
+      ),
+    }))
+    .filter((group) => group.flags.length > 0);
 
   return (
     <div ref={containerRef} className="relative">
@@ -92,7 +106,7 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
             </h2>
             <button
               type="button"
-              onClick={() => canvas.stepBookmark(-1)}
+              onClick={() => canvas.stepFlag(-1)}
               aria-label={labels.previous}
               title={labels.previous}
               className={navButtonClass}
@@ -101,7 +115,7 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
             </button>
             <button
               type="button"
-              onClick={() => canvas.stepBookmark(1)}
+              onClick={() => canvas.stepFlag(1)}
               aria-label={labels.next}
               title={labels.next}
               className={navButtonClass}
@@ -118,9 +132,31 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
             </button>
           </div>
 
-          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-            {flags.map((flag) => (
-              <BookmarkRow key={flag.uuid} canvas={canvas} flag={flag} />
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-3">
+            {groups.map((group) => (
+              <section key={group.type.id}>
+                <h3 className="m-0 mb-0.5 flex items-center gap-1.5 px-2 font-semibold text-[11px] text-text-muted uppercase tracking-[0.06em]">
+                  <Flag
+                    className="size-3 shrink-0"
+                    style={{ color: group.type.color }}
+                  />
+                  <span className="truncate">{group.type.name}</span>
+                  <span className="tabular-nums">
+                    {formatNumber(group.flags.length, locale)}
+                  </span>
+                </h3>
+                <div className="space-y-0.5">
+                  {group.flags.map((flag) => (
+                    <FlagRow
+                      key={flag.uuid}
+                      canvas={canvas}
+                      flag={flag}
+                      types={types}
+                      onTypeChanged={() => setFlags(canvas.flags)}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         </div>
@@ -129,15 +165,20 @@ export function BookmarksChip({ canvas }: BookmarksChipProps) {
   );
 }
 
-function BookmarkRow({
+function FlagRow({
   canvas,
   flag,
+  types,
+  onTypeChanged,
 }: {
   canvas: DrawableCanvas;
-  flag: BookmarkElement;
+  flag: FlagElement;
+  types: FlagType[];
+  onTypeChanged: () => void;
 }) {
-  const labels = useMessages().canvas.bookmarks;
+  const labels = useMessages().canvas.flags;
   const [draft, setDraft] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   if (draft !== null) {
     const commit = () => {
@@ -168,34 +209,75 @@ function BookmarkRow({
 
   const rowButtonClass =
     'flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary';
+  const type = resolveFlagType(types, flag.flagTypeId);
 
   return (
-    <div className="flex items-center gap-1 rounded-md transition-colors hover:bg-hover-tint">
-      <button
-        type="button"
-        onClick={() => canvas.focusBookmark(flag.uuid)}
-        className="min-w-0 flex-1 cursor-pointer truncate px-2 py-1.5 text-left text-text-secondary text-xs"
-      >
-        {flag.label || labels.untitled}
-      </button>
-      <button
-        type="button"
-        onClick={() => setDraft(flag.label)}
-        aria-label={labels.rename}
-        title={labels.rename}
-        className={rowButtonClass}
-      >
-        <Pencil className="size-3" />
-      </button>
-      <button
-        type="button"
-        onClick={() => canvas.removeElement(flag)}
-        aria-label={labels.remove}
-        title={labels.remove}
-        className={rowButtonClass}
-      >
-        <Trash2 className="size-3" />
-      </button>
+    <div className="rounded-md transition-colors hover:bg-hover-tint">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setPicking((value) => !value)}
+          aria-label={labels.changeType}
+          aria-expanded={picking}
+          title={labels.changeType}
+          className={cn(rowButtonClass, 'ml-0.5')}
+        >
+          <Flag className="size-3" style={{ color: type?.color }} />
+        </button>
+        <button
+          type="button"
+          onClick={() => canvas.focusFlag(flag.uuid)}
+          className="min-w-0 flex-1 cursor-pointer truncate py-1.5 pr-2 text-left text-text-secondary text-xs"
+        >
+          {flag.label || labels.untitled}
+        </button>
+        <button
+          type="button"
+          onClick={() => setDraft(flag.label)}
+          aria-label={labels.rename}
+          title={labels.rename}
+          className={rowButtonClass}
+        >
+          <Pencil className="size-3" />
+        </button>
+        <button
+          type="button"
+          onClick={() => canvas.removeElement(flag)}
+          aria-label={labels.remove}
+          title={labels.remove}
+          className={rowButtonClass}
+        >
+          <Trash2 className="size-3" />
+        </button>
+      </div>
+      {picking && (
+        <div className="flex flex-wrap gap-1 px-1.5 pb-1.5">
+          {types.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={option === type}
+              onClick={() => {
+                setPicking(false);
+                if (option !== type) {
+                  flag.setFlagTypeId(option.id);
+                  onTypeChanged();
+                }
+              }}
+              className={cn(
+                'flex max-w-full cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary',
+                option === type && 'bg-surface text-text-primary',
+              )}
+            >
+              <Flag
+                className="size-3 shrink-0"
+                style={{ color: option.color }}
+              />
+              <span className="truncate">{option.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

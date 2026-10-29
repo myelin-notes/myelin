@@ -264,7 +264,7 @@ const es: typeof en = {
 
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
-      bookmarks: 'Marcadores',
+      flags: 'Banderas',
       color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
@@ -278,10 +278,10 @@ const es: typeof en = {
       yes: 'Actualizar',
       no: 'Omitir',
     },
-    bookmarksDialog: {
-      title: 'Marcadores',
-      empty: 'Aún no hay marcadores en esta carpeta.',
-      loadFailed: 'No se pudieron cargar los marcadores',
+    flagsDialog: {
+      title: 'Banderas',
+      empty: 'Aún no hay banderas en esta carpeta.',
+      loadFailed: 'No se pudieron cargar las banderas',
     },
     tagDialog: {
       title: 'Administrar etiquetas',
@@ -685,17 +685,17 @@ const es: typeof en = {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
         },
-        'canvas:tool-bookmark': {
-          label: 'Herramienta de marcador',
-          description: 'Colocar una bandera de marcador',
+        'canvas:tool-flag': {
+          label: 'Herramienta de bandera',
+          description: 'Colocar una bandera',
         },
-        'canvas:bookmark-previous': {
-          label: 'Marcador anterior',
-          description: 'Ir al marcador anterior de este lienzo',
+        'canvas:flag-previous': {
+          label: 'Bandera anterior',
+          description: 'Ir a la bandera anterior de este lienzo',
         },
-        'canvas:bookmark-next': {
-          label: 'Marcador siguiente',
-          description: 'Ir al siguiente marcador de este lienzo',
+        'canvas:flag-next': {
+          label: 'Bandera siguiente',
+          description: 'Ir a la siguiente bandera de este lienzo',
         },
         'canvas:insert-frame': {
           label: 'Insertar marco de página',
@@ -865,14 +865,24 @@ const es: typeof en = {
       title: 'Backlinks',
       linkedMentions: 'Menciones enlazadas',
     },
-    bookmarks: {
-      title: 'Marcadores',
-      untitled: 'Marcador',
+    flags: {
+      title: 'Banderas',
+      untitled: 'Bandera',
       pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
       rename: 'Renombrar',
       remove: 'Eliminar',
-      previous: 'Marcador anterior',
-      next: 'Marcador siguiente',
+      previous: 'Bandera anterior',
+      next: 'Bandera siguiente',
+      changeType: 'Cambiar tipo de bandera',
+    },
+    flagTypes: {
+      todo: 'Pendiente',
+      review: 'Revisar',
+      examinable: 'Evaluable',
+      newFlag: 'Nueva bandera',
+      edit: 'Editar bandera',
+      remove: 'Eliminar bandera',
+      name: 'Nombre de la bandera',
     },
     toolbar: {
       clickForOptions: 'clic para opciones',
@@ -994,7 +1004,7 @@ const es: typeof en = {
       highlighter: 'Resaltador',
       eraser: 'Borrador',
       text: 'Texto',
-      bookmark: 'Marcador',
+      flag: 'Bandera',
     },
     toolOptions: {
       color: 'Color',
@@ -1015,6 +1025,7 @@ const es: typeof en = {
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
       increaseFontSize: 'Aumentar tamaño de fuente',
+      flagType: 'Bandera',
     },
     embedComposer: {
       dropToEmbed: 'Soltar para insertar',
@@ -1098,10 +1109,10 @@ const es: typeof en = {
       description:
         'Lo que dibujas en una página de un PDF se queda en esa página, y Anclar a la página fija en ella imágenes y formas. Siguen a la página cuando mueves el PDF o lo cambias a Columnas.',
     },
-    bookmarks: {
+    flags: {
       title: 'Marca lugares en tu lienzo',
       description:
-        'Usa la herramienta Marcador (B) para poner una bandera. Abre la lista de banderas en la parte superior del lienzo o pulsa [ y ] para saltar entre ellas.',
+        'Usa la herramienta Bandera (B) para poner una bandera. Abre la lista de banderas en la parte superior del lienzo o pulsa [ y ] para saltar entre ellas.',
     },
     canvasStyle: {
       title: 'Un estilo para cada lienzo',

@@ -38,6 +38,7 @@ export interface RepositoryPreferences {
   colors: VFSManifest['colors'];
   tagRegistry: string[];
   penPresets: VFSManifest['penPresets'];
+  flagTypes: VFSManifest['flagTypes'];
 }
 
 export interface MetadataPatch {

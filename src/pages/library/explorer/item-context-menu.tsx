@@ -21,7 +21,7 @@ interface ItemContextMenuProps {
   onRemove: () => void;
   onReveal?: () => void;
   onManageTags?: () => void;
-  onShowBookmarks?: () => void;
+  onShowFlags?: () => void;
   onVersionHistory?: () => void;
   createSubmenu?: ReactNode;
   /** Extra items rendered after Manage Tags. */
@@ -34,7 +34,7 @@ export function ItemContextMenu({
   onRemove,
   onReveal,
   onManageTags,
-  onShowBookmarks,
+  onShowFlags,
   onVersionHistory,
   createSubmenu,
   children,
@@ -67,13 +67,13 @@ export function ItemContextMenu({
           {strings.library.itemMenu.manageTags}
         </ContextMenuItem>
       )}
-      {onShowBookmarks && (
+      {onShowFlags && (
         <ContextMenuItem
           className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
-          onClick={onShowBookmarks}
+          onClick={onShowFlags}
         >
           <Flag className="size-4" />
-          {strings.library.itemMenu.bookmarks}
+          {strings.library.itemMenu.flags}
         </ContextMenuItem>
       )}
       {children}

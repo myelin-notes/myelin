@@ -4,11 +4,11 @@ import {
   AnchorableElement,
   type PageFrameAnchor,
 } from '../elements/anchorable-element';
-import { BookmarkElement } from '../elements/bookmark-element';
 import type {
   DrawableElement,
   SelectionToolbarItem,
 } from '../elements/drawable-element';
+import { FlagElement } from '../elements/flag-element';
 import {
   PAGE_GAP,
   PAGE_PADDING,
@@ -628,7 +628,7 @@ export class PageFrameAnchoring {
     };
     // PDF pages don't reflow, so there is no space to make; a flag is a point marker.
     if (
-      element instanceof BookmarkElement ||
+      element instanceof FlagElement ||
       (element.pageAnchor
         ? element.pageAnchor.kind === 'pdf'
         : frame instanceof PdfElement)

@@ -13,7 +13,7 @@ const TYPE_TEXT: i64 = 1;
 const TYPE_PAGE_FRAME: i64 = 3;
 const TYPE_PDF: i64 = 4;
 const TYPE_AUDIO: i64 = 7;
-const TYPE_BOOKMARK: i64 = 9;
+const TYPE_FLAG: i64 = 9;
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Serialize, Deserialize)]
@@ -215,7 +215,8 @@ fn extract_text(bytes: &[u8]) -> Result<String, String> {
         .join("\n\n"))
 }
 
-fn extract_bookmarks(bytes: &[u8]) -> Result<Vec<(String, String)>, String> {
+/// `(id, label, flag type id)` per flag.
+fn extract_flags(bytes: &[u8]) -> Result<Vec<(String, String, String)>, String> {
     if bytes.is_empty() {
         return Ok(Vec::new());
     }
@@ -233,7 +234,7 @@ fn extract_bookmarks(bytes: &[u8]) -> Result<Vec<(String, String)>, String> {
             Some(Out::Any(value)) => Some(value),
             _ => None,
         };
-        if field("type").as_ref().and_then(value_i64) != Some(TYPE_BOOKMARK) {
+        if field("type").as_ref().and_then(value_i64) != Some(TYPE_FLAG) {
             continue;
         }
         let Some(id) = field("uuid")
@@ -243,54 +244,56 @@ fn extract_bookmarks(bytes: &[u8]) -> Result<Vec<(String, String)>, String> {
         else {
             continue;
         };
-        let label = field("label")
-            .as_ref()
-            .and_then(value_string)
-            .unwrap_or_default()
-            .to_owned();
-        flags.push((id, label));
+        let string = |key: &str| {
+            field(key)
+                .as_ref()
+                .and_then(value_string)
+                .unwrap_or_default()
+                .to_owned()
+        };
+        flags.push((id, string("label"), string("flagTypeId")));
     }
     Ok(flags)
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BookmarkSource {
+pub struct FlagSource {
     node_id: String,
     path: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct NoteBookmark {
+pub struct NoteFlag {
     node_id: String,
     id: String,
     label: String,
+    flag_type_id: String,
 }
 
 // shortcut: decodes every note on each call, no cache; add one to the text index cache if large
 // folders get slow.
 #[tauri::command]
-pub async fn list_note_bookmarks(
-    sources: Vec<BookmarkSource>,
-) -> Result<Vec<NoteBookmark>, String> {
+pub async fn list_note_flags(sources: Vec<FlagSource>) -> Result<Vec<NoteFlag>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut bookmarks = Vec::new();
+        let mut note_flags = Vec::new();
         for source in sources {
             // An unreadable note contributes no flags rather than failing the whole folder.
             let Ok(flags) = std::fs::read(&source.path)
                 .map_err(|error| error.to_string())
-                .and_then(|bytes| extract_bookmarks(&bytes))
+                .and_then(|bytes| extract_flags(&bytes))
             else {
                 continue;
             };
-            bookmarks.extend(flags.into_iter().map(|(id, label)| NoteBookmark {
+            note_flags.extend(flags.into_iter().map(|(id, label, flag_type_id)| NoteFlag {
                 node_id: source.node_id.clone(),
                 id,
                 label,
+                flag_type_id,
             }));
         }
-        bookmarks
+        note_flags
     })
     .await
     .map_err(|error| error.to_string())
@@ -377,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn extracts_bookmark_flags_only() {
+    fn extracts_flags_only() {
         let doc = Doc::new();
         let elements = doc.get_or_insert_array("elements");
         let mut txn = doc.transact_mut();
@@ -388,16 +391,21 @@ mod tests {
         named.insert(&mut txn, "type", 9.0);
         named.insert(&mut txn, "uuid", "named");
         named.insert(&mut txn, "label", "Lecture 4 · p.12");
+        named.insert(&mut txn, "flagTypeId", "todo");
         let unnamed = elements.push_back(&mut txn, MapPrelim::default());
         unnamed.insert(&mut txn, "type", 9.0);
         unnamed.insert(&mut txn, "uuid", "unnamed");
         let bytes = txn.encode_state_as_update_v1(&StateVector::default());
         drop(txn);
         assert_eq!(
-            extract_bookmarks(&bytes).unwrap(),
+            extract_flags(&bytes).unwrap(),
             vec![
-                ("named".to_owned(), "Lecture 4 · p.12".to_owned()),
-                ("unnamed".to_owned(), String::new()),
+                (
+                    "named".to_owned(),
+                    "Lecture 4 · p.12".to_owned(),
+                    "todo".to_owned()
+                ),
+                ("unnamed".to_owned(), String::new(), String::new()),
             ]
         );
     }

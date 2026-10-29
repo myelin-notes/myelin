@@ -14,6 +14,7 @@ export interface CanvasElementFactoryOptions {
   ydoc: YDocManager;
   getElements: () => readonly DrawableElement[];
   getZoom?: () => number;
+  getFlagColor?: (flagTypeId: string) => string | undefined;
   onChange: () => void;
   invalidateContentBounds: () => void;
   requestRedraw: () => void;
@@ -94,6 +95,7 @@ export class CanvasElementFactory {
     return {
       getElements: this.options.getElements,
       getZoom: this.options.getZoom,
+      getFlagColor: this.options.getFlagColor,
       resolveNoteLink: this.options.resolveNoteLink,
       resolveMedia: this.options.resolveMedia,
       onPageFrameRenamed: (uuid, newName, oldName) => {

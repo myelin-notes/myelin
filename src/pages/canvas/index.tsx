@@ -31,6 +31,7 @@ import {
   PDF_QUOTE_OPEN_REQUEST_EVENT,
 } from '@myelin/editor/events';
 import type { ExportTarget } from '@myelin/editor/export/export-controller';
+import { useFlagTypes } from '@myelin/editor/flag-types';
 import { useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
@@ -64,7 +65,6 @@ import { useCanvasStyle } from '@/lib/use-canvas-style';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
-import { BookmarksChip } from './components/bookmarks-chip';
 import { CameraCapture } from './components/camera-capture';
 import { CanvasSearch } from './components/canvas-search';
 import { CanvasStyleButton } from './components/canvas-style-button';
@@ -72,6 +72,7 @@ import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
+import { FlagsChip } from './components/flags-chip';
 import { PdfQuoteButton } from './components/pdf-quote-button';
 import { PeerSyncPanel } from './components/peer-sync-panel';
 import { SelectionToolbar } from './components/selection-toolbar';
@@ -96,7 +97,7 @@ interface CanvasViewProps {
   recordingOwnerId: TabId;
   initialPageFrameName?: string | null;
   initialPageFrameId?: string | null;
-  initialBookmarkId?: string | null;
+  initialFlagId?: string | null;
 }
 
 export function CanvasView({
@@ -104,7 +105,7 @@ export function CanvasView({
   recordingOwnerId,
   initialPageFrameName,
   initialPageFrameId,
-  initialBookmarkId,
+  initialFlagId,
 }: CanvasViewProps) {
   return (
     <PenPresetsProvider>
@@ -113,7 +114,7 @@ export function CanvasView({
         recordingOwnerId={recordingOwnerId}
         initialPageFrameName={initialPageFrameName}
         initialPageFrameId={initialPageFrameId}
-        initialBookmarkId={initialBookmarkId}
+        initialFlagId={initialFlagId}
       />
     </PenPresetsProvider>
   );
@@ -124,12 +125,13 @@ function CanvasViewInner({
   recordingOwnerId,
   initialPageFrameName: initialPageFrameNameProp,
   initialPageFrameId: initialPageFrameIdProp,
-  initialBookmarkId,
+  initialFlagId,
 }: CanvasViewProps) {
   const tabController = useTabController();
   const paneId = usePaneId();
   const repository = useRepository();
   const strings = useMessages();
+  const { types: flagTypes } = useFlagTypes();
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgHostRef = useRef<HTMLDivElement>(null);
@@ -226,6 +228,11 @@ function CanvasViewInner({
     canvas.setRulerVisible(!rulerVisible);
     setRulerCanvas(rulerVisible ? null : canvas);
   }, [engine.drawableCanvas, rulerVisible]);
+
+  useEffect(() => {
+    engine.drawableCanvas?.setFlagTypes(flagTypes);
+  }, [engine.drawableCanvas, flagTypes]);
+
   const onExportCanvasPdf = useCallback(() => {
     const canvas = drawableCanvasRef.current;
     if (!canvas) {
@@ -318,11 +325,11 @@ function CanvasViewInner({
 
   useEffect(() => {
     // Same session-lag guard as the page frame target above.
-    if (!engine.ready || engine.noteSession?.id !== id || !initialBookmarkId) {
+    if (!engine.ready || engine.noteSession?.id !== id || !initialFlagId) {
       return;
     }
-    drawableCanvasRef.current?.focusBookmark(initialBookmarkId);
-  }, [engine.ready, engine.noteSession, id, initialBookmarkId]);
+    drawableCanvasRef.current?.focusFlag(initialFlagId);
+  }, [engine.ready, engine.noteSession, id, initialFlagId]);
 
   const importMarkdownFile = useCallback(
     async (file: File) => {
@@ -561,7 +568,7 @@ function CanvasViewInner({
             <TooltipContent>{strings.versionHistory.title}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <BookmarksChip canvas={engine.ready ? engine.drawableCanvas : null} />
+        <FlagsChip canvas={engine.ready ? engine.drawableCanvas : null} />
         <BacklinksChip noteId={id} onOpenSource={handleOpenBacklinkSource} />
       </>
     );

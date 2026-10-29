@@ -17,6 +17,14 @@ export interface PenPreset {
   size: number;
 }
 
+/** A user-defined flag category, such as a red "To-do". Flags reference it by `id`. */
+export interface FlagType {
+  id: string;
+  name: string;
+  /** Normalized hex. */
+  color: string;
+}
+
 /** Partial edit. Absent fields are left as they are. */
 export interface PenPresetChanges {
   color?: string;
@@ -209,6 +217,10 @@ export interface Repository {
   updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
   reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]>;
   removePenPreset(id: string): Promise<PenPreset[]>;
+
+  /** Empty until the user first edits the list; callers show the default types meanwhile. */
+  getFlagTypes(): Promise<FlagType[]>;
+  setFlagTypes(types: readonly FlagType[]): Promise<FlagType[]>;
 
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;

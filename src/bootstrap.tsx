@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { CustomColorsProvider } from '@myelin/editor/custom-colors';
+import { FlagTypesProvider } from '@myelin/editor/flag-types';
 import { I18nProvider } from '@myelin/editor/i18n';
 import { setPlatform } from '@myelin/editor/platform';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
@@ -50,7 +51,9 @@ try {
       <I18nProvider>
         <RepositoryProvider>
           <CustomColorsProvider>
-            <App />
+            <FlagTypesProvider>
+              <App />
+            </FlagTypesProvider>
           </CustomColorsProvider>
         </RepositoryProvider>
       </I18nProvider>

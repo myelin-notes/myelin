@@ -461,7 +461,7 @@ impl Store {
                     self.mark_node(id);
                 }
             }
-            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" => {
+            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types" => {
                 self.dirty_settings = true
             }
             _ => {}
@@ -653,7 +653,9 @@ fn valid_op(op: &Value) -> bool {
                         .all(|id| id.as_str().is_some_and(valid_component))
                 })
         }
-        Some("sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets") => true,
+        Some(
+            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types",
+        ) => true,
         _ => false,
     }
 }
