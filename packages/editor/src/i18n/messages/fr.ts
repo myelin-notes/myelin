@@ -273,7 +273,6 @@ const fr: typeof en = {
 
       rename: 'Renommer',
       manageTags: 'Gérer les étiquettes',
-      flags: 'Drapeaux',
       color: 'Couleur',
       versionHistory: 'Historique des versions',
       revealInFileManager: 'Afficher dans le gestionnaire de fichiers',
@@ -300,7 +299,6 @@ const fr: typeof en = {
   flagsPage: {
     title: 'Drapeaux',
     searchPlaceholder: 'Rechercher drapeaux, notes, dossiers...',
-    allFolders: 'Afficher tous les dossiers',
     empty: 'Aucun drapeau pour le moment.',
     allTypes: 'Tous',
     noMatches: 'Aucun drapeau ne correspond.',

@@ -268,7 +268,6 @@ const es: typeof en = {
 
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
-      flags: 'Banderas',
       color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
@@ -295,7 +294,6 @@ const es: typeof en = {
   flagsPage: {
     title: 'Banderas',
     searchPlaceholder: 'Buscar banderas, notas, carpetas...',
-    allFolders: 'Mostrar todas las carpetas',
     empty: 'Aún no hay banderas.',
     allTypes: 'Todas',
     noMatches: 'Ninguna bandera coincide.',

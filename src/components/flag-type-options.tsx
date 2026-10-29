@@ -56,7 +56,7 @@ export function FlagTypeOptions({
     );
   // Flags of a deleted type would silently resolve to the first remaining type, so they go too.
   const remove = (type: FlagType) => {
-    repository.listFlags(null).then(
+    repository.listFlags().then(
       (flags) => {
         const used = flags.filter(
           (flag) => resolveFlagType(types, flag.flagTypeId)?.id === type.id,

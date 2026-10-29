@@ -262,7 +262,6 @@ const en = {
 
       rename: 'Rename',
       manageTags: 'Manage Tags',
-      flags: 'Flags',
       color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
@@ -289,7 +288,6 @@ const en = {
   flagsPage: {
     title: 'Flags',
     searchPlaceholder: 'Search flags, notes, folders...',
-    allFolders: 'Show all folders',
     empty: 'No flags yet.',
     allTypes: 'All',
     noMatches: 'No flags match.',

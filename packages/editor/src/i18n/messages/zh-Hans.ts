@@ -251,7 +251,6 @@ const zhHans: typeof en = {
 
       rename: '重命名',
       manageTags: '管理标签',
-      flags: '旗标',
       color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
@@ -278,7 +277,6 @@ const zhHans: typeof en = {
   flagsPage: {
     title: '旗标',
     searchPlaceholder: '搜索旗标、笔记、文件夹...',
-    allFolders: '显示所有文件夹',
     empty: '还没有旗标。',
     allTypes: '全部',
     noMatches: '没有匹配的旗标。',

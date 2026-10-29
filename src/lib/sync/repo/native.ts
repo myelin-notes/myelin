@@ -52,7 +52,6 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
-  isNodeWithinFolder,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -940,17 +939,12 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
-  /** Flags in every canvas under the folder, or the whole repository for `null`, read from saved files. */
-  async listFlags(folderId: VFSNodeId | null): Promise<NoteFlag[]> {
+  /** Flags in every canvas, read from saved files. */
+  async listFlags(): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
     const sources: NoteIndexItem[] = [];
     for (const node of Object.values(manifest.nodes)) {
-      if (
-        node.type !== 'file' ||
-        node.fileType !== 'mcanvas' ||
-        node.system ||
-        !isNodeWithinFolder(manifest, node, folderId)
-      ) {
+      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
         continue;
       }
       const path = await this.getStoredAbsolutePath(node.id);

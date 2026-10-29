@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight, Flag, Folder, Search, X } from 'lucide-react';
+import { ChevronRight, Flag, Search, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { resolveFlagType } from '@myelin/editor/elements/flag-element';
 import { useFlagTypes } from '@myelin/editor/flag-types';
@@ -62,12 +62,11 @@ export function FlagsPage() {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const folderId = filter.folder?.id ?? null;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: dataVersion and reloadKey are change triggers
   useEffect(() => {
     let cancelled = false;
-    repository.listFlags(folderId).then(
+    repository.listFlags().then(
       (next) => {
         if (!cancelled) {
           setFlags(next);
@@ -75,7 +74,7 @@ export function FlagsPage() {
         }
       },
       (error) => {
-        logger.error('Failed to list flags', error, { folderId });
+        logger.error('Failed to list flags', error);
         if (!cancelled) {
           setFailed(true);
         }
@@ -84,7 +83,7 @@ export function FlagsPage() {
     return () => {
       cancelled = true;
     };
-  }, [folderId, repository, dataVersion, reloadKey]);
+  }, [repository, dataVersion, reloadKey]);
 
   const query = filter.query.trim().toLocaleLowerCase();
   // Ignores ids of types deleted since they were picked, which would otherwise hide every flag.
@@ -171,36 +170,19 @@ export function FlagsPage() {
             {labels.title}
           </h1>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex h-9 min-w-48 flex-1 items-center gap-2 rounded-xl bg-card px-3 ring-1 ring-border-subtle/70 focus-within:ring-accent-dark/15">
-              <Search className="size-3.5 shrink-0 text-text-muted" />
-              <input
-                type="text"
-                value={filter.query}
-                onChange={(event) =>
-                  setFlagsFilter({ query: event.target.value })
-                }
-                placeholder={labels.searchPlaceholder}
-                aria-label={labels.searchPlaceholder}
-                className="w-full min-w-0 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
-              />
-            </label>
-            {filter.folder && (
-              <span className="flex h-9 max-w-60 items-center gap-1.5 rounded-xl bg-surface pr-1 pl-3 text-sm text-text-primary">
-                <Folder className="size-3.5 shrink-0 text-text-muted" />
-                <span className="truncate">{filter.folder.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setFlagsFilter({ folder: null })}
-                  aria-label={labels.allFolders}
-                  title={labels.allFolders}
-                  className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            )}
-          </div>
+          <label className="flex h-9 items-center gap-2 rounded-xl bg-card px-3 ring-1 ring-border-subtle/70 focus-within:ring-accent-dark/15">
+            <Search className="size-3.5 shrink-0 text-text-muted" />
+            <input
+              type="text"
+              value={filter.query}
+              onChange={(event) =>
+                setFlagsFilter({ query: event.target.value })
+              }
+              placeholder={labels.searchPlaceholder}
+              aria-label={labels.searchPlaceholder}
+              className="w-full min-w-0 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+            />
+          </label>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <button

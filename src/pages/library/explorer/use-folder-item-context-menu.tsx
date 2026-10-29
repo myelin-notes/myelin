@@ -4,8 +4,6 @@ import { useCustomColors } from '@myelin/editor/custom-colors';
 import { Logger } from '@myelin/shared/logger';
 import type { VFSFolderNode } from '@/lib/sync';
 import { useRepository } from '@/lib/sync';
-import { useTabController } from '@/lib/tabs/context';
-import { setFlagsFilter } from '@/pages/flags/filter';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { FolderColorSubmenu } from './folder-color-submenu';
 import { DEFAULT_FOLDER_COLOR } from './folder-colors';
@@ -32,7 +30,6 @@ export function useFolderItemContextMenu(
   },
 ) {
   const repository = useRepository();
-  const tabController = useTabController();
   const { addColor } = useCustomColors('folder');
   const [menuOpen, setMenuOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -76,14 +73,6 @@ export function useFolderItemContextMenu(
       onRename={startRenaming}
       onRemove={handleRemove}
       onManageTags={() => setTagDialogOpen(true)}
-      onShowFlags={() => {
-        setFlagsFilter({
-          folder: { id: node.id, name: node.name },
-          query: '',
-          typeIds: [],
-        });
-        tabController.showPanePage('flags');
-      }}
       createSubmenu={options?.createSubmenu}
     >
       <FolderColorSubmenu
