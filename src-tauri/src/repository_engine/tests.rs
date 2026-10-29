@@ -2013,6 +2013,79 @@ async fn native_imports_store_bytes_before_publishing() {
     assert_eq!(read(&engine, "import").await, bytes);
 }
 
+fn flag_summary(doc: &yrs::Doc) -> Vec<(String, f64, String)> {
+    let txn = doc.transact();
+    txn.get_array("elements")
+        .unwrap()
+        .iter(&txn)
+        .filter_map(|value| {
+            let Out::YMap(element) = value else {
+                return None;
+            };
+            let field = |key| match element.get(&txn, key) {
+                Some(Out::Any(Any::String(value))) => value.to_string(),
+                _ => String::new(),
+            };
+            let Some(Out::Any(Any::Number(kind))) = element.get(&txn, "type") else {
+                return None;
+            };
+            Some((field("uuid"), kind, field("flagTypeId")))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn native_flag_edits_reach_the_saved_file_and_open_editors() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let original = yrs::Doc::new();
+    let elements = original.get_or_insert_array("elements");
+    {
+        let mut txn = original.transact_mut();
+        for (uuid, kind) in [("a", 1.0), ("a", 9.0), ("b", 9.0), ("c", 9.0)] {
+            let element = elements.push_back(&mut txn, yrs::MapPrelim::default());
+            element.insert(&mut txn, "type", kind);
+            element.insert(&mut txn, "uuid", uuid);
+            element.insert(&mut txn, "flagTypeId", "todo");
+        }
+    }
+    let bytes = document::bytes(&original);
+    seed(&engine, "note", "mcanvas", bytes.clone()).await;
+    let (_, removed) = engine
+        .operate(RepositoryOperation::EditFlags {
+            flag_ids: HashMap::from([("note".into(), HashSet::from(["a".into()]))]),
+            edit: flags::FlagEdit::Remove,
+        })
+        .await
+        .unwrap();
+    let (_, retyped) = engine
+        .operate(RepositoryOperation::EditFlags {
+            flag_ids: HashMap::from([
+                ("note".into(), HashSet::from(["b".into()])),
+                ("missing".into(), HashSet::from(["b".into()])),
+            ]),
+            edit: flags::FlagEdit::SetType {
+                flag_type_id: "review".into(),
+            },
+        })
+        .await
+        .unwrap();
+    let expected = vec![
+        ("a".to_owned(), 1.0, "todo".to_owned()),
+        ("b".to_owned(), 9.0, "review".to_owned()),
+        ("c".to_owned(), 9.0, "todo".to_owned()),
+    ];
+    // Flag listings read this file without the journal, so the edit must not wait in a delta.
+    let saved = fs::read(directory.0.join("data/files/note.myelin")).unwrap();
+    assert_eq!(flag_summary(&document::decode(&saved).unwrap()), expected);
+    let open_editor = document::decode(&bytes).unwrap();
+    for change in removed.documents.iter().chain(&retyped.documents) {
+        document::apply(&open_editor, &change.bytes).unwrap();
+    }
+    assert_eq!(flag_summary(&open_editor), expected);
+    assert_eq!(retyped.changed, vec!["note".to_owned()]);
+}
+
 #[tokio::test]
 async fn native_reference_renames_update_text_marks_indexes_and_mergeable_deltas_without_replacing_documents(
 ) {

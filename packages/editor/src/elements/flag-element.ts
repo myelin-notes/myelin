@@ -11,8 +11,8 @@ const DEFAULT_FLAG_COLOR = '#ef4444';
 const FLAG_BOX = new DOMRect(-4, -28, 22, 32);
 
 /**
- * Unknown ids (deleted types, flags from before types) fall back to the first type, so deleting a
- * type moves its flags there. `undefined` only when `types` is empty.
+ * Unknown ids (types deleted on another device, flags from before types) fall back to the first
+ * type. `undefined` only when `types` is empty.
  */
 export function resolveFlagType(
   types: readonly FlagType[],

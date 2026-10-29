@@ -24,6 +24,15 @@ struct TextRecord {
     text: String,
 }
 
+// Separate from `TextRecord` so listing flags never parses a note's (possibly huge) text.
+#[derive(Serialize, Deserialize)]
+struct FlagRecord {
+    schema_version: u32,
+    source_size: u64,
+    source_modified_ns: u64,
+    flags: Vec<(String, String, String)>,
+}
+
 fn cache_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Result<PathBuf, String> {
     for (label, value) in [("repo id", repo_id), ("node id", node_id)] {
         if value.is_empty()
@@ -84,18 +93,60 @@ fn index_file_at(cache_file: &Path, source: &Path, force: bool) -> Result<String
         source_modified_ns: stamp.1,
         text: text.clone(),
     };
-    if let Some(parent) = cache_file.parent() {
+    write_atomic(
+        cache_file,
+        &serde_json::to_vec(&record).map_err(|error| error.to_string())?,
+    )?;
+    Ok(text)
+}
+
+fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
     }
-    let temporary = cache_file.with_extension(format!(
+    let temporary = path.with_extension(format!(
         "{}.{}.tmp",
         std::process::id(),
         NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
     ));
-    let json = serde_json::to_vec(&record).map_err(|error| error.to_string())?;
-    std::fs::write(&temporary, json).map_err(|error| error.to_string())?;
-    std::fs::rename(&temporary, cache_file).map_err(|error| error.to_string())?;
-    Ok(text)
+    std::fs::write(&temporary, bytes).map_err(|error| error.to_string())?;
+    std::fs::rename(&temporary, path).map_err(|error| error.to_string())
+}
+
+fn flags_cache_path(text_cache: PathBuf) -> PathBuf {
+    text_cache.with_extension("flags.json")
+}
+
+/// Without a `cache_file` (the index hasn't started yet) the note is decoded every call.
+fn flags_at(
+    cache_file: Option<&Path>,
+    source: &Path,
+) -> Result<Vec<(String, String, String)>, String> {
+    let stamp = source_stamp(source)?;
+    if let Some(record) = cache_file
+        .and_then(|path| std::fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice::<FlagRecord>(&bytes).ok())
+        .filter(|record| {
+            record.schema_version == SCHEMA_VERSION
+                && (record.source_size, record.source_modified_ns) == stamp
+        })
+    {
+        return Ok(record.flags);
+    }
+    let flags = extract_flags(&std::fs::read(source).map_err(|error| error.to_string())?)?;
+    if let Some(cache_file) = cache_file {
+        let record = FlagRecord {
+            schema_version: SCHEMA_VERSION,
+            source_size: stamp.0,
+            source_modified_ns: stamp.1,
+            flags: flags.clone(),
+        };
+        // Best-effort: an unwritable cache only costs the next call a decode.
+        if let Ok(json) = serde_json::to_vec(&record) {
+            let _ = write_atomic(cache_file, &json);
+        }
+    }
+    Ok(flags)
 }
 
 fn index_file(
@@ -272,18 +323,21 @@ pub struct NoteFlag {
     flag_type_id: String,
 }
 
-// shortcut: decodes every note on each call, no cache; add one to the text index cache if large
-// folders get slow.
 #[tauri::command]
-pub async fn list_note_flags(sources: Vec<FlagSource>) -> Result<Vec<NoteFlag>, String> {
+pub async fn list_note_flags(
+    app: AppHandle,
+    repo_id: Option<String>,
+    sources: Vec<FlagSource>,
+) -> Result<Vec<NoteFlag>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut note_flags = Vec::new();
         for source in sources {
+            let cache_file = repo_id
+                .as_deref()
+                .and_then(|repo_id| cache_path(&app, repo_id, &source.node_id).ok())
+                .map(flags_cache_path);
             // An unreadable note contributes no flags rather than failing the whole folder.
-            let Ok(flags) = std::fs::read(&source.path)
-                .map_err(|error| error.to_string())
-                .and_then(|bytes| extract_flags(&bytes))
-            else {
+            let Ok(flags) = flags_at(cache_file.as_deref(), Path::new(&source.path)) else {
                 continue;
             };
             note_flags.extend(flags.into_iter().map(|(id, label, flag_type_id)| NoteFlag {
@@ -320,11 +374,14 @@ pub async fn remove_note_text_index(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = cache_path(&app, &repo_id, &node_id)?;
-        match std::fs::remove_file(path) {
-            Ok(()) => Ok(()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(error) => Err(error.to_string()),
+        for path in [flags_cache_path(path.clone()), path] {
+            match std::fs::remove_file(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.to_string()),
+            }
         }
+        Ok(())
     })
     .await
     .map_err(|error| error.to_string())?
@@ -408,6 +465,43 @@ mod tests {
                 ("unnamed".to_owned(), String::new(), String::new()),
             ]
         );
+    }
+
+    fn flag_note(flag_type_id: &str) -> Vec<u8> {
+        let doc = Doc::new();
+        let elements = doc.get_or_insert_array("elements");
+        let mut txn = doc.transact_mut();
+        let flag = elements.push_back(&mut txn, MapPrelim::default());
+        flag.insert(&mut txn, "type", 9.0);
+        flag.insert(&mut txn, "uuid", "flag");
+        flag.insert(&mut txn, "flagTypeId", flag_type_id);
+        txn.encode_state_as_update_v1(&StateVector::default())
+    }
+
+    #[test]
+    fn serves_cached_flags_until_the_note_is_saved() {
+        let dir =
+            std::env::temp_dir().join(format!("myelin-flag-cache-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("note.mcanvas");
+        let cache = dir.join("note.flags.json");
+        std::fs::write(&source, flag_note("todo")).unwrap();
+        let todo = vec![("flag".to_owned(), String::new(), "todo".to_owned())];
+        assert_eq!(flags_at(Some(&cache), &source).unwrap(), todo);
+
+        // A hit must not decode the note, so a planted record is served verbatim.
+        let mut record: FlagRecord =
+            serde_json::from_slice(&std::fs::read(&cache).unwrap()).unwrap();
+        record.flags.clear();
+        std::fs::write(&cache, serde_json::to_vec(&record).unwrap()).unwrap();
+        assert!(flags_at(Some(&cache), &source).unwrap().is_empty());
+
+        std::fs::write(&source, flag_note("review-later")).unwrap();
+        assert_eq!(
+            flags_at(Some(&cache), &source).unwrap()[0].2,
+            "review-later"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

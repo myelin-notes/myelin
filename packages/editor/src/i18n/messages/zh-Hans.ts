@@ -58,6 +58,10 @@ const zhHans: typeof en = {
         label: '打开关系图谱',
         description: '呈现画布笔记之间的显式链接',
       },
+      openFlags: {
+        label: '打开旗标',
+        description: '浏览并清理笔记中的旗标',
+      },
       importMarkdown: {
         label: '导入 Markdown',
         description: '从 Markdown 文件创建画布',
@@ -261,11 +265,6 @@ const zhHans: typeof en = {
       yes: '更新',
       no: '跳过',
     },
-    flagsDialog: {
-      title: '旗标',
-      empty: '此文件夹中还没有旗标。',
-      loadFailed: '无法加载旗标',
-    },
     tagDialog: {
       title: '管理标签',
       description: (name: string) => `${name} 的标签`,
@@ -275,6 +274,22 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称…',
     },
+  },
+  flagsPage: {
+    title: '旗标',
+    searchPlaceholder: '搜索旗标、笔记、文件夹...',
+    allFolders: '显示所有文件夹',
+    empty: '还没有旗标。',
+    allTypes: '全部',
+    noMatches: '没有匹配的旗标。',
+    loadFailed: '无法加载旗标',
+    selectAll: '全选',
+    selected: (count: number) => `已选择 ${count} 个`,
+    changeType: '更改类型',
+    delete: '删除',
+    deleteTitle: (count: number) => `删除 ${count} 个旗标？`,
+    deleteDescription: '它们将从所在笔记中移除。',
+    editFailed: '无法更新旗标',
   },
   graph: {
     title: '关系图谱',
@@ -852,6 +867,10 @@ const zhHans: typeof en = {
       edit: '编辑旗标',
       remove: '删除旗标',
       name: '旗标名称',
+      removeTitle: (name: string) => `删除“${name}”？`,
+      removeDescription: (count: number) =>
+        `有 ${count} 个旗标使用此类型，它们也会从笔记中删除。`,
+      removeConfirm: '删除',
     },
     toolbar: {
       clickForOptions: '点击查看选项',

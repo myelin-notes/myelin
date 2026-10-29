@@ -69,6 +69,7 @@ import type {
   FileImportSource,
   FileType,
   FileVersion,
+  FlagEdit,
   FlagType,
   NodeSearchResult,
   NoteBacklink,
@@ -939,8 +940,8 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
-  /** Flags in every canvas under the folder, read from saved files. */
-  async listFlags(folderId: VFSNodeId): Promise<NoteFlag[]> {
+  /** Flags in every canvas under the folder, or the whole repository for `null`, read from saved files. */
+  async listFlags(folderId: VFSNodeId | null): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
     const sources: NoteIndexItem[] = [];
     for (const node of Object.values(manifest.nodes)) {
@@ -959,14 +960,41 @@ export class NativeRepository implements Repository {
     }
     const flags = await invoke<
       { nodeId: VFSNodeId; id: string; label: string; flagTypeId: string }[]
-    >('list_note_flags', { sources });
-    return flags.map(({ nodeId, id, label, flagTypeId }) => ({
-      noteId: nodeId,
-      noteName: manifest.nodes[nodeId]?.name ?? '',
-      id,
-      label,
-      flagTypeId,
-    }));
+    >('list_note_flags', {
+      repoId: noteContentIndex.repoIdFor(this),
+      sources,
+    });
+    return flags.map(({ nodeId, id, label, flagTypeId }) => {
+      const note = manifest.nodes[nodeId];
+      const folderPath: string[] = [];
+      for (
+        let folder = note && manifest.nodes[note.parentId ?? ''];
+        folder;
+        folder = manifest.nodes[folder.parentId ?? '']
+      ) {
+        folderPath.unshift(folder.name);
+      }
+      return {
+        noteId: nodeId,
+        noteName: note?.name ?? '',
+        folderPath,
+        noteModifiedAt: note?.modifiedAt ?? 0,
+        id,
+        label,
+        flagTypeId,
+      };
+    });
+  }
+
+  async editFlags(
+    flags: readonly Pick<NoteFlag, 'noteId' | 'id'>[],
+    edit: FlagEdit,
+  ): Promise<void> {
+    const flagIds: Record<VFSNodeId, string[]> = {};
+    for (const flag of flags) {
+      (flagIds[flag.noteId] ??= []).push(flag.id);
+    }
+    await this.operation({ kind: 'edit-flags', flagIds, edit });
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {

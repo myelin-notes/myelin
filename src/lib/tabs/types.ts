@@ -2,7 +2,7 @@ import type { FileType, VFSNodeId } from '@/lib/sync';
 
 export type TabId = string;
 export type PaneId = string;
-export type PanePage = 'graph' | 'settings';
+export type PanePage = 'graph' | 'flags' | 'settings';
 
 export type TabTarget =
   | { type: 'graph' }

@@ -61,6 +61,10 @@ const fr: typeof en = {
         description:
           'Cartographier les liens explicites entre les notes canevas',
       },
+      openFlags: {
+        label: 'Ouvrir les drapeaux',
+        description: 'Parcourir et nettoyer les drapeaux de vos notes',
+      },
       importMarkdown: {
         label: 'Importer du Markdown',
         description: 'Créer un canevas à partir d’un fichier Markdown',
@@ -283,11 +287,6 @@ const fr: typeof en = {
       yes: 'Mettre à jour',
       no: 'Ignorer',
     },
-    flagsDialog: {
-      title: 'Drapeaux',
-      empty: 'Aucun drapeau dans ce dossier pour le moment.',
-      loadFailed: 'Impossible de charger les drapeaux',
-    },
     tagDialog: {
       title: 'Gérer les étiquettes',
       description: (name: string) => `Étiquettes de ${name}`,
@@ -297,6 +296,24 @@ const fr: typeof en = {
       createNew: 'Créer une étiquette',
       placeholder: 'Nom de l’étiquette...',
     },
+  },
+  flagsPage: {
+    title: 'Drapeaux',
+    searchPlaceholder: 'Rechercher drapeaux, notes, dossiers...',
+    allFolders: 'Afficher tous les dossiers',
+    empty: 'Aucun drapeau pour le moment.',
+    allTypes: 'Tous',
+    noMatches: 'Aucun drapeau ne correspond.',
+    loadFailed: 'Impossible de charger les drapeaux',
+    selectAll: 'Tout sélectionner',
+    selected: (count: number) =>
+      `${count} ${count === 1 ? 'sélectionné' : 'sélectionnés'}`,
+    changeType: 'Changer le type',
+    delete: 'Supprimer',
+    deleteTitle: (count: number) =>
+      `Supprimer ${count} ${count === 1 ? 'drapeau' : 'drapeaux'} ?`,
+    deleteDescription: 'Ils seront retirés de leurs notes.',
+    editFailed: 'Impossible de mettre à jour les drapeaux',
   },
   graph: {
     title: 'Graphe',
@@ -893,6 +910,12 @@ const fr: typeof en = {
       edit: 'Modifier le drapeau',
       remove: 'Supprimer le drapeau',
       name: 'Nom du drapeau',
+      removeTitle: (name: string) => `Supprimer « ${name} » ?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 drapeau utilise ce type. Il sera aussi supprimé de vos notes.'
+          : `${count} drapeaux utilisent ce type. Ils seront aussi supprimés de vos notes.`,
+      removeConfirm: 'Supprimer',
     },
     toolbar: {
       clickForOptions: 'cliquez pour les options',

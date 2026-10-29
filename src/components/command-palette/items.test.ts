@@ -18,6 +18,7 @@ function commandIdsForPage(currentPage: CommandPalettePage): string[] {
     canRefreshRepository: false,
     createNote: async () => {},
     openGraph: () => {},
+    openFlags: () => {},
     openPalette: () => {},
     refreshRepository: async () => {},
     triggerKeybindingAction: () => {},
@@ -52,6 +53,7 @@ describe('createCommandPaletteItems', () => {
       'open-note',
       'create-note',
       'open-graph',
+      'open-flags',
     ]);
   });
 
@@ -72,6 +74,7 @@ describe('createCommandPaletteItems', () => {
       canRefreshRepository: true,
       createNote: async () => {},
       openGraph: () => {},
+      openFlags: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
       triggerKeybindingAction: () => {},
@@ -103,6 +106,7 @@ describe('createCommandPaletteItems', () => {
       canRefreshRepository: false,
       createNote: async () => {},
       openGraph: () => {},
+      openFlags: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
       triggerKeybindingAction: (action) => triggered.push(action),
@@ -137,6 +141,7 @@ describe('createCommandPaletteItems', () => {
       canRefreshRepository: false,
       createNote: async () => {},
       openGraph: () => opened.push('graph'),
+      openFlags: () => {},
       openPalette: () => {},
       refreshRepository: async () => {},
       triggerKeybindingAction: () => {},

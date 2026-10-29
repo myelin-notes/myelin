@@ -167,6 +167,11 @@ export function useCommandPalette(): {
     }
   }, [closePalette, strings.graph.title, tabController]);
 
+  const openFlags = useCallback(() => {
+    closePalette();
+    tabController.showPanePage('flags');
+  }, [closePalette, tabController]);
+
   const triggerLibraryMarkdownImport = useCallback(async () => {
     closePalette();
     const file = await pickMarkdownFile();
@@ -285,6 +290,7 @@ export function useCommandPalette(): {
         canRefreshRepository,
         createNote,
         openGraph,
+        openFlags,
         openPalette,
         refreshRepository,
         triggerKeybindingAction,
@@ -299,6 +305,7 @@ export function useCommandPalette(): {
       isImportingMarkdown,
       isRefreshingRepository,
       openGraph,
+      openFlags,
       openPalette,
       refreshRepository,
       strings,

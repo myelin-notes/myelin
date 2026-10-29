@@ -59,6 +59,10 @@ const es: typeof en = {
         label: 'Abrir grafo',
         description: 'Mapear enlaces explícitos entre notas de lienzo',
       },
+      openFlags: {
+        label: 'Abrir banderas',
+        description: 'Explorar y limpiar las banderas de tus notas',
+      },
       importMarkdown: {
         label: 'Importar Markdown',
         description: 'Crear un lienzo desde un archivo Markdown',
@@ -278,11 +282,6 @@ const es: typeof en = {
       yes: 'Actualizar',
       no: 'Omitir',
     },
-    flagsDialog: {
-      title: 'Banderas',
-      empty: 'Aún no hay banderas en esta carpeta.',
-      loadFailed: 'No se pudieron cargar las banderas',
-    },
     tagDialog: {
       title: 'Administrar etiquetas',
       description: (name: string) => `Etiquetas en ${name}`,
@@ -292,6 +291,24 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+  },
+  flagsPage: {
+    title: 'Banderas',
+    searchPlaceholder: 'Buscar banderas, notas, carpetas...',
+    allFolders: 'Mostrar todas las carpetas',
+    empty: 'Aún no hay banderas.',
+    allTypes: 'Todas',
+    noMatches: 'Ninguna bandera coincide.',
+    loadFailed: 'No se pudieron cargar las banderas',
+    selectAll: 'Seleccionar todo',
+    selected: (count: number) =>
+      `${count} ${count === 1 ? 'seleccionada' : 'seleccionadas'}`,
+    changeType: 'Cambiar tipo',
+    delete: 'Eliminar',
+    deleteTitle: (count: number) =>
+      `¿Eliminar ${count} ${count === 1 ? 'bandera' : 'banderas'}?`,
+    deleteDescription: 'Se quitarán de sus notas.',
+    editFailed: 'No se pudieron actualizar las banderas',
   },
   graph: {
     title: 'Grafo',
@@ -883,6 +900,12 @@ const es: typeof en = {
       edit: 'Editar bandera',
       remove: 'Eliminar bandera',
       name: 'Nombre de la bandera',
+      removeTitle: (name: string) => `¿Eliminar «${name}»?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 bandera usa este tipo. También se eliminará de tus notas.'
+          : `${count} banderas usan este tipo. También se eliminarán de tus notas.`,
+      removeConfirm: 'Eliminar',
     },
     toolbar: {
       clickForOptions: 'clic para opciones',

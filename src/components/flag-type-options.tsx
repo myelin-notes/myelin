@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Flag, Pencil, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { resolveFlagType } from '@myelin/editor/elements/flag-element';
 import { FLAG_COLORS, useFlagTypes } from '@myelin/editor/flag-types';
@@ -8,6 +9,19 @@ import type { FlagType } from '@myelin/editor/sync/repo/types';
 import type { ToolOption } from '@myelin/editor/tools/tool';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
+import { errorDescription } from '@/components/command-palette/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { useRepository } from '@/lib/sync';
+import type { NoteFlag } from '@/lib/sync/repo/types';
 
 const logger = new Logger('FlagTypeOptions');
 
@@ -20,9 +34,15 @@ export function FlagTypeOptions({
 }: {
   option: Extract<ToolOption, { type: 'flag' }>;
 }) {
-  const labels = useMessages().canvas.flagTypes;
+  const strings = useMessages();
+  const labels = strings.canvas.flagTypes;
+  const repository = useRepository();
   const { types, setTypes } = useFlagTypes();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<{
+    type: FlagType;
+    flags: NoteFlag[];
+  } | null>(null);
   const active = resolveFlagType(types, option.value);
 
   const save = (next: FlagType[]) => {
@@ -34,6 +54,40 @@ export function FlagTypeOptions({
     save(
       types.map((type) => (type.id === id ? { ...type, ...changes } : type)),
     );
+  // Flags of a deleted type would silently resolve to the first remaining type, so they go too.
+  const remove = (type: FlagType) => {
+    repository.listFlags(null).then(
+      (flags) => {
+        const used = flags.filter(
+          (flag) => resolveFlagType(types, flag.flagTypeId)?.id === type.id,
+        );
+        if (used.length === 0) {
+          save(types.filter((candidate) => candidate.id !== type.id));
+        } else {
+          setPendingRemoval({ type, flags: used });
+        }
+      },
+      (error) => {
+        logger.error('Failed to list flags', error);
+      },
+    );
+  };
+  const confirmRemoval = () => {
+    if (!pendingRemoval) {
+      return;
+    }
+    const { type, flags } = pendingRemoval;
+    setPendingRemoval(null);
+    repository.editFlags(flags, { action: 'remove' }).then(
+      () => save(types.filter((candidate) => candidate.id !== type.id)),
+      (error) => {
+        logger.error('Failed to delete flags of a removed type', error);
+        toast.error(strings.flagsPage.editFailed, {
+          description: errorDescription(error),
+        });
+      },
+    );
+  };
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -81,9 +135,7 @@ export function FlagTypeOptions({
               {types.length > 1 && (
                 <button
                   type="button"
-                  onClick={() =>
-                    save(types.filter((candidate) => candidate !== type))
-                  }
+                  onClick={() => remove(type)}
                   aria-label={labels.remove}
                   title={labels.remove}
                   className={rowButtonClass}
@@ -112,6 +164,33 @@ export function FlagTypeOptions({
         <Plus className="size-3.5 shrink-0" />
         {labels.newFlag}
       </button>
+      <AlertDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRemoval(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          {pendingRemoval && (
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {labels.removeTitle(pendingRemoval.type.name)}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {labels.removeDescription(pendingRemoval.flags.length)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>{strings.common.cancel}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={confirmRemoval}>
+              {labels.removeConfirm}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

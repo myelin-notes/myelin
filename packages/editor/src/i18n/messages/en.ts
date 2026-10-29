@@ -57,6 +57,10 @@ const en = {
         label: 'Open graph',
         description: 'Map explicit links between canvas notes',
       },
+      openFlags: {
+        label: 'Open flags',
+        description: 'Browse and clean up flags across your notes',
+      },
       importMarkdown: {
         label: 'Import Markdown',
         description: 'Create a canvas from a Markdown file',
@@ -272,11 +276,6 @@ const en = {
       yes: 'Update',
       no: 'Skip',
     },
-    flagsDialog: {
-      title: 'Flags',
-      empty: 'No flags in this folder yet.',
-      loadFailed: 'Could not load flags',
-    },
     tagDialog: {
       title: 'Manage Tags',
       description: (name: string) => `Tags on ${name}`,
@@ -286,6 +285,23 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  flagsPage: {
+    title: 'Flags',
+    searchPlaceholder: 'Search flags, notes, folders...',
+    allFolders: 'Show all folders',
+    empty: 'No flags yet.',
+    allTypes: 'All',
+    noMatches: 'No flags match.',
+    loadFailed: 'Could not load flags',
+    selectAll: 'Select all',
+    selected: (count: number) => `${count} selected`,
+    changeType: 'Change type',
+    delete: 'Delete',
+    deleteTitle: (count: number) =>
+      `Delete ${count} ${count === 1 ? 'flag' : 'flags'}?`,
+    deleteDescription: 'They will be removed from their notes.',
+    editFailed: 'Could not update flags',
   },
   graph: {
     title: 'Graph',
@@ -874,6 +890,12 @@ const en = {
       edit: 'Edit flag',
       remove: 'Delete flag',
       name: 'Flag name',
+      removeTitle: (name: string) => `Delete “${name}”?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 flag uses this type. It will be deleted from your notes too.'
+          : `${count} flags use this type. They will be deleted from your notes too.`,
+      removeConfirm: 'Delete',
     },
     toolbar: {
       clickForOptions: 'click for options',
