@@ -7,6 +7,13 @@ import type { RepositoryConfig } from './sync/repo/config';
 
 const PREFIX = 'myelin:';
 
+/** Top-left corner as fractions of the canvas page, so the bar holds its place across resizes. */
+export interface PresetToolbarPosition {
+  x: number;
+  y: number;
+  vertical: boolean;
+}
+
 /* ── Single-source pref declarations ─────────────────────── */
 
 function pref<T>(storageKey: string, defaultValue: T) {
@@ -21,6 +28,11 @@ const PREFS = {
   wheelTools: pref<number[]>('wheel-tools', []),
   // Per device, unlike the presets themselves, so each device's wheel limit holds.
   wheelPresets: pref<string[]>('wheel-presets', []),
+  // `null` places the bar at its default spot.
+  presetToolbarPosition: pref<PresetToolbarPosition | null>(
+    'preset-toolbar-position',
+    null,
+  ),
   toolOptions: pref<Record<string, Record<string, unknown>>>(
     'tool-options',
     {},
@@ -53,6 +65,7 @@ const PREFS = {
   ),
   inputMode: pref<import('./input-mode').InputMode>('input-mode', 'touch'),
   penBarrelButtonImmediate: pref<boolean>('pen-barrel-button-immediate', false),
+  toolbarSide: pref<'left' | 'right'>('toolbar-side', 'left'),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
   alwaysRenameNoteReferences: pref<boolean>(

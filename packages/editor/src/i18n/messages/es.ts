@@ -412,6 +412,15 @@ const es: typeof en = {
         description:
           'Cambia al borrador al pulsar el botón del lápiz. Si está desactivado, aplica el cambio cuando se levanta el lápiz.',
       },
+      toolbarSide: {
+        label: 'Lado de la barra de herramientas',
+        description:
+          'En qué borde del lienzo se coloca la barra de herramientas. Quienes escriben con la izquierda quizá prefieran la derecha.',
+        options: {
+          left: 'Izquierda',
+          right: 'Derecha',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Edición de marcos de página',

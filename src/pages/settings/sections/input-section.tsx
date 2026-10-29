@@ -1,8 +1,9 @@
-import { Hand, PenLine } from 'lucide-react';
+import { Hand, PanelLeft, PanelRight, PenLine } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import type { InputMode } from '@myelin/editor/input-mode';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { useUserPref } from '@/lib/use-user-pref';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { OptionsRow, type OptionsRowOption } from '../components/options-row';
 import { ToggleRow } from '../components/toggle-row';
 
@@ -27,6 +28,26 @@ export function InputModeRow() {
   );
 }
 
+function ToolbarSideRow() {
+  const strings = useMessages();
+  const toolbarSide = useUserPref('toolbarSide');
+  const sideStrings = strings.settings.input.toolbarSide;
+  const rowOptions: ReadonlyArray<OptionsRowOption<'left' | 'right'>> = [
+    { value: 'left', label: sideStrings.options.left, Icon: PanelLeft },
+    { value: 'right', label: sideStrings.options.right, Icon: PanelRight },
+  ];
+
+  return (
+    <OptionsRow
+      value={toolbarSide}
+      onChange={(side) => UserPrefs.set('toolbarSide', side)}
+      label={sideStrings.label}
+      description={sideStrings.description}
+      options={rowOptions}
+    />
+  );
+}
+
 export function InputSection() {
   const strings = useMessages();
   const penBarrelButtonImmediate = useUserPref('penBarrelButtonImmediate');
@@ -39,6 +60,12 @@ export function InputSection() {
           {strings.settings.input.eyebrow}
         </span>
       </div>
+      {/* Compact always docks the toolbar along the bottom. */}
+      {!IS_PHONE_BUILD && (
+        <div className="mb-2">
+          <ToolbarSideRow />
+        </div>
+      )}
       <InputModeRow />
       <div className="mt-2">
         <ToggleRow

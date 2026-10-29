@@ -404,6 +404,15 @@ const en = {
         description:
           'Switch to the eraser as soon as the pen button is pressed. When off, apply the switch after the pen lifts.',
       },
+      toolbarSide: {
+        label: 'Toolbar side',
+        description:
+          'Which edge of the canvas the tools toolbar sits on. Left-handed writers may prefer the right.',
+        options: {
+          left: 'Left',
+          right: 'Right',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Page Frame Editing',

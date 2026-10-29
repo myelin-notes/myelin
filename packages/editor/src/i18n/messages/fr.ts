@@ -417,6 +417,15 @@ const fr: typeof en = {
         description:
           'Passe à la gomme dès que le bouton du stylet est pressé. Désactivé, le changement se fait lorsque le stylet est levé.',
       },
+      toolbarSide: {
+        label: 'Côté de la barre d’outils',
+        description:
+          'Le bord du canevas où se place la barre d’outils. Les gauchers préféreront peut-être la droite.',
+        options: {
+          left: 'Gauche',
+          right: 'Droite',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Édition des cadres de page',
