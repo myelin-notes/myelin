@@ -391,6 +391,14 @@ const zhHans: typeof en = {
         description:
           '按下手写笔按钮后立即切换到橡皮擦。关闭后，抬起手写笔时才应用切换。',
       },
+      toolbarSide: {
+        label: '工具栏位置',
+        description: '工具栏位于画布的哪一侧。左手书写者可能更喜欢右侧。',
+        options: {
+          left: '左侧',
+          right: '右侧',
+        },
+      },
     },
     pageFrameEditing: {
       title: '页面框编辑',

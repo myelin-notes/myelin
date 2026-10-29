@@ -20,6 +20,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface CanvasToolbarProps {
@@ -93,6 +94,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const strings = useMessages();
   const optionsOpen = optionsVisible && hasOptions && !shelfOpen;
   const optionsPresence = usePresence(optionsOpen);
+  const onRight = useUserPref('toolbarSide') === 'right' && !IS_PHONE_BUILD;
   const toolbarRef = useRef<HTMLDivElement>(null);
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
@@ -111,16 +113,19 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     toolButtonRefs.current[selectedToolIndex],
   );
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
-  const tooltipSide = IS_PHONE_BUILD ? 'top' : 'right';
-  // Panels hang off the rail's right edge, or off the top of the bottom bar.
+  const tooltipSide = IS_PHONE_BUILD ? 'top' : onRight ? 'left' : 'right';
+  // Panels hang off the rail's inner edge, or off the top of the bottom bar.
+  // Insert and embed bring their own ml-2, so only the right rail adds a gap.
   const panelAnchorClass = IS_PHONE_BUILD
     ? 'absolute right-0 bottom-full left-0 mb-2'
-    : 'absolute top-0 left-full';
+    : onRight
+      ? 'absolute top-0 right-full pr-2'
+      : 'absolute top-0 left-full';
   // The options controls are narrow, so stretched across the bar the panel is
   // mostly empty. On compact it sizes to its content and centres over the bar.
   const optionsAnchorClass = IS_PHONE_BUILD
     ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-[calc(100vw-1.5rem)] max-w-72'
-    : 'absolute top-0 left-full w-60 max-w-[calc(100vw-5rem)]';
+    : `absolute top-0 w-60 max-w-[calc(100vw-5rem)] ${onRight ? 'right-full' : 'left-full'}`;
   const dividerClass = IS_PHONE_BUILD
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';
@@ -201,7 +206,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         className={
           IS_PHONE_BUILD
             ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
-            : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+            : onRight
+              ? 'fade-in-0 slide-in-from-right-3 absolute top-1/2 right-6 z-[100] max-h-[calc(100dvh-10rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+              : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
         }
         role="toolbar"
         aria-label="Canvas tools"
@@ -211,7 +218,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           className={
             IS_PHONE_BUILD
               ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-              : 'flex max-h-[calc(100dvh-6rem)] flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+              : `flex flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                  // Shorter on the right, where the title bar and status bar share the edge.
+                  onRight
+                    ? 'max-h-[calc(100dvh-10rem)]'
+                    : 'max-h-[calc(100dvh-6rem)]'
+                }`
           }
         >
           <Tooltip>
@@ -338,7 +350,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className={`data-closed:fade-out-0 data-open:fade-in-0 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${
               IS_PHONE_BUILD
                 ? 'data-closed:slide-out-to-bottom-2 data-open:slide-in-from-bottom-2'
-                : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
+                : onRight
+                  ? 'data-closed:slide-out-to-right-2 data-open:slide-in-from-right-2 mr-2'
+                  : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
             } ${optionsAnchorClass}`}
             style={IS_PHONE_BUILD ? undefined : { top: optionsPanelOffset }}
           >
@@ -358,7 +372,9 @@ export const CanvasToolbar = memo(function CanvasToolbar({
             className={
               IS_PHONE_BUILD
                 ? panelAnchorClass
-                : 'absolute bottom-0 left-full ml-2'
+                : onRight
+                  ? 'absolute right-full bottom-0 mr-2'
+                  : 'absolute bottom-0 left-full ml-2'
             }
           >
             <ToolShelf
