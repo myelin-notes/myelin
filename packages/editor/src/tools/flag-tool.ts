@@ -1,12 +1,12 @@
 import { Flag } from 'lucide-react';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
-import { BookmarkElement } from '../elements/bookmark-element';
+import { FlagElement } from '../elements/flag-element';
 import { PageFrameElement } from '../elements/page-frame-element';
 import { PdfElement } from '../elements/pdf';
 import type { MessageGetter } from '../i18n';
 import { pageContainsPoint } from '../page-frame/anchoring';
 import { CollisionHelper } from '../utils/collision-helper';
-import type { ITool, SvgIcon, ToolId } from './tool';
+import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 const CLICK_THRESHOLD = 5;
 
@@ -29,13 +29,14 @@ function headingAbove(
   return heading;
 }
 
-export class BookmarkTool implements ITool {
+export class FlagTool implements ITool {
   private down: { point: Vector2; event: PointerEvent } | null = null;
+  private flagTypeId = '';
 
   public constructor(private readonly getStrings: MessageGetter) {}
 
   get id(): ToolId {
-    return 'bookmark';
+    return 'flag';
   }
 
   start(canvas: DrawableCanvas, event: PointerEvent): void {
@@ -60,9 +61,10 @@ export class BookmarkTool implements ITool {
     }
     const { point } = down;
     const label = this.labelAt(canvas, point, down.event);
+    const flagTypeId = canvas.resolveFlagType(this.flagTypeId)?.id ?? '';
     canvas.transact(() => {
       const flag = canvas.addElement((uuid) => {
-        const element = new BookmarkElement(uuid, label);
+        const element = new FlagElement(uuid, label, flagTypeId);
         element.setOffset(point.x, point.y);
         return element;
       });
@@ -87,7 +89,7 @@ export class BookmarkTool implements ITool {
         for (let page = 0; page < element.pageCount; page++) {
           const bounds = element.getPageBounds(page);
           if (bounds && CollisionHelper.inBox(point, bounds)) {
-            return this.getStrings().canvas.bookmarks.pdfPage(
+            return this.getStrings().canvas.flags.pdfPage(
               element.fileName,
               page + 1,
             );
@@ -114,6 +116,20 @@ export class BookmarkTool implements ITool {
   }
 
   get label(): string {
-    return this.getStrings().canvas.tools.bookmark;
+    return this.getStrings().canvas.tools.flag;
+  }
+
+  getOptions(): ToolOption[] {
+    return [
+      {
+        type: 'flag',
+        key: 'flagType',
+        label: this.getStrings().canvas.toolOptions.flagType,
+        value: this.flagTypeId,
+        set: (flagTypeId) => {
+          this.flagTypeId = flagTypeId;
+        },
+      },
+    ];
   }
 }

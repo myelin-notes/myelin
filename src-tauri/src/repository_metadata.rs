@@ -12,7 +12,7 @@ pub(crate) use legacy::{BACKUP, MARKER};
 pub(crate) const SUFFIX: &str = ".meta.json";
 
 pub(crate) fn empty_manifest() -> Value {
-    json!({ "version": 3, "nodes": {}, "linksBySource": {}, "colors": { "pen": [], "highlighter": [], "text": [], "folder": [] }, "tagRegistry": [], "penPresets": [] })
+    json!({ "version": 3, "nodes": {}, "linksBySource": {}, "colors": { "pen": [], "highlighter": [], "text": [], "folder": [] }, "tagRegistry": [], "penPresets": [], "flagTypes": [] })
 }
 
 pub(crate) fn is_marker(bytes: &[u8]) -> bool {
@@ -315,4 +315,11 @@ pub(crate) fn normalize(manifest: &mut Value) {
         Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max)}))
     }).take(12).collect::<Vec<_>>()).unwrap_or_default();
     manifest["penPresets"] = json!(presets);
+    let flag_types = manifest["flagTypes"].as_array().map(|entries| entries.iter().filter_map(|entry| {
+        let color = entry["color"].as_str()?.trim();
+        let color = color.strip_prefix('#').unwrap_or(color);
+        if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() || !entry["name"].is_string() { return None; }
+        Some(json!({"id": entry["id"], "name": entry["name"], "color": format!("#{}", color.to_lowercase())}))
+    }).collect::<Vec<_>>()).unwrap_or_default();
+    manifest["flagTypes"] = json!(flag_types);
 }

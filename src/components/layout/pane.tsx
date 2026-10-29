@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { PanePage, Tab } from '@/lib/tabs/types';
 import { CanvasView } from '@/pages/canvas';
 import { CsvViewerPage } from '@/pages/csv-viewer';
+import { FlagsPage } from '@/pages/flags';
 import { GraphPage } from '@/pages/graph';
 import { ImageViewerPage } from '@/pages/image-viewer';
 import { SettingsPage } from '@/pages/settings';
@@ -26,7 +27,7 @@ export const PaneContent = memo(function PaneContent({
           recordingOwnerId={tab.id}
           initialPageFrameName={tab.target.pageFrameName}
           initialPageFrameId={tab.target.pageFrameId}
-          initialBookmarkId={tab.target.bookmarkId}
+          initialFlagId={tab.target.flagId}
         />
       );
     case 'image':
@@ -46,6 +47,8 @@ export const PanePageContent = memo(function PanePageContent({
   switch (page) {
     case 'graph':
       return <GraphPage />;
+    case 'flags':
+      return <FlagsPage />;
     case 'settings':
       return <SettingsPage />;
   }

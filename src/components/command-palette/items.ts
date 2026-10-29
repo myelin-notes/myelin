@@ -1,6 +1,7 @@
 import {
   BookOpen,
   FileText,
+  Flag,
   Keyboard,
   Network,
   Plus,
@@ -29,6 +30,7 @@ export interface CommandPaletteItemContext {
   canRefreshRepository: boolean;
   createNote: () => Promise<void>;
   openGraph: () => void;
+  openFlags: () => void;
   openPalette: (mode: CommandPaletteMode) => void;
   refreshRepository: () => void;
   triggerKeybindingAction: (action: Action) => void;
@@ -45,6 +47,7 @@ export function createCommandPaletteItems({
   canRefreshRepository,
   createNote,
   openGraph,
+  openFlags,
   openPalette,
   refreshRepository,
   triggerKeybindingAction,
@@ -78,6 +81,15 @@ export function createCommandPaletteItems({
       section: strings.commandPalette.sections.commands,
       icon: Network,
       onSelect: openGraph,
+    },
+    {
+      id: 'open-flags',
+      label: strings.commandPalette.commands.openFlags.label,
+      description: strings.commandPalette.commands.openFlags.description,
+      keywords: ['flags', 'bookmarks', 'todo', 'review'],
+      section: strings.commandPalette.sections.commands,
+      icon: Flag,
+      onSelect: openFlags,
     },
     {
       id: 'import-markdown-library',

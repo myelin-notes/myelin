@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 export type CommandPaletteMode = 'commands' | 'notes';
 export type CommandPalettePage =
   | 'canvas'
+  | 'flags'
   | 'graph'
   | 'home'
   | 'settings'

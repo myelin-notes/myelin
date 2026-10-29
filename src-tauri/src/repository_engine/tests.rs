@@ -59,7 +59,7 @@ fn metadata_patch(previous: &Value, next: &Value) -> MetadataPatch {
         "nodes":next["nodes"].as_object().unwrap().iter().filter(|(id,node)| previous["nodes"][*id] != **node || previous["linksBySource"][*id] != next["linksBySource"][*id])
             .map(|(id,node)|json!({"node":node,"links":next["linksBySource"][id].as_array().cloned().unwrap_or_default()})).collect::<Vec<_>>(),
         "deletedNodeIds":previous["nodes"].as_object().unwrap().keys().filter(|id|next["nodes"][*id].is_null()).collect::<Vec<_>>(),
-        "settings":{"colors":next["colors"],"tagRegistry":next["tagRegistry"],"penPresets":next["penPresets"]}
+        "settings":{"colors":next["colors"],"tagRegistry":next["tagRegistry"],"penPresets":next["penPresets"],"flagTypes":next["flagTypes"]}
     })).unwrap()
 }
 
@@ -766,6 +766,28 @@ async fn failed_durability_blocks_more_writes_then_replays_the_delta_on_reopen()
 }
 
 #[tokio::test]
+async fn flag_types_persist_normalized_and_stay_queued_across_reopen() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["flagTypes"] = json!([
+        {"id": "todo", "name": "To-do", "color": "EF4444"},
+        {"id": "bad", "name": "Bad", "color": "red"}
+    ]);
+    save_manifest(&engine, manifest).await;
+    let reopened = Store::open(directory.0.join("data"), true).unwrap();
+    assert_eq!(
+        reopened.manifest["flagTypes"],
+        json!([{"id": "todo", "name": "To-do", "color": "#ef4444"}])
+    );
+    assert!(reopened
+        .outbox
+        .iter()
+        .any(|op| op["kind"] == "sync-flag-types"));
+}
+
+#[tokio::test]
 async fn corrupt_outbox_is_quarantined_and_pauses_cloud_without_losing_local_files() {
     let directory = TestDirectory::new();
     let engine = directory.engine(true);
@@ -1091,6 +1113,7 @@ async fn native_metadata_deletes_and_head_conflict_retry_preserve_remote_nodes_a
     let mut manifest = saved["manifest"].clone();
     manifest["nodes"]["folder"]["name"] = json!("Renamed");
     manifest["tagRegistry"] = json!(["native/tag"]);
+    manifest["flagTypes"] = json!([{"id": "todo", "name": "Exam", "color": "#22c55e"}]);
     save_manifest(&engine, manifest).await;
     {
         let mut remote = state.lock().unwrap();
@@ -1124,6 +1147,10 @@ async fn native_metadata_deletes_and_head_conflict_retry_preserve_remote_nodes_a
     assert_eq!(
         state.lock().unwrap().manifest["tagRegistry"],
         json!(["native/tag"])
+    );
+    assert_eq!(
+        state.lock().unwrap().manifest["flagTypes"],
+        json!([{"id": "todo", "name": "Exam", "color": "#22c55e"}])
     );
     let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     let mut manifest = saved["manifest"].clone();
@@ -1984,6 +2011,79 @@ async fn native_imports_store_bytes_before_publishing() {
     manifest["nodes"]["import"] = node("import", "png");
     save_manifest(&engine, manifest).await;
     assert_eq!(read(&engine, "import").await, bytes);
+}
+
+fn flag_summary(doc: &yrs::Doc) -> Vec<(String, f64, String)> {
+    let txn = doc.transact();
+    txn.get_array("elements")
+        .unwrap()
+        .iter(&txn)
+        .filter_map(|value| {
+            let Out::YMap(element) = value else {
+                return None;
+            };
+            let field = |key| match element.get(&txn, key) {
+                Some(Out::Any(Any::String(value))) => value.to_string(),
+                _ => String::new(),
+            };
+            let Some(Out::Any(Any::Number(kind))) = element.get(&txn, "type") else {
+                return None;
+            };
+            Some((field("uuid"), kind, field("flagTypeId")))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn native_flag_edits_reach_the_saved_file_and_open_editors() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let original = yrs::Doc::new();
+    let elements = original.get_or_insert_array("elements");
+    {
+        let mut txn = original.transact_mut();
+        for (uuid, kind) in [("a", 1.0), ("a", 9.0), ("b", 9.0), ("c", 9.0)] {
+            let element = elements.push_back(&mut txn, yrs::MapPrelim::default());
+            element.insert(&mut txn, "type", kind);
+            element.insert(&mut txn, "uuid", uuid);
+            element.insert(&mut txn, "flagTypeId", "todo");
+        }
+    }
+    let bytes = document::bytes(&original);
+    seed(&engine, "note", "mcanvas", bytes.clone()).await;
+    let (_, removed) = engine
+        .operate(RepositoryOperation::EditFlags {
+            flag_ids: HashMap::from([("note".into(), HashSet::from(["a".into()]))]),
+            edit: flags::FlagEdit::Remove,
+        })
+        .await
+        .unwrap();
+    let (_, retyped) = engine
+        .operate(RepositoryOperation::EditFlags {
+            flag_ids: HashMap::from([
+                ("note".into(), HashSet::from(["b".into()])),
+                ("missing".into(), HashSet::from(["b".into()])),
+            ]),
+            edit: flags::FlagEdit::SetType {
+                flag_type_id: "review".into(),
+            },
+        })
+        .await
+        .unwrap();
+    let expected = vec![
+        ("a".to_owned(), 1.0, "todo".to_owned()),
+        ("b".to_owned(), 9.0, "review".to_owned()),
+        ("c".to_owned(), 9.0, "todo".to_owned()),
+    ];
+    // Flag listings read this file without the journal, so the edit must not wait in a delta.
+    let saved = fs::read(directory.0.join("data/files/note.myelin")).unwrap();
+    assert_eq!(flag_summary(&document::decode(&saved).unwrap()), expected);
+    let open_editor = document::decode(&bytes).unwrap();
+    for change in removed.documents.iter().chain(&retyped.documents) {
+        document::apply(&open_editor, &change.bytes).unwrap();
+    }
+    assert_eq!(flag_summary(&open_editor), expected);
+    assert_eq!(retyped.changed, vec!["note".to_owned()]);
 }
 
 #[tokio::test]

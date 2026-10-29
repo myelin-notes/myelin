@@ -39,7 +39,7 @@ export function WhatsNewDialog() {
   const pages: WhatsNewPage[] = [
     { ...strings.whatsNew.pdfQuote, image: pdfQuoteDemo },
     { ...strings.whatsNew.pdfAnchoring, image: pdfAnchoringDemo },
-    { ...strings.whatsNew.bookmarks, image: bookmarksDemo },
+    { ...strings.whatsNew.flags, image: bookmarksDemo },
     { ...strings.whatsNew.canvasStyle, image: canvasStyleDemo },
     { ...strings.whatsNew.ruler, image: rulerDemo },
     { ...strings.whatsNew.rotate, image: rotateDemo },

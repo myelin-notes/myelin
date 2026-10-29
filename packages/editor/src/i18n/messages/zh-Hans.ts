@@ -58,6 +58,10 @@ const zhHans: typeof en = {
         label: '打开关系图谱',
         description: '呈现画布笔记之间的显式链接',
       },
+      openFlags: {
+        label: '打开旗标',
+        description: '浏览并清理笔记中的旗标',
+      },
       importMarkdown: {
         label: '导入 Markdown',
         description: '从 Markdown 文件创建画布',
@@ -247,7 +251,6 @@ const zhHans: typeof en = {
 
       rename: '重命名',
       manageTags: '管理标签',
-      bookmarks: '书签',
       color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
@@ -261,11 +264,6 @@ const zhHans: typeof en = {
       yes: '更新',
       no: '跳过',
     },
-    bookmarksDialog: {
-      title: '书签',
-      empty: '此文件夹中还没有书签。',
-      loadFailed: '无法加载书签',
-    },
     tagDialog: {
       title: '管理标签',
       description: (name: string) => `${name} 的标签`,
@@ -275,6 +273,21 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称…',
     },
+  },
+  flagsPage: {
+    title: '旗标',
+    searchPlaceholder: '搜索旗标、笔记、文件夹...',
+    empty: '还没有旗标。',
+    allTypes: '全部',
+    noMatches: '没有匹配的旗标。',
+    loadFailed: '无法加载旗标',
+    selectAll: '全选',
+    selected: (count: number) => `已选择 ${count} 个`,
+    changeType: '更改类型',
+    delete: '删除',
+    deleteTitle: (count: number) => `删除 ${count} 个旗标？`,
+    deleteDescription: '它们将从所在笔记中移除。',
+    editFailed: '无法更新旗标',
   },
   graph: {
     title: '关系图谱',
@@ -654,17 +667,17 @@ const zhHans: typeof en = {
           label: '文本工具',
           description: '创建新的文本节点',
         },
-        'canvas:tool-bookmark': {
-          label: '书签工具',
-          description: '放置书签旗标',
+        'canvas:tool-flag': {
+          label: '旗标工具',
+          description: '放置旗标',
         },
-        'canvas:bookmark-previous': {
-          label: '上一个书签',
-          description: '跳到此画布中的上一个书签',
+        'canvas:flag-previous': {
+          label: '上一个旗标',
+          description: '跳到此画布中的上一个旗标',
         },
-        'canvas:bookmark-next': {
-          label: '下一个书签',
-          description: '跳到此画布中的下一个书签',
+        'canvas:flag-next': {
+          label: '下一个旗标',
+          description: '跳到此画布中的下一个旗标',
         },
         'canvas:insert-frame': {
           label: '插入页面框',
@@ -833,15 +846,29 @@ const zhHans: typeof en = {
       title: '反向链接',
       linkedMentions: '链接提及',
     },
-    bookmarks: {
-      title: '书签',
-      untitled: '书签',
+    flags: {
+      title: '旗标',
+      untitled: '旗标',
       pdfPage: (fileName: string, page: number) =>
         `${fileName} · 第 ${page} 页`,
       rename: '重命名',
       remove: '删除',
-      previous: '上一个书签',
-      next: '下一个书签',
+      previous: '上一个旗标',
+      next: '下一个旗标',
+      changeType: '更改旗标类型',
+    },
+    flagTypes: {
+      todo: '待办',
+      review: '待复查',
+      examinable: '考试范围',
+      newFlag: '新建旗标',
+      edit: '编辑旗标',
+      remove: '删除旗标',
+      name: '旗标名称',
+      removeTitle: (name: string) => `删除“${name}”？`,
+      removeDescription: (count: number) =>
+        `有 ${count} 个旗标使用此类型，它们也会从笔记中删除。`,
+      removeConfirm: '删除',
     },
     toolbar: {
       clickForOptions: '点击查看选项',
@@ -962,7 +989,7 @@ const zhHans: typeof en = {
       highlighter: '荧光笔',
       eraser: '橡皮擦',
       text: '文本',
-      bookmark: '书签',
+      flag: '旗标',
     },
     toolOptions: {
       color: '颜色',
@@ -983,6 +1010,7 @@ const zhHans: typeof en = {
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',
       increaseFontSize: '增大字号',
+      flagType: '旗标',
     },
     embedComposer: {
       dropToEmbed: '拖放以嵌入',
@@ -1064,10 +1092,10 @@ const zhHans: typeof en = {
       description:
         '在 PDF 页面上手绘的内容会固定在该页，“锚定到页面”也能把图片和形状固定上去。移动 PDF 或切换为“分栏”时，它们会跟随页面。',
     },
-    bookmarks: {
-      title: '在画布上添加书签',
+    flags: {
+      title: '在画布上插上旗标',
       description:
-        '使用书签工具（B）插上旗标。在画布顶部打开旗标列表，或按 [ 和 ] 在旗标之间跳转。',
+        '使用旗标工具（B）插上旗标。在画布顶部打开旗标列表，或按 [ 和 ] 在旗标之间跳转。',
     },
     canvasStyle: {
       title: '为每个画布设置样式',

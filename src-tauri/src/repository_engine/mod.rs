@@ -1,4 +1,5 @@
 mod document;
+mod flags;
 mod onenote;
 mod references;
 mod remote;
@@ -79,6 +80,7 @@ struct RepositoryPreferences {
     colors: Value,
     tag_registry: Vec<String>,
     pen_presets: Vec<Value>,
+    flag_types: Vec<Value>,
 }
 
 #[derive(Deserialize)]
@@ -151,6 +153,11 @@ pub enum RepositoryOperation {
         target_id: String,
         new_name: String,
         reference_kind: references::ReferenceKind,
+    },
+    EditFlags {
+        /// Flag ids by canvas node id.
+        flag_ids: HashMap<String, HashSet<String>>,
+        edit: flags::FlagEdit,
     },
     StageBytes {
         transfer_id: String,
@@ -597,6 +604,7 @@ impl RepositoryOperation {
                         ("colors", "sync-custom-colors"),
                         ("tagRegistry", "sync-tag-registry"),
                         ("penPresets", "sync-pen-presets"),
+                        ("flagTypes", "sync-flag-types"),
                     ] {
                         if state.manifest[field] != settings[field] {
                             state.manifest[field] = settings[field].clone();
@@ -664,6 +672,9 @@ impl RepositoryOperation {
                 reference_kind,
             } => {
                 return references::rename(state, source_ids, target_id, new_name, reference_kind);
+            }
+            Self::EditFlags { flag_ids, edit } => {
+                return flags::edit(state, flag_ids, edit);
             }
             Self::StageBytes { .. } | Self::FinishTransfer { .. } | Self::CancelTransfer { .. } => {
                 return Err("Transfer requires a repository handle".into());

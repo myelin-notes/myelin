@@ -4,6 +4,7 @@ import type {
   FileImportSource,
   FileType,
   FileVersion,
+  FlagEdit,
   RenameReferencesRequest,
   RenameReferencesResult,
   StoredNoteLink,
@@ -38,6 +39,7 @@ export interface RepositoryPreferences {
   colors: VFSManifest['colors'];
   tagRegistry: string[];
   penPresets: VFSManifest['penPresets'];
+  flagTypes: VFSManifest['flagTypes'];
 }
 
 export interface MetadataPatch {
@@ -104,6 +106,11 @@ export interface NativeOperationRequests {
   };
   'import-one-note': OneNoteImportRequest & { kind: 'import-one-note' };
   'rename-references': RenameReferencesRequest & { kind: 'rename-references' };
+  'edit-flags': {
+    kind: 'edit-flags';
+    flagIds: Record<string, string[]>;
+    edit: FlagEdit;
+  };
   'create-file-version': {
     kind: 'create-file-version';
     nodeId: string;
@@ -151,6 +158,7 @@ export interface NativeOperationResults {
   'import-file': NativeRevision;
   'import-one-note': OneNoteImportResult;
   'rename-references': RenameReferencesResult;
+  'edit-flags': null;
   'create-file-version': FileVersion | null;
   'restore-file-version': null;
   'delete-file': null;

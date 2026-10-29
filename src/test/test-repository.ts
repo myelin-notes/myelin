@@ -214,6 +214,7 @@ export class TestRepository extends NativeRepository {
           colors: manifest.colors,
           tagRegistry: manifest.tagRegistry,
           penPresets: manifest.penPresets,
+          flagTypes: manifest.flagTypes,
         }),
       );
     }

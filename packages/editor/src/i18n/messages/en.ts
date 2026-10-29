@@ -57,6 +57,10 @@ const en = {
         label: 'Open graph',
         description: 'Map explicit links between canvas notes',
       },
+      openFlags: {
+        label: 'Open flags',
+        description: 'Browse and clean up flags across your notes',
+      },
       importMarkdown: {
         label: 'Import Markdown',
         description: 'Create a canvas from a Markdown file',
@@ -258,7 +262,6 @@ const en = {
 
       rename: 'Rename',
       manageTags: 'Manage Tags',
-      bookmarks: 'Bookmarks',
       color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
@@ -272,11 +275,6 @@ const en = {
       yes: 'Update',
       no: 'Skip',
     },
-    bookmarksDialog: {
-      title: 'Bookmarks',
-      empty: 'No bookmarks in this folder yet.',
-      loadFailed: 'Could not load bookmarks',
-    },
     tagDialog: {
       title: 'Manage Tags',
       description: (name: string) => `Tags on ${name}`,
@@ -286,6 +284,22 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  flagsPage: {
+    title: 'Flags',
+    searchPlaceholder: 'Search flags, notes, folders...',
+    empty: 'No flags yet.',
+    allTypes: 'All',
+    noMatches: 'No flags match.',
+    loadFailed: 'Could not load flags',
+    selectAll: 'Select all',
+    selected: (count: number) => `${count} selected`,
+    changeType: 'Change type',
+    delete: 'Delete',
+    deleteTitle: (count: number) =>
+      `Delete ${count} ${count === 1 ? 'flag' : 'flags'}?`,
+    deleteDescription: 'They will be removed from their notes.',
+    editFailed: 'Could not update flags',
   },
   graph: {
     title: 'Graph',
@@ -677,17 +691,17 @@ const en = {
           label: 'Text Tool',
           description: 'Create a new text node',
         },
-        'canvas:tool-bookmark': {
-          label: 'Bookmark Tool',
-          description: 'Place a bookmark flag',
+        'canvas:tool-flag': {
+          label: 'Flag Tool',
+          description: 'Place a flag',
         },
-        'canvas:bookmark-previous': {
-          label: 'Previous Bookmark',
-          description: 'Jump to the previous bookmark in this canvas',
+        'canvas:flag-previous': {
+          label: 'Previous Flag',
+          description: 'Jump to the previous flag in this canvas',
         },
-        'canvas:bookmark-next': {
-          label: 'Next Bookmark',
-          description: 'Jump to the next bookmark in this canvas',
+        'canvas:flag-next': {
+          label: 'Next Flag',
+          description: 'Jump to the next flag in this canvas',
         },
         'canvas:insert-frame': {
           label: 'Insert Page Frame',
@@ -856,14 +870,30 @@ const en = {
       title: 'Backlinks',
       linkedMentions: 'Linked mentions',
     },
-    bookmarks: {
-      title: 'Bookmarks',
-      untitled: 'Bookmark',
+    flags: {
+      title: 'Flags',
+      untitled: 'Flag',
       pdfPage: (fileName: string, page: number) => `${fileName} · p.${page}`,
       rename: 'Rename',
       remove: 'Remove',
-      previous: 'Previous bookmark',
-      next: 'Next bookmark',
+      previous: 'Previous flag',
+      next: 'Next flag',
+      changeType: 'Change flag type',
+    },
+    flagTypes: {
+      todo: 'To-do',
+      review: 'Review',
+      examinable: 'Examinable',
+      newFlag: 'New flag',
+      edit: 'Edit flag',
+      remove: 'Delete flag',
+      name: 'Flag name',
+      removeTitle: (name: string) => `Delete “${name}”?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 flag uses this type. It will be deleted from your notes too.'
+          : `${count} flags use this type. They will be deleted from your notes too.`,
+      removeConfirm: 'Delete',
     },
     toolbar: {
       clickForOptions: 'click for options',
@@ -985,7 +1015,7 @@ const en = {
       highlighter: 'Highlighter',
       eraser: 'Eraser',
       text: 'Text',
-      bookmark: 'Bookmark',
+      flag: 'Flag',
     },
     toolOptions: {
       color: 'Color',
@@ -1006,6 +1036,7 @@ const en = {
       deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',
       increaseFontSize: 'Increase font size',
+      flagType: 'Flag',
     },
     embedComposer: {
       dropToEmbed: 'Drop to embed',
@@ -1087,10 +1118,10 @@ const en = {
       description:
         'Drawings on a PDF page stay on that page, and Anchor to page pins images and shapes to it. They follow the page when you move the PDF or switch it to Columns.',
     },
-    bookmarks: {
-      title: 'Bookmark spots on your canvas',
+    flags: {
+      title: 'Flag spots on your canvas',
       description:
-        'Use the Bookmark tool (B) to drop a flag. Open the list of flags at the top of the canvas, or press [ and ] to jump between them.',
+        'Use the Flag tool (B) to drop a flag. Open the list of flags at the top of the canvas, or press [ and ] to jump between them.',
     },
     canvasStyle: {
       title: 'Give each canvas its own style',

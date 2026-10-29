@@ -7,13 +7,22 @@ export interface NoteIndexItem {
   path: string;
 }
 
-export interface NoteBookmark {
+export interface NoteFlag {
   noteId: VFSNodeId;
   noteName: string;
+  /** Names of the folders above the note, outermost first. */
+  folderPath: string[];
+  noteModifiedAt: number;
   id: string;
   /** Empty when the flag was placed away from any PDF page or page frame. */
   label: string;
+  /** Unresolved; see `resolveFlagType`. */
+  flagTypeId: string;
 }
+
+export type FlagEdit =
+  | { action: 'remove' }
+  | { action: 'set-type'; flagTypeId: string };
 
 export interface RenameReferencesRequest {
   sourceIds: readonly VFSNodeId[];

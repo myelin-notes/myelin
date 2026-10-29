@@ -206,10 +206,8 @@ export function loadWheelToolIndices(tools: readonly ITool[]): Set<number> {
       return new Set(valid);
     }
   }
-  // Bookmarking is occasional; leave its wheel slot to a pen preset.
-  return new Set(
-    tools.flatMap((tool, i) => (tool.id === 'bookmark' ? [] : [i])),
-  );
+  // Flagging is occasional; leave its wheel slot to a pen preset.
+  return new Set(tools.flatMap((tool, i) => (tool.id === 'flag' ? [] : [i])));
 }
 
 export function saveWheelToolIndices(indices: Set<number>) {

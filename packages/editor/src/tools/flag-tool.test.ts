@@ -4,10 +4,12 @@ import type { DrawableCanvas } from '../drawable-canvas';
 import type { DrawableElement } from '../elements/drawable-element';
 import { getElementDescriptor } from '../elements/element-descriptors';
 import { ElementType } from '../elements/element-type';
+import { resolveFlagType } from '../elements/flag-element';
 import { PdfElement } from '../elements/pdf';
 import { catalogs } from '../i18n/messages';
 import { YDocManager } from '../ydoc-manager';
-import { BookmarkTool } from './bookmark-tool';
+import { FlagTool } from './flag-tool';
+import { setToolOption } from './tool';
 
 function makeCanvas() {
   const ydoc = new YDocManager();
@@ -42,16 +44,19 @@ function makeCanvas() {
       }),
     },
     anchoring: { findFrame: () => null },
+    resolveFlagType: (id: string) =>
+      resolveFlagType(
+        [
+          { id: 'todo', name: 'To-do', color: '#ef4444' },
+          { id: 'review', name: 'Review', color: '#eab308' },
+        ],
+        id,
+      ),
   } as unknown as DrawableCanvas;
   return { canvas, ydoc, binding };
 }
 
-function click(
-  tool: BookmarkTool,
-  canvas: DrawableCanvas,
-  x: number,
-  y: number,
-) {
+function click(tool: FlagTool, canvas: DrawableCanvas, x: number, y: number) {
   tool.start(canvas, { clientX: x, clientY: y } as PointerEvent);
   tool.finish(canvas, { clientX: x + 1, clientY: y } as PointerEvent);
 }
@@ -60,15 +65,16 @@ function savedFlags(ydoc: YDocManager) {
   return ydoc.elements
     .toArray()
     .map((yMap) => yMap.toJSON())
-    .filter((json) => json.type === ElementType.BOOKMARK);
+    .filter((json) => json.type === ElementType.FLAG);
 }
 
-describe('BookmarkTool', () => {
-  it('saves a clicked flag with the keys the folder bookmark index reads', () => {
+describe('FlagTool', () => {
+  it('saves a clicked flag with the keys the folder flag index reads', () => {
     const { canvas, ydoc, binding } = makeCanvas();
     const pdf = binding.addElement((uuid) => new PdfElement(uuid), undefined);
     const page = pdf.getPageBounds(0)!;
-    const tool = new BookmarkTool(() => catalogs.en);
+    const tool = new FlagTool(() => catalogs.en);
+    setToolOption(tool, 'flagType', 'review');
 
     click(tool, canvas, page.x + 10, page.y + 10);
     click(tool, canvas, page.right + 500, page.bottom + 500);
@@ -81,8 +87,21 @@ describe('BookmarkTool', () => {
         offsetX: page.x + 10,
         offsetY: page.y + 10,
         label: `${pdf.fileName} · p.1`,
+        flagTypeId: 'review',
       }),
       expect.objectContaining({ uuid: expect.any(String), label: '' }),
+    ]);
+  });
+
+  it('places a deleted active type as the first remaining type', () => {
+    const { canvas, ydoc } = makeCanvas();
+    const tool = new FlagTool(() => catalogs.en);
+    setToolOption(tool, 'flagType', 'deleted');
+
+    click(tool, canvas, 0, 0);
+
+    expect(savedFlags(ydoc)).toEqual([
+      expect.objectContaining({ flagTypeId: 'todo' }),
     ]);
   });
 });

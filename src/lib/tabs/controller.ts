@@ -597,6 +597,14 @@ export class TabStateController {
   }
 
   togglePanePage(page: PanePage, paneId?: PaneId): void {
+    const pane = findPane(
+      this.state.layout,
+      paneId ?? this.state.focusedPaneId,
+    );
+    this.showPanePage(pane?.activePage === page ? undefined : page, paneId);
+  }
+
+  showPanePage(page: PanePage | undefined, paneId?: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId ?? state.focusedPaneId);
     if (!pane) {
@@ -604,10 +612,7 @@ export class TabStateController {
     }
 
     this.commit({
-      layout: replacePane(state.layout, {
-        ...pane,
-        activePage: pane.activePage === page ? undefined : page,
-      }),
+      layout: replacePane(state.layout, { ...pane, activePage: page }),
       focusedPaneId: pane.id,
     });
   }

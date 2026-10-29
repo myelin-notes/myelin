@@ -15,6 +15,7 @@ export interface CanvasUiServices {
 export interface CanvasElementContext {
   getElements: () => readonly DrawableElement[];
   getZoom?: () => number;
+  getFlagColor?: (flagTypeId: string) => string | undefined;
   resolveNoteLink?: ResolveNoteLink;
   resolveMedia?: ResolveMediaSrc;
   onPageFrameRenamed?: (uuid: string, newName: string, oldName: string) => void;

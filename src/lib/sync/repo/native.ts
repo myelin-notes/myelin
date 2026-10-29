@@ -52,7 +52,6 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
-  isNodeWithinFolder,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -69,9 +68,11 @@ import type {
   FileImportSource,
   FileType,
   FileVersion,
+  FlagEdit,
+  FlagType,
   NodeSearchResult,
   NoteBacklink,
-  NoteBookmark,
+  NoteFlag,
   NoteIndexItem,
   PenPreset,
   PenPresetChanges,
@@ -938,17 +939,12 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
-  /** Bookmark flags in every canvas under the folder, read from saved files. */
-  async listBookmarks(folderId: VFSNodeId): Promise<NoteBookmark[]> {
+  /** Flags in every canvas, read from saved files. */
+  async listFlags(): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
     const sources: NoteIndexItem[] = [];
     for (const node of Object.values(manifest.nodes)) {
-      if (
-        node.type !== 'file' ||
-        node.fileType !== 'mcanvas' ||
-        node.system ||
-        !isNodeWithinFolder(manifest, node, folderId)
-      ) {
+      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
         continue;
       }
       const path = await this.getStoredAbsolutePath(node.id);
@@ -957,14 +953,42 @@ export class NativeRepository implements Repository {
       }
     }
     const flags = await invoke<
-      { nodeId: VFSNodeId; id: string; label: string }[]
-    >('list_note_bookmarks', { sources });
-    return flags.map(({ nodeId, id, label }) => ({
-      noteId: nodeId,
-      noteName: manifest.nodes[nodeId]?.name ?? '',
-      id,
-      label,
-    }));
+      { nodeId: VFSNodeId; id: string; label: string; flagTypeId: string }[]
+    >('list_note_flags', {
+      repoId: noteContentIndex.repoIdFor(this),
+      sources,
+    });
+    return flags.map(({ nodeId, id, label, flagTypeId }) => {
+      const note = manifest.nodes[nodeId];
+      const folderPath: string[] = [];
+      for (
+        let folder = note && manifest.nodes[note.parentId ?? ''];
+        folder;
+        folder = manifest.nodes[folder.parentId ?? '']
+      ) {
+        folderPath.unshift(folder.name);
+      }
+      return {
+        noteId: nodeId,
+        noteName: note?.name ?? '',
+        folderPath,
+        noteModifiedAt: note?.modifiedAt ?? 0,
+        id,
+        label,
+        flagTypeId,
+      };
+    });
+  }
+
+  async editFlags(
+    flags: readonly Pick<NoteFlag, 'noteId' | 'id'>[],
+    edit: FlagEdit,
+  ): Promise<void> {
+    const flagIds: Record<VFSNodeId, string[]> = {};
+    for (const flag of flags) {
+      (flagIds[flag.noteId] ??= []).push(flag.id);
+    }
+    await this.operation({ kind: 'edit-flags', flagIds, edit });
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {
@@ -1190,6 +1214,29 @@ export class NativeRepository implements Repository {
     );
   }
 
+  async getFlagTypes(): Promise<FlagType[]> {
+    const { manifest } = await this.loadMetadata();
+    return manifest.flagTypes.map((type) => ({ ...type }));
+  }
+
+  async setFlagTypes(types: readonly FlagType[]): Promise<FlagType[]> {
+    const normalized = types.map(({ id, name, color }) => {
+      const normalizedColor = normalizeCustomColor(color);
+      if (!normalizedColor) {
+        throw new Error(`Invalid color: ${color}`);
+      }
+      return { id, name, color: normalizedColor };
+    });
+    return this.mutateMetadata(
+      'Set flag types',
+      { settings: true },
+      (manifest) => {
+        manifest.flagTypes = normalized;
+        return normalized.map((type) => ({ ...type }));
+      },
+    );
+  }
+
   async getPenPresets(): Promise<PenPreset[]> {
     const { manifest } = await this.loadMetadata();
     return manifest.penPresets.map((preset) => ({ ...preset }));
@@ -1349,6 +1396,7 @@ export class NativeRepository implements Repository {
             colors: manifest.colors,
             tagRegistry: manifest.tagRegistry,
             penPresets: manifest.penPresets,
+            flagTypes: manifest.flagTypes,
           }
         : null,
     };

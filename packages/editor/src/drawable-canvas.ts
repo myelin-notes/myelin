@@ -16,13 +16,13 @@ import {
   type ElementReorderDirection,
   moveElementOrderForSelection,
 } from './element-ordering';
-import { BookmarkElement } from './elements/bookmark-element';
 import type { CanvasUiServices } from './elements/canvas-element-context';
 import type {
   DrawableElement,
   ResizeHandle,
 } from './elements/drawable-element';
 import type { ElementType } from './elements/element-type';
+import { FlagElement, resolveFlagType } from './elements/flag-element';
 import type { Vector2 } from './geometry';
 import { catalogs, type MessageGetter } from './i18n/messages';
 import { PageFrameAnchoring } from './page-frame/anchoring';
@@ -32,6 +32,7 @@ import { PlacementController } from './placement-controller';
 import { Ruler } from './ruler';
 import { SelectionController } from './selection-controller';
 import type { LivePeersSnapshot } from './sync/live/peers';
+import type { FlagType } from './sync/repo/types';
 import { createDefaultTools } from './tools/default-tool-registry';
 import type { ITool, ToolId } from './tools/tool';
 import type { YDocManager } from './ydoc-manager';
@@ -89,7 +90,8 @@ export class DrawableCanvas {
   private readonly handleDocUpdate = () => this.requestRedraw();
   private contentBoundsCache: DOMRect | null = null;
   private contentBoundsValid = false;
-  private lastBookmarkId: string | null = null;
+  private lastFlagId: string | null = null;
+  private flagTypes: readonly FlagType[] = [];
   private toolSelected: ITool;
 
   public constructor(
@@ -124,6 +126,7 @@ export class DrawableCanvas {
       ydoc,
       getElements: () => this.elements,
       getZoom: () => this.viewport.zoom,
+      getFlagColor: (flagTypeId) => this.resolveFlagType(flagTypeId)?.color,
       onChange: () => this.notifyChange(),
       invalidateContentBounds: () => this.invalidateContentBounds(),
       requestRedraw: () => this.requestRedraw(),
@@ -290,21 +293,30 @@ export class DrawableCanvas {
   }
 
   /** Flags in reading order: top to bottom, then left to right. */
-  public get bookmarks(): BookmarkElement[] {
+  public get flags(): FlagElement[] {
     return this.elements
-      .filter((element) => element instanceof BookmarkElement)
+      .filter((element) => element instanceof FlagElement)
       .sort((a, b) => a.offset.y - b.offset.y || a.offset.x - b.offset.x);
   }
 
+  public setFlagTypes(types: readonly FlagType[]): void {
+    this.flagTypes = types;
+    this.requestRedraw();
+  }
+
+  public resolveFlagType(flagTypeId: string): FlagType | undefined {
+    return resolveFlagType(this.flagTypes, flagTypeId);
+  }
+
   // Centers the flag, zooming in to at least 100% so the marked spot is legible.
-  public focusBookmark(uuid: string): boolean {
+  public focusFlag(uuid: string): boolean {
     const flag = this.elements.find(
-      (element) => element instanceof BookmarkElement && element.uuid === uuid,
+      (element) => element instanceof FlagElement && element.uuid === uuid,
     );
     if (!flag) {
       return false;
     }
-    this.lastBookmarkId = uuid;
+    this.lastFlagId = uuid;
     const view = this.viewport.getWorldRect();
     const scale = this.viewport.zoom / Math.max(this.viewport.zoom, 1);
     const width = view.width * scale;
@@ -321,21 +333,19 @@ export class DrawableCanvas {
     return true;
   }
 
-  public stepBookmark(direction: 1 | -1): void {
-    const flags = this.bookmarks;
+  public stepFlag(direction: 1 | -1): void {
+    const flags = this.flags;
     if (flags.length === 0) {
       return;
     }
-    const current = flags.findIndex(
-      (flag) => flag.uuid === this.lastBookmarkId,
-    );
+    const current = flags.findIndex((flag) => flag.uuid === this.lastFlagId);
     const next =
       current === -1
         ? direction === 1
           ? 0
           : flags.length - 1
         : (current + direction + flags.length) % flags.length;
-    this.focusBookmark(flags[next].uuid);
+    this.focusFlag(flags[next].uuid);
   }
 
   public get editingElement(): DrawableElement | null {

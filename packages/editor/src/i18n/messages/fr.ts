@@ -61,6 +61,10 @@ const fr: typeof en = {
         description:
           'Cartographier les liens explicites entre les notes canevas',
       },
+      openFlags: {
+        label: 'Ouvrir les drapeaux',
+        description: 'Parcourir et nettoyer les drapeaux de vos notes',
+      },
       importMarkdown: {
         label: 'Importer du Markdown',
         description: 'Créer un canevas à partir d’un fichier Markdown',
@@ -269,7 +273,6 @@ const fr: typeof en = {
 
       rename: 'Renommer',
       manageTags: 'Gérer les étiquettes',
-      bookmarks: 'Signets',
       color: 'Couleur',
       versionHistory: 'Historique des versions',
       revealInFileManager: 'Afficher dans le gestionnaire de fichiers',
@@ -283,11 +286,6 @@ const fr: typeof en = {
       yes: 'Mettre à jour',
       no: 'Ignorer',
     },
-    bookmarksDialog: {
-      title: 'Signets',
-      empty: 'Aucun signet dans ce dossier pour le moment.',
-      loadFailed: 'Impossible de charger les signets',
-    },
     tagDialog: {
       title: 'Gérer les étiquettes',
       description: (name: string) => `Étiquettes de ${name}`,
@@ -297,6 +295,23 @@ const fr: typeof en = {
       createNew: 'Créer une étiquette',
       placeholder: 'Nom de l’étiquette...',
     },
+  },
+  flagsPage: {
+    title: 'Drapeaux',
+    searchPlaceholder: 'Rechercher drapeaux, notes, dossiers...',
+    empty: 'Aucun drapeau pour le moment.',
+    allTypes: 'Tous',
+    noMatches: 'Aucun drapeau ne correspond.',
+    loadFailed: 'Impossible de charger les drapeaux',
+    selectAll: 'Tout sélectionner',
+    selected: (count: number) =>
+      `${count} ${count === 1 ? 'sélectionné' : 'sélectionnés'}`,
+    changeType: 'Changer le type',
+    delete: 'Supprimer',
+    deleteTitle: (count: number) =>
+      `Supprimer ${count} ${count === 1 ? 'drapeau' : 'drapeaux'} ?`,
+    deleteDescription: 'Ils seront retirés de leurs notes.',
+    editFailed: 'Impossible de mettre à jour les drapeaux',
   },
   graph: {
     title: 'Graphe',
@@ -694,17 +709,17 @@ const fr: typeof en = {
           label: 'Outil Texte',
           description: 'Créer un nouveau bloc de texte',
         },
-        'canvas:tool-bookmark': {
-          label: 'Outil Signet',
-          description: 'Placer un drapeau de signet',
+        'canvas:tool-flag': {
+          label: 'Outil Drapeau',
+          description: 'Placer un drapeau',
         },
-        'canvas:bookmark-previous': {
-          label: 'Signet précédent',
-          description: 'Aller au signet précédent de ce canevas',
+        'canvas:flag-previous': {
+          label: 'Drapeau précédent',
+          description: 'Aller au drapeau précédent de ce canevas',
         },
-        'canvas:bookmark-next': {
-          label: 'Signet suivant',
-          description: 'Aller au signet suivant de ce canevas',
+        'canvas:flag-next': {
+          label: 'Drapeau suivant',
+          description: 'Aller au drapeau suivant de ce canevas',
         },
         'canvas:insert-frame': {
           label: 'Insérer un cadre de page',
@@ -875,14 +890,30 @@ const fr: typeof en = {
       title: 'Liens entrants',
       linkedMentions: 'Mentions liées',
     },
-    bookmarks: {
-      title: 'Signets',
-      untitled: 'Signet',
+    flags: {
+      title: 'Drapeaux',
+      untitled: 'Drapeau',
       pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
       rename: 'Renommer',
       remove: 'Supprimer',
-      previous: 'Signet précédent',
-      next: 'Signet suivant',
+      previous: 'Drapeau précédent',
+      next: 'Drapeau suivant',
+      changeType: 'Changer le type de drapeau',
+    },
+    flagTypes: {
+      todo: 'À faire',
+      review: 'À revoir',
+      examinable: 'À l’examen',
+      newFlag: 'Nouveau drapeau',
+      edit: 'Modifier le drapeau',
+      remove: 'Supprimer le drapeau',
+      name: 'Nom du drapeau',
+      removeTitle: (name: string) => `Supprimer « ${name} » ?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 drapeau utilise ce type. Il sera aussi supprimé de vos notes.'
+          : `${count} drapeaux utilisent ce type. Ils seront aussi supprimés de vos notes.`,
+      removeConfirm: 'Supprimer',
     },
     toolbar: {
       clickForOptions: 'cliquez pour les options',
@@ -1005,7 +1036,7 @@ const fr: typeof en = {
       highlighter: 'Surligneur',
       eraser: 'Gomme',
       text: 'Texte',
-      bookmark: 'Signet',
+      flag: 'Drapeau',
     },
     toolOptions: {
       color: 'Couleur',
@@ -1026,6 +1057,7 @@ const fr: typeof en = {
       deleteColor: 'Supprimer la couleur',
       decreaseFontSize: 'Réduire la taille de police',
       increaseFontSize: 'Augmenter la taille de police',
+      flagType: 'Drapeau',
     },
     embedComposer: {
       dropToEmbed: 'Déposez pour intégrer',
@@ -1108,10 +1140,10 @@ const fr: typeof en = {
       description:
         'Ce que vous dessinez sur une page d’un PDF reste sur cette page, et Ancrer à la page y fixe images et formes. Elles suivent la page quand vous déplacez le PDF ou passez en Colonnes.',
     },
-    bookmarks: {
-      title: 'Placez des signets sur le canevas',
+    flags: {
+      title: 'Placez des drapeaux sur le canevas',
       description:
-        'Utilisez l’outil Signet (B) pour poser un drapeau. Ouvrez la liste des drapeaux en haut du canevas, ou appuyez sur [ et ] pour passer de l’un à l’autre.',
+        'Utilisez l’outil Drapeau (B) pour poser un drapeau. Ouvrez la liste des drapeaux en haut du canevas, ou appuyez sur [ et ] pour passer de l’un à l’autre.',
     },
     canvasStyle: {
       title: 'Un style pour chaque canevas',

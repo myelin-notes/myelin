@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import {
-  Flag,
   FolderInput,
   FolderOpen,
   History,
@@ -21,7 +20,6 @@ interface ItemContextMenuProps {
   onRemove: () => void;
   onReveal?: () => void;
   onManageTags?: () => void;
-  onShowBookmarks?: () => void;
   onVersionHistory?: () => void;
   createSubmenu?: ReactNode;
   /** Extra items rendered after Manage Tags. */
@@ -34,7 +32,6 @@ export function ItemContextMenu({
   onRemove,
   onReveal,
   onManageTags,
-  onShowBookmarks,
   onVersionHistory,
   createSubmenu,
   children,
@@ -65,15 +62,6 @@ export function ItemContextMenu({
         >
           <Tag className="size-4" />
           {strings.library.itemMenu.manageTags}
-        </ContextMenuItem>
-      )}
-      {onShowBookmarks && (
-        <ContextMenuItem
-          className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
-          onClick={onShowBookmarks}
-        >
-          <Flag className="size-4" />
-          {strings.library.itemMenu.bookmarks}
         </ContextMenuItem>
       )}
       {children}
