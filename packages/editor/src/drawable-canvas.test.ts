@@ -204,6 +204,40 @@ describe('tablet selection routing', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     UserPrefs.set('inputMode', 'touch');
+    UserPrefs.remove('penButtons');
+  });
+
+  it('pans instead of drawing while a pen button bound to pan is held', () => {
+    UserPrefs.set('penButtons', { eraser: null, toolWheel: 1, pan: 2 });
+    const { interaction, tool, viewport } = makeInteraction(false);
+    // Pressed while hovering, then the tip lands mid-pan.
+    const press = {
+      pointerId: 1,
+      pointerType: 'pen',
+      button: 2,
+      buttons: 2,
+      movementX: 0,
+      movementY: 0,
+      type: 'pointerdown',
+    } as PointerEvent;
+
+    interaction.onPointerDown(press);
+    interaction.onPointerMove({
+      ...press,
+      button: -1,
+      buttons: 3,
+      movementX: 5,
+      type: 'pointermove',
+    } as PointerEvent);
+    interaction.onPointerUp({
+      ...press,
+      buttons: 0,
+      type: 'pointerup',
+    } as PointerEvent);
+
+    expect(viewport.panBy).toHaveBeenCalledWith(5, 0);
+    expect(tool.start).not.toHaveBeenCalled();
+    interaction.destroy();
   });
 
   it.each([
@@ -445,6 +479,21 @@ describe('pen eraser override', () => {
     }
     vi.unstubAllGlobals();
     UserPrefs.set('penBarrelButtonImmediate', false);
+    UserPrefs.remove('penButtons');
+  });
+
+  it('erases with whichever button the eraser is bound to', () => {
+    UserPrefs.set('penButtons', { eraser: 1, toolWheel: null, pan: null });
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 2, 2));
+    expect(canvas.selectedTool).toBe(pen);
+    canvas.syncEraserOverride(penEvent('pointerup', 2, 0));
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 1, 4));
+    expect(canvas.selectedTool).toBe(eraser);
+    canvas.syncEraserOverride(penEvent('pointerup', 1, 0));
+    expect(canvas.selectedTool).toBe(pen);
   });
 
   it('defaults to queued mode', () => {

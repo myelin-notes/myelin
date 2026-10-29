@@ -2,14 +2,14 @@ import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableCanvas, Vector2 } from './drawable-canvas';
 import { InputModeController } from './input-mode';
 import { PalmRejection } from './palm-rejection';
+import { buttonBit, penButtonBit } from './pen-buttons';
 import type { ITool, ToolId } from './tools/tool';
 import { UserPrefs } from './user-prefs';
 import { StateMachine } from './utils/state-machine';
 
 const TOUCH_TAP_SLOP = 8;
-const PEN_ERASER_BUTTONS = 32 | 2;
+const PEN_ERASER_END = 32;
 const PEN_CONTACT_BUTTONS = 1 | 32;
-const PEN_WHEEL_BUTTONS = 4;
 const LONG_FRAME_MS = 25;
 
 export function coalescedPointerSamples(
@@ -305,7 +305,7 @@ export class CanvasInteractionController {
     this.state.update(event);
     if (event.target === this.host.canvas) {
       const point = this.host.viewport.screenToWorld(this.screenPosition);
-      this.selectedTool.hover?.(this.host.drawableCanvas, point);
+      this.selectedTool.hover?.(this.host.drawableCanvas, point, event);
       if (this.state.current === InteractState.Idle) {
         this.rulerCursor = this.host.drawableCanvas.ruler.cursorAt(
           point,
@@ -336,7 +336,12 @@ export class CanvasInteractionController {
         this.startTouchInteraction(event);
         return;
       case 'pen':
-        if (event.buttons & PEN_WHEEL_BUTTONS) {
+        if (event.buttons & penButtonBit('toolWheel')) {
+          return;
+        }
+        if (event.buttons & penButtonBit('pan')) {
+          this.state.change(InteractState.Moving, event);
+          this.state.update(event);
           return;
         }
         this.syncEraserOverride(event);
@@ -530,7 +535,9 @@ export class CanvasInteractionController {
     if (event.pointerType !== 'pen') {
       return;
     }
-    const reportedHeld = (event.buttons & PEN_ERASER_BUTTONS) !== 0;
+    const eraserButton = UserPrefs.get('penButtons').eraser;
+    const reportedHeld =
+      (event.buttons & (PEN_ERASER_END | buttonBit(eraserButton))) !== 0;
     const penContact = (event.buttons & PEN_CONTACT_BUTTONS) !== 0;
     const penLifted = this.penContactOpen && !penContact;
     if (event.type === 'pointercancel') {
@@ -538,7 +545,7 @@ export class CanvasInteractionController {
       this.setEraserOverrideApplied(false, event);
       return;
     }
-    if (event.button === 2 || penContact) {
+    if (event.button === eraserButton || penContact) {
       this.eraserButtonsHeld = reportedHeld;
     }
     if (

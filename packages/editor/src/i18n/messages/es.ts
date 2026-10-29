@@ -397,6 +397,24 @@ const es: typeof en = {
         description:
           'Cambia al borrador al pulsar el botón del lápiz. Si está desactivado, aplica el cambio cuando se levanta el lápiz.',
       },
+      penButtons: {
+        label: 'Botones del lápiz',
+        description:
+          'Haz clic en una acción y pulsa el botón del lápiz que quieras usar. Si no ocurre nada, asigna ese botón a Clic central en el controlador de tu tableta.',
+        actions: {
+          eraser: 'Borrar mientras se mantiene',
+          toolWheel: 'Abrir rueda de herramientas',
+          pan: 'Desplazar mientras se mantiene',
+        },
+        buttons: {
+          1: 'Clic central',
+          2: 'Clic derecho',
+          3: 'Atrás',
+          4: 'Adelante',
+        },
+        pressButton: 'Pulsa un botón del lápiz...',
+        notPen: 'Eso fue un ratón, no un lápiz',
+      },
     },
     pageFrameEditing: {
       title: 'Edición de marcos de página',

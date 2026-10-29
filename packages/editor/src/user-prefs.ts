@@ -53,6 +53,11 @@ const PREFS = {
   ),
   inputMode: pref<import('./input-mode').InputMode>('input-mode', 'touch'),
   penBarrelButtonImmediate: pref<boolean>('pen-barrel-button-immediate', false),
+  penButtons: pref<import('./pen-buttons').PenButtonBindings>('pen-buttons', {
+    eraser: 2,
+    toolWheel: 1,
+    pan: null,
+  }),
   noteLinkHoverPreview: pref<boolean>('note-link-hover-preview', true),
   linkRequireModifier: pref<boolean>('link-require-modifier', true),
   alwaysRenameNoteReferences: pref<boolean>(

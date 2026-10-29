@@ -402,6 +402,24 @@ const fr: typeof en = {
         description:
           'Passe à la gomme dès que le bouton du stylet est pressé. Désactivé, le changement se fait lorsque le stylet est levé.',
       },
+      penButtons: {
+        label: 'Boutons du stylet',
+        description:
+          'Cliquez sur une action, puis appuyez sur le bouton du stylet à utiliser. Si rien ne se passe, réglez ce bouton sur Clic central dans le pilote de votre tablette.',
+        actions: {
+          eraser: 'Gommer en maintenant',
+          toolWheel: 'Ouvrir la roue d’outils',
+          pan: 'Déplacer en maintenant',
+        },
+        buttons: {
+          1: 'Clic central',
+          2: 'Clic droit',
+          3: 'Précédent',
+          4: 'Suivant',
+        },
+        pressButton: 'Appuyez sur un bouton du stylet...',
+        notPen: 'C’était une souris, pas un stylet',
+      },
     },
     pageFrameEditing: {
       title: 'Édition des cadres de page',
