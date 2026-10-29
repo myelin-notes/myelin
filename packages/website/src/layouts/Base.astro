@@ -72,9 +72,12 @@ const pageJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       document.addEventListener(
         'click',
         (event) => {
-          const link = (event.target as Element).closest<HTMLAnchorElement>(
-            'a[data-download]',
-          );
+          const target = event.target as Element;
+          if (target.closest('a[data-try]')) {
+            trackWebEvent('try_clicked');
+            return;
+          }
+          const link = target.closest<HTMLAnchorElement>('a[data-download]');
           if (!link) {
             return;
           }

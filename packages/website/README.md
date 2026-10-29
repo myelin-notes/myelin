@@ -31,5 +31,6 @@ top-level `functions/` directory. The build output is
 Download links ship pointing at the GitHub releases page, and
 `src/lib/downloads.ts` upgrades them to the latest release's installers. Every
 `a[data-download]` click sends a PostHog `download_clicked` event with the
-platform (see `src/layouts/Base.astro`). Anything recorded on the site must
+platform, and every `a[data-try]` click sends `try_clicked` (see
+`src/layouts/Base.astro`). Anything recorded on the site must
 match the "This website" section of `src/pages/privacy.astro`.
