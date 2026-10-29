@@ -1,0 +1,196 @@
+---
+// The features page, in one language. Rendered by `src/pages/features.astro`
+// for English and `src/pages/[locale]/features.astro` for every other locale.
+import Base from '../layouts/Base.astro';
+import CheckList from './static/CheckList.astro';
+import InkMark from './static/InkMark.astro';
+import PageScripts from './static/PageScripts.astro';
+import Shot from './static/Shot.astro';
+import SiteFooter from './static/SiteFooter.astro';
+import {
+  FEATURE_SECTION_IDS,
+  type FeatureClipId,
+  type FeatureSectionId,
+  getCopy,
+  siteLinks,
+} from '../content/site';
+import { type Locale, localizePath } from '../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+const page = copy.features;
+
+// Each clip is a 896x578 loop in public/media, rendered from the myelin-reels scene of the same name.
+const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
+  handwriting: [
+    ['shapes', 'ft-shapes'],
+    ['toolWheel', 'ft-tool-wheel'],
+    ['ruler', 'wn-ruler'],
+    ['rotate', 'wn-rotate'],
+  ],
+  pdfs: [
+    ['pdfQuote', 'wn-pdf-quote'],
+    ['pdfAnchor', 'wn-pdf-anchor'],
+  ],
+  pages: [
+    ['slash', 'ft-slash'],
+    ['imageAnchor', 'anchoring'],
+  ],
+  canvas: [
+    ['canvasStyle', 'wn-canvas-style'],
+    ['bookmarks', 'wn-bookmarks'],
+  ],
+  agents: [['agents', 'ft-mcp-agent']],
+};
+
+const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
+const band = 'py-24 lg:py-32';
+const heading =
+  'reveal mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
+const cardTitle = 'font-heading text-xl font-medium text-text-primary';
+const cardBody = 'mt-2.5 text-sm leading-relaxed text-text-secondary';
+const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
+---
+
+<Base locale={locale} title={page.meta.title} description={page.meta.description}>
+  <div class="relative z-10 pt-12">
+    <section class:list={[wrap, 'pt-16 pb-4 lg:pt-24']}>
+      <p class="rise text-sm text-text-muted">{page.eyebrow}</p>
+      <h1
+        class="rise mt-6 max-w-3xl font-heading text-[clamp(2.6rem,4.5vw,4rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
+        style="animation-delay:.06s"
+      >
+        {page.headline}
+      </h1>
+      <p class="rise mt-6 max-w-xl text-text-secondary" style="animation-delay:.14s">
+        {page.subheadline}
+      </p>
+      <nav
+        aria-label={page.jumpNav}
+        class="rise mt-10 flex flex-wrap gap-2"
+        style="animation-delay:.22s"
+      >
+        {
+          FEATURE_SECTION_IDS.map((id) => (
+            <a
+              href={`#${id}`}
+              class="rounded-xl bg-card px-4 py-2 text-sm text-text-secondary shadow-elevated transition-colors hover:text-ink"
+            >
+              {page.sections[id].label}
+            </a>
+          ))
+        }
+      </nav>
+    </section>
+
+    {
+      FEATURE_SECTION_IDS.map((id, i) => {
+        const section = page.sections[id];
+        const cards = clips[id] ?? [];
+        // A lone clip shares its row with the details instead of leaving half of it empty.
+        const detailsBeside = cards.length === 1;
+        return (
+          <section id={id} class:list={[wrap, band]}>
+            <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+              <div class="lg:col-span-6">
+                <p class="reveal kicker text-text-muted">
+                  {String(i + 1).padStart(2, '0')} / {section.label}
+                </p>
+                <h2 class={heading}>{section.heading}</h2>
+                <InkMark variant={(i % 3) as 0 | 1 | 2} class="mt-5" />
+              </div>
+              <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+                {section.lede}
+              </p>
+            </div>
+
+            {cards.length > 0 && (
+              <div class="mt-14 grid gap-6 md:grid-cols-2 lg:mt-16">
+                {cards.map(([clipId, file], j) => {
+                  const clip = page.clips[clipId];
+                  return (
+                    <article
+                      class="reveal-scale lift overflow-hidden rounded-2xl bg-card shadow-elevated"
+                      style={`--i:${(j % 2) + 1}`}
+                    >
+                      <Shot
+                        src={`/media/${file}.mp4`}
+                        alt={clip.alt}
+                        width={896}
+                        height={578}
+                        phoneCrop={false}
+                        class="rounded-none! border-b border-border-ghost shadow-none!"
+                      />
+                      <div class="p-6 lg:p-7">
+                        <h3 class={cardTitle}>{clip.title}</h3>
+                        <p class={cardBody}>{clip.body}</p>
+                      </div>
+                    </article>
+                  );
+                })}
+                {detailsBeside && section.details && (
+                  <CheckList items={section.details} class:list={[details, 'self-center md:pl-6']} />
+                )}
+              </div>
+            )}
+
+            {id === 'connect' && (
+              <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4">
+                {page.notes.map((note, j) => (
+                  <div
+                    class="reveal-scale lift rounded-2xl bg-card p-6 shadow-elevated"
+                    style={`--i:${(j % 4) + 1}`}
+                  >
+                    <h3 class="font-heading text-lg font-medium text-text-primary">{note.title}</h3>
+                    <p class={cardBody}>{note.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!detailsBeside && section.details && (
+              <CheckList
+                items={section.details}
+                class:list={[details, 'mt-12 md:grid-cols-2 lg:grid-cols-3']}
+              />
+            )}
+          </section>
+        );
+      })
+    }
+
+    <section class="bg-primary text-text-on-dark">
+      <div class:list={[wrap, 'py-28 lg:py-36']}>
+        <h2 class="max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance">
+          {page.closing.heading}
+        </h2>
+        <p class="mt-7 max-w-2xl text-text-on-dark/75">{page.closing.body}</p>
+        <div class="mt-12 flex flex-wrap gap-3">
+          <a
+            href={siteLinks.releases}
+            data-download="auto"
+            class="inline-flex h-12 items-center gap-2 rounded-xl bg-white px-7 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85"
+          >
+            {copy.download.cta}
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nudge-y size-4"><path d="M12 15V3"></path><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5"></path></svg>
+          </a>
+          <a
+            href={localizePath('/try', locale)}
+            class="inline-flex h-12 items-center gap-2 rounded-xl bg-white/10 px-7 text-sm text-text-on-dark transition-colors hover:bg-white/20"
+          >
+            {copy.hero.ctaSecondary}
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nudge-x size-4"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <SiteFooter locale={locale} />
+  </div>
+
+  <PageScripts />
+</Base>

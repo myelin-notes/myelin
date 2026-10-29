@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, type Locale } from '@/lib/locale';
+import { DEFAULT_LOCALE, type Locale, localizePath } from '@/lib/locale';
 import en from './en';
 import es from './es';
 import fr from './fr';
@@ -30,25 +30,68 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'privacy' | 'support';
+export type LinkId = 'features' | 'privacy' | 'support';
 
 /**
  * The header and footer carry the same links. The set itself is the same in
  * every language; only the labels translate.
  */
-export const navLinks: LinkId[] = ['support', 'privacy'];
+export const navLinks: LinkId[] = ['features', 'support', 'privacy'];
 
-/**
- * The privacy policy is published in English only, so its href carries no
- * locale prefix and every locale links to the same page.
- */
 const hrefs: Record<LinkId, string> = {
+  features: '/features',
   privacy: '/privacy',
   support: '/support',
 };
 
-export function linkHref(id: LinkId): string {
-  return hrefs[id];
+/**
+ * Published in English only, so their href carries no locale prefix and every
+ * locale links to the same page.
+ */
+const englishOnly: LinkId[] = ['privacy', 'support'];
+
+export function linkHref(id: LinkId, locale: Locale): string {
+  return englishOnly.includes(id) ? hrefs[id] : localizePath(hrefs[id], locale);
+}
+
+/** Sections of the features page, in page order. */
+export const FEATURE_SECTION_IDS = [
+  'handwriting',
+  'pdfs',
+  'pages',
+  'canvas',
+  'agents',
+  'connect',
+  'more',
+] as const;
+
+export type FeatureSectionId = (typeof FEATURE_SECTION_IDS)[number];
+
+/** Features-page cards that play a clip. */
+export type FeatureClipId =
+  | 'shapes'
+  | 'toolWheel'
+  | 'ruler'
+  | 'rotate'
+  | 'pdfQuote'
+  | 'pdfAnchor'
+  | 'slash'
+  | 'imageAnchor'
+  | 'canvasStyle'
+  | 'bookmarks'
+  | 'agents';
+
+interface FeatureSection {
+  /** The kicker, and the section's jump link at the top of the page. */
+  label: string;
+  heading: string;
+  lede: string;
+  details?: string[];
+}
+
+interface FeatureNote {
+  title: string;
+  body: string;
 }
 
 interface SyncTier {
@@ -160,6 +203,21 @@ export interface SiteCopy {
     faqTitle: string;
     /** `## ` headings become the FAQ entries; see `getFaqs`. */
     faqMarkdown: string;
+  };
+
+  /** The features page, which goes past what the landing page shows. */
+  features: {
+    meta: { title: string; description: string };
+    eyebrow: string;
+    headline: string;
+    subheadline: string;
+    /** Labels the row of jump links to each section. */
+    jumpNav: string;
+    sections: Record<FeatureSectionId, FeatureSection>;
+    clips: Record<FeatureClipId, FeatureNote & { alt: string }>;
+    /** Text-only cards in the `connect` section. */
+    notes: FeatureNote[];
+    closing: { heading: string; body: string };
   };
 
   linkLabels: Record<LinkId, string>;

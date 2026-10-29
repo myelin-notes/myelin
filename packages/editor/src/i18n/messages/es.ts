@@ -1137,7 +1137,7 @@ const es: typeof en = {
     pdfAnchoring: {
       title: 'Ancla notas a las páginas de un PDF',
       description:
-        'Lo que dibujas en una página de un PDF se queda en esa página, y Anclar a la página fija en ella imágenes y formas. Siguen a la página cuando mueves el PDF o lo cambias a Columnas.',
+        'Lo que escribes en una página de un PDF queda unido a esa página. Si mueves el PDF o cambias su disposición, tus notas siguen en el mismo lugar de la página. Anclar a la página fija imágenes y formas de la misma manera.',
     },
     flags: {
       title: 'Marca lugares en tu lienzo',

@@ -1147,7 +1147,7 @@ const fr: typeof en = {
     pdfAnchoring: {
       title: 'Ancrez vos notes aux pages d’un PDF',
       description:
-        'Ce que vous dessinez sur une page d’un PDF reste sur cette page, et Ancrer à la page y fixe images et formes. Elles suivent la page quand vous déplacez le PDF ou passez en Colonnes.',
+        'Ce que vous écrivez sur une page de PDF est attaché à cette page. Si vous déplacez le PDF ou changez sa disposition, vos notes restent au même endroit de la page. Ancrer à la page fixe aussi les images et les formes.',
     },
     flags: {
       title: 'Placez des drapeaux sur le canevas',

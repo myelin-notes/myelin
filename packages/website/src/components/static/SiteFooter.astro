@@ -1,0 +1,46 @@
+---
+import { Wordmark } from '@myelin/ui';
+import { getCopy, linkHref, navLinks, siteLinks } from '../../content/site';
+import type { Locale } from '../../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const copy = getCopy(locale);
+const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
+---
+
+<footer class={wrap}>
+  <div class="grid gap-10 py-16 lg:grid-cols-12">
+    <div class="lg:col-span-5">
+      <Wordmark className="text-[1.35rem]" />
+    </div>
+    <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
+      <ul class="flex flex-wrap gap-x-8 gap-y-3">
+        {locale === 'en' && (
+          <li><a href={siteLinks.source} class="text-sm text-text-secondary transition-colors hover:text-ink">Myelin Notes on GitHub</a></li>
+        )}
+        {
+          navLinks.map((id) => (
+            <li>
+              <a
+                href={linkHref(id, locale)}
+                class="text-sm text-text-secondary transition-colors hover:text-ink"
+              >
+                {copy.linkLabels[id]}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+  <div class="h-px w-full bg-border-ghost"></div>
+  <div
+    class="flex flex-wrap items-center justify-between gap-4 py-10 text-sm text-text-muted"
+  >
+    <p class="kicker">{copy.footer.platforms}</p>
+  </div>
+</footer>

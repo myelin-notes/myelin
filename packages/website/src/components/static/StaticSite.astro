@@ -1,17 +1,17 @@
 ---
 // The landing page. The FAQ sits just ahead of the download band so the page
 // closes on the CTA rather than on a question.
-import { Wordmark, buttonVariants, cn } from '@myelin/ui';
+import { buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
 import InkMark from './InkMark.astro';
+import PageScripts from './PageScripts.astro';
 import Shot from './Shot.astro';
+import SiteFooter from './SiteFooter.astro';
 import { IMPORT_SOURCE_ICONS } from '../import-icons';
 import {
-  navLinks,
   getCopy,
   getFaqs,
   isComingSoon,
-  linkHref,
   siteLinks,
 } from '../../content/site';
 import { type Locale, localizePath } from '../../lib/locale';
@@ -332,84 +332,7 @@ const ctaOutline = cn(
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class={wrap}>
-    <div class="grid gap-10 py-16 lg:grid-cols-12">
-      <div class="lg:col-span-5">
-        <Wordmark className="text-[1.35rem]" />
-      </div>
-      <nav class="lg:col-span-7" aria-label={copy.footer.nav}>
-        <ul class="flex flex-wrap gap-x-8 gap-y-3">
-          {locale === 'en' && (
-            <li><a href={siteLinks.source} class="text-sm text-text-secondary transition-colors hover:text-ink">Myelin Notes on GitHub</a></li>
-          )}
-          {
-            navLinks.map((id) => (
-              <li>
-                <a
-                  href={linkHref(id)}
-                  class="text-sm text-text-secondary transition-colors hover:text-ink"
-                >
-                  {copy.linkLabels[id]}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
-      </nav>
-    </div>
-    <div class="h-px w-full bg-border-ghost"></div>
-    <div
-      class="flex flex-wrap items-center justify-between gap-4 py-10 text-sm text-text-muted"
-    >
-      <p class="kicker">{copy.footer.platforms}</p>
-    </div>
-  </footer>
+  <SiteFooter locale={locale} />
 </div>
 
-<script>
-  import {
-    autoDownloadUrl,
-    detectPlatform,
-    fetchDownloadUrls,
-  } from '../../lib/downloads';
-  import type { PlatformKey } from '../../content/site/links';
-
-  // Every download link ships pointing at the releases page; upgrade the ones
-  // whose platform has a real installer in the latest release. "auto" means the
-  // link is a bare "Download", so it follows the visitor's OS. Anything left
-  // unresolved (no JS, GitHub unreachable) keeps the releases page, which is a
-  // working destination on its own.
-  void fetchDownloadUrls().then((urls) => {
-    const detected = detectPlatform();
-    const links =
-      document.querySelectorAll<HTMLAnchorElement>('a[data-download]');
-    for (const link of links) {
-      const attr = link.dataset.download;
-      const url =
-        attr === 'auto'
-          ? autoDownloadUrl(urls, detected)
-          : urls[attr as PlatformKey];
-      if (url) {
-        link.href = url;
-      }
-    }
-  });
-
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('in');
-            observer.unobserve(entry.target);
-          }
-        }
-      },
-      { rootMargin: '0px 0px -10% 0px' },
-    );
-    document
-      .querySelectorAll('.reveal, .reveal-scale, .ink-scroll')
-      .forEach((el) => observer.observe(el));
-  }
-</script>
+<PageScripts />

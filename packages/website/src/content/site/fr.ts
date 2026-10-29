@@ -213,7 +213,201 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
 `,
   },
 
+  features: {
+    meta: {
+      title: 'Fonctionnalités | Myelin Notes',
+      description:
+        'Tout ce que fait Myelin Notes : formes qui se redressent toutes seules, règle et préréglages de stylo pour l’écriture manuscrite, citations et encre ancrée dans les PDF, pages avec diagrammes Mermaid, agents IA via MCP local, et plus encore.',
+    },
+    eyebrow: 'Fonctionnalités',
+    headline: 'Tout ce que fait Myelin Notes.',
+    subheadline:
+      'La page d’accueil montre l’essentiel. Voici le détail : les outils pour l’écriture manuscrite, les PDF, les pages et le canevas, et la façon dont ils s’articulent.',
+    jumpNav: 'Sections',
+    sections: {
+      handwriting: {
+        label: 'Écriture manuscrite',
+        heading:
+          'Une encre qui se comporte comme un stylo, avec des astuces que le papier n’a pas.',
+        lede: 'Écrivez au stylet, au doigt ou à la souris. Myelin redresse ce que vous voulez droit et laisse votre écriture telle qu’elle est.',
+        details: [
+          'Stylos sensibles à la pression, avec une stabilisation réglable pour des traits plus sûrs',
+          'Rejet de la paume, et un mode Stylet ou Tactile pour choisir ce que font vos doigts',
+          'Le bouton du stylet passe à la gomme, tout de suite ou une fois le stylet levé',
+          'Une gomme par trait, ou une gomme précise qui n’efface que ce qu’elle touche',
+          'Sélection au rectangle ou au lasso, pour déplacer, copier, verrouiller ou réordonner',
+          'Des couleurs personnalisées enregistrées une fois pour toutes, et du texte dans la police de votre choix',
+        ],
+      },
+      pdfs: {
+        label: 'PDF',
+        heading:
+          'Des PDF dans lesquels on travaille, pas seulement qu’on regarde.',
+        lede: 'Annotez, citez et réorganisez vos PDF sur le même canevas que le reste de vos notes, puis exportez le résultat.',
+        details: [
+          'Exportez le PDF annoté une fois terminé',
+          'Allez à n’importe quelle page avec le navigateur de pages',
+          'Affichez un PDF en Pages, ou côte à côte en Colonnes',
+          'Mettez un signet sur une page de PDF pour y revenir',
+          'Trouvez des mots dans vos PDF avec la recherche du canevas',
+        ],
+      },
+      pages: {
+        label: 'Pages',
+        heading: 'Des pages qui font plus que contenir du texte.',
+        lede: 'Les cadres de page sont des documents en texte enrichi sur le canevas. Tapez / pour insérer ce que vous voulez, ou écrivez simplement en Markdown.',
+        details: [
+          'Raccourcis Markdown pour les titres, listes, citations et la mise en forme',
+          'Listes de tâches, encadrés et tableaux',
+          'Blocs de maths, et blocs de code exécutables',
+          '[[Liens de notes]] avec aperçu au survol, mis à jour quand vous renommez une note',
+          'Images, vidéos, YouTube et cartes de lien intégrés',
+          'Mise en page Pages, Colonnes ou Continu',
+        ],
+      },
+      canvas: {
+        label: 'Canevas',
+        heading: 'Un canevas infini où l’on ne se perd pas.',
+        lede: 'Placez pages, PDF, images, audio et encre où vous voulez, et revenez à n’importe quel endroit en une touche.',
+        details: [
+          'Des images à rogner, faire pivoter, verrouiller et ancrer à une page',
+          'Prenez une photo avec votre caméra et déposez-la directement',
+          'Des blocs LaTeX pour les équations, partout sur le canevas',
+          'Thème clair ou sombre, ou celui du système',
+          'Raccourcis clavier modifiables dans les Réglages',
+        ],
+      },
+      agents: {
+        label: 'Agents IA',
+        heading: 'Votre propre IA, sur votre propre machine.',
+        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire.',
+        details: [
+          'Le serveur n’écoute que sur 127.0.0.1, sur le port de votre choix',
+          'Copiez l’invite d’installation depuis les Réglages pour connecter votre agent',
+          'Les agents peuvent lire notes, liens, pages, PDF, images, écriture manuscrite et captures du canevas',
+          'L’écriture reste désactivée tant que vous n’activez pas les écritures MCP directes dans les Réglages',
+          'Une fois l’écriture activée, les agents peuvent créer notes, pages, LaTeX et encre, et modifier les étiquettes',
+        ],
+      },
+      connect: {
+        label: 'Trouver et relier',
+        heading: 'Tout ce que vous écrivez se retrouve.',
+        lede: 'L’audio, la recherche et les liens relient vos notes, si bien que l’idée du mois dernier n’est qu’à quelques touches.',
+      },
+      more: {
+        label: 'Et plus encore',
+        heading: 'Vos fichiers, votre synchronisation, votre langue.',
+        lede: 'L’essentiel, en une liste.',
+        details: [
+          'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert (Yjs)',
+          'Fonctionne entièrement hors ligne, sans compte',
+          'Synchronisation entre appareils via un dépôt GitHub que vous contrôlez',
+          'Collaboration en direct par une connexion chiffrée directement entre appareils',
+          'Import depuis Goodnotes, OneNote, Obsidian, Notion, Markdown et PDF',
+          'Export en PDF, en Markdown, en coffre Obsidian ou en JSON de l’espace de travail',
+          'En anglais, espagnol, français et chinois simplifié',
+        ],
+      },
+    },
+    clips: {
+      shapes: {
+        title: 'Formes redressées',
+        body: 'Tracez à main levée un rectangle, une ellipse, un triangle ou une ligne, puis gardez le stylet immobile. La forme devient nette.',
+        alt: 'Des formes tracées à main levée deviennent nettes quand le stylet reste immobile',
+      },
+      toolWheel: {
+        title: 'Roue d’outils et préréglages de stylo',
+        body: 'Un clic droit ouvre une roue de vos outils et stylos enregistrés, là où vous écrivez. Inutile de remonter à la barre d’outils.',
+        alt: 'La roue d’outils s’ouvre au curseur et un stylo enregistré y est choisi',
+      },
+      ruler: {
+        title: 'Règle',
+        body: 'Activez la Règle, faites glisser sa poignée jusqu’à l’angle voulu et tracez le long de son bord pour une ligne parfaitement droite.',
+        alt: 'La règle est tournée à 30 degrés et un trait tremblant le long de son bord devient parfaitement droit',
+      },
+      rotate: {
+        title: 'Faites pivoter ce que vous voulez',
+        body: 'Sélectionnez une image, une forme ou un dessin et faites glisser la poignée au-dessus. Maintenez Maj pour pivoter par pas de 15°.',
+        alt: 'Une photo est inclinée avec la poignée au-dessus, puis une flèche dessinée à la main tourne pour la désigner',
+      },
+      pdfQuote: {
+        title: 'Citez vos PDF',
+        body: 'Sélectionnez du texte dans un PDF, choisissez Citer et touchez une page pour l’y déposer, avec un lien vers sa source.',
+        alt: 'Une phrase sélectionnée dans un PDF est citée dans une note sous forme de bloc de citation qui renvoie au PDF',
+      },
+      pdfAnchor: {
+        title: 'Des notes qui restent sur la page',
+        body: 'Ce que vous écrivez sur une page de PDF est attaché à cette page. Si vous déplacez le PDF ou changez sa disposition, vos notes restent au même endroit de la page. Ancrer à la page fixe aussi les images et les formes.',
+        alt: 'Une formule de la page 2 d’un PDF est entourée et annotée, puis le PDF passe en Colonnes et l’encre suit sa page',
+      },
+      slash: {
+        title: 'Insérez tout avec /',
+        body: 'Tapez / dans une page pour les titres, tableaux, encadrés, maths et code. Un bloc de code mermaid dessine un diagramme, et Intégration transforme un lien en vidéo ou en carte de lien.',
+        alt: 'Le menu / insère un bloc de code dont l’organigramme mermaid s’affiche en diagramme, puis Intégration transforme un lien YouTube en carte vidéo',
+      },
+      imageAnchor: {
+        title: 'Des images qui suivent le texte',
+        body: 'Ancrez une image à une page et le texte lui fait de la place. Écrivez au-dessus et l’image descend avec les mots.',
+        alt: 'Une photo est ancrée dans une page, le texte lui fait de la place, puis la saisie au-dessus la fait descendre',
+      },
+      canvasStyle: {
+        title: 'Un style pour chaque canevas',
+        body: 'Choisissez une grille, des points, des lignes ou votre propre image, et réglez les couleurs. Chaque canevas peut avoir le sien, et les Réglages fixent celui par défaut.',
+        alt: 'Le panneau Style du canevas passe le fond en lignes et choisit une couleur de papier chaude',
+      },
+      bookmarks: {
+        title: 'Signets',
+        body: 'Placez un drapeau avec l’outil Signet (B), ouvrez la liste en haut du canevas, ou appuyez sur [ et ] pour passer d’un drapeau à l’autre.',
+        alt: 'Un titre et une page de PDF reçoivent un signet, puis la liste des signets passe de l’un à l’autre',
+      },
+      agents: {
+        title: 'Votre app d’IA, en dialogue avec Myelin',
+        body: 'La fenêtre de discussion représente l’app d’IA que vous utilisez : elle ne fait pas partie de Myelin. Via MCP sur votre machine, elle lit votre écriture manuscrite et ajoute au canevas une page de résumé tapé.',
+        alt: 'Une app d’IA distincte lit des notes manuscrites dans Myelin via MCP et ajoute à côté une page de résumé tapé',
+      },
+    },
+    notes: [
+      {
+        title: 'Enregistrement audio',
+        body: 'Enregistrez un cours ou une réunion directement sur le canevas, ou importez un mémo vocal.',
+      },
+      {
+        title: 'Transcription sur l’appareil',
+        body: 'Un modèle Whisper intégré transcrit sur votre machine. Touchez l’horodatage d’une ligne pour lire à partir de là.',
+      },
+      {
+        title: 'Recherche',
+        body: 'Cherchez dans votre bibliothèque par titre, étiquettes, texte enregistré ou transcriptions, et trouvez n’importe quel mot sur le canevas ouvert.',
+      },
+      {
+        title: 'Liens et liens entrants',
+        body: 'Reliez vos notes avec des [[doubles crochets]], voyez chaque lien entrant et survolez un lien pour prévisualiser la note.',
+      },
+      {
+        title: 'Vue graphe',
+        body: 'Voyez comment vos notes sont reliées, et ouvrez n’importe laquelle depuis le graphe.',
+      },
+      {
+        title: 'Étiquettes imbriquées',
+        body: 'Étiquetez vos notes, imbriquez les étiquettes les unes dans les autres et filtrez la bibliothèque par n’importe laquelle.',
+      },
+      {
+        title: 'Palette de commandes',
+        body: 'Ouvrez une note, créez-en une ou ouvrez le graphe sans lâcher le clavier.',
+      },
+      {
+        title: 'Historique des versions',
+        body: 'Chaque note conserve ses versions antérieures, et chacune se restaure en un clic.',
+      },
+    ],
+    closing: {
+      heading: 'Essayez par vous-même.',
+      body: 'Gratuit pour un usage personnel, sans compte. Téléchargez l’app, ou essayez d’abord un canevas dans votre navigateur.',
+    },
+  },
+
   linkLabels: {
+    features: 'Fonctionnalités',
     privacy: 'Confidentialité',
     support: 'Assistance',
   },
