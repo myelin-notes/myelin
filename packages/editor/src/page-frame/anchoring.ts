@@ -355,6 +355,10 @@ export class PageFrameAnchoring {
         ),
       });
       this.refresh();
+    } else {
+      // Refresh measures the origin at the decoded position, not `pos`: an empty Y fragment (a fresh
+      // page) decodes every position to 0, which lifted ink a line on pen-up.
+      element.setOffset(offset.x, offset.y);
     }
     return true;
   }

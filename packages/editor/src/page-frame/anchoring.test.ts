@@ -331,6 +331,48 @@ describe('page frame anchoring', () => {
     expect(element.pageAnchor).toBeNull();
     expect(element.offset.x).toBe(-1000);
   });
+
+  it('keeps ink in place when it anchors below the placeholder line of a fresh page', () => {
+    // A fresh page shows ProseMirror's placeholder paragraph over a Y fragment that is still empty.
+    const fragment = new Y.Doc().getXmlFragment('page');
+    const initial = initProseMirrorDoc(fragment, schema);
+    const view = {
+      state: EditorState.create({
+        doc: schema.topNodeType.createAndFill()!,
+        plugins: [
+          ySyncPlugin(fragment, { mapping: initial.mapping }),
+          anchorGapsPlugin(),
+        ],
+      }),
+      dispatch(tr: Transaction) {
+        this.state = this.state.apply(tr);
+      },
+      // The paragraph spans y 40–66; the end of the document measures its bottom edge.
+      posAtCoords: () => null,
+      coordsAtPos: (pos: number) => ({ left: 48, top: pos === 2 ? 66 : 40 }),
+      dom: {
+        getBoundingClientRect: () => new DOMRect(48, 40, 544, 26),
+        querySelectorAll: () => [],
+      },
+    };
+    const frame = new PageFrameElement('frame');
+    frame.pmEditor = {
+      view: view as unknown as EditorView,
+    } as PageFrameEditorState;
+    frame.mountDOM(
+      {} as HTMLDivElement,
+      {
+        offsetWidth: 640,
+        getBoundingClientRect: () => new DOMRect(0, 0, 640, 880),
+      } as HTMLDivElement,
+    );
+    const ink = stroke([100, 200, 0.5, 150, 210, 0.5]);
+    const anchors = controller([frame, ink]);
+    anchors.autoAnchorStroke(ink);
+    anchors.refresh();
+    expect(ink.pageAnchor?.frameId).toBe(frame.uuid);
+    expect(ink.offset).toEqual({ x: 0, y: 0 });
+  });
 });
 
 describe('PDF anchoring', () => {
