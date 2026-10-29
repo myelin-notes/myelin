@@ -75,6 +75,7 @@ import { ExportDialog } from './components/export-dialog';
 import { FlagsChip } from './components/flags-chip';
 import { PdfQuoteButton } from './components/pdf-quote-button';
 import { PeerSyncPanel } from './components/peer-sync-panel';
+import { PresetToolbar } from './components/preset-toolbar';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
 import { TitleBar, TitleBarTooltip } from './components/title-bar';
@@ -732,6 +733,15 @@ function CanvasViewInner({
       )}
       <TitleBar trailing={titleTrailing} />
 
+      {toolState.presets.length > 0 && (
+        <PresetToolbar
+          presets={toolState.presets}
+          activePresetId={toolState.activePresetId}
+          onEditPreset={toolState.editPreset}
+          onDeletePreset={toolState.deletePreset}
+          onReorderPresets={toolState.reorderPresets}
+        />
+      )}
       <CanvasToolbar
         tools={toolState.canvasTools}
         selectedToolIndex={toolState.selectedToolIndex}
@@ -743,15 +753,11 @@ function CanvasViewInner({
         wheelEnabledIndices={toolState.wheelEnabledIndices}
         presets={toolState.presets}
         wheelPresetIds={toolState.wheelPresetIds}
-        activePresetId={toolState.activePresetId}
         editingPresetId={toolState.editingPresetId}
         wheelFull={toolState.wheelFull}
         savePresetDisabledReason={toolState.savePresetDisabledReason}
-        onEditPreset={toolState.editPreset}
-        onDeletePreset={toolState.deletePreset}
         onSavePreset={toolState.saveCurrentAsPreset}
         onTogglePresetInWheel={toolState.togglePresetInWheel}
-        onReorderPresets={toolState.reorderPresets}
         onSelectTool={toolState.selectTool}
         onToggleOptions={toolState.toggleOptions}
         onToggleShelf={toolState.toggleShelf}
