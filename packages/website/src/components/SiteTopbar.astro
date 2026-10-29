@@ -61,7 +61,7 @@ const { path } = splitLocalePath(Astro.url.pathname);
     {
       navLinks.map((id) => (
         <a
-          href={linkHref(id)}
+          href={linkHref(id, locale)}
           class="text-[0.8rem] text-text-secondary no-underline transition-colors hover:text-ink"
         >
           {copy.linkLabels[id]}

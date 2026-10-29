@@ -219,8 +219,200 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
 `,
   },
 
+  features: {
+    meta: {
+      title: 'Features | Myelin Notes',
+      description:
+        'Everything Myelin Notes can do: shape snapping, a ruler and pen presets for handwriting, PDF quotes and anchored ink, pages with Mermaid diagrams, AI agents over local MCP, and more.',
+    },
+    eyebrow: 'Features',
+    headline: 'Everything Myelin Notes can do.',
+    subheadline:
+      'The home page shows the big picture. This is the detail: the tools for handwriting, PDFs, pages, and the canvas, and how they fit together.',
+    jumpNav: 'Sections',
+    sections: {
+      handwriting: {
+        label: 'Handwriting',
+        heading: 'Ink that feels like a pen, with a few tricks paper lacks.',
+        lede: 'Write with a stylus, a finger, or a mouse. Myelin straightens what you want straight and leaves your handwriting yours.',
+        details: [
+          'Pressure-sensitive pens, with adjustable stabilization for steadier lines',
+          'Palm rejection, and a Pen or Touch mode for what your fingers do',
+          'The pen button switches to the eraser, right away or once the pen lifts',
+          'A stroke eraser or a precise one that erases only what it touches',
+          'Rectangle or lasso selection, then move, copy, lock, or reorder',
+          'Custom colors you save once and reuse, and typed text in your choice of font',
+        ],
+      },
+      pdfs: {
+        label: 'PDFs',
+        heading: 'PDFs you work in, not just look at.',
+        lede: 'Annotate, quote, and rearrange PDFs on the same canvas as the rest of your notes, then export the result.',
+        details: [
+          'Export the annotated PDF when you are done',
+          'Jump to any page with the page navigator',
+          'Lay a PDF out as Pages, or side by side as Columns',
+          'Bookmark a PDF page to come back to it',
+          'Find words inside PDFs with canvas search',
+        ],
+      },
+      pages: {
+        label: 'Pages',
+        heading: 'Pages that do more than hold text.',
+        lede: 'Page frames are rich-text documents on the canvas. Type / for anything you want to insert, or just write Markdown.',
+        details: [
+          'Markdown shortcuts for headings, lists, quotes, and formatting',
+          'To-do checklists, callouts, and tables',
+          'Math blocks, and code blocks you can run',
+          '[[Note links]] with hover previews, updated when you rename a note',
+          'Embedded images, videos, YouTube, and link cards',
+          'Pages, Columns, or Continuous layout',
+        ],
+      },
+      canvas: {
+        label: 'Canvas',
+        heading: 'An infinite canvas that stays easy to find your way around.',
+        lede: 'Put pages, PDFs, images, audio, and ink anywhere, and get back to any spot in a keystroke.',
+        details: [
+          'Images you can crop, rotate, lock, and anchor to a page',
+          'Take a photo with your camera and drop it straight in',
+          'LaTeX blocks for equations anywhere on the canvas',
+          'Light or dark theme, or follow the system',
+          'Rebind keyboard shortcuts in Settings',
+        ],
+      },
+      agents: {
+        label: 'AI agents',
+        heading: 'Bring your own AI, on your own machine.',
+        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them.',
+        details: [
+          'The server listens only on 127.0.0.1, on a port you choose',
+          'Copy the install prompt from Settings to connect your agent',
+          'Agents can read notes, links, pages, PDFs, images, handwriting, and canvas screenshots',
+          'Writing stays off until you turn on direct MCP writes in Settings',
+          'With writes on, agents can create notes, pages, LaTeX, and ink, and edit tags',
+        ],
+      },
+      connect: {
+        label: 'Find & connect',
+        heading: 'Everything you write stays findable.',
+        lede: 'Audio, search, and links tie your notes together, so last month’s idea is a few keystrokes away.',
+      },
+      more: {
+        label: 'And more',
+        heading: 'Your files, your sync, your language.',
+        lede: 'The foundations, in one list.',
+        details: [
+          'Notes are plain files on your disk, in an open format (Yjs)',
+          'Works fully offline, with no account',
+          'Sync across devices through a GitHub repo you control',
+          'Live collaboration over an encrypted connection straight between devices',
+          'Import from Goodnotes, OneNote, Obsidian, Notion, Markdown, and PDFs',
+          'Export to PDF, Markdown, an Obsidian vault, or workspace JSON',
+          'In English, Spanish, French, and Simplified Chinese',
+        ],
+      },
+    },
+    clips: {
+      shapes: {
+        title: 'Shape snapping',
+        body: 'Draw a rough rectangle, ellipse, triangle, or line and hold the pen still. It snaps to a clean shape.',
+        alt: 'Rough shapes drawn with the pen snap to clean ones when the pen holds still',
+      },
+      toolWheel: {
+        title: 'Tool wheel and pen presets',
+        body: 'Right-click to open a wheel of your tools and saved pens right where you are writing. No trip to the toolbar.',
+        alt: 'The tool wheel opens at the cursor and a saved pen preset is picked from it',
+      },
+      ruler: {
+        title: 'Ruler',
+        body: 'Turn on the Ruler, drag its knob to any angle, and draw along its edge for a dead-straight line.',
+        alt: 'The ruler is turned to 30 degrees and a wobbly stroke along its edge lands perfectly straight',
+      },
+      rotate: {
+        title: 'Rotate anything',
+        body: 'Select an image, shape, or drawing and drag the handle above it. Hold Shift to snap in 15° steps.',
+        alt: 'A photo is tilted with the handle above it, then a hand-drawn arrow is turned to point at it',
+      },
+      pdfQuote: {
+        title: 'Quote from PDFs',
+        body: 'Select text in a PDF, choose Quote, and tap a page to drop it in, with a link back to where it came from.',
+        alt: 'A sentence selected in a PDF is quoted into a note as a blockquote that links back to the PDF',
+      },
+      pdfAnchor: {
+        title: 'Notes that stay on the page',
+        body: 'What you write on a PDF page is attached to that page. Move the PDF or change its layout, and your notes stay in the same spot on the page. Anchor to page pins images and shapes the same way.',
+        alt: 'A formula on page 2 of a PDF is circled and annotated, then the PDF switches to Columns and the ink moves with its page',
+      },
+      slash: {
+        title: 'Insert anything with /',
+        body: 'Type / in a page for headings, tables, callouts, math, and code. A mermaid code block draws a diagram, and Embed turns a link into a video or link card.',
+        alt: 'The / menu inserts a code block whose mermaid flowchart renders as a diagram, then Embed turns a YouTube link into a video card',
+      },
+      imageAnchor: {
+        title: 'Images that flow with your text',
+        body: 'Anchor an image to a page and the text makes room for it. Type above it and the image moves down with the words.',
+        alt: 'A photo on a page is anchored, the text makes room for it, and typing above carries it down',
+      },
+      canvasStyle: {
+        title: 'A style for every canvas',
+        body: 'Pick a grid, dots, lines, or your own image, and set the colors. Each canvas can have its own, and Settings sets the default.',
+        alt: 'The Canvas style panel switches the background to lines and picks a warm paper color',
+      },
+      bookmarks: {
+        title: 'Bookmarks',
+        body: 'Drop a flag with the Bookmark tool (B), open the list at the top of the canvas, or press [ and ] to jump between flags.',
+        alt: 'A heading and a PDF page are bookmarked, then the bookmark list jumps between them',
+      },
+      agents: {
+        title: 'Your AI app, talking to Myelin',
+        body: 'The chat window here stands in for whichever AI app you use: it is not part of Myelin. Over MCP on your machine, it reads your handwriting and adds a typed summary page to the canvas.',
+        alt: 'A separate AI app reads handwritten notes in Myelin over MCP and adds a typed summary page beside them',
+      },
+    },
+    notes: [
+      {
+        title: 'Audio recording',
+        body: 'Record a lecture or meeting straight onto the canvas, or import a voice memo.',
+      },
+      {
+        title: 'On-device transcription',
+        body: 'A bundled Whisper model transcribes on your machine. Tap any line’s timestamp to play from there.',
+      },
+      {
+        title: 'Search',
+        body: 'Search your library by title, tags, and saved text or transcripts, and find any word on the open canvas.',
+      },
+      {
+        title: 'Links and backlinks',
+        body: 'Link notes with [[double brackets]], see every backlink, and hover a link to preview the note.',
+      },
+      {
+        title: 'Graph view',
+        body: 'See how your notes link together, and open any of them from the graph.',
+      },
+      {
+        title: 'Nested tags',
+        body: 'Tag your notes, nest tags under each other, and filter the library by any of them.',
+      },
+      {
+        title: 'Command palette',
+        body: 'Open a note, create one, or open the graph without leaving the keyboard.',
+      },
+      {
+        title: 'Version history',
+        body: 'Every note keeps its earlier versions, and any of them restores in a click.',
+      },
+    ],
+    closing: {
+      heading: 'See it for yourself.',
+      body: 'Free for personal use, with no account. Download the app, or try a canvas in your browser first.',
+    },
+  },
+
   /** Labels for the shared link set; the hrefs live in `index.ts`. */
   linkLabels: {
+    features: 'Features',
     privacy: 'Privacy',
     support: 'Support',
   },

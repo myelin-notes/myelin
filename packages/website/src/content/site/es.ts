@@ -221,7 +221,200 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
 `,
   },
 
+  features: {
+    meta: {
+      title: 'Funciones | Myelin Notes',
+      description:
+        'Todo lo que puede hacer Myelin Notes: formas que se ajustan solas, regla y ajustes de lápiz para escribir a mano, citas y tinta anclada en PDF, páginas con diagramas Mermaid, agentes de IA por MCP local y más.',
+    },
+    eyebrow: 'Funciones',
+    headline: 'Todo lo que puede hacer Myelin Notes.',
+    subheadline:
+      'La página de inicio muestra el panorama general. Aquí está el detalle: las herramientas para escribir a mano, los PDF, las páginas y el lienzo, y cómo encajan entre sí.',
+    jumpNav: 'Secciones',
+    sections: {
+      handwriting: {
+        label: 'Escritura a mano',
+        heading:
+          'Tinta que se siente como un lápiz, con trucos que el papel no tiene.',
+        lede: 'Escribe con un lápiz óptico, con el dedo o con el ratón. Myelin endereza lo que quieres recto y deja tu letra como es.',
+        details: [
+          'Lápices sensibles a la presión, con estabilización ajustable para trazos más firmes',
+          'Rechazo de la palma, y un modo Lápiz o Toque para decidir qué hacen tus dedos',
+          'El botón del lápiz cambia a la goma, al instante o al levantar el lápiz',
+          'Una goma de trazos o una precisa que borra solo lo que toca',
+          'Selección por rectángulo o lazo, para mover, copiar, bloquear o reordenar',
+          'Colores personalizados que guardas una vez y reutilizas, y texto con la fuente que elijas',
+        ],
+      },
+      pdfs: {
+        label: 'PDF',
+        heading: 'PDF en los que trabajas, no solo que miras.',
+        lede: 'Anota, cita y reorganiza PDF en el mismo lienzo que el resto de tus notas, y exporta el resultado.',
+        details: [
+          'Exporta el PDF anotado cuando termines',
+          'Salta a cualquier página con el navegador de páginas',
+          'Muestra un PDF como Páginas, o lado a lado como Columnas',
+          'Marca una página del PDF para volver a ella',
+          'Encuentra palabras dentro de los PDF con la búsqueda del lienzo',
+        ],
+      },
+      pages: {
+        label: 'Páginas',
+        heading: 'Páginas que hacen más que guardar texto.',
+        lede: 'Los marcos de página son documentos de texto enriquecido sobre el lienzo. Escribe / para insertar lo que quieras, o escribe directamente en Markdown.',
+        details: [
+          'Atajos de Markdown para encabezados, listas, citas y formato',
+          'Listas de tareas, avisos y tablas',
+          'Bloques de fórmulas, y bloques de código que puedes ejecutar',
+          '[[Enlaces entre notas]] con vista previa al pasar el cursor, actualizados al renombrar una nota',
+          'Imágenes, vídeos, YouTube y tarjetas de enlace incrustados',
+          'Diseño en Páginas, Columnas o Continuo',
+        ],
+      },
+      canvas: {
+        label: 'Lienzo',
+        heading: 'Un lienzo infinito en el que no te pierdes.',
+        lede: 'Coloca páginas, PDF, imágenes, audio y tinta donde quieras, y vuelve a cualquier punto con una tecla.',
+        details: [
+          'Imágenes que puedes recortar, girar, bloquear y anclar a una página',
+          'Haz una foto con la cámara y colócala directamente',
+          'Bloques LaTeX para ecuaciones en cualquier parte del lienzo',
+          'Tema claro u oscuro, o el del sistema',
+          'Reasigna los atajos de teclado en Ajustes',
+        ],
+      },
+      agents: {
+        label: 'Agentes de IA',
+        heading: 'Trae tu propia IA, en tu propio equipo.',
+        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas.',
+        details: [
+          'El servidor solo escucha en 127.0.0.1, en el puerto que elijas',
+          'Copia la instrucción de instalación desde Ajustes para conectar tu agente',
+          'Los agentes pueden leer notas, enlaces, páginas, PDF, imágenes, escritura a mano y capturas del lienzo',
+          'La escritura sigue desactivada hasta que actives las escrituras MCP directas en Ajustes',
+          'Con la escritura activada, los agentes pueden crear notas, páginas, LaTeX y tinta, y editar etiquetas',
+        ],
+      },
+      connect: {
+        label: 'Buscar y conectar',
+        heading: 'Todo lo que escribes se puede encontrar.',
+        lede: 'El audio, la búsqueda y los enlaces unen tus notas, así que la idea del mes pasado está a unas pocas teclas.',
+      },
+      more: {
+        label: 'Y más',
+        heading: 'Tus archivos, tu sincronización, tu idioma.',
+        lede: 'Lo esencial, en una lista.',
+        details: [
+          'Las notas son archivos normales en tu disco, en un formato abierto (Yjs)',
+          'Funciona sin conexión y sin cuenta',
+          'Sincroniza entre dispositivos a través de un repositorio de GitHub que tú controlas',
+          'Colaboración en vivo por una conexión cifrada directa entre dispositivos',
+          'Importa desde Goodnotes, OneNote, Obsidian, Notion, Markdown y PDF',
+          'Exporta a PDF, Markdown, una bóveda de Obsidian o JSON del espacio de trabajo',
+          'En inglés, español, francés y chino simplificado',
+        ],
+      },
+    },
+    clips: {
+      shapes: {
+        title: 'Formas que se ajustan solas',
+        body: 'Dibuja a mano alzada un rectángulo, una elipse, un triángulo o una línea y deja el lápiz quieto. Se convierte en una forma limpia.',
+        alt: 'Formas dibujadas a mano con el lápiz se convierten en formas limpias al dejar el lápiz quieto',
+      },
+      toolWheel: {
+        title: 'Rueda de herramientas y ajustes de lápiz',
+        body: 'Haz clic derecho para abrir una rueda con tus herramientas y lápices guardados justo donde escribes. Sin ir a la barra de herramientas.',
+        alt: 'La rueda de herramientas se abre en el cursor y se elige en ella un lápiz guardado',
+      },
+      ruler: {
+        title: 'Regla',
+        body: 'Activa la Regla, arrastra su control hasta el ángulo que quieras y dibuja a lo largo del borde para una línea perfectamente recta.',
+        alt: 'La regla se gira a 30 grados y un trazo tembloroso a lo largo del borde queda perfectamente recto',
+      },
+      rotate: {
+        title: 'Gira lo que quieras',
+        body: 'Selecciona una imagen, una forma o un dibujo y arrastra el control que aparece encima. Mantén Mayús para girar en pasos de 15°.',
+        alt: 'Una foto se inclina con el control de encima y luego una flecha dibujada a mano gira hasta señalarla',
+      },
+      pdfQuote: {
+        title: 'Cita texto de tus PDF',
+        body: 'Selecciona texto en un PDF, elige Citar y toca una página para colocarlo, con un enlace al lugar de donde salió.',
+        alt: 'Una frase seleccionada en un PDF se cita en una nota como bloque de cita con un enlace al PDF',
+      },
+      pdfAnchor: {
+        title: 'Notas que se quedan en la página',
+        body: 'Lo que escribes en una página de un PDF queda unido a esa página. Si mueves el PDF o cambias su disposición, tus notas siguen en el mismo lugar de la página. Anclar a la página fija imágenes y formas de la misma manera.',
+        alt: 'Se rodea y anota una fórmula en la página 2 de un PDF; luego el PDF cambia a Columnas y la tinta se mueve con su página',
+      },
+      slash: {
+        title: 'Inserta lo que quieras con /',
+        body: 'Escribe / en una página para encabezados, tablas, avisos, fórmulas y código. Un bloque de código mermaid dibuja un diagrama, y Insertar contenido convierte un enlace en un vídeo o una tarjeta de enlace.',
+        alt: 'El menú / inserta un bloque de código cuyo diagrama de flujo mermaid se dibuja como diagrama, y luego Insertar contenido convierte un enlace de YouTube en una tarjeta de vídeo',
+      },
+      imageAnchor: {
+        title: 'Imágenes que fluyen con el texto',
+        body: 'Ancla una imagen a una página y el texto le hace sitio. Escribe encima y la imagen baja con las palabras.',
+        alt: 'Una foto en una página se ancla, el texto le hace sitio y, al escribir encima, la foto baja',
+      },
+      canvasStyle: {
+        title: 'Un estilo para cada lienzo',
+        body: 'Elige cuadrícula, puntos, líneas o tu propia imagen, y ajusta los colores. Cada lienzo puede tener el suyo, y Ajustes fija el predeterminado.',
+        alt: 'El panel Estilo del lienzo cambia el fondo a líneas y elige un color de papel cálido',
+      },
+      bookmarks: {
+        title: 'Marcadores',
+        body: 'Coloca una bandera con la herramienta Marcador (B), abre la lista en la parte superior del lienzo o pulsa [ y ] para saltar entre banderas.',
+        alt: 'Se marcan un encabezado y una página de un PDF, y luego la lista de marcadores salta entre ellos',
+      },
+      agents: {
+        title: 'Tu app de IA, hablando con Myelin',
+        body: 'La ventana de chat representa la app de IA que uses: no forma parte de Myelin. A través de MCP en tu equipo, lee tu escritura a mano y añade al lienzo una página con un resumen escrito.',
+        alt: 'Una app de IA independiente lee por MCP notas escritas a mano en Myelin y añade a su lado una página con un resumen escrito',
+      },
+    },
+    notes: [
+      {
+        title: 'Grabación de audio',
+        body: 'Graba una clase o una reunión directamente en el lienzo, o importa una nota de voz.',
+      },
+      {
+        title: 'Transcripción en el dispositivo',
+        body: 'Un modelo Whisper incluido transcribe en tu equipo. Toca la marca de tiempo de cualquier línea para reproducir desde ahí.',
+      },
+      {
+        title: 'Búsqueda',
+        body: 'Busca en tu biblioteca por título, etiquetas y texto o transcripciones guardados, y encuentra cualquier palabra en el lienzo abierto.',
+      },
+      {
+        title: 'Enlaces y retroenlaces',
+        body: 'Enlaza notas con [[corchetes dobles]], consulta todos los retroenlaces y pasa el cursor por un enlace para ver la nota.',
+      },
+      {
+        title: 'Vista de grafo',
+        body: 'Mira cómo se enlazan tus notas y abre cualquiera desde el grafo.',
+      },
+      {
+        title: 'Etiquetas anidadas',
+        body: 'Etiqueta tus notas, anida unas etiquetas dentro de otras y filtra la biblioteca por cualquiera de ellas.',
+      },
+      {
+        title: 'Paleta de comandos',
+        body: 'Abre una nota, crea una nueva o abre el grafo sin soltar el teclado.',
+      },
+      {
+        title: 'Historial de versiones',
+        body: 'Cada nota guarda sus versiones anteriores, y cualquiera se restaura con un clic.',
+      },
+    ],
+    closing: {
+      heading: 'Compruébalo tú mismo.',
+      body: 'Gratis para uso personal y sin cuenta. Descarga la app o prueba antes un lienzo en tu navegador.',
+    },
+  },
+
   linkLabels: {
+    features: 'Funciones',
     privacy: 'Privacidad',
     support: 'Ayuda',
   },
