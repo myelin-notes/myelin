@@ -33,8 +33,8 @@ const zhHans: SiteCopy = {
 
   hero: {
     eyebrow: 'Myelin Notes · 本地优先的笔记应用',
-    headline: '手写、打字与 PDF，都在同一则笔记。',
-    headlineMark: '都在同一则笔记。',
+    headline: '手写、打字与 PDF，都在同一则笔记',
+    headlineMark: '都在同一则笔记',
     subheadline:
       'Myelin Notes 是一款原生、本地优先的笔记应用：在同一块画布上，笔迹、富文本、PDF、图片与音频共处一处。你的笔记留在自己的设备上，同时仍可与他人实时协作编辑，无需任何服务器。',
     trustLine: '个人使用完全免费 · 无需账号 · 你的笔记永不被付费墙锁住',
@@ -52,18 +52,18 @@ const zhHans: SiteCopy = {
   },
 
   ink: {
-    pdfHeading: '直接在 PDF 上书写批注。',
+    pdfHeading: '直接在 PDF 上书写批注',
     pdfBody:
       '把 PDF 拖到画布上，用与其他内容相同的笔迹批注：圈出公式、高亮某一行、在页边随手涂写。完成后，可以把带批注的 PDF 导出。',
   },
 
   pages: {
-    heading: '真正的文档，就在画布上。',
+    heading: '真正的文档，就在画布上',
     body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及可以直接运行的代码块。',
   },
 
   audioSearch: {
-    heading: '录下来，转成文字。在画布上找得到。',
+    heading: '录下来，转成文字。在画布上找得到',
     audioBody:
       '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。',
     searchBody:
@@ -71,12 +71,12 @@ const zhHans: SiteCopy = {
   },
 
   linked: {
-    heading: '你的笔记，彼此相连。',
+    heading: '你的笔记，彼此相连',
     body: '[[笔记链接]]、反向链接与悬停预览卡片，让相关的想法始终只有一步之遥。命令面板带你跳转到任何位置，按文件保存的版本历史可以还原笔记的任一早期状态。',
   },
 
   importing: {
-    heading: '把旧笔记一起带过来。',
+    heading: '把旧笔记一起带过来',
     body: '从其他应用导入你的笔记',
     sources: [
       {
@@ -103,7 +103,7 @@ const zhHans: SiteCopy = {
   },
 
   localFirst: {
-    heading: '一切都留在你自己的电脑上。',
+    heading: '一切都留在你自己的电脑上',
     lede: '中间没有任何云端。你的笔记就是自己硬盘上的普通文件，Myelin 完全可以离线使用。',
     bullets: [
       '你的笔记是硬盘上的普通文件，采用开放、无冲突的格式（Yjs）。任何内容都不会被锁定。',
@@ -114,7 +114,7 @@ const zhHans: SiteCopy = {
   },
 
   sync: {
-    heading: '同步与协作，中间没有服务器。',
+    heading: '同步与协作，中间没有服务器',
     kicker:
       '实时协作编辑通常意味着由服务器保管你的笔记。Myelin 选择让设备之间直接连接。',
     tiers: [
@@ -220,14 +220,14 @@ const zhHans: SiteCopy = {
         'Myelin Notes 的全部功能：手写时自动规整的形状、直尺与笔预设，PDF 引用与锚定笔迹，支持 Mermaid 图表的页面，通过本地 MCP 连接的 AI 智能体，以及更多。',
     },
     eyebrow: '功能',
-    headline: 'Myelin Notes 能做的一切。',
+    headline: 'Myelin Notes 能做的一切',
     subheadline:
       '首页展示的是全貌，这里讲的是细节：手写、PDF、页面和画布上的各种工具，以及它们如何配合。',
     jumpNav: '章节',
     sections: {
       handwriting: {
         label: '手写',
-        heading: '像真笔一样书写，还有纸上做不到的技巧。',
+        heading: '像真笔一样书写，还有纸上做不到的技巧',
         lede: '用触控笔、手指或鼠标书写。想要笔直的地方，Myelin 帮你拉直；你的字迹，仍然是你的字迹。',
         details: [
           '支持压感的笔，防抖强度可调，线条更稳',
@@ -240,7 +240,7 @@ const zhHans: SiteCopy = {
       },
       pdfs: {
         label: 'PDF',
-        heading: '不只是阅读，更能在 PDF 里工作。',
+        heading: '不只是阅读，更能在 PDF 里工作',
         lede: '在与其他笔记同一张画布上批注、引用和重新排列 PDF，完成后导出结果。',
         details: [
           '完成后导出带批注的 PDF',
@@ -252,7 +252,7 @@ const zhHans: SiteCopy = {
       },
       pages: {
         label: '页面',
-        heading: '页面不只是用来放文字。',
+        heading: '页面不只是用来放文字',
         lede: '页面框是画布上的富文本文档。输入 / 插入任何内容，或者直接用 Markdown 书写。',
         details: [
           '用 Markdown 快捷输入标题、列表、引用和格式',
@@ -265,7 +265,7 @@ const zhHans: SiteCopy = {
       },
       canvas: {
         label: '画布',
-        heading: '一张无限画布，也不会让你迷路。',
+        heading: '一张无限画布，也不会让你迷路',
         lede: '页面、PDF、图片、音频和笔迹可以放在任何位置，按一个键就能回到任意地点。',
         details: [
           '图片可以裁剪、旋转、锁定，并锚定到页面',
@@ -277,7 +277,7 @@ const zhHans: SiteCopy = {
       },
       agents: {
         label: 'AI 智能体',
-        heading: '用你自己的 AI，在你自己的电脑上。',
+        heading: '用你自己的 AI，在你自己的电脑上',
         lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。',
         details: [
           '服务器只监听 127.0.0.1，端口由你选择',
@@ -289,12 +289,12 @@ const zhHans: SiteCopy = {
       },
       connect: {
         label: '查找与关联',
-        heading: '你写下的一切，都找得到。',
+        heading: '你写下的一切，都找得到',
         lede: '音频、搜索和链接把笔记串在一起，上个月的想法也只需敲几下键盘。',
       },
       more: {
         label: '更多',
-        heading: '你的文件，你的同步，你的语言。',
+        heading: '你的文件，你的同步，你的语言',
         lede: '基础能力，一览无余。',
         details: [
           '笔记是你磁盘上的普通文件，采用开放格式（Yjs）',
@@ -399,7 +399,7 @@ const zhHans: SiteCopy = {
       },
     ],
     closing: {
-      heading: '亲自试试吧。',
+      heading: '亲自试试吧',
       body: '个人使用完全免费，无需账号。下载应用，或先在浏览器中试用画布。',
     },
   },
