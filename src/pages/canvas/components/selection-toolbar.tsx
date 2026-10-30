@@ -22,6 +22,7 @@ import {
 import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import { FlagElement } from '@myelin/editor/elements/flag-element';
 import { LatexElement } from '@myelin/editor/elements/latex/element';
 import { PdfElement } from '@myelin/editor/elements/pdf';
 import {
@@ -67,6 +68,7 @@ interface ToolbarState {
   latexFontSize: number | null;
   pdfElement: PdfElement | null;
   pdfCurrentPage: number | null;
+  flagElement: FlagElement | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -80,6 +82,7 @@ const HIDDEN_STATE: ToolbarState = {
   latexFontSize: null,
   pdfElement: null,
   pdfCurrentPage: null,
+  flagElement: null,
 };
 
 const VIEWPORT_MARGIN = 12;
@@ -133,7 +136,8 @@ function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
     a.latexElement === b.latexElement &&
     a.latexFontSize === b.latexFontSize &&
     a.pdfElement === b.pdfElement &&
-    a.pdfCurrentPage === b.pdfCurrentPage
+    a.pdfCurrentPage === b.pdfCurrentPage &&
+    a.flagElement === b.flagElement
   );
 }
 
@@ -153,6 +157,15 @@ function findLatexTarget(canvas: DrawableCanvas): LatexElement | null {
   }
   const [only] = selected;
   return only instanceof LatexElement ? only : null;
+}
+
+function findFlagTarget(canvas: DrawableCanvas): FlagElement | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1) {
+    return null;
+  }
+  const [only] = selected;
+  return only instanceof FlagElement ? only : null;
 }
 
 function findPdfPageState(canvas: DrawableCanvas): {
@@ -305,6 +318,7 @@ export function SelectionToolbar({
             latexFontSize: latexElement ? latexElement.fontSize : null,
             pdfElement: pdfPageState?.element ?? null,
             pdfCurrentPage: pdfPageState?.currentPage ?? null,
+            flagElement: findFlagTarget(canvas),
           };
         }
       }
@@ -493,6 +507,16 @@ export function SelectionToolbar({
             <Divider />
           </>
         )}
+        {state.flagElement && (
+          <>
+            <FlagLabelField
+              key={state.flagElement.uuid}
+              flag={state.flagElement}
+              strings={strings}
+            />
+            <Divider />
+          </>
+        )}
         {state.textElement && state.textStyle && (
           <>
             <TextStyleControls
@@ -618,6 +642,60 @@ function PdfPageControls({
         <ChevronRight className="size-4" />
       </button>
     </>
+  );
+}
+
+// Reads `flag.label` at render: label writes don't fire `canvas.onChange`, so toolbar state can't carry it.
+function FlagLabelField({
+  flag,
+  strings,
+}: {
+  flag: FlagElement;
+  strings: Messages;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const untitled = strings.canvas.flags.untitled;
+
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        className="h-8 max-w-48 shrink-0 cursor-text truncate whitespace-nowrap rounded-lg border-none bg-transparent px-2 text-sm transition-colors hover:bg-hover-tint focus-visible:outline-none"
+        aria-label={strings.canvas.flags.rename}
+        onClick={() => setDraft(flag.label)}
+      >
+        {flag.label || untitled}
+      </button>
+    );
+  }
+
+  const commit = () => {
+    if (draft.trim() !== flag.label) {
+      flag.setLabel(draft.trim());
+    }
+    setDraft(null);
+  };
+  return (
+    <input
+      autoFocus
+      aria-label={strings.canvas.flags.rename}
+      className="h-8 w-48 shrink-0 rounded-lg border-none bg-hover-tint px-2 text-sm outline-none"
+      placeholder={untitled}
+      value={draft}
+      onFocus={(event) => event.currentTarget.select()}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setDraft(null);
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          commit();
+        }
+      }}
+    />
   );
 }
 
