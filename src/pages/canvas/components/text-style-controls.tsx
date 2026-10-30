@@ -8,6 +8,7 @@ import {
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import { useCustomColors } from '@myelin/editor/custom-colors';
 import type {
   TextElement,
@@ -22,7 +23,6 @@ import {
   TEXT_FONT_SIZE_STEP,
   TEXT_FONTS,
 } from '@myelin/editor/tools/text-tool';
-import { FontSizeField } from '@/components/font-size-field';
 
 interface TextStyleControlsProps {
   element: TextElement;

@@ -169,7 +169,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           <div
             {...optionsPresence.state}
             onAnimationEnd={optionsPresence.onAnimationEnd}
-            className="data-closed:slide-out-to-left-2 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:fade-in-0 absolute left-full ml-2 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+            className="data-closed:slide-out-to-left-2 data-closed:fade-out-0 data-open:slide-in-from-left-2 data-open:fade-in-0 absolute left-full ml-2 w-60 max-w-[calc(100vw-5rem)] duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
             style={{ top: optionsPanelOffset }}
           >
             <ToolOptionsPanel

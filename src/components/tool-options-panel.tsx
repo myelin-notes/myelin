@@ -3,13 +3,13 @@ import { ChevronDown as ChevronDownIcon, Plus as PlusIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import { useCustomColors } from '@myelin/editor/custom-colors';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { FlagTypeOptions } from '@/components/flag-type-options';
-import { FontSizeField } from '@/components/font-size-field';
 import { Switch } from '@/components/ui/switch';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 

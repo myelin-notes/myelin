@@ -9,6 +9,7 @@
     "./components/color-picker-dialog": "./src/components/color-picker-dialog.tsx",
     "./components/color-swatch": "./src/components/color-swatch.tsx",
     "./components/custom-color-swatch": "./src/components/custom-color-swatch.tsx",
+    "./components/font-size-field": "./src/components/font-size-field.tsx",
     "./components/insert-popover": "./src/components/insert-popover.tsx",
     "./components/pen-preset-mark": "./src/components/pen-preset-mark.tsx",
     "./components/virtual-list": "./src/components/virtual-list.tsx",

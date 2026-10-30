@@ -19,6 +19,7 @@ import {
   ArrowUp as MoveForwardIcon,
   LockOpen as UnlockIcon,
 } from 'lucide-react';
+import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
 import { LatexElement } from '@myelin/editor/elements/latex/element';
@@ -34,7 +35,6 @@ import {
   TEXT_FONT_SIZE_MIN,
   TEXT_FONT_SIZE_STEP,
 } from '@myelin/editor/tools/text-tool';
-import { FontSizeField } from '@/components/font-size-field';
 import {
   Tooltip,
   TooltipContent,
