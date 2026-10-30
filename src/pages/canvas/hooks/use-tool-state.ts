@@ -477,7 +477,6 @@ export function useToolState(
       applyPreset(preset);
       setEditingPresetId(preset.id);
       setShelfOpen(false);
-      setOptionsVisible(true);
     },
     [applyPreset],
   );
