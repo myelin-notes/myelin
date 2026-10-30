@@ -31,11 +31,16 @@ const softwareJsonLd = {
   operatingSystem: 'macOS, Windows, Linux',
   description: copy.meta.description,
   inLanguage: languageTag,
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-  },
+  offers: [
+    { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: 'USD' },
+    {
+      '@type': 'Offer',
+      name: 'Myelin Pro',
+      price: '49.99',
+      priceCurrency: 'USD',
+      url: new URL('/pricing', Astro.site).href,
+    },
+  ],
 };
 
 const faqJsonLd = {

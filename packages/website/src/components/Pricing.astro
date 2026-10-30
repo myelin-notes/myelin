@@ -1,0 +1,183 @@
+---
+// The pricing page, in one language. Rendered by `src/pages/pricing.astro`
+// for English and `src/pages/[locale]/pricing.astro` for every other locale.
+import { buttonVariants, cn } from '@myelin/ui';
+import Base from '../layouts/Base.astro';
+import CheckList from './static/CheckList.astro';
+import InkMark from './static/InkMark.astro';
+import PageScripts from './static/PageScripts.astro';
+import SiteFooter from './static/SiteFooter.astro';
+import { getCopy, siteLinks } from '../content/site';
+import type { Locale } from '../lib/locale';
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const page = getCopy(locale).pricing;
+const { free, pro, student } = page;
+
+const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
+const card = 'reveal-scale flex flex-col rounded-2xl bg-card p-7 shadow-elevated lg:p-10';
+const planName = 'kicker text-text-muted';
+const price =
+  'font-heading text-[clamp(2.4rem,4vw,3.2rem)] leading-none font-medium tracking-[-0.02em] text-text-primary';
+const includesLabel = 'mt-8 text-sm font-medium text-text-primary';
+const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
+---
+
+<Base locale={locale} title={page.meta.title} description={page.meta.description}>
+  <div class="relative z-10 pt-12">
+    <section class:list={[wrap, 'pt-16 pb-4 lg:pt-24']}>
+      <p class="rise text-sm text-text-muted">{page.eyebrow}</p>
+      <h1
+        class="rise mt-6 max-w-3xl font-heading text-[clamp(2.6rem,4.5vw,4rem)] leading-[1.02] font-medium tracking-[-0.02em] text-balance text-text-primary"
+        style="animation-delay:.06s"
+      >
+        {page.headline}
+      </h1>
+      <p class="rise mt-6 max-w-xl text-text-secondary" style="animation-delay:.14s">
+        {page.subheadline}
+      </p>
+    </section>
+
+    <section class:list={[wrap, 'py-16 lg:py-20']}>
+      <div class="grid gap-6 md:grid-cols-2">
+        <div class={card} style="--i:1">
+          <p class={planName}>{free.name}</p>
+          <p class:list={[price, 'mt-6']}>{free.price}</p>
+          <p class="mt-4 text-sm text-text-secondary">{free.tagline}</p>
+          <p class={includesLabel}>{free.includesLabel}</p>
+          <CheckList items={free.includes} class="mt-4" />
+          <a
+            href={siteLinks.releases}
+            data-download="auto"
+            class={cn(buttonVariants({ variant: 'outline' }), button, 'self-start')}
+          >
+            {free.cta}
+          </a>
+        </div>
+
+        <div class:list={[card, 'ring-2 ring-ink']} style="--i:2">
+          <p class={planName}>{pro.name}</p>
+          <p class="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span class={price}>{pro.price}</span>
+            <span class="text-sm text-text-muted">{pro.priceNote}</span>
+          </p>
+          <p class="mt-4 text-sm text-text-secondary">{pro.tagline}</p>
+          <p class={includesLabel}>{pro.includesLabel}</p>
+          <CheckList items={pro.includes} class="mt-4" />
+          <a
+            href={siteLinks.proCheckout}
+            class={cn(buttonVariants(), button, 'self-start')}
+          >
+            {pro.cta}
+          </a>
+          <p class="mt-4 text-sm text-text-muted">{pro.licenseNote}</p>
+          {/* The script reads its status messages from the data attributes, so they stay translated. */}
+          <form
+            id="student"
+            action="/api/student"
+            method="post"
+            class="mt-8 border-t border-border-divider pt-6 text-sm"
+            data-sending={student.sending}
+            data-sent={student.sent}
+            data-not-academic={student.notAcademic}
+            data-failed={student.failed}
+          >
+            <p class="text-text-secondary">
+              <span class="font-medium text-text-primary">{student.price}</span>
+              {' '}{student.note}
+            </p>
+            <label for="student-email" class="sr-only">{student.emailLabel}</label>
+            <div class="mt-4 flex flex-wrap gap-3">
+              <input
+                id="student-email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                maxlength="254"
+                required
+                placeholder={student.emailLabel}
+                class="h-10 min-w-0 flex-1 basis-48 rounded-xl border border-border-divider bg-card px-4 text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-primary"
+              />
+              <button
+                type="submit"
+                class={cn(buttonVariants({ variant: 'outline' }), 'h-10 rounded-xl px-5 text-sm')}
+              >
+                {student.submit}
+              </button>
+            </div>
+            <div class="absolute -left-[10000px]" aria-hidden="true">
+              <label for="student-company">Company</label>
+              <input id="student-company" name="company" type="text" autocomplete="off" tabindex="-1" />
+            </div>
+            <p id="student-status" class="mt-3 text-text-secondary" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section class:list={[wrap, 'py-24 lg:py-32']}>
+      <h2 class="reveal font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary">
+        {page.faqTitle}
+      </h2>
+      <InkMark variant={1} class="mt-5" />
+      <dl class="mt-12 grid gap-x-10 sm:mt-16 sm:grid-cols-2">
+        {
+          page.faqs.map((faq) => (
+            <div class="border-t border-border-divider py-7">
+              <dt class="text-lg font-semibold text-text-primary">{faq.question}</dt>
+              <dd class="mt-3 max-w-md text-text-secondary">{faq.answer}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <SiteFooter locale={locale} />
+  </div>
+
+  <PageScripts />
+</Base>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>('#student');
+  const status = document.querySelector<HTMLElement>('#student-status');
+  const submitButton = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+  form?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!form.reportValidity() || !status || !submitButton) {
+      return;
+    }
+
+    const { sending, sent, notAcademic, failed } = form.dataset;
+    const label = submitButton.textContent;
+    submitButton.disabled = true;
+    submitButton.textContent = sending ?? '';
+    status.textContent = '';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        body: new FormData(form),
+      });
+      status.textContent = response.ok
+        ? (sent ?? '')
+        : response.status === 422
+          ? (notAcademic ?? '')
+          : (failed ?? '');
+      if (response.ok) {
+        form.reset();
+      }
+    } catch {
+      status.textContent = failed ?? '';
+    } finally {
+      submitButton.disabled = false;
+      submitButton.textContent = label;
+    }
+  });
+</script>

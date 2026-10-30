@@ -15,6 +15,8 @@ export const siteLinks = {
    *  per-platform installer asset behind every download button. */
   latestReleaseApi:
     'https://api.github.com/repos/myelin-notes/myelin/releases/latest',
+  // TODO: replace with the Polar checkout link for the Pro product.
+  proCheckout: 'https://buy.polar.sh/REPLACE_WITH_PRO_CHECKOUT_LINK',
 };
 
 /** Every platform Myelin ships a native build for. */
