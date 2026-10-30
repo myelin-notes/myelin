@@ -22,7 +22,8 @@ import {
   PAGE_WIDTH,
   PageFrameElement,
 } from '@myelin/editor/elements/page-frame-element';
-import { I18nProvider } from '@myelin/editor/i18n';
+import { defaultFlagTypes } from '@myelin/editor/flag-types';
+import { I18nProvider, useMessages } from '@myelin/editor/i18n';
 import { keybindings } from '@myelin/editor/keybinds';
 import {
   getMediaImportHandler,
@@ -151,6 +152,8 @@ function registerCanvasKeybindings(
       onDown: () => startPageFramePlacement(canvas),
     },
     { action: 'canvas:insert-embed', onDown: openFilePicker },
+    { action: 'canvas:flag-previous', onDown: () => canvas.stepFlag(-1) },
+    { action: 'canvas:flag-next', onDown: () => canvas.stepFlag(1) },
     ...canvas.tools.map((tool, index) => ({
       action: TOOL_ACTIONS[tool.id],
       onDown: () => canvas.switchTool(index),
@@ -280,8 +283,13 @@ function CanvasEditorInner() {
     null,
   );
   const [insertOpen, setInsertOpen] = useState(false);
+  const strings = useMessages();
 
   const { canvasTools, setSelectedToolIndex, hideOptions } = toolState;
+
+  useEffect(() => {
+    canvas?.setFlagTypes(defaultFlagTypes(strings));
+  }, [canvas, strings]);
 
   useEffect(() => {
     const fg = fgRef.current;

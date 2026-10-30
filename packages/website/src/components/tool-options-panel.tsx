@@ -1,12 +1,15 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { ChevronDown as ChevronDownIcon, Flag as FlagIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
+import { resolveFlagType } from '@myelin/editor/elements/flag-element';
+import { defaultFlagTypes } from '@myelin/editor/flag-types';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
 import { useCustomColors } from '@/lib/custom-colors';
+import { useMessages } from '@/lib/i18n';
 
 interface ToolOptionsPanelProps {
   options: ToolOption[];
@@ -114,6 +117,7 @@ export function ToolOptionsPanel({
     promptAddColor,
     removeColor,
   } = useCustomColors(customColorTool ?? 'pen');
+  const strings = useMessages();
 
   if (options.length === 0) {
     return null;
@@ -212,6 +216,39 @@ export function ToolOptionsPanel({
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          );
+        }
+
+        // The try page has no repository to save edits to, so only the default types are offered.
+        if (option.type === 'flag') {
+          const types = defaultFlagTypes(strings);
+          const active = resolveFlagType(types, option.value);
+          return (
+            <div key={option.key} className="flex flex-col gap-1.5">
+              <span className="select-none font-bold text-[10px] text-text-muted uppercase tracking-[0.1em]">
+                {option.label}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                {types.map((type) => (
+                  <button
+                    key={type.id}
+                    aria-pressed={type === active}
+                    onClick={() => option.set(type.id)}
+                    className={`flex cursor-pointer items-center gap-2 rounded-md border-none px-2 py-1.5 text-left font-medium text-text-primary text-xs transition-colors ${
+                      type === active
+                        ? 'bg-surface'
+                        : 'bg-transparent hover:bg-hover-tint'
+                    }`}
+                  >
+                    <FlagIcon
+                      className="size-3.5 shrink-0"
+                      style={{ color: type.color }}
+                    />
+                    {type.name}
+                  </button>
+                ))}
               </div>
             </div>
           );

@@ -32,7 +32,7 @@ const FlagTypesContext = createContext<FlagTypesContextValue | null>(null);
 const logger = new Logger('FlagTypes');
 
 // Fixed ids so flags placed before the list is first saved keep their type.
-function defaultFlagTypes(strings: Messages): FlagType[] {
+export function defaultFlagTypes(strings: Messages): FlagType[] {
   const names = strings.canvas.flagTypes;
   return [
     { id: 'todo', name: names.todo, color: '#ef4444' },
