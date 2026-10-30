@@ -102,6 +102,7 @@ scribble = { version = "0.5.4", features = ["metal"] }
 
 [target.'cfg(target_os = "ios")'.dependencies]
 tauri-plugin-apple-compliance = { path = "plugins/tauri-plugin-apple-compliance" }
+objc2-ui-kit = { version = "0.3", default-features = false, features = ["std", "UIPasteboard", "UIImage"] }
 
 [profile.dev.package.scrypt]
 opt-level = 3

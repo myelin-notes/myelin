@@ -4381,6 +4381,7 @@ dependencies = [
  "krilla",
  "libc",
  "n0-future",
+ "objc2-ui-kit 0.3.2",
  "onenote_parser",
  "png 0.18.1",
  "scribble",
