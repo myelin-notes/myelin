@@ -254,7 +254,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Export the annotated PDF when you are done',
           'Jump to any page with the page navigator',
           'Lay a PDF out as Pages, or side by side as Columns',
-          'Bookmark a PDF page to come back to it',
+          'Flag a PDF page to come back to it',
           'Find words inside PDFs with canvas search',
         ],
       },
@@ -361,10 +361,10 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         body: 'Pick a grid, dots, lines, or your own image, and set the colors. Each canvas can have its own, and Settings sets the default.',
         alt: 'The Canvas style panel switches the background to lines and picks a warm paper color',
       },
-      bookmarks: {
-        title: 'Bookmarks',
-        body: 'Drop a flag with the Bookmark tool (B), open the list at the top of the canvas, or press [ and ] to jump between flags.',
-        alt: 'A heading and a PDF page are bookmarked, then the bookmark list jumps between them',
+      flags: {
+        title: 'Flags to come back to',
+        body: 'Drop a flag with the Flag tool (B) and pick a type like To-do or Review, or make your own. Jump between the flags on a canvas, or open Flags to filter them across all your notes.',
+        alt: 'A heading gets a To-do flag and a PDF page a Review flag, the flag list jumps to the PDF, then the Flags page filters to Review flags across notes',
       },
       agents: {
         title: 'Your AI app, talking to Myelin',

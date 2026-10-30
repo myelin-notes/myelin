@@ -251,7 +251,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Exportez le PDF annoté une fois terminé',
           'Allez à n’importe quelle page avec le navigateur de pages',
           'Affichez un PDF en Pages, ou côte à côte en Colonnes',
-          'Mettez un signet sur une page de PDF pour y revenir',
+          'Posez un drapeau sur une page de PDF pour y revenir',
           'Trouvez des mots dans vos PDF avec la recherche du canevas',
         ],
       },
@@ -358,10 +358,10 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         body: 'Choisissez une grille, des points, des lignes ou votre propre image, et réglez les couleurs. Chaque canevas peut avoir le sien, et les Réglages fixent celui par défaut.',
         alt: 'Le panneau Style du canevas passe le fond en lignes et choisit une couleur de papier chaude',
       },
-      bookmarks: {
-        title: 'Signets',
-        body: 'Placez un drapeau avec l’outil Signet (B), ouvrez la liste en haut du canevas, ou appuyez sur [ et ] pour passer d’un drapeau à l’autre.',
-        alt: 'Un titre et une page de PDF reçoivent un signet, puis la liste des signets passe de l’un à l’autre',
+      flags: {
+        title: 'Des drapeaux pour y revenir',
+        body: 'Posez un drapeau avec l’outil Drapeau (B) et choisissez un type comme À faire ou À revoir, ou créez le vôtre. Passez d’un drapeau à l’autre sur un canevas, ou ouvrez Drapeaux pour les filtrer dans toutes vos notes.',
+        alt: 'Un titre reçoit un drapeau À faire et une page de PDF un drapeau À revoir, la liste des drapeaux saute au PDF, puis la page Drapeaux filtre les drapeaux À revoir de toutes les notes',
       },
       agents: {
         title: 'Votre app d’IA, en dialogue avec Myelin',
