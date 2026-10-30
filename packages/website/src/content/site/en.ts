@@ -283,6 +283,17 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Rebind keyboard shortcuts in Settings',
         ],
       },
+      sync: {
+        label: 'Live sync',
+        heading: 'Write together, with no server holding your notes.',
+        lede: 'Open a note on two devices and they connect to each other directly. What you write on one shows up on the other as you write it.',
+        details: [
+          'Devices with the same note open find each other on their own',
+          'Edits travel over an end-to-end encrypted QUIC connection (iroh)',
+          'Both devices need access to the same GitHub sync repo',
+          'No Myelin account needed',
+        ],
+      },
       agents: {
         label: 'AI agents',
         heading: 'Bring your own AI, on your own machine.',
@@ -308,7 +319,6 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Notes are plain files on your disk, in an open format (Yjs)',
           'Works fully offline, with no account',
           'Sync across devices through a GitHub repo you control',
-          'Live collaboration over an encrypted connection straight between devices',
           'Import from Goodnotes, OneNote, Obsidian, Notion, Markdown, and PDFs',
           'Export to PDF, Markdown, an Obsidian vault, or workspace JSON',
           'In English, Spanish, French, and Simplified Chinese',
@@ -331,10 +341,10 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         body: 'Turn on the Ruler, drag its knob to any angle, and draw along its edge for a dead-straight line.',
         alt: 'The ruler is turned to 30 degrees and a wobbly stroke along its edge lands perfectly straight',
       },
-      rotate: {
-        title: 'Rotate anything',
-        body: 'Select an image, shape, or drawing and drag the handle above it. Hold Shift to snap in 15° steps.',
-        alt: 'A photo is tilted with the handle above it, then a hand-drawn arrow is turned to point at it',
+      lasso: {
+        title: 'Tidy up after you write',
+        body: 'Lasso a patch of handwriting to drag it into place, or pull a corner to resize it. Select a single drawing to turn it with the handle above it.',
+        alt: 'Handwriting is lassoed, dragged under its heading and shrunk from a corner, then an arrow is turned to point at it',
       },
       pdfQuote: {
         title: 'Quote from PDFs',
@@ -365,6 +375,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         title: 'Flags to come back to',
         body: 'Drop a flag with the Flag tool (B) and pick a type like To-do or Review, or make your own. Jump between the flags on a canvas, or open Flags to filter them across all your notes.',
         alt: 'A heading gets a To-do flag and a PDF page a Review flag, the flag list jumps to the PDF, then the Flags page filters to Review flags across notes',
+      },
+      liveCollab: {
+        title: 'Live collaboration',
+        body: 'Ink appears on the other screen stroke by stroke as you draw, and typing appears letter by letter, in both directions.',
+        alt: 'Ink drawn on a Mac appears on Ada’s PC as it is written, then a to-do Ada types appears on the Mac letter by letter',
       },
       agents: {
         title: 'Your AI app, talking to Myelin',

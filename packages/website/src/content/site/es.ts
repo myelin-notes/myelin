@@ -287,6 +287,17 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Reasigna los atajos de teclado en Ajustes',
         ],
       },
+      sync: {
+        label: 'Sincronización en directo',
+        heading: 'Escribe con otros, sin un servidor que guarde tus notas.',
+        lede: 'Abre una nota en dos dispositivos y se conectan directamente entre sí. Lo que escribes en uno aparece en el otro mientras lo escribes.',
+        details: [
+          'Los dispositivos con la misma nota abierta se encuentran solos',
+          'Los cambios viajan por una conexión QUIC cifrada de extremo a extremo (iroh)',
+          'Ambos dispositivos necesitan acceso al mismo repositorio de sincronización de GitHub',
+          'Sin cuenta de Myelin',
+        ],
+      },
       agents: {
         label: 'Agentes de IA',
         heading: 'Trae tu propia IA, en tu propio equipo.',
@@ -312,7 +323,6 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Las notas son archivos normales en tu disco, en un formato abierto (Yjs)',
           'Funciona sin conexión y sin cuenta',
           'Sincroniza entre dispositivos a través de un repositorio de GitHub que tú controlas',
-          'Colaboración en vivo por una conexión cifrada directa entre dispositivos',
           'Importa desde Goodnotes, OneNote, Obsidian, Notion, Markdown y PDF',
           'Exporta a PDF, Markdown, una bóveda de Obsidian o JSON del espacio de trabajo',
           'En inglés, español, francés y chino simplificado',
@@ -335,10 +345,10 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         body: 'Activa la Regla, arrastra su control hasta el ángulo que quieras y dibuja a lo largo del borde para una línea perfectamente recta.',
         alt: 'La regla se gira a 30 grados y un trazo tembloroso a lo largo del borde queda perfectamente recto',
       },
-      rotate: {
-        title: 'Gira lo que quieras',
-        body: 'Selecciona una imagen, una forma o un dibujo y arrastra el control que aparece encima. Mantén Mayús para girar en pasos de 15°.',
-        alt: 'Una foto se inclina con el control de encima y luego una flecha dibujada a mano gira hasta señalarla',
+      lasso: {
+        title: 'Ordena lo que escribiste',
+        body: 'Rodea con el lazo un trozo de escritura para arrastrarlo a su sitio, o tira de una esquina para cambiar su tamaño. Selecciona un solo dibujo para girarlo con el control de encima.',
+        alt: 'Se rodea la escritura con el lazo, se arrastra bajo su título y se reduce desde una esquina, y luego una flecha gira hasta señalarla',
       },
       pdfQuote: {
         title: 'Cita texto de tus PDF',
@@ -369,6 +379,11 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         title: 'Banderas para volver',
         body: 'Coloca una bandera con la herramienta Bandera (B) y elige un tipo como Pendiente o Revisar, o crea el tuyo. Salta entre las banderas de un lienzo, o abre Banderas para filtrarlas en todas tus notas.',
         alt: 'Un encabezado recibe una bandera Pendiente y una página de un PDF una bandera Revisar; la lista de banderas salta al PDF y luego la página Banderas filtra las banderas Revisar de todas las notas',
+      },
+      liveCollab: {
+        title: 'Colaboración en directo',
+        body: 'La tinta aparece en la otra pantalla trazo a trazo mientras dibujas, y el texto letra a letra, en ambas direcciones.',
+        alt: 'La tinta dibujada en un Mac aparece en el PC de Ada mientras se escribe, y luego una tarea que Ada teclea aparece en el Mac letra a letra',
       },
       agents: {
         title: 'Tu app de IA, hablando con Myelin',

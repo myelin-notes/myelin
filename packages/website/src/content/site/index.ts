@@ -60,6 +60,7 @@ export const FEATURE_SECTION_IDS = [
   'pdfs',
   'pages',
   'canvas',
+  'sync',
   'agents',
   'connect',
   'more',
@@ -72,13 +73,14 @@ export type FeatureClipId =
   | 'shapes'
   | 'toolWheel'
   | 'ruler'
-  | 'rotate'
+  | 'lasso'
   | 'pdfQuote'
   | 'pdfAnchor'
   | 'slash'
   | 'imageAnchor'
   | 'canvasStyle'
   | 'flags'
+  | 'liveCollab'
   | 'agents';
 
 interface FeatureSection {
