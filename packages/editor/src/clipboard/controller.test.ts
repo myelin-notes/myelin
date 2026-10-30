@@ -125,7 +125,7 @@ describe('CanvasClipboardController', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it('uses the Myelin clipboard payload before media fallback and nudges repeated pastes', () => {
+  it('uses the Myelin clipboard payload before media fallback, centers in the viewport, and nudges repeats', () => {
     const controller = new CanvasClipboardController();
     const snapshot = buildCanvasClipboardSnapshot(createSelection('note-1'));
     const payload = serializeCanvasClipboardSnapshot(snapshot);
@@ -145,12 +145,12 @@ describe('CanvasClipboardController', () => {
     expect(pasteSnapshot).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ sourceNoteId: 'note-1' }),
-      expect.objectContaining({ translate: { x: 24, y: 24 }, pasteCount: 1 }),
+      expect.objectContaining({ translate: { x: 290, y: 240 }, pasteCount: 1 }),
     );
     expect(pasteSnapshot).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ sourceNoteId: 'note-1' }),
-      expect.objectContaining({ translate: { x: 48, y: 48 }, pasteCount: 2 }),
+      expect.objectContaining({ translate: { x: 314, y: 264 }, pasteCount: 2 }),
     );
   });
 

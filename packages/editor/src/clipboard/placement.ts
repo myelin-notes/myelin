@@ -22,12 +22,8 @@ function placementTranslation(
   context: CanvasPasteContext,
   pasteCount: number,
 ): CanvasPoint {
-  const nudge = PASTE_NUDGE * pasteCount;
-
-  if (snapshot.sourceNoteId === context.noteId) {
-    return { x: nudge, y: nudge };
-  }
-
+  // First paste lands exactly centered; repeats cascade so they don't stack.
+  const nudge = PASTE_NUDGE * (pasteCount - 1);
   const sourceCenter = centerOfRect(snapshot.selectionBounds);
   return {
     x: context.viewportCenter.x - sourceCenter.x + nudge,
