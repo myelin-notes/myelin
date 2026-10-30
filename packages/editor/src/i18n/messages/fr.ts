@@ -1152,7 +1152,7 @@ const fr: typeof en = {
     flags: {
       title: 'Placez des drapeaux sur le canevas',
       description:
-        'Utilisez l’outil Drapeau (B) pour poser un drapeau. Ouvrez la liste des drapeaux en haut du canevas, ou appuyez sur [ et ] pour passer de l’un à l’autre.',
+        'Utilisez l’outil Drapeau (B) pour poser un drapeau, puis choisissez son type ou créez le vôtre. Passez de l’un à l’autre depuis la liste en haut du canevas ou avec [ et ], et ouvrez Drapeaux en haut à droite pour les voir dans toutes vos notes.',
     },
     canvasStyle: {
       title: 'Un style pour chaque canevas',

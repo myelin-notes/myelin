@@ -1142,7 +1142,7 @@ const es: typeof en = {
     flags: {
       title: 'Marca lugares en tu lienzo',
       description:
-        'Usa la herramienta Bandera (B) para poner una bandera. Abre la lista de banderas en la parte superior del lienzo o pulsa [ y ] para saltar entre ellas.',
+        'Usa la herramienta Bandera (B) para poner una bandera, y elige su tipo o crea el tuyo. Salta entre banderas desde la lista en la parte superior del lienzo o con [ y ], y abre Banderas arriba a la derecha para verlas en todas tus notas.',
     },
     canvasStyle: {
       title: 'Un estilo para cada lienzo',

@@ -78,7 +78,7 @@ export type FeatureClipId =
   | 'slash'
   | 'imageAnchor'
   | 'canvasStyle'
-  | 'bookmarks'
+  | 'flags'
   | 'agents';
 
 interface FeatureSection {

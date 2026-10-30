@@ -255,7 +255,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Exporta el PDF anotado cuando termines',
           'Salta a cualquier página con el navegador de páginas',
           'Muestra un PDF como Páginas, o lado a lado como Columnas',
-          'Marca una página del PDF para volver a ella',
+          'Pon una bandera en una página del PDF para volver a ella',
           'Encuentra palabras dentro de los PDF con la búsqueda del lienzo',
         ],
       },
@@ -362,10 +362,10 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         body: 'Elige cuadrícula, puntos, líneas o tu propia imagen, y ajusta los colores. Cada lienzo puede tener el suyo, y Ajustes fija el predeterminado.',
         alt: 'El panel Estilo del lienzo cambia el fondo a líneas y elige un color de papel cálido',
       },
-      bookmarks: {
-        title: 'Marcadores',
-        body: 'Coloca una bandera con la herramienta Marcador (B), abre la lista en la parte superior del lienzo o pulsa [ y ] para saltar entre banderas.',
-        alt: 'Se marcan un encabezado y una página de un PDF, y luego la lista de marcadores salta entre ellos',
+      flags: {
+        title: 'Banderas para volver',
+        body: 'Coloca una bandera con la herramienta Bandera (B) y elige un tipo como Pendiente o Revisar, o crea el tuyo. Salta entre las banderas de un lienzo, o abre Banderas para filtrarlas en todas tus notas.',
+        alt: 'Un encabezado recibe una bandera Pendiente y una página de un PDF una bandera Revisar; la lista de banderas salta al PDF y luego la página Banderas filtra las banderas Revisar de todas las notas',
       },
       agents: {
         title: 'Tu app de IA, hablando con Myelin',

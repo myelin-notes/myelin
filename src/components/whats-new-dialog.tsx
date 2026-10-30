@@ -3,8 +3,8 @@ import { useMessages } from '@myelin/editor/i18n';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { cn } from '@myelin/editor/utils';
 import { Button } from '@myelin/ui/button';
-import bookmarksDemo from '@/assets/whats-new/bookmarks.webp';
 import canvasStyleDemo from '@/assets/whats-new/canvas-style.webp';
+import flagsDemo from '@/assets/whats-new/flags.webp';
 import pdfAnchoringDemo from '@/assets/whats-new/pdf-anchoring.webp';
 import pdfQuoteDemo from '@/assets/whats-new/pdf-quote.webp';
 import rotateDemo from '@/assets/whats-new/rotate.webp';
@@ -19,7 +19,7 @@ import {
 import { useUserPref } from '@/lib/use-user-pref';
 
 // Bump whenever the pages change: anyone who dismissed an older id sees the panel again.
-export const WHATS_NEW_RELEASE = 'pdf-quotes-bookmarks';
+export const WHATS_NEW_RELEASE = 'pdf-quotes-flags';
 
 interface WhatsNewPage {
   title: string;
@@ -39,7 +39,7 @@ export function WhatsNewDialog() {
   const pages: WhatsNewPage[] = [
     { ...strings.whatsNew.pdfQuote, image: pdfQuoteDemo },
     { ...strings.whatsNew.pdfAnchoring, image: pdfAnchoringDemo },
-    { ...strings.whatsNew.flags, image: bookmarksDemo },
+    { ...strings.whatsNew.flags, image: flagsDemo },
     { ...strings.whatsNew.canvasStyle, image: canvasStyleDemo },
     { ...strings.whatsNew.ruler, image: rulerDemo },
     { ...strings.whatsNew.rotate, image: rotateDemo },

@@ -1130,7 +1130,7 @@ const en = {
     flags: {
       title: 'Flag spots on your canvas',
       description:
-        'Use the Flag tool (B) to drop a flag. Open the list of flags at the top of the canvas, or press [ and ] to jump between them.',
+        'Use the Flag tool (B) to drop a flag, and pick its type or make your own. Jump between flags from the list at the top of the canvas or with [ and ], and open Flags at the top right to see them across all your notes.',
     },
     canvasStyle: {
       title: 'Give each canvas its own style',
