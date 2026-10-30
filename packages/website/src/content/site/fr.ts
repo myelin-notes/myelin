@@ -280,6 +280,17 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Raccourcis clavier modifiables dans les Réglages',
         ],
       },
+      sync: {
+        label: 'Synchronisation en direct',
+        heading: 'Écrivez à plusieurs, sans serveur qui garde vos notes.',
+        lede: 'Ouvrez une note sur deux appareils et ils se connectent directement l’un à l’autre. Ce que vous écrivez sur l’un apparaît sur l’autre au fil de l’écriture.',
+        details: [
+          'Les appareils ayant la même note ouverte se trouvent d’eux-mêmes',
+          'Les modifications passent par une connexion QUIC chiffrée de bout en bout (iroh)',
+          'Les deux appareils doivent avoir accès au même dépôt de synchronisation GitHub',
+          'Aucun compte Myelin requis',
+        ],
+      },
       agents: {
         label: 'Agents IA',
         heading: 'Votre propre IA, sur votre propre machine.',
@@ -305,7 +316,6 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert (Yjs)',
           'Fonctionne entièrement hors ligne, sans compte',
           'Synchronisation entre appareils via un dépôt GitHub que vous contrôlez',
-          'Collaboration en direct par une connexion chiffrée directement entre appareils',
           'Import depuis Goodnotes, OneNote, Obsidian, Notion, Markdown et PDF',
           'Export en PDF, en Markdown, en coffre Obsidian ou en JSON de l’espace de travail',
           'En anglais, espagnol, français et chinois simplifié',
@@ -328,10 +338,10 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         body: 'Activez la Règle, faites glisser sa poignée jusqu’à l’angle voulu et tracez le long de son bord pour une ligne parfaitement droite.',
         alt: 'La règle est tournée à 30 degrés et un trait tremblant le long de son bord devient parfaitement droit',
       },
-      rotate: {
-        title: 'Faites pivoter ce que vous voulez',
-        body: 'Sélectionnez une image, une forme ou un dessin et faites glisser la poignée au-dessus. Maintenez Maj pour pivoter par pas de 15°.',
-        alt: 'Une photo est inclinée avec la poignée au-dessus, puis une flèche dessinée à la main tourne pour la désigner',
+      lasso: {
+        title: 'Rangez après avoir écrit',
+        body: 'Entourez un passage manuscrit au lasso pour le déplacer, ou tirez un coin pour le redimensionner. Sélectionnez un seul dessin pour le faire pivoter avec la poignée au-dessus.',
+        alt: 'Un passage manuscrit est entouré au lasso, glissé sous son titre et réduit par un coin, puis une flèche pivote pour le désigner',
       },
       pdfQuote: {
         title: 'Citez vos PDF',
@@ -362,6 +372,11 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         title: 'Des drapeaux pour y revenir',
         body: 'Posez un drapeau avec l’outil Drapeau (B) et choisissez un type comme À faire ou À revoir, ou créez le vôtre. Passez d’un drapeau à l’autre sur un canevas, ou ouvrez Drapeaux pour les filtrer dans toutes vos notes.',
         alt: 'Un titre reçoit un drapeau À faire et une page de PDF un drapeau À revoir, la liste des drapeaux saute au PDF, puis la page Drapeaux filtre les drapeaux À revoir de toutes les notes',
+      },
+      liveCollab: {
+        title: 'Collaboration en direct',
+        body: 'L’encre apparaît sur l’autre écran trait par trait pendant que vous dessinez, et le texte lettre par lettre, dans les deux sens.',
+        alt: 'L’encre tracée sur un Mac apparaît sur le PC d’Ada au fil de l’écriture, puis une tâche saisie par Ada apparaît lettre par lettre sur le Mac',
       },
       agents: {
         title: 'Votre app d’IA, en dialogue avec Myelin',
