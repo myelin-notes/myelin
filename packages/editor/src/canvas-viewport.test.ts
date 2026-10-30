@@ -16,9 +16,10 @@ function createViewport() {
   } as HTMLCanvasElement;
   const viewport = new CanvasViewport(canvas);
 
-  const wheel = (deltaX: number, deltaY: number) => {
+  const wheel = (deltaX: number, deltaY: number, shiftKey = false) => {
     const event = {
       ctrlKey: false,
+      shiftKey,
       deltaX,
       deltaY,
       preventDefault: vi.fn(),
@@ -90,6 +91,16 @@ describe('CanvasViewport edit-mode wheel panning', () => {
     wheel(120, 50);
 
     expect(viewport.offset).toEqual({ x: -120, y: 0 });
+  });
+
+  it('pans horizontally on shift+wheel whether or not the platform swapped the axis', () => {
+    const { viewport, wheel } = createViewport();
+
+    wheel(0, 100, true);
+    expect(viewport.offset).toEqual({ x: -100, y: 0 });
+
+    wheel(100, 0, true);
+    expect(viewport.offset).toEqual({ x: -200, y: 0 });
   });
 });
 
