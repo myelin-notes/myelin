@@ -24,6 +24,7 @@ import { useRepository } from '@/lib/sync';
 import type { NoteFlag } from '@/lib/sync/repo/types';
 
 const logger = new Logger('FlagTypeOptions');
+const MAX_FLAG_TYPES = 8;
 
 // No hover tint: it would stack on the row's own hover tint.
 const rowButtonClass =
@@ -147,23 +148,25 @@ export function FlagTypeOptions({
           ),
         )}
       </div>
-      <button
-        type="button"
-        onClick={() => {
-          const used = new Set(types.map((type) => type.color));
-          const color =
-            FLAG_COLORS.find((candidate) => !used.has(candidate)) ??
-            FLAG_COLORS[0];
-          const id = crypto.randomUUID();
-          save([...types, { id, name: labels.newFlag, color }]);
-          option.set(id);
-          setEditingId(id);
-        }}
-        className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
-      >
-        <Plus className="size-3.5 shrink-0" />
-        {labels.newFlag}
-      </button>
+      {types.length < MAX_FLAG_TYPES && (
+        <button
+          type="button"
+          onClick={() => {
+            const used = new Set(types.map((type) => type.color));
+            const color =
+              FLAG_COLORS.find((candidate) => !used.has(candidate)) ??
+              FLAG_COLORS[0];
+            const id = crypto.randomUUID();
+            save([...types, { id, name: labels.newFlag, color }]);
+            option.set(id);
+            setEditingId(id);
+          }}
+          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
+        >
+          <Plus className="size-3.5 shrink-0" />
+          {labels.newFlag}
+        </button>
+      )}
       <AlertDialog
         open={pendingRemoval !== null}
         onOpenChange={(open) => {
