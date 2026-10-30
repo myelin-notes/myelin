@@ -47,6 +47,8 @@ const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
   sync: [['liveCollab', 'ft-live-collab']],
   agents: [['agents', 'ft-mcp-agent']],
 };
+// Lone-clip sections that put their details left of the clip, so back-to-back ones don't mirror each other.
+const detailsLeft: FeatureSectionId[] = ['sync'];
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
@@ -134,7 +136,14 @@ const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
                   );
                 })}
                 {detailsBeside && section.details && (
-                  <CheckList items={section.details} class:list={[details, 'self-center md:pl-6']} />
+                  <CheckList
+                    items={section.details}
+                    class:list={[
+                      details,
+                      'self-center',
+                      detailsLeft.includes(id) ? 'md:order-first md:pr-6' : 'md:pl-6',
+                    ]}
+                  />
                 )}
               </div>
             )}
