@@ -230,8 +230,8 @@ export class DrawableCanvas {
     this.elementFactory.setOnPageFrameRenamed(callback);
   }
 
-  public setBackgroundHost(host: HTMLElement): void {
-    this.renderer.setBackgroundHost(host);
+  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
+    this.renderer.setBackgroundCanvas(canvas);
   }
 
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {

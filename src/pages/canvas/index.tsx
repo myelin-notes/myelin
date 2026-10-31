@@ -135,7 +135,7 @@ function CanvasViewInner({
   const { types: flagTypes } = useFlagTypes();
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bgHostRef = useRef<HTMLDivElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
@@ -202,7 +202,7 @@ function CanvasViewInner({
     recordingOwnerId,
     thumbnailRootRef,
     canvasRef,
-    bgHostRef,
+    bgCanvasRef,
     overlayCanvasRef,
     domOverlayRef,
     wheelRef,
@@ -658,13 +658,11 @@ function CanvasViewInner({
         className="absolute inset-0 isolate overflow-clip bg-page"
         style={surfaceStyle}
       >
-        {/* Background layer: dot grid, as a repeating CSS background rather
-            than a canvas — panning it is a compositor translate that
-            rasterizes nothing. Position and size are written by CanvasRenderer,
-            which owns the overdraw the pan translate depends on. */}
-        <div
-          ref={bgHostRef}
+        {/* Background pattern, below the DOM layers. */}
+        <canvas
+          ref={bgCanvasRef}
           data-thumbnail-exclude="true"
+          className="pointer-events-none absolute inset-0 block h-full w-full"
           style={{ zIndex: 0 }}
         />
 
