@@ -122,6 +122,8 @@ describe('native editor sessions', () => {
   it('retains failed deltas for retry and does not echo incoming peer/cloud updates', async () => {
     const native = nativeTarget();
     const session = await NoteSession.open('note', native.target);
+    // Queued behind the background subscribe, so the session is listening once this resolves.
+    await session.pull();
     native.persist.mockRejectedValueOnce(new Error('disk unavailable'));
     let lastError: Error | null = null;
     session.subscribeStatus((status) => {
@@ -158,6 +160,22 @@ describe('native editor sessions', () => {
     native.doc.destroy();
   });
 
+  it('opens with the loaded document before the subscription settles', async () => {
+    const native = nativeTarget();
+    native.doc.getText('content').insert(0, 'loaded');
+    const gate = deferred();
+    const subscribe = native.target.subscribeDocument;
+    native.target.subscribeDocument = async (...args) => {
+      await gate.promise;
+      return subscribe(...args);
+    };
+    const session = await NoteSession.open('note', native.target);
+    expect(session.ydoc.doc.getText('content').toString()).toBe('loaded');
+    gate.resolve();
+    await session.close();
+    native.doc.destroy();
+  });
+
   it('catches updates and replacements between initial load and subscription', async () => {
     const native = nativeTarget();
     const subscribe = native.target.subscribeDocument;
@@ -167,7 +185,9 @@ describe('native editor sessions', () => {
       return off;
     };
     const session = await NoteSession.open('note', native.target);
-    expect(session.ydoc.doc.getText('content').toString()).toBe('gap update');
+    await vi.waitFor(() =>
+      expect(session.ydoc.doc.getText('content').toString()).toBe('gap update'),
+    );
     await session.close();
     native.target.subscribeDocument = async (...args) => {
       const off = await subscribe(...args);
@@ -175,7 +195,7 @@ describe('native editor sessions', () => {
       return off;
     };
     const replaced = await NoteSession.open('note', native.target);
-    expect(replaced.documentReplaced).toBe(true);
+    await vi.waitFor(() => expect(replaced.documentReplaced).toBe(true));
     await replaced.close();
     native.doc.destroy();
   });
@@ -183,6 +203,7 @@ describe('native editor sessions', () => {
   it('invalidates replaced sessions and prevents old edits from being saved on close', async () => {
     const native = nativeTarget();
     const session = await NoteSession.open('note', native.target);
+    await session.pull();
     const replaced = vi.fn();
     session.subscribeReplacement(replaced);
     native.replace();

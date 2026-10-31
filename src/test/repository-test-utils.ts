@@ -321,8 +321,21 @@ export function createPluginFsModule() {
       currentStorage.rename(oldPath, newPath),
     writeFile: async (path: string, bytes: Uint8Array) =>
       currentStorage.writeFile(path, bytes),
-    writeTextFile: async (path: string, text: string) =>
-      currentStorage.writeTextFile(path, text),
+    stat: async (path: string) => ({
+      size: new TextEncoder().encode(currentStorage.readText(path) ?? '')
+        .byteLength,
+    }),
+    writeTextFile: async (
+      path: string,
+      text: string,
+      options?: { append?: boolean },
+    ) =>
+      currentStorage.writeTextFile(
+        path,
+        options?.append
+          ? `${currentStorage.readText(path) ?? ''}${text}`
+          : text,
+      ),
   };
 }
 

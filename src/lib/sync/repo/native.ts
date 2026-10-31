@@ -155,7 +155,12 @@ function encode(bytes: Uint8Array): string {
 }
 
 function decode(base64: string): Uint8Array {
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded

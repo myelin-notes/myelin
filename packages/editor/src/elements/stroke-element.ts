@@ -338,16 +338,19 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
     if (this.dirty) {
-      // The outline is only needed to build the Path2D; it is not retained.
-      const outline = this.strokeOutline();
-      const path = new Path2D();
-      appendStrokeOutline(path, outline);
-      this.cachedPath = path;
-      this.dirty = false;
+      this.cachePath(this.strokeOutline());
     }
 
     ctx.fillStyle = resolveInkColor(this.style.color);
     ctx.fill(this.cachedPath);
+  }
+
+  // The outline is only needed to build the Path2D; it is not retained.
+  private cachePath(outline: number[][]): void {
+    const path = new Path2D();
+    appendStrokeOutline(path, outline);
+    this.cachedPath = path;
+    this.dirty = false;
   }
 
   public override drawToPdf(ctx: PdfHarvestContext): void {
@@ -435,6 +438,8 @@ export class StrokeElement extends AnchorableElement {
     }
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+    // Loading a note lands here once per stroke; reusing the outline halves perfect-freehand work.
+    this.cachePath(outlinePoints);
   }
 }
 
