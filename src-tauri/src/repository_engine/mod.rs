@@ -727,7 +727,9 @@ impl RepositoryOperation {
                         generation
                     }
                 };
-                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": revision(&document::bytes(state.doc(&node_id)?)), "generation": generation})
+                // Not a content hash: hashing the full encode cost a second whole-document encode
+                // per open, even for the state-vector pull whose diff is a few bytes.
+                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": format!("native:{}", state.data_version), "generation": generation})
             }
             Self::CheckpointDocument { node_id } => {
                 if state.delta_counts.contains_key(&node_id) {

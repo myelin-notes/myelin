@@ -29,4 +29,17 @@ describe('tauri log sink', () => {
     expect(raw).not.toContain('first entry that should be rotated out');
     expect(raw).toContain('third entry that should survive');
   });
+
+  it('counts a log file left by a previous launch toward the cap', async () => {
+    await getRepositoryTestStorage().writeTextFile(
+      getLogFilePath(),
+      `${'x'.repeat(74)}\n`,
+    );
+
+    await writeLogs(['new entry'], 80);
+
+    const raw = getRepositoryTestStorage().readText(getLogFilePath()) ?? '';
+    expect(new TextEncoder().encode(raw).byteLength).toBeLessThanOrEqual(80);
+    expect(raw).toContain('new entry');
+  });
 });
