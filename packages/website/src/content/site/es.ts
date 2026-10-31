@@ -44,7 +44,7 @@ const es: SiteCopy = {
     subheadline:
       'Myelin Notes es una app de notas nativa que funciona en local: un lienzo donde la tinta, el texto enriquecido, los PDFs, las imágenes y el audio conviven. Tus notas se quedan en tu equipo, y aun así puedes editarlas en directo con otras personas, sin ningún servidor.',
     trustLine:
-      'Totalmente gratis para uso personal · Sin cuenta · Tus notas nunca quedan tras un muro de pago',
+      'Gratis para uso personal · Sin cuenta · Tus notas nunca quedan tras un muro de pago',
     ctaPrimary: 'Descargar',
     ctaSecondary: 'Pruébalo en el navegador',
   },
@@ -66,13 +66,13 @@ const es: SiteCopy = {
 
   pages: {
     heading: 'Documentos de verdad, sobre el lienzo.',
-    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código que puedes ejecutar.',
+    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código, que Pro te permite ejecutar.',
   },
 
   audioSearch: {
     heading: 'Grábalo. Transcríbelo. Encuéntralo en el lienzo.',
     audioBody:
-      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera.',
+      'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera. Pro añade modelos más precisos.',
     searchBody:
       'Busca en la biblioteca por título, etiquetas, texto guardado y transcripciones de audio. También puedes buscar dentro de un lienzo abierto.',
   },
@@ -119,7 +119,7 @@ const es: SiteCopy = {
     bullets: [
       'Tus notas son archivos normales en tu disco, en un formato abierto y sin conflictos (Yjs). Nada queda nunca atrapado.',
       'Todo funciona sin conexión, sin cuenta y sin ningún servidor por medio.',
-      'Usa la IA que quieras: los modelos se conectan a través de un servidor MCP local, nunca de una nube que hayamos elegido por ti.',
+      'Con Pro, usa la IA que quieras: los modelos se conectan a través de un servidor MCP local, nunca de una nube que hayamos elegido por ti.',
       'Importa desde Obsidian o GoodNotes, exporta a PDF, imágenes o JSON, y lee cada línea del código en GitHub.',
     ],
   },
@@ -192,7 +192,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí, totalmente gratis para uso personal. Myelin Notes está en beta, así que los planes de precios pueden cambiar.
+Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
 
 ## ¿Dónde se guardan mis notas?
 
@@ -269,7 +269,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         details: [
           'Atajos de Markdown para encabezados, listas, citas y formato',
           'Listas de tareas, avisos y tablas',
-          'Bloques de fórmulas, y bloques de código que puedes ejecutar',
+          'Bloques de fórmulas, y bloques de código que puedes ejecutar con Pro',
           '[[Enlaces entre notas]] con vista previa al pasar el cursor, actualizados al renombrar una nota',
           'Imágenes, vídeos, YouTube y tarjetas de enlace incrustados',
           'Diseño en Páginas, Columnas o Continuo',
@@ -301,7 +301,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       agents: {
         label: 'Agentes de IA',
         heading: 'Trae tu propia IA, en tu propio equipo.',
-        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas.',
+        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas. Los agentes de IA forman parte de Myelin Pro.',
         details: [
           'El servidor solo escucha en 127.0.0.1, en el puerto que elijas',
           'Copia la instrucción de instalación desde Ajustes para conectar tu agente',
@@ -372,7 +372,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       },
       canvasStyle: {
         title: 'Un estilo para cada lienzo',
-        body: 'Elige cuadrícula, puntos, líneas o tu propia imagen, y ajusta los colores. Cada lienzo puede tener el suyo, y Ajustes fija el predeterminado.',
+        body: 'Elige cuadrícula, puntos, líneas o, con Pro, tu propia imagen, y ajusta los colores. Cada lienzo puede tener el suyo, y Ajustes fija el predeterminado.',
         alt: 'El panel Estilo del lienzo cambia el fondo a líneas y elige un color de papel cálido',
       },
       flags: {
@@ -431,8 +431,99 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
     },
   },
 
+  pricing: {
+    meta: {
+      title: 'Precios | Myelin Notes',
+      description:
+        'Myelin Notes es gratis para uso personal. Myelin Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.',
+    },
+    eyebrow: 'Precios',
+    headline: 'Gratis para usar. Pro cuando quieras más.',
+    subheadline:
+      'La versión gratuita lo tiene casi todo. Pro es un pago único que desbloquea el resto y apoya el desarrollo de Myelin.',
+    free: {
+      name: 'Gratis',
+      price: '0 USD',
+      tagline: 'Para uso personal, sin límite de tiempo.',
+      includesLabel: 'Incluye',
+      includes: [
+        'Escritura a mano, PDF, páginas y el lienzo infinito',
+        'Grabación de audio con transcripción en el dispositivo',
+        'Sincronización con GitHub y colaboración en directo',
+        'Importación, exportación, búsqueda y enlaces',
+        'Hasta 6 ajustes de lápiz personalizados',
+        '2 tipos de bandera',
+      ],
+      cta: 'Descargar',
+    },
+    pro: {
+      name: 'Pro',
+      price: '49,99 USD',
+      priceNote: 'pago único',
+      tagline: 'Pagas una vez. Sin suscripción.',
+      includesLabel: 'Todo lo de Gratis, y además',
+      includes: [
+        'Agentes de IA a través de un servidor MCP local',
+        'Ejecuta bloques de código en tus páginas',
+        'Tipos de bandera ilimitados',
+        'Ajustes de lápiz personalizados ilimitados',
+        'Tus propias imágenes como fondo del lienzo',
+        'Modelos de transcripción más precisos',
+        'Apoya el desarrollo de Myelin',
+      ],
+      cta: 'Comprar Pro',
+      licenseNote:
+        'Recibes una clave de licencia por correo. Desbloquea Pro en hasta 3 de tus dispositivos.',
+      checkoutFailed: 'No hemos podido abrir el pago. Inténtalo de nuevo.',
+    },
+    student: {
+      name: 'Estudiantes',
+      tagline:
+        'Todo lo de Pro, para estudiantes con un correo de su centro de estudios.',
+      price: '29,99 USD',
+      note: 'Introduce el correo de tu centro de estudios y te enviaremos un enlace al pago con precio de estudiante.',
+      emailLabel: 'Correo del centro de estudios',
+      submit: 'Enviar enlace',
+      sending: 'Enviando…',
+      sent: 'Revisa tu bandeja de entrada: te hemos enviado el enlace.',
+      notAcademic:
+        'No reconocemos ese correo como de un centro de estudios. Escribe a soporte si falta tu centro.',
+      failed: 'No hemos podido enviar el enlace. Inténtalo de nuevo.',
+      linkExpired:
+        'Este enlace de estudiante ha caducado. Solicita uno nuevo más abajo.',
+    },
+    faqTitle: 'Preguntas sobre precios',
+    faqs: [
+      {
+        question: '¿Cómo desbloqueo Pro?',
+        answer:
+          'Compra Pro y recibirás una clave de licencia por correo. Introdúcela en la app de Myelin para desbloquear Pro en ese dispositivo.',
+      },
+      {
+        question: '¿En cuántos dispositivos puedo usarlo?',
+        answer:
+          'Una clave de licencia desbloquea Pro en hasta 3 de tus dispositivos.',
+      },
+      {
+        question: '¿Es una suscripción?',
+        answer: 'No. Pro es un pago único.',
+      },
+      {
+        question: '¿Cómo funciona el precio para estudiantes?',
+        answer:
+          'Introduce el correo de tu centro de estudios en esta página. Si pertenece a un centro reconocido, te enviamos un enlace para comprar Pro por 29,99 USD. El enlace es válido durante 24 horas.',
+      },
+      {
+        question: '¿Qué pasa con mis notas si sigo con la versión gratuita?',
+        answer:
+          'Nada. Tus notas son archivos normales en tu disco, y la versión gratuita los abre todos.',
+      },
+    ],
+  },
+
   linkLabels: {
     features: 'Funciones',
+    pricing: 'Precios',
     privacy: 'Privacidad',
     support: 'Ayuda',
   },

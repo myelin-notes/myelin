@@ -1637,6 +1637,18 @@
   resolved "https://registry.yarnpkg.com/@oxc-project/types/-/types-0.155.0.tgz#a3525bff41bc0575839e95d2064635dd73dfef81"
   integrity sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==
 
+"@polar-sh/checkout@^0.6.0":
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/@polar-sh/checkout/-/checkout-0.6.0.tgz#d8e1af13aa1fde2565145a14e078c8c021fd8a86"
+  integrity sha512-pFlb15vZZ9PVkd0I9cMWyO8CP5LbKNCzbLgALxKkzK0rjE2z1u6TtyvIw67evNkfmcFrrJhuOcs2BneHbVa9fw==
+  dependencies:
+    date-fns "^4.4.0"
+
+"@polar-sh/sdk@^1.0.2":
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/@polar-sh/sdk/-/sdk-1.0.2.tgz#8fca6ad2a12b381591b953e9910a4ef9c2f63ff3"
+  integrity sha512-c3jdqYloVfcejKsAqYfYcW4bG7KkXj5bXkgdsdx4GHlJPzHFV5tysfeZGf9V7dJReLBirAluchsuHWiAIBco8w==
+
 "@posthog/core@^1.35.4":
   version "1.35.4"
   resolved "https://registry.yarnpkg.com/@posthog/core/-/core-1.35.4.tgz#1b659a23a95f234b970da253ff7c4438ae495bcb"
@@ -2682,12 +2694,12 @@
   dependencies:
     undici-types "~7.18.0"
 
-"@types/react-dom@19.2.3", "@types/react-dom@^19.1.6":
+"@types/react-dom@^19.1.6":
   version "19.2.3"
   resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-19.2.3.tgz#c1e305d15a52a3e508d54dca770d202cb63abf2c"
   integrity sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==
 
-"@types/react@19.2.15", "@types/react@^19.1.8":
+"@types/react@^19.1.8":
   version "19.2.15"
   resolved "https://registry.yarnpkg.com/@types/react/-/react-19.2.15.tgz#9e2c6a4251a290f5c525c3143caa872fa6e01e0d"
   integrity sha512-eRwcGNHve+E8qtEQSSRl6urh+rFop4v8gm6O8rGv25CodbvFdLjA1vVQ1KkiFE0w0UPOnb8tDiFKL5lp0rtY5Q==
@@ -3665,6 +3677,11 @@ dagre-d3-es@7.0.14:
   dependencies:
     d3 "^7.9.0"
     lodash-es "^4.17.21"
+
+date-fns@^4.4.0:
+  version "4.4.0"
+  resolved "https://registry.yarnpkg.com/date-fns/-/date-fns-4.4.0.tgz#806539edf45c616b2b76b5f78b88c56ed3c7e036"
+  integrity sha512-+1UMbeh68lH1SegH83CGWwpb6OHHbpSgr3+s5Eww5M4CAgswBpoWS0AjTOfEJ33HiYKz1hdj/KTFprzXHmq/6w==
 
 dayjs@^1.11.20:
   version "1.11.21"
