@@ -12,6 +12,10 @@ const fr: typeof en = {
     never: 'Jamais',
     or: 'ou',
   },
+  plan: {
+    proRequired: 'Cette fonctionnalité fait partie de Myelin Pro.',
+    upgrade: 'Passer à Pro',
+  },
   tabBar: {
     library: 'Bibliothèque',
     home: 'Accueil',
@@ -912,7 +916,6 @@ const fr: typeof en = {
     flagTypes: {
       todo: 'À faire',
       review: 'À revoir',
-      examinable: 'À l’examen',
       newFlag: 'Nouveau drapeau',
       edit: 'Modifier le drapeau',
       remove: 'Supprimer le drapeau',

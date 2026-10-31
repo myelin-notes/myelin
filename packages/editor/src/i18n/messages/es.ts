@@ -12,6 +12,10 @@ const es: typeof en = {
     never: 'Nunca',
     or: 'o',
   },
+  plan: {
+    proRequired: 'Esta función es de Myelin Pro.',
+    upgrade: 'Mejorar',
+  },
   tabBar: {
     library: 'Biblioteca',
     home: 'Inicio',
@@ -902,7 +906,6 @@ const es: typeof en = {
     flagTypes: {
       todo: 'Pendiente',
       review: 'Revisar',
-      examinable: 'Evaluable',
       newFlag: 'Nueva bandera',
       edit: 'Editar bandera',
       remove: 'Eliminar bandera',

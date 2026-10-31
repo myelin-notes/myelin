@@ -12,6 +12,10 @@ const zhHans: typeof en = {
     never: '从不',
     or: '或',
   },
+  plan: {
+    proRequired: '此功能需要 Myelin Pro。',
+    upgrade: '升级',
+  },
   tabBar: {
     library: '资料库',
     home: '主页',
@@ -868,7 +872,6 @@ const zhHans: typeof en = {
     flagTypes: {
       todo: '待办',
       review: '待复查',
-      examinable: '考试范围',
       newFlag: '新建旗标',
       edit: '编辑旗标',
       remove: '删除旗标',

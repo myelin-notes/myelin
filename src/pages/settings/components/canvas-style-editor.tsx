@@ -9,6 +9,7 @@ import {
 } from '@myelin/editor/canvas-style';
 import { ColorPickerDialog } from '@myelin/editor/components/color-picker-dialog';
 import { useMessages } from '@myelin/editor/i18n';
+import { isPro, promptUpgrade } from '@myelin/editor/plan';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { OptionsRow, OptionsSegmented } from './options-row';
@@ -153,9 +154,18 @@ export function CanvasStyleEditor({
   const [picker, setPicker] = useState<ColorField | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // An image chosen before the user lost Pro stays selectable; only picking a new one is gated.
+  const chooseImage = () => {
+    if (!isPro()) {
+      promptUpgrade();
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
   const handlePattern = (pattern: CanvasPattern) => {
     if (pattern === 'image' && !style.image) {
-      fileInputRef.current?.click();
+      chooseImage();
       return;
     }
     onChange({ pattern });
@@ -225,7 +235,7 @@ export function CanvasStyleEditor({
   const chooseImageButton = (
     <button
       type="button"
-      onClick={() => fileInputRef.current?.click()}
+      onClick={chooseImage}
       className="flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-card/70 px-3 py-1.5 font-medium text-text-primary text-xs ring-1 ring-border-ghost transition-colors hover:bg-card-active"
     >
       <ImagePlus className="size-3.5" />

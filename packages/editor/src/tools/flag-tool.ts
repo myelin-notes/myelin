@@ -5,6 +5,7 @@ import { PageFrameElement } from '../elements/page-frame-element';
 import { PdfElement } from '../elements/pdf';
 import type { MessageGetter } from '../i18n';
 import { pageContainsPoint } from '../page-frame/anchoring';
+import { planLimit, promptUpgrade } from '../plan';
 import { CollisionHelper } from '../utils/collision-helper';
 import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
@@ -57,6 +58,13 @@ export class FlagTool implements ITool {
       Math.abs(end.x - down.point.x) * zoom >= CLICK_THRESHOLD ||
       Math.abs(end.y - down.point.y) * zoom >= CLICK_THRESHOLD
     ) {
+      return;
+    }
+    const flagCount = [...canvas.elements].filter(
+      (element) => element instanceof FlagElement,
+    ).length;
+    if (flagCount >= planLimit('flagsPerNote')) {
+      promptUpgrade();
       return;
     }
     const { point } = down;

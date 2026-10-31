@@ -10,6 +10,10 @@ const en = {
     never: 'Never',
     or: 'or',
   },
+  plan: {
+    proRequired: 'This is a Myelin Pro feature.',
+    upgrade: 'Upgrade',
+  },
   tabBar: {
     library: 'Library',
     home: 'Home',
@@ -892,7 +896,6 @@ const en = {
     flagTypes: {
       todo: 'To-do',
       review: 'Review',
-      examinable: 'Examinable',
       newFlag: 'New flag',
       edit: 'Edit flag',
       remove: 'Delete flag',
