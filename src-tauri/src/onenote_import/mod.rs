@@ -44,6 +44,8 @@ const DEFAULT_INK_COLOR: &str = "#191c1e";
 
 pub(crate) struct ImportedNotebook {
     pub(crate) sections: Vec<ImportedSection>,
+    /// Parser messages for top-level entries it skipped because they failed to parse.
+    pub(crate) failed_sections: Vec<String>,
 }
 
 pub(crate) struct ImportedSection {
@@ -90,15 +92,27 @@ pub(crate) struct ImportedStroke {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OneNotePreview {
     pages: usize,
     sections: usize,
+    skipped_sections: usize,
 }
 
 #[tauri::command]
 pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePreview, String> {
     tokio::task::spawn_blocking(move || {
         let notebook = read_notebook(&app, path)?;
+        // Reported here, not on import: every import scans first, and a user who
+        // cancels after seeing the skipped count still hit the failure.
+        for message in &notebook.failed_sections {
+            crate::error_report::report_error(
+                &app,
+                "onenote-import",
+                "OneNote section could not be read",
+                message,
+            );
+        }
         Ok(OneNotePreview {
             pages: notebook
                 .sections
@@ -106,6 +120,7 @@ pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePrevi
                 .map(|section| section.pages.len())
                 .sum(),
             sections: notebook.sections.len(),
+            skipped_sections: notebook.failed_sections.len(),
         })
     })
     .await
@@ -134,6 +149,7 @@ fn parse_single_section(bytes: &[u8]) -> Result<ImportedNotebook, String> {
 
     Ok(ImportedNotebook {
         sections: vec![convert_section(&section, String::new())],
+        failed_sections: Vec::new(),
     })
 }
 
@@ -144,7 +160,15 @@ fn parse_package(bytes: &[u8]) -> Result<ImportedNotebook, String> {
 
     let mut sections = Vec::new();
     collect_sections(notebook.entries(), "", 0, &mut sections);
-    Ok(ImportedNotebook { sections })
+    Ok(ImportedNotebook {
+        sections,
+        failed_sections: notebook
+            .report()
+            .warnings()
+            .iter()
+            .map(|warning| warning.message().to_string())
+            .collect(),
+    })
 }
 
 fn collect_sections(

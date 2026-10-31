@@ -35,12 +35,15 @@ export const onenoteProvider: ImportProvider = {
             { icon: 'page', text: source.pages(pages) },
             { icon: 'note', text: source.sections(notebook.sections) },
           ],
-          skippedText: null,
+          skippedText:
+            notebook.skippedSections > 0
+              ? source.skippedSections(notebook.skippedSections)
+              : null,
           isEmpty: pages === 0,
         };
       },
 
-      async run({ rootName, onProgress }) {
+      async run({ scanned, rootName, onProgress }) {
         const result = await importOneNote({
           path,
           repository,
@@ -50,13 +53,17 @@ export const onenoteProvider: ImportProvider = {
           onProgress,
         });
 
+        const skipped = [
+          result.skippedPages > 0 ? source.skipped(result.skippedPages) : null,
+          scanned.skippedSections > 0
+            ? source.skippedSections(scanned.skippedSections)
+            : null,
+        ].filter((text) => text !== null);
+
         return {
           focusNodeId: result.rootFolderId,
           text: source.summary(result.pagesImported),
-          skippedText:
-            result.skippedPages > 0
-              ? source.skipped(result.skippedPages)
-              : null,
+          skippedText: skipped.length > 0 ? skipped.join(' · ') : null,
           stats: {
             count: result.pagesImported,
             skipped: result.skippedPages,

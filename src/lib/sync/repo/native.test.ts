@@ -1013,7 +1013,7 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
   vi.mocked(invoke).mockImplementation(async (command, args) => {
     if (command === 'scan_onenote') {
       expect(args).toEqual({ path: '/picked/Notebook.onepkg' });
-      return { pages: 2, sections: 1 };
+      return { pages: 2, sections: 1, skippedSections: 2 };
     }
     const op = (args as { operation?: Record<string, unknown> })?.operation;
     if (command === 'repository_operation' && op?.kind === 'import-one-note') {
@@ -1041,6 +1041,9 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     en.library.importSources.onenote.pages(2),
     en.library.importSources.onenote.sections(1),
   ]);
+  expect(preview.skippedText).toBe(
+    en.library.importSources.onenote.skippedSections(2),
+  );
   const onProgress = vi.fn();
   const summary = await job.run({ conflictResolution: 'rename', onProgress });
   expect(imported).toMatchObject({
@@ -1056,6 +1059,9 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     fileName: 'Page',
   });
   expect(summary.focusNodeId).toBe(result.rootFolderId);
+  expect(summary.skippedText).toBe(
+    en.library.importSources.onenote.skippedSections(2),
+  );
   expect(summary.stats).toEqual({ count: 2, skipped: 0 });
   expect(native.operations.map((op) => op.kind)).toEqual(['manifest']);
   await repository.dispose();

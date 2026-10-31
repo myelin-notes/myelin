@@ -31,6 +31,7 @@ export function oneNoteRootName(path: string): string {
 export interface OneNotePreview {
   pages: number;
   sections: number;
+  skippedSections: number;
 }
 
 export type { OneNoteImportResult } from '@/lib/sync/repo/native-operations';

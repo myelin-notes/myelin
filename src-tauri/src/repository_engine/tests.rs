@@ -2453,6 +2453,7 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
                 },
             ],
         }],
+        failed_sections: Vec::new(),
     };
     let progress = Arc::new(Mutex::new(Vec::new()));
     let captured = progress.clone();
@@ -2579,6 +2580,7 @@ async fn onenote_import_preserves_shared_section_groups_and_rejects_missing_dest
                 }],
             })
             .collect(),
+        failed_sections: Vec::new(),
     };
     let operation = |parent_id| RepositoryOperation::ImportedOneNote {
         notebook: notebook(),
