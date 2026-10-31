@@ -19,7 +19,7 @@ const page = getCopy(locale).pricing;
 const { free, pro, student } = page;
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
-const card = 'reveal-scale flex flex-col rounded-2xl bg-card p-7 shadow-elevated lg:p-10';
+const card = 'reveal-scale flex flex-col rounded-2xl bg-card p-7 shadow-elevated lg:p-8';
 const planName = 'kicker text-text-muted';
 const price =
   'font-heading text-[clamp(2.4rem,4vw,3.2rem)] leading-none font-medium tracking-[-0.02em] text-text-primary';
@@ -43,7 +43,7 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
     </section>
 
     <section class:list={[wrap, 'py-16 lg:py-20']}>
-      <div class="grid gap-6 md:grid-cols-2">
+      <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <div class={card} style="--i:1">
           <p class={planName}>{free.name}</p>
           <p class:list={[price, 'mt-6']}>{free.price}</p>
@@ -75,21 +75,28 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
             {pro.cta}
           </a>
           <p class="mt-4 text-sm text-text-muted">{pro.licenseNote}</p>
+        </div>
+
+        {/* Full width when the grid has two columns, so it does not sit alone in half a row. */}
+        <div class:list={[card, 'md:col-span-2 lg:col-span-1']} style="--i:3">
+          <p class={planName}>{student.name}</p>
+          <p class="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span class={price}>{student.price}</span>
+            <span class="text-sm text-text-muted">{pro.priceNote}</span>
+          </p>
+          <p class="mt-4 text-sm text-text-secondary">{student.tagline}</p>
           {/* The script reads its status messages from the data attributes, so they stay translated. */}
           <form
             id="student"
             action="/api/student"
             method="post"
-            class="mt-8 border-t border-border-divider pt-6 text-sm"
+            class="mt-8 text-sm"
             data-sending={student.sending}
             data-sent={student.sent}
             data-not-academic={student.notAcademic}
             data-failed={student.failed}
           >
-            <p class="text-text-secondary">
-              <span class="font-medium text-text-primary">{student.price}</span>
-              {' '}{student.note}
-            </p>
+            <p class="text-text-secondary">{student.note}</p>
             <label for="student-email" class="sr-only">{student.emailLabel}</label>
             <div class="mt-4 flex flex-wrap gap-3">
               <input
@@ -115,6 +122,7 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
             </div>
             <p id="student-status" class="mt-3 text-text-secondary" role="status" aria-live="polite"></p>
           </form>
+          <p class="mt-4 text-sm text-text-muted">{pro.licenseNote}</p>
         </div>
       </div>
     </section>

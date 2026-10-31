@@ -469,7 +469,10 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         'Vous recevez une clé de licence par e-mail. Elle débloque Pro sur jusqu’à 3 de vos appareils.',
     },
     student: {
-      price: '29,99 USD pour les étudiants.',
+      name: 'Étudiant',
+      tagline:
+        'Tout Pro, pour les étudiants ayant une adresse e-mail d’établissement.',
+      price: '29,99 USD',
       note: 'Saisissez l’adresse e-mail de votre établissement et nous vous enverrons un lien vers le paiement au tarif étudiant.',
       emailLabel: 'E-mail de l’établissement',
       submit: 'Envoyer le lien',

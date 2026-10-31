@@ -464,7 +464,9 @@ const zhHans: SiteCopy = {
         '许可证密钥会通过邮件发送给你，可在最多 3 台设备上解锁 Pro。',
     },
     student: {
-      price: '学生价 29.99 美元。',
+      name: '学生版',
+      tagline: '包含 Pro 全部功能，面向拥有学校邮箱的学生。',
+      price: '29.99 美元',
       note: '输入你的学校邮箱，我们会把学生价购买链接发送给你。',
       emailLabel: '学校邮箱',
       submit: '发送链接',

@@ -476,7 +476,10 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         'Recibes una clave de licencia por correo. Desbloquea Pro en hasta 3 de tus dispositivos.',
     },
     student: {
-      price: '29,99 USD para estudiantes.',
+      name: 'Estudiantes',
+      tagline:
+        'Todo lo de Pro, para estudiantes con un correo de su centro de estudios.',
+      price: '29,99 USD',
       note: 'Introduce el correo de tu centro de estudios y te enviaremos un enlace al pago con precio de estudiante.',
       emailLabel: 'Correo del centro de estudios',
       submit: 'Enviar enlace',

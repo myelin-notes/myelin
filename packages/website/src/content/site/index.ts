@@ -255,6 +255,8 @@ export interface SiteCopy {
     };
     /** The school-email form that sends a student checkout link. */
     student: {
+      name: string;
+      tagline: string;
       price: string;
       /** Follows `price`, explaining how to qualify. */
       note: string;

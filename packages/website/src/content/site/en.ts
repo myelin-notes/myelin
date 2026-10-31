@@ -472,7 +472,9 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         'You get a license key by email. It unlocks Pro on up to 3 of your devices.',
     },
     student: {
-      price: '$29.99 for students.',
+      name: 'Student',
+      tagline: 'Everything in Pro, for students with a school email address.',
+      price: '$29.99',
       note: 'Enter your school email address and we will send you a link to the student checkout.',
       emailLabel: 'School email',
       submit: 'Send link',
