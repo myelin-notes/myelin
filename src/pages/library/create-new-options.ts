@@ -1,5 +1,6 @@
 import { FolderPlus, Import, LayoutGrid } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
+import { holdVirtualKeyboard } from '@/lib/hold-virtual-keyboard';
 import type { FileType } from '@/lib/sync';
 
 export interface CreateNewActions {
@@ -25,14 +26,19 @@ export function useCreateNewOptions({
       id: 'canvas',
       label: strings.library.createNew.canvas,
       icon: LayoutGrid,
-      onClick: () =>
-        onNewFile?.(strings.library.createNew.untitledCanvas, 'mcanvas'),
+      onClick: () => {
+        holdVirtualKeyboard();
+        onNewFile?.(strings.library.createNew.untitledCanvas, 'mcanvas');
+      },
     },
     {
       id: 'folder',
       label: strings.library.createNew.folder,
       icon: FolderPlus,
-      onClick: onNewFolder,
+      onClick: () => {
+        holdVirtualKeyboard();
+        onNewFolder?.();
+      },
     },
     {
       id: 'import',
