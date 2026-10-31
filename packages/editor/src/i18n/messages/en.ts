@@ -163,6 +163,8 @@ const en = {
           `Imported ${count} page${count === 1 ? '' : 's'}`,
         skipped: (count: number) =>
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
+        skippedSections: (count: number) =>
+          `${count} section${count === 1 ? '' : 's'} could not be read`,
       },
       obsidian_vault: {
         label: 'Import from Obsidian',

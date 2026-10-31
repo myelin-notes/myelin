@@ -1277,7 +1277,7 @@ async fn github_head(
     repo: &str,
     branch: &str,
 ) -> Result<String, String> {
-    let payload = client
+    let head = client
         .json(
             "GitHub branch request failed",
             Method::GET,
@@ -1287,7 +1287,40 @@ async fn github_head(
             )?,
             None,
         )
-        .await?;
+        .await;
+    let payload = match head {
+        Ok(payload) => payload,
+        Err(error) => {
+            let branches = client
+                .json(
+                    "GitHub branch list failed",
+                    Method::GET,
+                    endpoint(&endpoints.github, &["repos", owner, repo, "branches"])?,
+                    None,
+                )
+                .await;
+            if !branches.is_ok_and(|branches| branches.as_array().is_some_and(Vec::is_empty)) {
+                return Err(error);
+            }
+            // A new repository has no branch to read or push onto until its first commit, and
+            // GitHub's Git Data API refuses empty repositories; the contents API creates one.
+            client
+                .json(
+                    "GitHub repository initialization failed",
+                    Method::PUT,
+                    endpoint(
+                        &endpoints.github,
+                        &["repos", owner, repo, "contents", "README.md"],
+                    )?,
+                    Some(json!({
+                        "message": "Initialize repository",
+                        "content": STANDARD.encode(format!("# {repo}\n")),
+                        "branch": branch,
+                    })),
+                )
+                .await?
+        }
+    };
     payload["commit"]["sha"]
         .as_str()
         .filter(|value| git2::Oid::from_str(value).is_ok())

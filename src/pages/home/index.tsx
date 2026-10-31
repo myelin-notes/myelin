@@ -15,6 +15,7 @@ import {
 } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { BetaFeedbackBanner } from '@/pages/library/beta-feedback-banner';
+import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
 import { RecentCard } from '@/pages/library/recent-card';
 
 const logger = new Logger('HomePage');
@@ -25,6 +26,7 @@ export function HomePage() {
   const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const setupState = useExplorerSetupState(repositoryStatus.config);
   const tabController = useTabController();
   const scrollRef = useRef<HTMLElement | null>(null);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
@@ -115,6 +117,7 @@ export function HomePage() {
             <Button
               size="lg"
               className="mt-7"
+              disabled={setupState !== 'ready'}
               onClick={() => void createCanvas()}
             >
               <Plus />

@@ -940,6 +940,7 @@ struct GitHubFixture {
     fail_blob: bool,
     fail_ref_response: bool,
     advance_on_commit: bool,
+    empty: bool,
 }
 impl GitHubFixture {
     fn new(manifest: Value, files: HashMap<String, Vec<u8>>) -> Self {
@@ -955,6 +956,7 @@ impl GitHubFixture {
             fail_blob: false,
             fail_ref_response: false,
             advance_on_commit: false,
+            empty: false,
         }
     }
     fn repository_files(&self) -> HashMap<String, Vec<u8>> {
@@ -987,6 +989,16 @@ impl GitHubFixture {
     fn handle(&mut self, request: &Request) -> (u16, Vec<u8>) {
         let body: Value = serde_json::from_slice(&request.body).unwrap_or(Value::Null);
         let reply = |value: Value| (200, serde_json::to_vec(&value).unwrap());
+        if self.empty {
+            if request.path.ends_with("/branches") {
+                return reply(json!([]));
+            }
+            if request.method == "PUT" && request.path.ends_with("/contents/README.md") {
+                self.empty = false;
+                return reply(json!({"commit": {"sha": self.head}}));
+            }
+            return (404, b"{}".to_vec());
+        }
         if request.path.contains("/branches/") {
             return reply(json!({"commit": {"sha": self.head}}));
         }
@@ -1924,6 +1936,33 @@ async fn native_github_upload_retains_newer_deltas_retries_and_reuses_a_single_r
 }
 
 #[tokio::test]
+async fn github_sync_initializes_an_empty_repository_branch() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        crate::repository_metadata::empty_manifest(),
+        HashMap::new(),
+    )));
+    state.lock().unwrap().empty = true;
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    seed(&engine, "picture", "png", b"local".to_vec()).await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(state.lock().unwrap().files["picture"], b"local");
+    let requests = server.requests.lock().unwrap();
+    let initialized: Vec<_> = requests
+        .iter()
+        .filter(|request| request.method == "PUT")
+        .collect();
+    assert_eq!(initialized.len(), 1);
+    let body: Value = serde_json::from_slice(&initialized[0].body).unwrap();
+    assert_eq!(body["branch"], "feature/notes");
+}
+
+#[tokio::test]
 async fn native_raw_sync_preserves_legacy_content_bases_and_makes_conflict_copies_before_extensions(
 ) {
     let directory = TestDirectory::new();
@@ -2414,6 +2453,7 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
                 },
             ],
         }],
+        failed_sections: Vec::new(),
     };
     let progress = Arc::new(Mutex::new(Vec::new()));
     let captured = progress.clone();
@@ -2540,6 +2580,7 @@ async fn onenote_import_preserves_shared_section_groups_and_rejects_missing_dest
                 }],
             })
             .collect(),
+        failed_sections: Vec::new(),
     };
     let operation = |parent_id| RepositoryOperation::ImportedOneNote {
         notebook: notebook(),

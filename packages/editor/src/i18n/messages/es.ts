@@ -165,6 +165,8 @@ const es: typeof en = {
           `Se ${count === 1 ? 'importó' : 'importaron'} ${count} página${count === 1 ? '' : 's'}`,
         skipped: (count: number) =>
           `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
+        skippedSections: (count: number) =>
+          `No se ${count === 1 ? 'pudo' : 'pudieron'} leer ${count} ${count === 1 ? 'sección' : 'secciones'}`,
       },
       obsidian_vault: {
         label: 'Importar desde Obsidian',

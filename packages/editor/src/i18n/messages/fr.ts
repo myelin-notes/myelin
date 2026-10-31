@@ -169,6 +169,8 @@ const fr: typeof en = {
           `${count} page${count > 1 ? 's' : ''} importée${count > 1 ? 's' : ''}`,
         skipped: (count: number) =>
           `${count} page${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être importée${count > 1 ? 's' : ''}`,
+        skippedSections: (count: number) =>
+          `${count} section${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être lue${count > 1 ? 's' : ''}`,
       },
       obsidian_vault: {
         label: 'Importer depuis Obsidian',

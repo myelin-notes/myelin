@@ -1438,7 +1438,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 2.0.117",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -5303,9 +5303,8 @@ dependencies = [
 
 [[package]]
 name = "onenote_parser"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9850dc986316a0f729457917284a8e63ff06a359be2ba1ce051239d37e1c978"
+version = "2.1.0"
+source = "git+https://github.com/myelin-notes/onenote.rs?branch=fix%2Fchunk-terminator-padding#8039c25f4f406b6fbd3bd0e8cda462fae5da5515"
 dependencies = [
  "bytes",
  "cab",
@@ -5326,9 +5325,8 @@ dependencies = [
 
 [[package]]
 name = "onenote_parser-macros"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17af8bc18349182a1821dd8451343d04d89464b09587054db4a9c560d3c75037"
+version = "2.1.0"
+source = "git+https://github.com/myelin-notes/onenote.rs?branch=fix%2Fchunk-terminator-padding#8039c25f4f406b6fbd3bd0e8cda462fae5da5515"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8483,7 +8481,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.2",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

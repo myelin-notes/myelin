@@ -1,3 +1,4 @@
+import { Logger } from '@myelin/shared/logger';
 import { OneNoteIcon } from '../brand-icons';
 import {
   importOneNote,
@@ -8,6 +9,8 @@ import {
 } from '../onenote';
 import { createRootFolderImportJob } from './root-folder-job';
 import { expectFilePath, type ImportProvider } from './types';
+
+const logger = new Logger('OneNoteImport');
 
 export const onenoteProvider: ImportProvider = {
   id: 'onenote',
@@ -26,7 +29,15 @@ export const onenoteProvider: ImportProvider = {
       repository,
       parentId,
 
-      scan: () => scanOneNoteFile(path),
+      async scan() {
+        const notebook = await scanOneNoteFile(path);
+        // Reported on scan, not import: every import scans first, and a user who
+        // cancels after seeing the skipped count still hit the failure.
+        for (const reason of notebook.failedSections) {
+          logger.error('OneNote section import failed', { reason });
+        }
+        return notebook;
+      },
 
       preview: (notebook) => {
         const pages = notebook.pages;
@@ -35,12 +46,15 @@ export const onenoteProvider: ImportProvider = {
             { icon: 'page', text: source.pages(pages) },
             { icon: 'note', text: source.sections(notebook.sections) },
           ],
-          skippedText: null,
+          skippedText:
+            notebook.failedSections.length > 0
+              ? source.skippedSections(notebook.failedSections.length)
+              : null,
           isEmpty: pages === 0,
         };
       },
 
-      async run({ rootName, onProgress }) {
+      async run({ scanned, rootName, onProgress }) {
         const result = await importOneNote({
           path,
           repository,
@@ -50,13 +64,17 @@ export const onenoteProvider: ImportProvider = {
           onProgress,
         });
 
+        const skipped = [
+          result.skippedPages > 0 ? source.skipped(result.skippedPages) : null,
+          scanned.failedSections.length > 0
+            ? source.skippedSections(scanned.failedSections.length)
+            : null,
+        ].filter((text) => text !== null);
+
         return {
           focusNodeId: result.rootFolderId,
           text: source.summary(result.pagesImported),
-          skippedText:
-            result.skippedPages > 0
-              ? source.skipped(result.skippedPages)
-              : null,
+          skippedText: skipped.length > 0 ? skipped.join(' · ') : null,
           stats: {
             count: result.pagesImported,
             skipped: result.skippedPages,

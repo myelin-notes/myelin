@@ -366,6 +366,9 @@ export function ExplorerTree({
 
   const containerClassName = cn(
     'min-h-[80px] rounded-xl transition-colors',
+    // While a row is renaming, other rows ignore clicks; the click lands on the
+    // container instead and blurs the input, which commits the rename.
+    '[&:has(input)_button:not(:has(input))]:pointer-events-none',
     dragOver && canDrop ? 'bg-accent/10' : '',
   );
   const containerProps = canDrop ? dropTargetProps : undefined;

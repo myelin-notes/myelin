@@ -156,6 +156,7 @@ const zhHans: typeof en = {
         sections: (count: number) => `${count} 个分区`,
         summary: (count: number) => `已导入 ${count} 个页面`,
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
+        skippedSections: (count: number) => `有 ${count} 个分区无法读取`,
       },
       obsidian_vault: {
         label: '从 Obsidian 导入',

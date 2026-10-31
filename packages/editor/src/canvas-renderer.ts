@@ -5,19 +5,43 @@ import {
   subscribeCanvasStyle,
 } from './canvas-style';
 import { getCanvasPalette, onCanvasThemeChange } from './canvas-theme';
-import { type CanvasViewport, MAX_ZOOM } from './canvas-viewport';
+import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import { isBackgroundElement } from './elements/element-type';
-import { IS_MOBILE_BUILD } from './env';
 import type { Vector2 } from './geometry';
 import type { PlacementController } from './placement-controller';
-import { quantizeRasterZoom } from './raster-zoom';
 import type { Ruler } from './ruler';
 import type { SelectionController } from './selection-controller';
 import type { ITool } from './tools/tool';
 
-/** Side length of one background pattern tile, in world units. */
-const BG_TILE_SIZE = 24;
+/** Spacing of the background pattern, in world units. */
+const BG_SPACING = 24;
+// Below this screen spacing a level fades out and the next-coarser one takes over.
+const BG_MIN_SPACING_PX = 12;
+
+export interface BackgroundGridLevel {
+  /** World spacing of the finest drawn lines; even multiples are drawn opaque. */
+  step: number;
+  /** Alpha of the odd multiples of `step`. */
+  minorAlpha: number;
+}
+
+export function backgroundGridLevel(zoom: number): BackgroundGridLevel {
+  if (!(zoom > 0)) {
+    return { step: BG_SPACING, minorAlpha: 1 };
+  }
+  let step = BG_SPACING;
+  while (step * zoom < BG_MIN_SPACING_PX) {
+    step *= 2;
+  }
+  // 0 as this level's spacing reaches the minimum, where the next level's odd lines are exactly
+  // this level's; 1 at twice the minimum, so a line's alpha never jumps across a level change.
+  const minorAlpha = Math.min(
+    1,
+    (step * zoom - BG_MIN_SPACING_PX) / BG_MIN_SPACING_PX,
+  );
+  return { step, minorAlpha };
+}
 
 // Deliberately loose: strokes and glyphs paint outside their bounding box.
 const CULL_MARGIN_PX = 128;
@@ -30,114 +54,26 @@ export function cullMarginWorld(zoom: number): number {
   return CULL_MARGIN_PX / zoom;
 }
 
-// WebKit re-rasters the tiled bg layer as its scale drifts mid-pinch: 40.4ms vs 19.3ms/frame
-// on iPad. Frame count ignores a single wheel notch; settle window bridges two notches.
-const BG_ZOOM_GESTURE_FRAMES = 3;
-const BG_ZOOM_SETTLE_MS = 150;
-
-export interface ZoomGestureState {
-  lastZoom: number;
-  changedAt: number;
-  run: number;
-}
-
-export function createZoomGestureState(): ZoomGestureState {
-  return { lastZoom: Number.NaN, changedAt: 0, run: 0 };
-}
-
-// Derived from the zoom value rather than viewport events: pinch, trackpad and animated
-// zooms have three different starts and only one has an end event.
-export function isZoomGestureActive(
-  state: ZoomGestureState,
-  zoom: number,
-  now: number,
-): boolean {
-  if (zoom !== state.lastZoom) {
-    state.lastZoom = zoom;
-    state.changedAt = now;
-    state.run += 1;
-  } else if (now - state.changedAt >= BG_ZOOM_SETTLE_MS) {
-    state.run = 0;
-  }
-  return state.run >= BG_ZOOM_GESTURE_FRAMES;
-}
-
-export function backgroundPanShift(
-  panScreenPx: number,
-  tileScreenPx: number,
-): number {
-  if (!(tileScreenPx > 0) || !Number.isFinite(panScreenPx)) {
-    return 0;
-  }
-  return ((panScreenPx % tileScreenPx) + tileScreenPx) % tileScreenPx;
-}
-
-export function buildBackgroundTile(
-  style: 'grid' | 'dots' | 'lines',
-  color: string,
-  resolution: number,
-): string {
-  const size = BG_TILE_SIZE * resolution;
-  const tile = document.createElement('canvas');
-  tile.width = size;
-  tile.height = size;
-  const ctx = tile.getContext('2d');
-  if (!ctx) {
-    return '';
-  }
-  ctx.scale(resolution, resolution);
-
-  if (style === 'dots') {
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(BG_TILE_SIZE / 2, BG_TILE_SIZE / 2, 0.75, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    if (style === 'grid') {
-      ctx.moveTo(BG_TILE_SIZE, 0);
-      ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
-    }
-    ctx.moveTo(0, BG_TILE_SIZE);
-    ctx.lineTo(BG_TILE_SIZE, BG_TILE_SIZE);
-    ctx.stroke();
-  }
-  return tile.toDataURL();
-}
-
 /**
- * The background is a CSS-backed element, not a third canvas. On iPad, filling one viewport
- * with a CanvasPattern cost ~8ms of a 24ms frame, and a third full-viewport canvas is a third
- * of the canvas memory that decides whether WebKit keeps 2D contexts GPU-accelerated at all.
+ * The background is drawn as geometry on its own canvas below the DOM layers. A CSS tiled
+ * background re-rasterized its whole layer on the CPU every zoom frame (40.4ms vs 19.3ms on iPad),
+ * and a CanvasPattern fill of the viewport cost ~8ms; ~200 lines touch only the pixels they cover.
  */
 export class CanvasRenderer {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly canvas: HTMLCanvasElement;
   private overlayCtx: CanvasRenderingContext2D | null = null;
   private overlayCanvas: HTMLCanvasElement | null = null;
-  private bgHost: HTMLElement | null = null;
+  private bgCanvas: HTMLCanvasElement | null = null;
+  private bgCtx: CanvasRenderingContext2D | null = null;
   private bgStyle: CanvasStyle;
-  private bgTileW = BG_TILE_SIZE;
-  private bgTileH = BG_TILE_SIZE;
-  // Pan translates this layer by up to one tile, so it must already cover one tile
-  // past each edge. Sizing for max zoom keeps its geometry constant across zooms.
-  private bgOverdraw = BG_TILE_SIZE * MAX_ZOOM;
+  private bgImage: HTMLImageElement | null = null;
+  private bgImagePattern: CanvasPattern | null = null;
+  // The view the background canvas was last drawn for; '' forces the next frame to draw it.
+  private bgDrawnKey = '';
   private unsubBgPref: (() => void) | null = null;
   private unsubTheme: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
-
-  // The tile only needs re-sizing when the zoom changes; a pan is a translate.
-  private bgLastRasterZoom = Number.NaN;
-  private bgLastTransform = '';
-
-  /** The DPR the layer's tile was last written at; NaN until one has been. */
-  private bgTileDpr = Number.NaN;
-
-  /** Zoom-gesture tracking for the layer's takedown. @see BG_ZOOM_SETTLE_MS */
-  private readonly bgZoomGesture = createZoomGestureState();
-  private bgTakenDown = false;
 
   // clearRect invalidates a full-viewport layer as thoroughly as drawing does, so an
   // unconditional clear re-uploads it for a transparent frame. Half of ~11ms/frame on iPad.
@@ -151,16 +87,14 @@ export class CanvasRenderer {
   ) {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
-    // Read before the sync below, which reaches setBackgroundStyle(this.bgStyle)
-    // and would otherwise write the still-undefined value straight back.
     this.bgStyle = getCanvasStyle(doc);
     this.syncSizeToContainer();
     this.unsubBgPref = subscribeCanvasStyle(doc, () => {
       this.setBackgroundStyle(getCanvasStyle(doc));
     });
-    // Theme toggle changes the grid color, but the tile is cached — rebuild.
     this.unsubTheme = onCanvasThemeChange(() => {
-      this.setBackgroundStyle(this.bgStyle);
+      // The theme grid color is read at draw time.
+      this.bgDrawnKey = '';
       // Adaptive ink resolves against the theme.
       this.requestRedraw();
     });
@@ -171,29 +105,14 @@ export class CanvasRenderer {
     this.resizeObserver.observe(this.canvas);
   }
 
-  // Geometry is written here rather than in the host stylesheet: the overdraw is what makes
-  // the pan translate safe.
-  public setBackgroundHost(host: HTMLElement): void {
-    this.bgHost = host;
-    host.style.position = 'absolute';
-    this.writeBackgroundOverdraw(host);
-    host.style.pointerEvents = 'none';
-    host.style.backgroundRepeat = 'repeat';
-    host.style.backgroundPosition = '0 0';
-    // About the centre this would pull the left/top edges inward, and the overdraw only covers
-    // the bottom-right growth of a scale that is never below 1.
-    host.style.transformOrigin = '0 0';
-    // Standing promotion. Decided on the first frame of a pan, the transform could be serviced
-    // by repainting the tiling instead of moving an existing texture.
-    host.style.willChange = 'transform';
-    // A host adopted mid-takedown would otherwise stay hidden forever.
-    host.style.display = '';
-    this.bgTakenDown = false;
-    // The memo describes the adopted element, not the view: a fresh host has
-    // none of these styles, so forget them or the next sync skips writing them.
-    this.bgLastRasterZoom = Number.NaN;
-    this.bgLastTransform = '';
-    this.setBackgroundStyle(this.bgStyle);
+  public setBackgroundCanvas(canvas: HTMLCanvasElement): void {
+    this.bgCanvas = canvas;
+    this.bgCtx = canvas.getContext('2d', { alpha: true });
+    this.bgImagePattern = null;
+    this.resizeBackgroundCanvas(
+      this.canvas.clientWidth,
+      this.canvas.clientHeight,
+    );
   }
 
   public setOverlayCanvas(canvas: HTMLCanvasElement): void {
@@ -204,52 +123,21 @@ export class CanvasRenderer {
 
   public setBackgroundStyle(style: CanvasStyle): void {
     this.bgStyle = style;
-    const host = this.bgHost;
-    if (!host) {
-      return;
+    const src = style.pattern === 'image' ? style.image?.src : undefined;
+    if (src && this.bgImage?.src !== src) {
+      const image = new Image();
+      image.onload = () => {
+        if (this.bgImage === image) {
+          this.bgDrawnKey = '';
+          this.requestRedraw();
+        }
+      };
+      image.src = src;
+      this.bgImage = image;
+      this.bgImagePattern = null;
     }
-    const dpr = window.devicePixelRatio || 1;
-    const { pattern, image } = style;
-    if (pattern === 'image' && image) {
-      host.style.backgroundImage = `url("${image.src}")`;
-      this.setBackgroundTileSize(host, image.width, image.height);
-    } else {
-      const color =
-        style.patternColorMode === 'custom'
-          ? style.patternColor
-          : getCanvasPalette().grid;
-      host.style.backgroundImage =
-        pattern === 'blank' || pattern === 'image'
-          ? 'none'
-          : `url(${buildBackgroundTile(pattern, color, dpr)})`;
-      this.setBackgroundTileSize(host, BG_TILE_SIZE, BG_TILE_SIZE);
-    }
-    this.bgTileDpr = dpr;
-  }
-
-  private setBackgroundTileSize(
-    host: HTMLElement,
-    width: number,
-    height: number,
-  ): void {
-    if (width === this.bgTileW && height === this.bgTileH) {
-      return;
-    }
-    this.bgTileW = width;
-    this.bgTileH = height;
-    this.bgOverdraw = Math.max(width, height) * MAX_ZOOM;
-    this.writeBackgroundOverdraw(host);
-    this.bgLastRasterZoom = Number.NaN;
-    this.bgLastTransform = '';
+    this.bgDrawnKey = '';
     this.requestRedraw();
-  }
-
-  private writeBackgroundOverdraw(host: HTMLElement): void {
-    const overdraw = this.bgOverdraw;
-    host.style.left = `${-overdraw}px`;
-    host.style.top = `${-overdraw}px`;
-    host.style.width = `calc(100% + ${overdraw * 2}px)`;
-    host.style.height = `calc(100% + ${overdraw * 2}px)`;
   }
 
   public redraw(
@@ -271,7 +159,7 @@ export class CanvasRenderer {
     const zoom = viewport.zoom;
     const offset = viewport.offset;
 
-    this.syncBackground(zoom, offset);
+    this.drawBackground(viewport);
 
     // Foreground canvas: element content + tool cursor
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -330,56 +218,79 @@ export class CanvasRenderer {
       reorderDomOverlay(domOverlayHost, this.canvas, elements, visibleElements);
     }
 
-    // The background comes back only once a frame sees the zoom settle.
-    return this.bgTakenDown || selection.isOverlayAnimating;
+    return selection.isOverlayAnimating;
   }
 
-  // A pan is a compositor translate of the already-painted tiling. Styles are written only when
-  // their value changed, since assigning an identical string still dirties the element.
-  // A zoom is the case this cannot win, so on tablets the layer leaves the tree. @see BG_ZOOM_SETTLE_MS
-  private syncBackground(zoom: number, offset: Vector2): void {
-    const host = this.bgHost;
-    if (!host) {
+  private drawBackground(viewport: CanvasViewport): void {
+    const ctx = this.bgCtx;
+    const canvas = this.bgCanvas;
+    if (!ctx || !canvas) {
       return;
     }
-
-    const zooming =
-      IS_MOBILE_BUILD &&
-      isZoomGestureActive(this.bgZoomGesture, zoom, performance.now());
-    if (zooming !== this.bgTakenDown) {
-      host.style.display = zooming ? 'none' : '';
-      this.bgTakenDown = zooming;
-    }
-    if (zooming) {
-      // Nothing below would be visible, and writing it only dirties an element
-      // that gets laid out again when the gesture ends.
+    const { zoom, offset } = viewport;
+    // Skipped when only content changed: an inking frame shouldn't redraw the whole background.
+    const key = `${zoom} ${offset.x} ${offset.y} ${canvas.width} ${canvas.height}`;
+    if (key === this.bgDrawnKey) {
       return;
     }
+    this.bgDrawnKey = key;
 
-    const rasterZoom = quantizeRasterZoom(zoom);
-    if (rasterZoom !== this.bgLastRasterZoom) {
-      host.style.backgroundSize = `${this.bgTileW * rasterZoom}px ${this.bgTileH * rasterZoom}px`;
-      this.bgLastRasterZoom = rasterZoom;
-    }
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, width, height);
 
-    // The layer's top-left starts one overdraw before the world origin, which is a whole number
-    // of tiles only at some zooms — so the overdraw is reduced along with the pan, or
-    // the grid slides against the content as the zoom changes.
-    const shiftX = backgroundPanShift(
-      offset.x * zoom + this.bgOverdraw,
-      this.bgTileW * zoom,
-    );
-    const shiftY = backgroundPanShift(
-      offset.y * zoom + this.bgOverdraw,
-      this.bgTileH * zoom,
-    );
-    // The translate is listed first, so it applies in screen pixels and the
-    // scale after it does not multiply the pan shift.
-    const transform = `translate3d(${shiftX}px, ${shiftY}px, 0) scale(${zoom / rasterZoom})`;
-    if (transform !== this.bgLastTransform) {
-      host.style.transform = transform;
-      this.bgLastTransform = transform;
+    const style = this.bgStyle;
+    if (style.pattern === 'blank') {
+      return;
     }
+    if (style.pattern === 'image') {
+      this.drawBackgroundImage(ctx, zoom, offset, width, height);
+      return;
+    }
+    const color =
+      style.patternColorMode === 'custom'
+        ? style.patternColor
+        : getCanvasPalette().grid;
+    drawBackgroundPattern(
+      ctx,
+      style.pattern,
+      color,
+      viewport.getWorldRect(),
+      zoom,
+      offset,
+    );
+  }
+
+  private drawBackgroundImage(
+    ctx: CanvasRenderingContext2D,
+    zoom: number,
+    offset: Vector2,
+    width: number,
+    height: number,
+  ): void {
+    const tile = this.bgStyle.image;
+    const image = this.bgImage;
+    if (!tile || !image?.complete || image.naturalWidth === 0) {
+      return;
+    }
+    this.bgImagePattern ??= ctx.createPattern(image, 'repeat');
+    if (!this.bgImagePattern) {
+      return;
+    }
+    this.bgImagePattern.setTransform(
+      new DOMMatrix([
+        (tile.width * zoom) / image.naturalWidth,
+        0,
+        0,
+        (tile.height * zoom) / image.naturalHeight,
+        offset.x * zoom,
+        offset.y * zoom,
+      ]),
+    );
+    ctx.fillStyle = this.bgImagePattern;
+    ctx.fillRect(0, 0, width, height);
   }
 
   // DPR changes (e.g. moving the window between monitors) fire a window resize without
@@ -398,7 +309,7 @@ export class CanvasRenderer {
   }
 
   // The canvas is stretched to its pane by CSS, so clientWidth/Height is the visible viewport
-  // with the sidebar already excluded. The background layer is sized in CSS.
+  // with the sidebar already excluded.
   private syncSizeToContainer(): void {
     const width = this.canvas.clientWidth;
     const height = this.canvas.clientHeight;
@@ -407,13 +318,9 @@ export class CanvasRenderer {
     }
     this.resizeCanvas(width, height);
     this.resizeOverlayCanvas(width, height);
+    this.resizeBackgroundCanvas(width, height);
     // Resizing a canvas clears it.
     this.requestRedraw();
-    // Only on a DPR change: dragging the sidebar or a split divider fires a resize per frame, and
-    // a rebuild encodes a PNG and repaints the whole overdrawn layer for an identical tile.
-    if ((window.devicePixelRatio || 1) !== this.bgTileDpr) {
-      this.setBackgroundStyle(this.bgStyle);
-    }
   }
 
   private resizeCanvas(width: number, height: number): void {
@@ -433,6 +340,86 @@ export class CanvasRenderer {
     this.overlayCanvas.width = width * dpr;
     this.overlayCanvas.height = height * dpr;
   }
+
+  private resizeBackgroundCanvas(width: number, height: number): void {
+    if (!this.bgCanvas || width === 0 || height === 0) {
+      return;
+    }
+    const dpr = window.devicePixelRatio || 1;
+    this.bgCanvas.width = width * dpr;
+    this.bgCanvas.height = height * dpr;
+    this.bgDrawnKey = '';
+  }
+}
+
+function drawBackgroundPattern(
+  ctx: CanvasRenderingContext2D,
+  pattern: 'grid' | 'dots' | 'lines',
+  color: string,
+  view: DOMRect,
+  zoom: number,
+  offset: Vector2,
+): void {
+  const { step, minorAlpha } = backgroundGridLevel(zoom);
+  // Screen-constant below 100% zoom, so zoomed-out lines don't thin into nothing.
+  const scale = Math.max(zoom, 1);
+  // Dots sit mid-tile, lines on the tile edges.
+  const phase = pattern === 'dots' ? BG_SPACING / 2 : 0;
+  const first = (min: number) => Math.ceil((min - phase) / step);
+  const last = (max: number) => Math.floor((max - phase) / step);
+  const toScreenX = (n: number) => (n * step + phase + offset.x) * zoom;
+  const toScreenY = (n: number) => (n * step + phase + offset.y) * zoom;
+  const right = view.width * zoom;
+  const bottom = view.height * zoom;
+  const x0 = first(view.x);
+  const x1 = last(view.x + view.width);
+  const y0 = first(view.y);
+  const y1 = last(view.y + view.height);
+
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.5 * scale;
+  const radius = 0.75 * scale;
+  // Pass 0 draws the opaque even multiples, pass 1 the fading odd ones.
+  for (const minor of [false, true]) {
+    const alpha = minor ? minorAlpha : 1;
+    if (alpha <= 0) {
+      continue;
+    }
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    if (pattern === 'dots') {
+      for (let i = x0; i <= x1; i++) {
+        for (let j = y0; j <= y1; j++) {
+          if ((i % 2 !== 0 || j % 2 !== 0) !== minor) {
+            continue;
+          }
+          const x = toScreenX(i);
+          const y = toScreenY(j);
+          ctx.moveTo(x + radius, y);
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+        }
+      }
+      ctx.fill();
+      continue;
+    }
+    if (pattern === 'grid') {
+      for (let i = x0; i <= x1; i++) {
+        if ((i % 2 !== 0) === minor) {
+          ctx.moveTo(toScreenX(i), 0);
+          ctx.lineTo(toScreenX(i), bottom);
+        }
+      }
+    }
+    for (let j = y0; j <= y1; j++) {
+      if ((j % 2 !== 0) === minor) {
+        ctx.moveTo(0, toScreenY(j));
+        ctx.lineTo(right, toScreenY(j));
+      }
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
 }
 
 // DOM roots and page-frame chrome stack at `index + 1`, and the foreground canvas above all of them,
