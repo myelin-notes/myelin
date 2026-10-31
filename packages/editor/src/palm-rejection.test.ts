@@ -22,7 +22,7 @@ describe('PalmRejection', () => {
   it('rejects a broad contact without stylus contact until it lifts', () => {
     const palm = new PalmRejection();
     expect(palm.isPalm(FINGER, 20, 20)).toBe(false);
-    expect(palm.isPalm(PALM, 80, 20)).toBe(true);
+    expect(palm.isPalm(PALM, 140, 20)).toBe(true);
     expect(palm.suppressed).toBe(true);
     expect(palm.pointerUp(PALM)).toBe(true);
     expect(palm.suppressed).toBe(false);

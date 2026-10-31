@@ -321,7 +321,7 @@ describe('tablet selection routing', () => {
     const palm = {
       pointerId: 2,
       pointerType: 'touch',
-      width: 80,
+      width: 140,
       height: 20,
     } as PointerEvent;
     interaction.onPointerDown(palm);
@@ -355,7 +355,7 @@ describe('tablet selection routing', () => {
     interaction.onPointerDown(touch);
     interaction.onPointerMove({
       ...touch,
-      width: 80,
+      width: 140,
       type: 'pointermove',
     } as PointerEvent);
 
