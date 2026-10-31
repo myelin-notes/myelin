@@ -462,6 +462,7 @@ const zhHans: SiteCopy = {
       cta: '购买 Pro',
       licenseNote:
         '许可证密钥会通过邮件发送给你，可在最多 3 台设备上解锁 Pro。',
+      checkoutFailed: '无法打开结账页面，请重试。',
     },
     student: {
       name: '学生版',
@@ -475,6 +476,7 @@ const zhHans: SiteCopy = {
       notAcademic:
         '我们无法识别该学校邮箱。如果你的学校不在列表中，请联系支持。',
       failed: '链接发送失败，请重试。',
+      linkExpired: '此学生链接已过期，请在下方重新申请。',
     },
     faqTitle: '价格常见问题',
     faqs: [

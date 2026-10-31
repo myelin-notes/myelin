@@ -467,6 +467,8 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       cta: 'Acheter Pro',
       licenseNote:
         'Vous recevez une clé de licence par e-mail. Elle débloque Pro sur jusqu’à 3 de vos appareils.',
+      checkoutFailed:
+        'Nous n’avons pas pu ouvrir le paiement. Veuillez réessayer.',
     },
     student: {
       name: 'Étudiant',
@@ -481,6 +483,8 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       notAcademic:
         'Nous ne reconnaissons pas cette adresse comme celle d’un établissement. Contactez l’assistance si votre établissement manque.',
       failed: 'Nous n’avons pas pu envoyer le lien. Veuillez réessayer.',
+      linkExpired:
+        'Ce lien étudiant a expiré. Demandez-en un nouveau ci-dessous.',
     },
     faqTitle: 'Questions sur les tarifs',
     faqs: [

@@ -1,17 +1,13 @@
 // POST emails a signed checkout link to a school address that JetBrains swot
-// recognises; GET follows that link into a Polar checkout with the student discount.
+// recognises. The link opens the pricing page, which hands the token to /api/checkout.
 const SWOT_DOMAINS =
   'https://raw.githubusercontent.com/JetBrains/swot/master/lib/domains';
-const POLAR_CHECKOUTS = 'https://api.polar.sh/v1/checkouts/';
 const STUDENT_FROM = 'Myelin Notes <support@trymyelin.app>';
 const LINK_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_EMAIL_LENGTH = 254;
 
 interface Env {
   RESEND_API_KEY?: string;
-  POLAR_ACCESS_TOKEN?: string;
-  POLAR_PRO_PRODUCT_ID?: string;
-  POLAR_STUDENT_DISCOUNT_ID?: string;
   /** Signs the emailed link, so only the inbox owner can open the discounted checkout. */
   STUDENT_LINK_SECRET?: string;
 }
@@ -32,13 +28,6 @@ function json(message: string, status = 200): Response {
       },
     },
   );
-}
-
-function text(message: string, status: number): Response {
-  return new Response(message, {
-    status,
-    headers: { 'Cache-Control': 'no-store' },
-  });
 }
 
 // `null` for anything that is not a plain ASCII domain: the domain becomes a
@@ -133,7 +122,7 @@ async function signLink(
 }
 
 // The email the link was issued to, or `null` if it is forged, malformed or expired.
-async function verifyLink(
+export async function verifyLink(
   token: string,
   secret: string,
   now: number,
@@ -216,8 +205,8 @@ export async function onRequestPost({
     return json('We could not check that address. Please try again.', 502);
   }
 
-  const link = new URL('/api/student', request.url);
-  link.searchParams.set('token', await signLink(email, secret, Date.now()));
+  const link = new URL('/pricing', request.url);
+  link.searchParams.set('student', await signLink(email, secret, Date.now()));
 
   let result: Response;
   try {
@@ -247,59 +236,4 @@ export async function onRequestPost({
   }
 
   return json('Check your inbox for the student checkout link.');
-}
-
-export async function onRequestGet({
-  request,
-  env,
-}: StudentFunctionContext): Promise<Response> {
-  const secret = env.STUDENT_LINK_SECRET?.trim();
-  const polarToken = env.POLAR_ACCESS_TOKEN?.trim();
-  if (
-    !secret ||
-    !polarToken ||
-    !env.POLAR_PRO_PRODUCT_ID ||
-    !env.POLAR_STUDENT_DISCOUNT_ID
-  ) {
-    return text(
-      'Student checkout is temporarily unavailable. Please try again later.',
-      503,
-    );
-  }
-
-  const token = new URL(request.url).searchParams.get('token') ?? '';
-  const email = await verifyLink(token, secret, Date.now());
-  if (!email) {
-    return text(
-      'This link is invalid or has expired. Request a new one at https://trymyelin.app/pricing.',
-      400,
-    );
-  }
-
-  let checkout: Response;
-  try {
-    checkout = await fetch(POLAR_CHECKOUTS, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${polarToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        products: [env.POLAR_PRO_PRODUCT_ID],
-        discount_id: env.POLAR_STUDENT_DISCOUNT_ID,
-        allow_discount_codes: false,
-        customer_email: email,
-      }),
-    });
-  } catch {
-    return text('We could not start the checkout. Please try again.', 502);
-  }
-
-  if (!checkout.ok) {
-    console.error('Polar rejected a student checkout', checkout.status);
-    return text('We could not start the checkout. Please try again.', 502);
-  }
-
-  const { url } = (await checkout.json()) as { url: string };
-  return Response.redirect(url, 303);
 }

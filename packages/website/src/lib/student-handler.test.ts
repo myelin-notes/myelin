@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { onRequestGet, onRequestPost } from '../../../../functions/api/student';
+import { onRequestPost as startCheckout } from '../../../../functions/api/checkout';
+import { onRequestPost } from '../../../../functions/api/student';
 
 const env = {
   RESEND_API_KEY: 'resend-key',
@@ -30,7 +31,10 @@ function stubServices() {
     if (url.startsWith('https://api.resend.com/')) {
       return Response.json({ id: 'email-id' });
     }
-    if (url.startsWith('https://api.polar.sh/')) {
+    if (
+      url.startsWith('https://api.polar.sh/') ||
+      url.startsWith('https://sandbox-api.polar.sh/')
+    ) {
       return Response.json({ url: 'https://polar.sh/checkout/abc' });
     }
     throw new Error(`Unexpected fetch ${url}`);
@@ -57,8 +61,17 @@ function sentEmails(fetch: ReturnType<typeof stubServices>) {
     .map(([, init]) => JSON.parse(String(init?.body)));
 }
 
+// What the pricing page does with the emailed link: hand its token to /api/checkout.
 function openLink(href: string): Promise<Response> {
-  return onRequestGet({ request: new Request(href), env });
+  return startCheckout({
+    request: new Request('https://trymyelin.app/api/checkout', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: new URL(href).searchParams.get('student'),
+      }),
+    }),
+    env,
+  });
 }
 
 describe('student verification handler', () => {
@@ -75,22 +88,23 @@ describe('student verification handler', () => {
 
     const [email] = sentEmails(fetch);
     expect(email.to).toEqual(['ada@tum.de']);
-    const link = /https:\/\/trymyelin\.app\/api\/student\?token=\S+/.exec(
+    const link = /https:\/\/trymyelin\.app\/pricing\?student=\S+/.exec(
       email.text,
     )?.[0];
     expect(link).toBeDefined();
 
     const checkout = await openLink(link as string);
-    expect(checkout.status).toBe(303);
-    expect(checkout.headers.get('Location')).toBe(
-      'https://polar.sh/checkout/abc',
-    );
+    expect(checkout.status).toBe(200);
+    expect(await checkout.json()).toEqual({
+      url: 'https://polar.sh/checkout/abc',
+    });
     const polarCall = fetch.mock.calls.find(([url]) =>
       String(url).startsWith('https://api.polar.sh/'),
     );
     expect(JSON.parse(String(polarCall?.[1]?.body))).toMatchObject({
       products: ['pro-product'],
       discount_id: 'student-discount',
+      embed_origin: 'https://trymyelin.app',
       customer_email: 'ada@tum.de',
     });
   });
@@ -115,15 +129,15 @@ describe('student verification handler', () => {
       /https:\/\/\S+/.exec(sentEmails(fetch)[0].text)?.[0] as string,
     );
     const [payload, signature] = (
-      link.searchParams.get('token') as string
+      link.searchParams.get('student') as string
     ).split('.');
     const forged = btoa(
       JSON.stringify({ email: 'someone@gmail.com', exp: Date.now() + 1e9 }),
     );
-    link.searchParams.set('token', `${forged}.${signature}`);
+    link.searchParams.set('student', `${forged}.${signature}`);
     expect((await openLink(link.href)).status).toBe(400);
 
-    link.searchParams.set('token', `${payload}.${signature}`);
+    link.searchParams.set('student', `${payload}.${signature}`);
     vi.setSystemTime(Date.now() + 25 * 60 * 60 * 1000);
     expect((await openLink(link.href)).status).toBe(400);
 
@@ -132,5 +146,20 @@ describe('student verification handler', () => {
         String(url).startsWith('https://api.polar.sh/'),
       ),
     ).toBe(false);
+  });
+
+  it('sends preview deployments to the Polar sandbox', async () => {
+    const fetch = stubServices();
+
+    await startCheckout({
+      request: new Request('https://abc123.myelin.pages.dev/api/checkout', {
+        method: 'POST',
+      }),
+      env,
+    });
+
+    expect(String(fetch.mock.calls[0][0])).toMatch(
+      /^https:\/\/sandbox-api\.polar\.sh\//,
+    );
   });
 });

@@ -252,6 +252,8 @@ export interface SiteCopy {
       priceNote: string;
       /** Fine print under the buy button. */
       licenseNote: string;
+      /** Shown when the checkout could not be opened. */
+      checkoutFailed: string;
     };
     /** The school-email form that sends a student checkout link. */
     student: {
@@ -266,6 +268,8 @@ export interface SiteCopy {
       sent: string;
       notAcademic: string;
       failed: string;
+      /** Shown when an emailed checkout link is forged or past its 24 hours. */
+      linkExpired: string;
     };
     faqTitle: string;
     faqs: Faq[];

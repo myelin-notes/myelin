@@ -470,6 +470,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       cta: 'Buy Pro',
       licenseNote:
         'You get a license key by email. It unlocks Pro on up to 3 of your devices.',
+      checkoutFailed: 'We could not open the checkout. Please try again.',
     },
     student: {
       name: 'Student',
@@ -483,6 +484,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       notAcademic:
         'We do not recognise that as a school email address. Contact support if your school is missing.',
       failed: 'We could not send the link. Please try again.',
+      linkExpired: 'This student link has expired. Request a new one below.',
     },
     faqTitle: 'Pricing questions',
     faqs: [

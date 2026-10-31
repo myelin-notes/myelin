@@ -474,6 +474,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       cta: 'Comprar Pro',
       licenseNote:
         'Recibes una clave de licencia por correo. Desbloquea Pro en hasta 3 de tus dispositivos.',
+      checkoutFailed: 'No hemos podido abrir el pago. Inténtalo de nuevo.',
     },
     student: {
       name: 'Estudiantes',
@@ -488,6 +489,8 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       notAcademic:
         'No reconocemos ese correo como de un centro de estudios. Escribe a soporte si falta tu centro.',
       failed: 'No hemos podido enviar el enlace. Inténtalo de nuevo.',
+      linkExpired:
+        'Este enlace de estudiante ha caducado. Solicita uno nuevo más abajo.',
     },
     faqTitle: 'Preguntas sobre precios',
     faqs: [
