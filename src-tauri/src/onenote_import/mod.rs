@@ -44,7 +44,7 @@ const DEFAULT_INK_COLOR: &str = "#191c1e";
 
 pub(crate) struct ImportedNotebook {
     pub(crate) sections: Vec<ImportedSection>,
-    /// Parser messages for top-level entries it skipped because they failed to parse.
+    /// Why each skipped top-level entry failed to parse, with its name removed.
     pub(crate) failed_sections: Vec<String>,
 }
 
@@ -96,23 +96,13 @@ pub(crate) struct ImportedStroke {
 pub struct OneNotePreview {
     pages: usize,
     sections: usize,
-    skipped_sections: usize,
+    failed_sections: Vec<String>,
 }
 
 #[tauri::command]
 pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePreview, String> {
     tokio::task::spawn_blocking(move || {
         let notebook = read_notebook(&app, path)?;
-        // Reported here, not on import: every import scans first, and a user who
-        // cancels after seeing the skipped count still hit the failure.
-        for message in &notebook.failed_sections {
-            crate::error_report::report_error(
-                &app,
-                "onenote-import",
-                "OneNote section could not be read",
-                message,
-            );
-        }
         Ok(OneNotePreview {
             pages: notebook
                 .sections
@@ -120,7 +110,7 @@ pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePrevi
                 .map(|section| section.pages.len())
                 .sum(),
             sections: notebook.sections.len(),
-            skipped_sections: notebook.failed_sections.len(),
+            failed_sections: notebook.failed_sections,
         })
     })
     .await
@@ -166,9 +156,20 @@ fn parse_package(bytes: &[u8]) -> Result<ImportedNotebook, String> {
             .report()
             .warnings()
             .iter()
-            .map(|warning| warning.message().to_string())
+            .map(|warning| failure_reason(warning.message()))
             .collect(),
     })
+}
+
+/// Section names are note content, which the privacy policy keeps on device, and
+/// the parser only reports "failed to import section {path}: {error}" where
+/// `error` can repeat the path. Sanitized paths never contain ':'.
+fn failure_reason(message: &str) -> String {
+    message
+        .strip_prefix("failed to import section ")
+        .and_then(|rest| rest.split_once(": "))
+        .map(|(path, error)| error.replace(path, "<section>"))
+        .unwrap_or_else(|| "unrecognized parser warning".to_string())
 }
 
 fn collect_sections(
@@ -584,6 +585,24 @@ mod tests {
         assert_eq!(
             color_ref_to_hex(ColorRef::Manual { r: 1, g: 2, b: 3 }),
             Some("#010203".to_string())
+        );
+    }
+
+    #[test]
+    fn failure_reason_drops_the_section_name() {
+        assert_eq!(
+            failure_reason("failed to import section Solids 2.one: Unexpected end of file"),
+            "Unexpected end of file"
+        );
+        assert_eq!(
+            failure_reason(
+                "failed to import section Lab/Notes.one: Not a section file: Lab/Notes.one"
+            ),
+            "Not a section file: <section>"
+        );
+        assert_eq!(
+            failure_reason("Solids 2.one could not be read"),
+            "unrecognized parser warning"
         );
     }
 
