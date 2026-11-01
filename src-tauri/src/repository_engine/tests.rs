@@ -3102,11 +3102,12 @@ async fn native_github_sync_does_not_read_unchanged_document_contents() {
 }
 
 #[tokio::test]
-async fn sync_diagnostics_report_version_history_size() {
+async fn sync_diagnostics_report_version_history_and_media_size() {
     let directory = TestDirectory::new();
     let engine = directory.engine(true);
     let bytes = fixture_bytes("baseUpdate");
     seed(&engine, "canvas", "mcanvas", bytes.clone()).await;
+    let version_bytes = read(&engine, "canvas").await.len() as u64;
     capture_version(&engine, "canvas", true).await;
     let state = Arc::new(Mutex::new(GitHubFixture::new(
         manifest_with("canvas", "mcanvas"),
@@ -3120,8 +3121,14 @@ async fn sync_diagnostics_report_version_history_size() {
         .await
         .unwrap();
     let fields = trace.fields();
+    assert_eq!(fields["document_count"], 2);
     assert_eq!(fields["version_count"], 1);
-    assert_eq!(fields["version_bytes"], bytes.len() as u64);
+    assert_eq!(fields["version_bytes"], version_bytes);
+    assert_eq!(fields["media_count"], 1);
+    assert_eq!(
+        fields["media_bytes"],
+        fixture()["expected"]["pdfByteLength"]
+    );
 }
 
 #[tokio::test]
