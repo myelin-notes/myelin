@@ -111,6 +111,48 @@ pub(crate) fn lock_git() -> Result<MutexGuard<'static, ()>, String> {
     GIT_LOCK.lock().map_err(|_| "Git lock unavailable".into())
 }
 
+// openssl-src builds Android with `no-stdio`, so OpenSSL cannot read a CA file from disk and
+// `git2::opts::set_ssl_cert_file` always fails there.
+#[cfg(target_os = "android")]
+fn trust_bundled_certificates() -> Result<(), String> {
+    static TRUSTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let trusted = TRUSTED.get_or_init(|| unsafe {
+        libgit2_sys::init();
+        let bundle = include_bytes!("../resources/cacert.pem");
+        let bio = openssl_sys::BIO_new_mem_buf(bundle.as_ptr().cast(), bundle.len() as libc::c_int);
+        if bio.is_null() {
+            return false;
+        }
+        let mut all_added = true;
+        let mut count = 0;
+        loop {
+            let certificate = openssl_sys::PEM_read_bio_X509(
+                bio,
+                std::ptr::null_mut(),
+                None,
+                std::ptr::null_mut(),
+            );
+            if certificate.is_null() {
+                break;
+            }
+            all_added &= libgit2_sys::git_libgit2_opts(
+                libgit2_sys::GIT_OPT_ADD_SSL_X509_CERT as libc::c_int,
+                certificate,
+            ) == 0;
+            openssl_sys::X509_free(certificate);
+            count += 1;
+        }
+        openssl_sys::BIO_free_all(bio);
+        // The end of the bundle reads as an error; left queued, SSL_get_error would misreport the
+        // next TLS call on this thread.
+        openssl_sys::ERR_clear_error();
+        all_added && count > 0
+    });
+    trusted
+        .then_some(())
+        .ok_or_else(|| "Git TLS certificates unavailable".into())
+}
+
 /// Fetches `branch` into the bare cache at `repo_path`, cloning on first use, and returns its
 /// head. The caller must hold [`lock_git`]; `scratch` must be an existing, empty directory.
 pub(crate) fn fetch_head(
@@ -121,17 +163,8 @@ pub(crate) fn fetch_head(
     token: &str,
 ) -> Result<(Repository, Oid), String> {
     let trace = crate::repository_engine::telemetry::current();
-    #[cfg(any(target_os = "android", test))]
-    {
-        let cert_path = scratch.with_file_name("cacert.pem");
-        std::fs::write(&cert_path, include_bytes!("../resources/cacert.pem"))
-            .map_err(|_| "Git CA bundle unavailable")?;
-        if cfg!(target_os = "android") {
-            // All Git network operations in this app hold GIT_LOCK.
-            unsafe { git2::opts::set_ssl_cert_file(cert_path.as_path()) }
-                .map_err(|_| "Git TLS certificates unavailable")?;
-        }
-    }
+    #[cfg(target_os = "android")]
+    trust_bundled_certificates()?;
     // Same bound as the REST client; a stalled fetch could otherwise hold the sync locks.
     unsafe {
         git2::opts::set_server_connect_timeout_in_milliseconds(30_000)
@@ -458,10 +491,6 @@ mod tests {
         )
         .expect("push succeeds");
         assert_eq!(result.status, "pushed");
-        assert_eq!(
-            fs::read(root.join("cacert.pem")).expect("Git CA bundle"),
-            include_bytes!("../resources/cacert.pem")
-        );
         let pushed = git2::Repository::open_bare(&bare_path).expect("pushed repository");
         let pushed_head = pushed
             .find_reference("refs/heads/main")

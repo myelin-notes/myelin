@@ -48,6 +48,8 @@ impl Default for RemoteEndpoints {
     }
 }
 
+const STALL_TIMEOUT: Duration = Duration::from_secs(if cfg!(test) { 5 } else { 120 });
+
 pub(crate) struct RemoteClient {
     pub(crate) client: Client,
     pub(crate) token: String,
@@ -79,9 +81,12 @@ fn copy_durable(source: &Path, destination: &Path) -> std::io::Result<()> {
 
 impl RemoteClient {
     pub(crate) fn new(token: String, github: bool) -> Result<Self, String> {
+        // Bounds stalls, not transfers: a total limit failed a 1 GB tarball that took just over 120s.
+        // shortcut: closing the app waits out an in-flight download, cancel on release if noticed.
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(30))
+            .read_timeout(STALL_TIMEOUT)
             .build()
             .map_err(|_| "Repository download client unavailable")?;
         Ok(Self {
