@@ -61,6 +61,17 @@ pub(super) fn inline(
     .unwrap_or(Cow::Borrowed(update))
 }
 
+/// The media this update points at. An error means the update could not be fully read, so the caller
+/// cannot conclude that anything is unreferenced.
+pub(super) fn references(update: &[u8]) -> Result<Vec<String>, Error> {
+    let mut found = Vec::new();
+    rewrite(update, |bytes| {
+        found.extend(reference_hash(bytes).map(str::to_owned));
+        None
+    })?;
+    Ok(found)
+}
+
 /// Whether `extract` would change this update, without hashing anything.
 pub(super) fn has_inline_media(update: &[u8]) -> bool {
     update.len() >= MIN_BYTES

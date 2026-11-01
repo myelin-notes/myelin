@@ -113,7 +113,10 @@ async fn read(engine: &RepositoryEngine, id: &str) -> Vec<u8> {
 fn stored_document(directory: &TestDirectory) -> Vec<u8> {
     let files = directory.0.join("data/files");
     let bytes = fs::read(files.join("canvas.myelin")).unwrap();
-    media::inline(&bytes, |hash| fs::read(files.join(format!("{hash}.media"))).ok()).into_owned()
+    media::inline(&bytes, |hash| {
+        fs::read(files.join(format!("{hash}.media"))).ok()
+    })
+    .into_owned()
 }
 fn assert_document(bytes: &[u8]) {
     let expected = fixture()["expected"].clone();
@@ -3554,4 +3557,168 @@ async fn documents_and_versions_written_before_media_storage_are_rewritten_and_u
         .await
         .unwrap();
     assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
+
+// Across devices, compare content: yrs re-encodes JSON maps with their keys in no fixed order.
+fn assert_media_intact(document: &[u8]) {
+    let image = media_value(document, 0, "imageData");
+    assert_eq!(image.len(), 2048);
+    assert_eq!(media_value(document, 1, "pdfData"), image);
+}
+
+// Two devices sharing a document that points at one media file, plus that file's hash.
+async fn devices_sharing_media(
+    state: &Arc<Mutex<GitHubFixture>>,
+    endpoints: &RemoteEndpoints,
+    first: &RepositoryEngine,
+    second: &RepositoryEngine,
+) -> String {
+    first.cycle(github_source(), endpoints).await.unwrap();
+    seed(first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    second.cycle(github_source(), endpoints).await.unwrap();
+    let remote = state.lock().unwrap();
+    remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|node| node["system"]["kind"] == "media")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+// What a remote looks like after another device removed this media.
+fn remove_media_from_remote(state: &Arc<Mutex<GitHubFixture>>, hash: &str, head: &str) {
+    let mut remote = state.lock().unwrap();
+    remote.manifest["nodes"]
+        .as_object_mut()
+        .unwrap()
+        .remove(hash);
+    remote.manifest["deletedNodes"][hash] = json!("removal");
+    remote.files.remove(hash);
+    remote.head = head.repeat(40);
+}
+
+fn media_github_fixture() -> Arc<Mutex<GitHubFixture>> {
+    Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), fixture_bytes("baseUpdate"))]),
+    )))
+}
+
+#[tokio::test]
+async fn a_device_whose_documents_still_use_removed_media_publishes_it_again() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&second, "drawing").await);
+    assert!(second
+        .store
+        .lock()
+        .unwrap()
+        .outbox
+        .iter()
+        .any(|op| op["kind"] == "push-note" && op["nodeId"] == hash.as_str()));
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert_eq!(remote.files[&hash].len(), 2048);
+        assert!(remote.manifest["deletedNodes"][&hash].is_null());
+        assert_eq!(remote.manifest["restoredNodes"][&hash], "removal");
+    }
+
+    // The restore must not be taken for an edit to a deleted file on the device that never saw it.
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "drawing").await);
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+}
+
+#[tokio::test]
+async fn a_pending_document_brings_back_removed_media_it_needs() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    // Offline, the second device saves a version that points at the media.
+    let version = capture_version(&second, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert_eq!(remote.files[&hash].len(), 2048);
+        assert_eq!(remote.manifest["restoredNodes"][&hash], "removal");
+        assert!(remote.manifest["deletedNodes"][&hash].is_null());
+        assert!(remote.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .all(|id| !id.starts_with("conflict-")));
+    }
+    assert_media_intact(&read(&second, version_id).await);
+
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, version_id).await);
+}
+
+#[tokio::test]
+async fn removed_media_nothing_uses_is_deleted_from_the_device_that_applies_the_removal() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    let (saved, _) = first.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["nodes"].as_object_mut().unwrap().remove("drawing");
+    save_manifest(&first, manifest).await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert!(second.store.lock().unwrap().manifest["nodes"][&hash].is_null());
+    assert!(!second_directory
+        .0
+        .join(format!("data/files/{hash}.media"))
+        .exists());
 }

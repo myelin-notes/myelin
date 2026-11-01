@@ -1,6 +1,7 @@
 mod document;
 mod flags;
 mod media;
+mod media_cleanup;
 mod onenote;
 mod references;
 mod remote;

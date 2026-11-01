@@ -1,5 +1,5 @@
 use super::{
-    document, media,
+    document, media, media_cleanup,
     store::{file_name, now, FileWrite, Store, SyncState},
     telemetry, Changes, RepositoryEngine, RepositoryManager,
 };
@@ -353,6 +353,21 @@ fn inline_media<'a>(store: &Store, snapshot: &Snapshot, document: &'a [u8]) -> C
     })
 }
 
+// Clears a tombstone from a device that removed this media after finding it unused: that device only
+// saw what had been synced. Recording the revision lets every other device accept the restore.
+fn restore_media_node(manifest: &mut Value, hash: &str, node: Value) {
+    let deletion = manifest["deletedNodes"]
+        .as_object_mut()
+        .and_then(|deleted| deleted.remove(hash));
+    if let Some(deletion) = deletion {
+        if !manifest["restoredNodes"].is_object() {
+            manifest["restoredNodes"] = json!({});
+        }
+        manifest["restoredNodes"][hash] = deletion;
+    }
+    manifest["nodes"][hash] = node;
+}
+
 fn capture(store: &mut Store) -> Result<Captured, String> {
     if let Some(error) = &store.recovery_error {
         return Err(error.clone());
@@ -507,6 +522,10 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
         if node["type"] != "file" {
             continue;
         }
+        // Media is named by content, so it comes back under its own ID, never as a recovered copy.
+        if node["system"]["kind"] == "media" && remote.manifest["nodes"][&id].is_null() {
+            restore_media_node(&mut remote.manifest, &id, node.clone());
+        }
         let recovered = remote.manifest["nodes"][&id].is_null()
             && !remote.manifest["deletedNodes"][&id].is_null();
         if recovered {
@@ -559,7 +578,7 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
                     let media_node = media::node(hash, bytes.len());
                     additions.insert(format!("files/{}", file_name(&media_node)?), bytes.to_vec());
                     new_media.push((hash.clone(), bytes.to_vec()));
-                    remote.manifest["nodes"][hash] = media_node;
+                    restore_media_node(&mut remote.manifest, hash, media_node);
                 }
             }
             extracted.document.into_owned()
@@ -703,6 +722,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         if op["kind"] != "push-note"
             || plan.snapshot.manifest["deletedNodes"][id].is_null()
             || store.manifest["nodes"][id]["type"] != "file"
+            || store.manifest["nodes"][id]["system"]["kind"] == "media"
         {
             continue;
         }
@@ -929,8 +949,13 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             plan.snapshot.manifest["linksBySource"][&id] = json!(links);
         }
     }
+    let mut removed_media = Vec::new();
     for (id, node) in previous["nodes"].as_object().unwrap() {
         if plan.snapshot.manifest["nodes"][id].is_null() {
+            if node["system"]["kind"] == "media" {
+                removed_media.push(node.clone());
+                continue;
+            }
             changes.deleted.push(id.clone());
             if node["type"] == "file" {
                 writes.push(FileWrite {
@@ -957,6 +982,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
     store.sync.document_generations = generations;
     store.sync.last_remote_sync_at = Some(now());
     store.commit(writes)?;
+    changes.wake_remote |= media_cleanup::settle_removed(store, removed_media)?;
     Ok(changes)
 }
 
@@ -1101,6 +1127,9 @@ impl RepositoryEngine {
         *self.error.lock().unwrap() = result.as_ref().err().cloned();
         match result {
             Ok(changes) => {
+                if changes.wake_remote {
+                    self.wake.notify_one();
+                }
                 self.last_checked_at.store(now(), Ordering::Relaxed);
                 let _ = app.emit("repository-status", self.status().await);
                 let _ = app.emit("repository-data", json!({"repositoryId": self.id, "changed": changes.changed, "deleted": changes.deleted}));
