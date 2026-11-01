@@ -1,7 +1,29 @@
-use super::{media, store::file_name, FileWrite, Store};
+use super::{
+    media,
+    store::{atomic_write, file_name},
+    FileWrite, Store,
+};
 use crate::repository_bootstrap::reject_symlink;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashSet, fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
+
+const SCAN_INTERVAL_MS: u64 = 24 * 60 * 60 * 1000;
+// Current versions restore media they still need, but older ones cannot, so this gives them time to
+// update and catches anything that only looks unused for a while.
+const UNUSED_FOR_MS: u64 = 30 * 24 * 60 * 60 * 1000;
+const PROGRESS_FILE: &str = ".native-media-unused.json";
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Progress {
+    scanned_at: u64,
+    first_unused_at: HashMap<String, u64>,
+}
 
 // Reads stored files rather than the manifest, so a document whose metadata was quarantined still
 // protects its media.
@@ -65,4 +87,73 @@ pub(super) fn settle_removed(state: &mut Store, removed: Vec<Value>) -> Result<b
     }
     state.commit(files)?;
     Ok(restored)
+}
+
+/// Removes media that no document has pointed at for `UNUSED_FOR_MS` and returns how many. Waits until
+/// this device has synced and has nothing pending, because only then does it hold every document, and
+/// removes nothing if any document cannot be read. Timing is per device, so it causes no sync traffic.
+pub(super) fn clean(state: &mut Store, now: u64) -> Result<usize, String> {
+    if state.recovery_error.is_some()
+        || !state.outbox.is_empty()
+        || (state.remote && state.sync.last_remote_sync_at.is_none())
+    {
+        return Ok(0);
+    }
+    let path = state.root.join(PROGRESS_FILE);
+    let saved: Progress = fs::read(&path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    if now.saturating_sub(saved.scanned_at) < SCAN_INTERVAL_MS {
+        return Ok(0);
+    }
+    let referenced = referenced(&state.root)?;
+    let unused: Vec<Value> = state.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .filter(|node| {
+            node["system"]["kind"] == "media"
+                && node["id"]
+                    .as_str()
+                    .is_some_and(|id| !referenced.contains(id))
+        })
+        .cloned()
+        .collect();
+    let mut progress = Progress {
+        scanned_at: now,
+        first_unused_at: HashMap::new(),
+    };
+    let mut files = Vec::new();
+    for node in unused {
+        let hash = node["id"].as_str().ok_or("Invalid repository node ID")?;
+        let first = saved.first_unused_at.get(hash).copied().unwrap_or(now);
+        if now.saturating_sub(first) < UNUSED_FOR_MS {
+            progress.first_unused_at.insert(hash.to_owned(), first);
+            continue;
+        }
+        state.transaction_active = true;
+        state.manifest["nodes"]
+            .as_object_mut()
+            .unwrap()
+            .remove(hash);
+        state.queue(
+            "delete-manifest-node",
+            Some(hash),
+            json!({"deletedFileIds": [hash]}),
+        );
+        files.push(FileWrite {
+            name: file_name(&node)?,
+            bytes: None,
+        });
+    }
+    let removed = files.len();
+    if removed > 0 {
+        state.commit(files)?;
+    }
+    atomic_write(
+        &path,
+        &serde_json::to_vec(&progress).map_err(|error| error.to_string())?,
+    )?;
+    Ok(removed)
 }

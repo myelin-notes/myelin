@@ -3722,3 +3722,405 @@ async fn removed_media_nothing_uses_is_deleted_from_the_device_that_applies_the_
         .join(format!("data/files/{hash}.media"))
         .exists());
 }
+
+const DAY_MS: u64 = 24 * 60 * 60 * 1000;
+
+async fn clean_media(engine: &RepositoryEngine, at: u64) -> Result<usize, String> {
+    engine
+        .with_store(move |state| media_cleanup::clean(state, at))
+        .await
+}
+
+async fn empty_media_document(engine: &RepositoryEngine) {
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    engine
+        .operate(RepositoryOperation::WriteFile {
+            node: saved["manifest"]["nodes"]["drawing"].clone(),
+            bytes_base64: STANDARD.encode(document::bytes(&yrs::Doc::new())),
+            replace: true,
+            overwrite_remote: true,
+        })
+        .await
+        .unwrap();
+}
+
+async fn delete_node(engine: &RepositoryEngine, id: &str) {
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["nodes"].as_object_mut().unwrap().remove(id);
+    save_manifest(engine, manifest).await;
+}
+
+fn local_media(directory: &TestDirectory) -> usize {
+    fs::read_dir(directory.0.join("data/files"))
+        .unwrap()
+        .filter(|entry| {
+            entry
+                .as_ref()
+                .unwrap()
+                .path()
+                .extension()
+                .is_some_and(|kind| kind == "media")
+        })
+        .count()
+}
+
+// A version protects media after the document moves on. Once nothing points at it, the file lasts
+// thirty days and is then removed locally and from the remote.
+async fn unused_media_is_removed_after_thirty_days(
+    source: RepositorySource,
+    endpoints: &RemoteEndpoints,
+) {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let version = capture_version(&engine, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    empty_media_document(&engine).await;
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert_eq!(clean_media(&engine, start + 40 * DAY_MS).await, Ok(0));
+    assert_media_intact(&read(&engine, version_id).await);
+
+    delete_node(&engine, version_id).await;
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+    let unused = start + 41 * DAY_MS;
+    assert_eq!(clean_media(&engine, unused).await, Ok(0));
+    assert_eq!(clean_media(&engine, unused + 29 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+
+    assert_eq!(clean_media(&engine, unused + 30 * DAY_MS).await, Ok(1));
+    assert_eq!(local_media(&directory), 0);
+    engine.cycle(source, endpoints).await.unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
+
+#[tokio::test]
+async fn github_removes_media_unused_for_thirty_days() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    unused_media_is_removed_after_thirty_days(github_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote.files.values().all(|bytes| bytes.len() != 2048));
+    assert!(remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .all(|node| node["system"]["kind"] != "media"));
+    assert_eq!(
+        remote.manifest["deletedNodes"].as_object().unwrap().len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn google_drive_removes_media_unused_for_thirty_days() {
+    let state = Arc::new(Mutex::new(DriveFixture::new()));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    unused_media_is_removed_after_thirty_days(drive_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote
+        .files
+        .iter()
+        .all(|file| !file.name.ends_with(".media")));
+}
+
+#[tokio::test]
+async fn cleanup_removes_nothing_while_any_document_is_unreadable() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    empty_media_document(&engine).await;
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+
+    let broken = directory.0.join("data/files/broken.myelin");
+    fs::write(&broken, [0xff; 32]).unwrap();
+    assert!(clean_media(&engine, start + 31 * DAY_MS).await.is_err());
+    assert_eq!(local_media(&directory), 1);
+
+    fs::remove_file(&broken).unwrap();
+    assert_eq!(clean_media(&engine, start + 31 * DAY_MS).await, Ok(1));
+    assert_eq!(local_media(&directory), 0);
+}
+
+#[tokio::test]
+async fn cleanup_waits_for_pending_changes_and_a_first_sync() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert!(!directory.0.join("data/.native-media-unused.json").exists());
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    empty_media_document(&engine).await;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert!(!directory.0.join("data/.native-media-unused.json").exists());
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(clean_media(&engine, start + 40 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+}
+
+#[tokio::test]
+async fn media_removed_by_one_device_returns_for_an_offline_device_that_needs_it() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    let version = capture_version(&second, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    delete_node(&first, "drawing").await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&first, start).await, Ok(0));
+    assert_eq!(clean_media(&first, start + 30 * DAY_MS).await, Ok(1));
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(!state.lock().unwrap().files.contains_key(&hash));
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_media_intact(&read(&second, version_id).await);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+    assert_media_intact(&read(&first, version_id).await);
+}
+
+#[tokio::test]
+async fn media_added_again_after_removal_reaches_every_device() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    delete_node(&first, "drawing").await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&first, start).await, Ok(0));
+    assert_eq!(clean_media(&first, start + 30 * DAY_MS).await, Ok(1));
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(local_media(&second_directory), 0);
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+
+    seed(
+        &first,
+        "drawing-again",
+        "mcanvas",
+        media_fixture("document"),
+    )
+    .await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&second, "drawing-again").await);
+}
+
+#[tokio::test]
+async fn media_referenced_only_by_unsaved_updates_is_kept() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    let original = media_fixture("document");
+    seed(&engine, "drawing", "mcanvas", original.clone()).await;
+    seed(&engine, "other", "mcanvas", Vec::new()).await;
+    // An editor that loaded a document while its media was missing copies references around.
+    engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "other".into(),
+            update_base64: STANDARD.encode(media::extract(&original).document),
+            origin: "local".into(),
+            generation: None,
+            source_session: None,
+        })
+        .await
+        .unwrap();
+    assert!(directory.0.join("data/.native-updates/other").exists());
+    empty_media_document(&engine).await;
+
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert_eq!(clean_media(&engine, start + 31 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+}
+
+// The first device adds, deletes and cleans up media the second has never seen.
+async fn remove_media_the_other_device_never_saw(
+    state: &Arc<Mutex<GitHubFixture>>,
+    endpoints: &RemoteEndpoints,
+    first: &RepositoryEngine,
+) -> String {
+    seed(first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    let hash = {
+        let remote = state.lock().unwrap();
+        remote.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .find(|node| node["system"]["kind"] == "media")
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    delete_node(first, "drawing").await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(first, start).await, Ok(0));
+    assert_eq!(clean_media(first, start + 30 * DAY_MS).await, Ok(1));
+    first.cycle(github_source(), endpoints).await.unwrap();
+    assert!(!state.lock().unwrap().files.contains_key(&hash));
+    hash
+}
+
+fn assert_no_conflict_copies(state: &Arc<Mutex<GitHubFixture>>) {
+    let remote = state.lock().unwrap();
+    assert!(remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .all(|id| !id.starts_with("conflict-")));
+}
+
+#[tokio::test]
+async fn an_offline_device_adding_the_same_bytes_restores_them_without_a_conflict_copy() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    // Deleting the first document leaves the media queued ahead of the one that still uses it.
+    seed(&second, "discarded", "mcanvas", media_fixture("document")).await;
+    delete_node(&second, "discarded").await;
+    seed(&second, "offline", "mcanvas", media_fixture("document")).await;
+    let hash = remove_media_the_other_device_never_saw(&state, &server.endpoints, &first).await;
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_no_conflict_copies(&state);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+    assert_media_intact(&read(&second, "offline").await);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "offline").await);
+}
+
+#[tokio::test]
+async fn media_added_while_a_sync_applies_its_removal_survives() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let hash = remove_media_the_other_device_never_saw(&state, &server.endpoints, &first).await;
+
+    // The upload is paused after the plan has seen the removal, then the same bytes arrive.
+    update(&second, "localUpdate", "local").await;
+    server.pause_blob.store(true, Ordering::SeqCst);
+    let syncing = second.clone();
+    let endpoints = server.endpoints.clone();
+    let sync = tokio::spawn(async move { syncing.cycle(github_source(), &endpoints).await });
+    tokio::time::timeout(std::time::Duration::from_secs(10), server.paused.notified())
+        .await
+        .unwrap();
+    seed(&second, "during-sync", "mcanvas", media_fixture("document")).await;
+    server.resume.notify_one();
+    sync.await.unwrap().unwrap();
+
+    assert_media_intact(&read(&second, "during-sync").await);
+    assert!(second_directory
+        .0
+        .join(format!("data/files/{hash}.media"))
+        .exists());
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_no_conflict_copies(&state);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "during-sync").await);
+}

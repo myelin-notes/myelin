@@ -1043,6 +1043,16 @@ impl RepositoryEngine {
             }
         };
         let status = self.status().await;
+        // Inside the network lock, so no sync can change what this scan is looking at.
+        if result.is_ok() && status.last_error.is_none() {
+            let cleaned = self
+                .with_store(|state| media_cleanup::clean(state, now()))
+                .await;
+            if let Ok(removed @ 1..) = cleaned {
+                trace.set("media_removed", removed as u64);
+                self.wake.notify_one();
+            }
+        }
         trace.set("duration_ms", started.elapsed().as_millis() as u64);
         trace.set("pending_writes_end", status.pending_remote_writes as u64);
         trace.set(
@@ -1062,6 +1072,7 @@ impl RepositoryEngine {
             .unwrap_or(0)
             > 0
             || fields.contains_key("plan_ms")
+            || fields.contains_key("media_removed")
             || result.is_err()
             || status.last_error.is_some()
             || started.elapsed().as_secs() >= 5
