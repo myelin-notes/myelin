@@ -20,7 +20,7 @@ Remote files hold references. Sync extracts media after merging, uploads whateve
 
 ### Failure behaviour
 
-Media that is missing, or does not match its hash, leaves the reference in the document. The rest of the document stays usable and saving preserves the reference, so nothing is lost; the element appears broken until the document is reopened after the media arrives. A document that cannot be parsed or fails verification after extraction stays inline, which only costs space.
+Media that is missing, or does not match its hash, leaves the reference in the document. The rest of the document stays usable and saving preserves the reference, so nothing is lost; the element appears broken until the document is reopened after the media arrives. A document that cannot be parsed or fails verification after extraction stays inline, which only costs space. A `.myelin` file copied by hand out of the repository folder holds references rather than media; use an export instead. A version's `byteLength` is the size of the complete document, not of its stored file.
 
 ### Upgrading existing repositories
 
