@@ -107,6 +107,16 @@ objc2-ui-kit = { version = "0.3", default-features = false, features = ["std", "
 [profile.dev.package.scrypt]
 opt-level = 3
 
+# Unoptimized, OneNote imports take several times longer than in release.
+[profile.dev.package.lzxd]
+opt-level = 3
+
+[profile.dev.package.onenote_parser]
+opt-level = 3
+
+[profile.dev.package.yrs]
+opt-level = 3
+
 # Fork carrying the Windows MSVC compilation fix (whisper logging hooks) plus
 # Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
 # a clean checkout (CI) resolves it without any local patch step.

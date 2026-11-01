@@ -1,30 +1,51 @@
-use super::{document, store, Changes, FileWrite, Store, STANDARD};
+use super::{document, store, Changes, Store};
 use crate::onenote_import::{ImportedElement, ImportedNotebook, ImportedPage};
-use base64::Engine as _;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tauri::ipc::Channel;
-use yrs::{Any, Array, Doc, Map, MapPrelim, Transact};
+use yrs::{Any, Array, ArrayRef, Doc, Map, MapPrelim, Transact, TransactionMut};
 
-fn push_element(doc: &Doc, kind: u8, props: Value, image: Option<Vec<u8>>) {
-    let elements = doc.get_or_insert_array("elements");
-    let mut txn = doc.transact_mut();
-    let element = elements.push_back(&mut txn, MapPrelim::default());
-    element.insert(&mut txn, "type", kind as i64);
-    element.insert(&mut txn, "uuid", uuid::Uuid::new_v4().to_string());
+/// `payload` is set directly because stroke points and image bytes are too large for the JSON
+/// round trip `props` takes: 12M points spent most of an import there.
+fn push_element(
+    txn: &mut TransactionMut,
+    elements: &ArrayRef,
+    kind: u8,
+    props: Value,
+    payload: Option<(&str, Any)>,
+) {
+    let element = elements.insert(txn, 0, MapPrelim::default());
+    element.insert(txn, "type", kind as i64);
+    element.insert(txn, "uuid", uuid::Uuid::new_v4().to_string());
     if let Any::Map(props) = Any::from_json(&props.to_string()).unwrap() {
         for (key, value) in props.iter() {
-            element.insert(&mut txn, key.as_str(), value.clone());
+            element.insert(txn, key.as_str(), value.clone());
         }
     }
-    if let Some(bytes) = image {
-        element.insert(&mut txn, "imageData", Any::Buffer(bytes.into()));
+    if let Some((key, value)) = payload {
+        element.insert(txn, key, value);
     }
+}
+
+fn image_dimensions(data: &[u8]) -> Option<(u32, u32)> {
+    image::ImageReader::new(std::io::Cursor::new(data))
+        .with_guessed_format()
+        .ok()?
+        .into_dimensions()
+        .ok()
 }
 
 fn page_document(page: ImportedPage) -> Doc {
     let doc = Doc::new();
-    for element in page.elements {
+    let elements = doc.get_or_insert_array("elements");
+    push_page(&mut doc.transact_mut(), &elements, page);
+    doc
+}
+
+// Builds the page back to front, inserting at the head: yrs walks the list from the head on every
+// insert, so `push_back` is quadratic in a page's strokes.
+fn push_page(txn: &mut TransactionMut, elements: &ArrayRef, page: ImportedPage) {
+    for element in page.elements.into_iter().rev() {
         match element {
             ImportedElement::Text {
                 x,
@@ -36,7 +57,8 @@ fn page_document(page: ImportedPage) -> Doc {
                 color,
             } => {
                 push_element(
-                    &doc,
+                    txn,
+                    elements,
                     1,
                     json!({
                         "offsetX": x + 160.0, "offsetY": y + 80.0, "scaleX": 1, "scaleY": 1,
@@ -48,22 +70,34 @@ fn page_document(page: ImportedPage) -> Doc {
                 );
             }
             ImportedElement::Ink { strokes } => {
-                for stroke in strokes {
+                for stroke in strokes.into_iter().rev() {
                     // The parser drops pressure; zero placeholders keep the editor's [x, y, pressure] format.
-                    let points: Vec<f32> = stroke
+                    let points: Vec<Any> = stroke
                         .points
                         .chunks_exact(2)
                         .flat_map(|point| [point[0] + 160.0, point[1] + 80.0, 0.0])
+                        .map(|value| {
+                            if value.is_finite() {
+                                Any::Number(value as f64)
+                            } else {
+                                Any::Null
+                            }
+                        })
                         .collect();
                     let mut props = json!({
                         "offsetX": 0, "offsetY": 0, "scaleX": 1, "scaleY": 1,
-                        "color": stroke.color, "size": stroke.size, "hasPressure": false,
-                        "points": points
+                        "color": stroke.color, "size": stroke.size, "hasPressure": false
                     });
                     if stroke.highlighter {
                         props["simulatePressure"] = json!(false);
                     }
-                    push_element(&doc, 0, props, None);
+                    push_element(
+                        txn,
+                        elements,
+                        0,
+                        props,
+                        Some(("points", Any::Array(points.into()))),
+                    );
                 }
             }
             ImportedElement::Image {
@@ -73,12 +107,12 @@ fn page_document(page: ImportedPage) -> Doc {
                 height,
                 data,
             } => {
-                let Ok(bitmap) = image::load_from_memory(&data) else {
+                let Some((natural_width, natural_height)) = image_dimensions(&data) else {
                     continue;
                 };
-                let (natural_width, natural_height) = (bitmap.width(), bitmap.height());
                 push_element(
-                    &doc,
+                    txn,
+                    elements,
                     2,
                     json!({
                         "offsetX": x + 160.0, "offsetY": y + 80.0,
@@ -87,12 +121,11 @@ fn page_document(page: ImportedPage) -> Doc {
                         "naturalWidth": natural_width, "naturalHeight": natural_height,
                         "cropX": 0, "cropY": 0, "cropW": natural_width, "cropH": natural_height
                     }),
-                    Some(data),
+                    Some(("imageData", Any::Buffer(data.into()))),
                 );
             }
         }
     }
-    doc
 }
 
 fn add_node(
@@ -145,7 +178,7 @@ pub(super) fn import(
         .map(|section| section.pages.len())
         .sum();
     let mut folders = HashMap::new();
-    let mut files = Vec::new();
+    let mut written = Vec::new();
     let mut imported = 0;
     for section in notebook.sections {
         let mut parent = root_id.clone();
@@ -198,10 +231,20 @@ pub(super) fn import(
             }
             let doc = page_document(page);
             let id = add_node(state, name, Some(parent.clone()), true, &mut changes);
-            files.push(FileWrite {
-                name: store::file_name(&state.manifest["nodes"][&id])?,
-                bytes: Some(STANDARD.encode(document::bytes(&doc))),
-            });
+            // Skips the journal, which would base64 the whole notebook into one JSON file and write
+            // it twice. These IDs are new, so a file is unreachable until the commit below adds its
+            // node, and a crash before then leaves only an inert orphan.
+            let path = state
+                .root
+                .join("files")
+                .join(store::file_name(&state.manifest["nodes"][&id])?);
+            if let Err(error) = store::atomic_write(&path, &document::bytes(&doc)) {
+                for path in written {
+                    let _ = std::fs::remove_file(path);
+                }
+                return Err(error);
+            }
+            written.push(path);
             state
                 .sync
                 .document_generations
@@ -210,7 +253,7 @@ pub(super) fn import(
             let _ = progress.send(json!({"current": imported, "total": total, "fileName": title}));
         }
     }
-    state.commit(files)?;
+    state.commit(Vec::new())?;
     Ok((
         json!({"rootFolderId": root_id, "pagesImported": imported, "skippedPages": 0}),
         changes,

@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::Mutex;
 
 use onenote_parser::Parser;
 use onenote_parser::contents::{
@@ -47,6 +48,10 @@ const RECTANGLE_PEN_TIP: u8 = 1;
 
 /// Same alpha as `HighlighterTool`, so imported highlights match ones drawn in Myelin.
 const HIGHLIGHTER_ALPHA: f32 = 0.3;
+
+/// The last scan, so confirming an import skips a second parse. Held until that import, the next
+/// scan or `discard_onenote_scan`.
+static LAST_SCAN: Mutex<Option<(String, ImportedNotebook)>> = Mutex::new(None);
 
 pub(crate) struct ImportedNotebook {
     pub(crate) sections: Vec<ImportedSection>,
@@ -110,22 +115,46 @@ pub struct OneNotePreview {
 #[tauri::command]
 pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePreview, String> {
     tokio::task::spawn_blocking(move || {
-        let notebook = read_notebook(&app, path)?;
-        Ok(OneNotePreview {
+        let key = path.to_string();
+        let notebook = parse_path(&app, path)?;
+        let preview = OneNotePreview {
             pages: notebook
                 .sections
                 .iter()
                 .map(|section| section.pages.len())
                 .sum(),
             sections: notebook.sections.len(),
-            failed_sections: notebook.failed_sections,
-        })
+            failed_sections: notebook.failed_sections.clone(),
+        };
+        *LAST_SCAN.lock().unwrap() = Some((key, notebook));
+        Ok(preview)
     })
     .await
     .map_err(|e| format!("OneNote scan task panicked: {e}"))?
 }
 
+// Async so dropping a large notebook stays off the main thread.
+#[tauri::command]
+pub async fn discard_onenote_scan() {
+    *LAST_SCAN.lock().unwrap() = None;
+}
+
 pub(crate) fn read_notebook(app: &AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
+    match take_scan(&path.to_string()) {
+        Some(notebook) => Ok(notebook),
+        None => parse_path(app, path),
+    }
+}
+
+fn take_scan(key: &str) -> Option<ImportedNotebook> {
+    LAST_SCAN
+        .lock()
+        .unwrap()
+        .take_if(|(scanned, _)| scanned == key)
+        .map(|(_, notebook)| notebook)
+}
+
+fn parse_path(app: &AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
     let bytes = crate::import_files::FileImportSource::Path { path }.read(app)?;
     parse_file(&bytes)
 }
@@ -678,6 +707,21 @@ mod tests {
         let path = [(1270.0, 1270.0)];
         let points = accumulate_path(path.into_iter(), 2.0, -1.0);
         assert_eq!(points, vec![(1.0 + 2.0) * 48.0, (1.0 - 1.0) * 48.0]);
+    }
+
+    #[test]
+    fn a_scan_is_only_reused_for_the_file_it_read_and_only_once() {
+        *LAST_SCAN.lock().unwrap() = Some((
+            "a.onepkg".to_string(),
+            ImportedNotebook {
+                sections: Vec::new(),
+                failed_sections: Vec::new(),
+            },
+        ));
+
+        assert!(take_scan("b.onepkg").is_none());
+        assert!(take_scan("a.onepkg").is_some());
+        assert!(take_scan("a.onepkg").is_none());
     }
 
     #[test]

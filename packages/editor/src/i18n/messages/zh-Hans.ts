@@ -189,6 +189,7 @@ const zhHans: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `正在导入 ${current}/${total}…`,
+        preparing: '正在准备导入…',
         cancelling: '正在取消…',
       },
       summary: {
