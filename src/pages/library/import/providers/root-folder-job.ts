@@ -27,6 +27,7 @@ interface RootFolderJobConfig<TScanned> {
     rootName: string;
     onProgress: (progress: ImportProgress) => void;
   }): Promise<ImportSummaryData>;
+  dispose?(): void;
 }
 
 /**
@@ -44,6 +45,7 @@ export function createRootFolderImportJob<TScanned>(
     title: config.title,
     scanningLabel: config.scanningLabel,
     emptyLabel: config.emptyLabel,
+    dispose: config.dispose,
 
     async scan() {
       scanned = await config.scan();

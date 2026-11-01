@@ -206,6 +206,7 @@ const fr: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `Import de ${current} sur ${total}...`,
+        preparing: "Préparation de l'importation...",
         cancelling: 'Annulation...',
       },
       summary: {

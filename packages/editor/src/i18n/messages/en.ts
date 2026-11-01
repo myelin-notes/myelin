@@ -198,6 +198,7 @@ const en = {
       progress: {
         importing: (current: number, total: number) =>
           `Importing ${current} of ${total}...`,
+        preparing: 'Preparing import...',
         cancelling: 'Cancelling...',
       },
       summary: {
