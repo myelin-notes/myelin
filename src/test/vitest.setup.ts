@@ -33,6 +33,7 @@ if (typeof globalThis.DOMRect === 'undefined') {
 if (typeof globalThis.Path2D === 'undefined') {
   class Path2DPolyfill {
     moveTo() {}
+    lineTo() {}
     quadraticCurveTo() {}
     closePath() {}
   }

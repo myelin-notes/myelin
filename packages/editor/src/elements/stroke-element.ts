@@ -31,6 +31,10 @@ const POINT_FLUSH_INTERVAL_MS = 300;
 // stroke keeps perfect-freehand's velocity simulation, which is what a mouse wants.
 const NO_SENSOR_PRESSURE = 0.5;
 
+// World units; 0.55 device px at most at MAX_ZOOM on a 2x display. Imported ink packs outline points
+// ~0.4 device px apart at 60%, and redrawing all of them every frame was what made dense notes lag.
+const OUTLINE_TOLERANCE = 0.05;
+
 export class StrokeElement extends AnchorableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
@@ -338,6 +342,7 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
     if (this.dirty) {
+      // Unsimplified: the kept points change as the tip moves, which would make live ink wobble.
       this.cachePath(this.strokeOutline());
     }
 
@@ -439,7 +444,12 @@ export class StrokeElement extends AnchorableElement {
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     // Loading a note lands here once per stroke; reusing the outline halves perfect-freehand work.
-    this.cachePath(outlinePoints);
+    this.cachedPath = simplifiedOutlinePath(
+      outlinePoints,
+      OUTLINE_TOLERANCE /
+        Math.max(Math.abs(this.scale.x), Math.abs(this.scale.y)),
+    );
+    this.dirty = false;
   }
 }
 
@@ -490,4 +500,89 @@ export function appendStrokeOutline(
   }
 
   path.closePath();
+}
+
+// Straight segments through the painted curve, not simplified outline points still traced as curves:
+// a midpoint quadratic over a long edge swings wide of a stroke tip, by up to 0.33 world units.
+// Rendering only; bounds and PDF export use the full outline.
+function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
+  const path = new Path2D();
+  const points = simplifyPolyline(flattenOutline(outline), tolerance);
+  if (points.length === 0) {
+    return path;
+  }
+  path.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) {
+    path.lineTo(points[i][0], points[i][1]);
+  }
+  path.closePath();
+  return path;
+}
+
+function flattenOutline(outline: number[][]): number[][] {
+  const flat: number[][] = [];
+  let lastX = 0;
+  let lastY = 0;
+  appendStrokeOutline(
+    {
+      moveTo(x, y) {
+        flat.push([x, y]);
+        lastX = x;
+        lastY = y;
+      },
+      quadraticCurveTo(cx, cy, x, y) {
+        flat.push([(lastX + 2 * cx + x) / 4, (lastY + 2 * cy + y) / 4], [x, y]);
+        lastX = x;
+        lastY = y;
+      },
+      closePath() {},
+    },
+    outline,
+  );
+  return flat;
+}
+
+// Ramer-Douglas-Peucker: keeps each point straying over `tolerance` from the chord around it.
+function simplifyPolyline(points: number[][], tolerance: number): number[][] {
+  if (points.length < 3) {
+    return points;
+  }
+  const keep = new Uint8Array(points.length);
+  keep[0] = 1;
+  keep[points.length - 1] = 1;
+  const toleranceSquared = tolerance * tolerance;
+  const ranges = [0, points.length - 1];
+  while (ranges.length > 0) {
+    const end = ranges.pop()!;
+    const start = ranges.pop()!;
+    const [startX, startY] = points[start];
+    const chordX = points[end][0] - startX;
+    const chordY = points[end][1] - startY;
+    const chordSquared = chordX * chordX + chordY * chordY;
+    let farthest = -1;
+    let farthestSquared = toleranceSquared;
+    for (let i = start + 1; i < end; i++) {
+      const x = points[i][0] - startX;
+      const y = points[i][1] - startY;
+      // An outline can close on itself, leaving no chord to project onto.
+      const along =
+        chordSquared > 0
+          ? Math.min(1, Math.max(0, (x * chordX + y * chordY) / chordSquared))
+          : 0;
+      const awayX = x - along * chordX;
+      const awayY = y - along * chordY;
+      const distanceSquared = awayX * awayX + awayY * awayY;
+      if (distanceSquared > farthestSquared) {
+        farthest = i;
+        farthestSquared = distanceSquared;
+      }
+    }
+    if (farthest >= 0) {
+      keep[farthest] = 1;
+      ranges.push(start, farthest, farthest, end);
+    }
+  }
+  const simplified = points.filter((_, i) => keep[i] === 1);
+  // Two points enclose nothing to fill, and a dot has to stay a dot.
+  return simplified.length < 3 ? points : simplified;
 }
