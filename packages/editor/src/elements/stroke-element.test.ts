@@ -662,6 +662,75 @@ describe('StrokeElement outline simplification', () => {
     expect(paintedPath(stroke).segments).toBeLessThan(live / 2);
   });
 
+  it('paints a stroke longer than the buffers start out, to its very end', () => {
+    const points = Array.from({ length: 6000 }, (_, i) => [
+      i * 0.2,
+      Math.sin(i / 3) * 4,
+      0.5,
+    ]).flat();
+    const stroke = new StrokeElement('long', points, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    stroke.updateBounds();
+    expect(fullOutlineWorld(stroke).length).toBeGreaterThan(4096);
+
+    const painted = paintedPath(stroke).points;
+    const box = stroke.localBoundingBox;
+    expect(painted.flat().every(Number.isFinite)).toBe(true);
+    expect(Math.max(...painted.map(([x]) => x))).toBeCloseTo(box.right, 0);
+    expect(Math.min(...painted.map(([x]) => x))).toBeCloseTo(box.left, 0);
+  });
+
+  it('paints a stroke the same after a longer one has used the buffers', () => {
+    const make = (uuid: string) => {
+      const stroke = new StrokeElement(uuid, densePoints, false, {
+        color: '#ff0000',
+        size: 1.3,
+      });
+      stroke.updateBounds();
+      return paintedPath(stroke).points;
+    };
+    const before = make('first');
+
+    const longer = new StrokeElement(
+      'longer',
+      Array.from({ length: 3000 }, (_, i) => [i, (i % 7) * 3, 0.5]).flat(),
+      false,
+      { color: '#ff0000', size: 1.3 },
+    );
+    longer.updateBounds();
+
+    expect(make('second')).toEqual(before);
+  });
+
+  it('paints nothing for a stroke with no outline, not the stroke before it', () => {
+    const previous = new StrokeElement('previous', densePoints, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    previous.updateBounds();
+
+    const empty = new StrokeElement('empty', densePoints, false, {
+      color: '#ff0000',
+      size: 0,
+    });
+    empty.updateBounds();
+
+    expect(paintedPath(empty).segments).toBe(0);
+  });
+
+  it('keeps a tap shrunk below the tolerance from vanishing', () => {
+    const stroke = new StrokeElement('tiny', [5, 5, 0.5], false, {
+      color: '#ff0000',
+      size: 0.5,
+    });
+    stroke.setScale(0.05, 0.05);
+
+    // Fewer than two segments enclose nothing to fill.
+    expect(paintedPath(stroke).segments).toBeGreaterThanOrEqual(2);
+  });
+
   it('still paints a tap', () => {
     const stroke = new StrokeElement('tap', [5, 5, 0.5], false, {
       color: '#ff0000',

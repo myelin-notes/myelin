@@ -441,7 +441,9 @@ export class StrokeElement extends AnchorableElement {
     let maxX = Number.NEGATIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    for (const [x, y] of outlinePoints) {
+    for (let i = 0; i < outlinePoints.length; i++) {
+      const x = outlinePoints[i][0];
+      const y = outlinePoints[i][1];
       if (x < minX) {
         minX = x;
       }
@@ -516,68 +518,80 @@ export function appendStrokeOutline(
   path.closePath();
 }
 
+// Reused between strokes: allocating these per point cost more than the outlines themselves.
+let flatXY = new Float64Array(8192);
+let flatKeep = new Uint8Array(4096);
+let flatCount = 0;
+const flatRanges: number[] = [];
+
+const outlineFlattener: QuadraticPathSink = {
+  moveTo(x, y) {
+    flatXY[0] = x;
+    flatXY[1] = y;
+    flatCount = 1;
+  },
+  quadraticCurveTo(cx, cy, x, y) {
+    const end = flatCount * 2;
+    flatXY[end] = (flatXY[end - 2] + 2 * cx + x) / 4;
+    flatXY[end + 1] = (flatXY[end - 1] + 2 * cy + y) / 4;
+    flatXY[end + 2] = x;
+    flatXY[end + 3] = y;
+    flatCount += 2;
+  },
+  closePath() {},
+};
+
 // Straight segments through the painted curve, not simplified outline points still traced as curves:
 // a midpoint quadratic over a long edge swings wide of a stroke tip, by up to 0.33 world units.
 // Rendering only; bounds and PDF export use the full outline.
 function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
   const path = new Path2D();
-  const points = simplifyPolyline(flattenOutline(outline), tolerance);
-  if (points.length === 0) {
+  if (outline.length * 2 > flatKeep.length) {
+    flatKeep = new Uint8Array(outline.length * 4);
+    flatXY = new Float64Array(outline.length * 8);
+  }
+  flatCount = 0;
+  appendStrokeOutline(outlineFlattener, outline);
+  if (flatCount === 0) {
     return path;
   }
-  path.moveTo(points[0][0], points[0][1]);
-  for (let i = 1; i < points.length; i++) {
-    path.lineTo(points[i][0], points[i][1]);
+  // Two points enclose nothing to fill, and a dot has to stay a dot.
+  const keepAll = markSimplifiedPoints(tolerance) < 3;
+  path.moveTo(flatXY[0], flatXY[1]);
+  for (let i = 1; i < flatCount; i++) {
+    if (keepAll || flatKeep[i] === 1) {
+      path.lineTo(flatXY[i * 2], flatXY[i * 2 + 1]);
+    }
   }
   path.closePath();
   return path;
 }
 
-function flattenOutline(outline: number[][]): number[][] {
-  const flat: number[][] = [];
-  let lastX = 0;
-  let lastY = 0;
-  appendStrokeOutline(
-    {
-      moveTo(x, y) {
-        flat.push([x, y]);
-        lastX = x;
-        lastY = y;
-      },
-      quadraticCurveTo(cx, cy, x, y) {
-        flat.push([(lastX + 2 * cx + x) / 4, (lastY + 2 * cy + y) / 4], [x, y]);
-        lastX = x;
-        lastY = y;
-      },
-      closePath() {},
-    },
-    outline,
-  );
-  return flat;
-}
-
-// Ramer-Douglas-Peucker: keeps each point straying over `tolerance` from the chord around it.
-function simplifyPolyline(points: number[][], tolerance: number): number[][] {
-  if (points.length < 3) {
-    return points;
-  }
-  const keep = new Uint8Array(points.length);
+// Ramer-Douglas-Peucker over the flattened outline: marks each point straying over `tolerance` from
+// the chord around it in `flatKeep`, and returns how many are kept.
+function markSimplifiedPoints(tolerance: number): number {
+  const xy = flatXY;
+  const keep = flatKeep;
+  keep.fill(0, 0, flatCount);
   keep[0] = 1;
-  keep[points.length - 1] = 1;
+  keep[flatCount - 1] = 1;
+  let kept = 2;
   const toleranceSquared = tolerance * tolerance;
-  const ranges = [0, points.length - 1];
-  while (ranges.length > 0) {
-    const end = ranges.pop()!;
-    const start = ranges.pop()!;
-    const [startX, startY] = points[start];
-    const chordX = points[end][0] - startX;
-    const chordY = points[end][1] - startY;
+  flatRanges.length = 0;
+  flatRanges.push(0, flatCount - 1);
+  while (flatRanges.length > 0) {
+    const end = flatRanges.pop()!;
+    const start = flatRanges.pop()!;
+    const startX = xy[start * 2];
+    const startY = xy[start * 2 + 1];
+    const chordX = xy[end * 2] - startX;
+    const chordY = xy[end * 2 + 1] - startY;
     const chordSquared = chordX * chordX + chordY * chordY;
     let farthest = -1;
     let farthestSquared = toleranceSquared;
     for (let i = start + 1; i < end; i++) {
-      const x = points[i][0] - startX;
-      const y = points[i][1] - startY;
+      const x = xy[i * 2] - startX;
+      const y = xy[i * 2 + 1] - startY;
       // An outline can close on itself, leaving no chord to project onto.
       const along =
         chordSquared > 0
@@ -593,10 +607,9 @@ function simplifyPolyline(points: number[][], tolerance: number): number[][] {
     }
     if (farthest >= 0) {
       keep[farthest] = 1;
-      ranges.push(start, farthest, farthest, end);
+      kept += 1;
+      flatRanges.push(start, farthest, farthest, end);
     }
   }
-  const simplified = points.filter((_, i) => keep[i] === 1);
-  // Two points enclose nothing to fill, and a dot has to stay a dot.
-  return simplified.length < 3 ? points : simplified;
+  return kept;
 }
