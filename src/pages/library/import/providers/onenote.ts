@@ -1,6 +1,7 @@
 import { Logger } from '@myelin/shared/logger';
 import { OneNoteIcon } from '../brand-icons';
 import {
+  discardOneNoteScan,
   importOneNote,
   ONENOTE_DIALOG_FILTERS,
   type OneNotePreview,
@@ -28,6 +29,7 @@ export const onenoteProvider: ImportProvider = {
       rootName: oneNoteRootName(path),
       repository,
       parentId,
+      dispose: discardOneNoteScan,
 
       async scan() {
         const notebook = await scanOneNoteFile(path);

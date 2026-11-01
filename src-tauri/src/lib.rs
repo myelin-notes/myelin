@@ -122,6 +122,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::scan_onenote,
+            onenote_import::discard_onenote_scan,
             import_files::import_file_name,
             crash_reports::configure_crash_reporting,
             crash_reports::acknowledge_crash_report,

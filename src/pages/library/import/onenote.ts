@@ -41,6 +41,11 @@ export function scanOneNoteFile(path: string): Promise<OneNotePreview> {
   return invoke<OneNotePreview>('scan_onenote', { path });
 }
 
+/** Frees the notebook `scanOneNoteFile` kept for the import. */
+export function discardOneNoteScan(): void {
+  void invoke('discard_onenote_scan');
+}
+
 export async function importOneNote({
   path,
   repository,
