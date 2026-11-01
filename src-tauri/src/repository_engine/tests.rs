@@ -3084,6 +3084,29 @@ async fn native_github_sync_does_not_read_unchanged_document_contents() {
 }
 
 #[tokio::test]
+async fn sync_diagnostics_report_version_history_size() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let bytes = fixture_bytes("baseUpdate");
+    seed(&engine, "canvas", "mcanvas", bytes.clone()).await;
+    capture_version(&engine, "canvas", true).await;
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), bytes.clone())]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let trace = telemetry::SyncTrace::new();
+    trace
+        .scope(engine.cycle(github_source(), &server.endpoints))
+        .await
+        .unwrap();
+    let fields = trace.fields();
+    assert_eq!(fields["version_count"], 1);
+    assert_eq!(fields["version_bytes"], bytes.len() as u64);
+}
+
+#[tokio::test]
 async fn sync_diagnostics_include_recovered_http_retries() {
     let requests = Arc::new(AtomicUsize::new(0));
     let seen = requests.clone();

@@ -1116,6 +1116,19 @@ impl RepositoryEngine {
                 .filter(|node| node["type"] == "file")
                 .count() as u64,
         );
+        let versions = captured.snapshot.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .filter(|node| node["system"]["kind"] == "file-version");
+        let (version_count, version_bytes) = versions.fold((0u64, 0u64), |(count, bytes), node| {
+            (
+                count + 1,
+                bytes + node["system"]["byteLength"].as_u64().unwrap_or(0),
+            )
+        });
+        trace.set("version_count", version_count);
+        trace.set("version_bytes", version_bytes);
         let head_check = trace.phase("remote_check");
         let mut unchanged_head = false;
         let mut pending_drive_deletions = false;
