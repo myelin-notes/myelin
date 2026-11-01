@@ -30,7 +30,19 @@ Older app versions load references as corrupt media and show those elements blan
 
 ### Cleanup
 
-Media files are not deleted yet, so removing an element or letting its versions expire does not reclaim space. Cleanup must not delete media an offline device still references: a device can hold unsynced documents that point at a file another device considers unused, and applying that file's tombstone would destroy the only copy.
+Media that no document or version points at is removed after 30 days. Removal is an ordinary deletion: the file goes away and a tombstone stays in its sidecar.
+
+Each device times this for itself in `.native-media-unused.json`, so it causes no sync traffic. A device looks at most once a day, and only when it could know every reference: its last sync succeeded, nothing is pending, it is not in recovery, and it could read every stored document and unsaved update. An unreadable document stops cleanup entirely. It scans files rather than metadata, so a document with quarantined metadata still protects its media.
+
+A device can only see what has been synced, so another device may still need media it removes. Media therefore comes back in three ways, and always under its own ID rather than as a recovered copy:
+
+- A device applying a removal first checks its own documents. If one still points at the media, it keeps the file and publishes it again.
+- A document being uploaded holds complete media, so uploading it restores anything the remote has removed.
+- Writing the same bytes again recreates the media.
+
+The tombstone's revision is recorded as `restoredFrom`, which is how other devices accept the restore. A device that applied the removal has a dangling reference until the media returns, and its open editors show that element as broken until the document is reopened.
+
+Two gaps remain, both narrow. Older app versions apply removals without checking their documents, which is the main reason for the 30-day wait. And media could be lost if a device starts using 30-day-unused media again, uploads that document in the moment another device removes the file, and then never syncs again.
 
 ## Automatic migration
 
