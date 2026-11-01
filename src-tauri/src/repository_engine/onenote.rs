@@ -55,16 +55,15 @@ fn page_document(page: ImportedPage) -> Doc {
                         .chunks_exact(2)
                         .flat_map(|point| [point[0] + 160.0, point[1] + 80.0, 0.0])
                         .collect();
-                    push_element(
-                        &doc,
-                        0,
-                        json!({
-                            "offsetX": 0, "offsetY": 0, "scaleX": 1, "scaleY": 1,
-                            "color": stroke.color, "size": stroke.size, "hasPressure": false,
-                            "points": points
-                        }),
-                        None,
-                    );
+                    let mut props = json!({
+                        "offsetX": 0, "offsetY": 0, "scaleX": 1, "scaleY": 1,
+                        "color": stroke.color, "size": stroke.size, "hasPressure": false,
+                        "points": points
+                    });
+                    if stroke.highlighter {
+                        props["simulatePressure"] = json!(false);
+                    }
+                    push_element(&doc, 0, props, None);
                 }
             }
             ImportedElement::Image {

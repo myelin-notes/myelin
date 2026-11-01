@@ -2425,6 +2425,7 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
                                 points: vec![1.0, 2.0, 3.0, 4.0],
                                 color: "#654321".into(),
                                 size: 2.0,
+                                highlighter: false,
                             }],
                         },
                         ImportedElement::Image {
@@ -2440,6 +2441,14 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
                             width: None,
                             height: None,
                             data: vec![1, 2, 3],
+                        },
+                        ImportedElement::Ink {
+                            strokes: vec![ImportedStroke {
+                                points: vec![5.0, 6.0],
+                                color: "rgba(255,255,0,0.3)".into(),
+                                size: 18.0,
+                                highlighter: true,
+                            }],
                         },
                     ],
                 },
@@ -2509,7 +2518,7 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
     let doc = reopened.doc(&id).unwrap();
     let txn = doc.transact();
     let elements = txn.get_array("elements").unwrap();
-    assert_eq!(elements.len(&txn), 3);
+    assert_eq!(elements.len(&txn), 4);
     let maps = elements
         .iter(&txn)
         .map(|value| match value {
@@ -2532,6 +2541,15 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
     assert_eq!(
         maps[1].get(&txn, "hasPressure"),
         Some(Out::Any(Any::Bool(false)))
+    );
+    assert_eq!(maps[1].get(&txn, "simulatePressure"), None);
+    assert_eq!(
+        maps[3].get(&txn, "simulatePressure"),
+        Some(Out::Any(Any::Bool(false)))
+    );
+    assert_eq!(
+        maps[3].get(&txn, "color"),
+        Some(Out::Any(Any::from("rgba(255,255,0,0.3)")))
     );
     assert_eq!(
         maps[2].get(&txn, "imageData"),
