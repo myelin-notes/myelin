@@ -1,5 +1,6 @@
 mod document;
 mod flags;
+mod media;
 mod onenote;
 mod references;
 mod remote;
