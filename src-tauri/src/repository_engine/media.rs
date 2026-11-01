@@ -13,7 +13,7 @@ use yrs::{
 
 const FILE_TYPE: &str = "media";
 // Below this, a separate file costs more than the copies it saves.
-const MIN_BYTES: usize = if cfg!(test) { 1024 } else { 64 * 1024 };
+pub(super) const MIN_BYTES: usize = if cfg!(test) { 1024 } else { 64 * 1024 };
 const REFERENCE_PREFIX: &[u8] = b"\0myelin-media:";
 const HASH_LENGTH: usize = 64;
 

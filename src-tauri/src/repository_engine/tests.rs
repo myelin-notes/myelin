@@ -3484,3 +3484,67 @@ async fn restoring_a_version_returns_its_media_after_the_document_moves_on() {
     );
     assert!(stored_file(&directory, "drawing.myelin").len() < 2048);
 }
+
+#[tokio::test]
+async fn documents_and_versions_written_before_media_storage_are_rewritten_and_uploaded() {
+    let inline = media_fixture("document");
+    let mut version = node("old-version", "mcanvas");
+    version["system"] = json!({
+        "kind": "file-version", "sourceFileId": "drawing", "sourceFileType": "mcanvas",
+        "sourceName": "drawing", "sourceRevision": "old", "capturedAt": 1,
+        "byteLength": inline.len()
+    });
+    let mut manifest = manifest_with("drawing", "mcanvas");
+    manifest["nodes"]["old-version"] = version;
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("drawing".into(), inline.clone()),
+            ("old-version".into(), inline.clone()),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(stored_file(&directory, "drawing.myelin"), inline);
+    let before = read(&engine, "drawing").await;
+
+    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
+        .await
+        .unwrap();
+    for name in ["drawing.myelin", "old-version.myelin"] {
+        assert!(stored_file(&directory, name).len() < 2048, "{name}");
+    }
+    assert_eq!(read(&engine, "drawing").await, before);
+    assert_eq!(read(&engine, "old-version").await, before);
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert!(remote.files["drawing"].len() < 2048);
+        assert!(remote.files["old-version"].len() < 2048);
+        assert_eq!(
+            remote
+                .files
+                .values()
+                .filter(|bytes| bytes.len() == 2048)
+                .count(),
+            1
+        );
+    }
+
+    // Finding nothing left to do must not queue another upload.
+    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
