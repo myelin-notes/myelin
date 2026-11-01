@@ -1,6 +1,7 @@
 import { Logger } from '@myelin/shared/logger';
 import { getPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
+import { withTimeout } from '../utils/with-timeout';
 
 export interface ThumbnailProducer {
   render(
@@ -19,6 +20,8 @@ export interface ThumbnailRegenerationOptions {
 
 const MAX_SIZE = 600;
 const SCHEDULED_DEBOUNCE_MS = 30_000;
+// Note teardown waits on renders, so one that never settles would pin the canvas and session.
+const RENDER_TIMEOUT_MS = 10_000;
 const THUMBNAILS_DIR = 'Thumbnails';
 
 function cachePath(nodeId: VFSNodeId): string {
@@ -99,7 +102,7 @@ export async function ensureThumbnail(
   }
 }
 
-/** Callers must keep the note's elements alive until this resolves. */
+/** Callers must keep the note's elements alive until this resolves, at most `RENDER_TIMEOUT_MS`. */
 export async function settleThumbnail(nodeId: VFSNodeId): Promise<void> {
   await inflight.get(nodeId);
 }
@@ -177,7 +180,10 @@ async function runGenerate(
 
   const task = (async () => {
     try {
-      const blob = await producer.render(MAX_SIZE, { reason });
+      const blob = await withTimeout(
+        producer.render(MAX_SIZE, { reason }),
+        RENDER_TIMEOUT_MS,
+      );
       if (blob === null) {
         return;
       }

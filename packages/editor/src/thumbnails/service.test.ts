@@ -7,6 +7,7 @@ import {
   regenerateThumbnailNow,
   registerThumbnailProducer,
   requestThumbnailRegeneration,
+  settleThumbnail,
 } from './service';
 
 const writeArtifact = vi.fn(async () => {});
@@ -115,8 +116,8 @@ describe('thumbnail service', () => {
 
     await vi.waitFor(() => {
       expect(render).toHaveBeenCalledTimes(2);
+      expect(writeArtifact).toHaveBeenCalledTimes(2);
     });
-    expect(writeArtifact).toHaveBeenCalledTimes(2);
   });
 
   it('does not remove a newer producer after an old unregister flush finishes', async () => {
@@ -185,6 +186,40 @@ describe('thumbnail service', () => {
     await vi.advanceTimersByTimeAsync(3_000);
 
     expect(render).not.toHaveBeenCalled();
+
+    unregister();
+  });
+
+  it('gives up on a stuck render so teardown and later renders can proceed', async () => {
+    const nodeId = 'thumbnail-stuck-render' as VFSNodeId;
+    let finishStuckRender!: (blob: Blob) => void;
+    const render = vi
+      .fn<() => Promise<Blob>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Blob>((resolve) => {
+            finishStuckRender = resolve;
+          }),
+      )
+      .mockResolvedValue(new Blob(['fresh']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    const stuck = regenerateThumbnailNow(nodeId);
+    const settled = settleThumbnail(nodeId);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([stuck, settled]);
+
+    expect(writeArtifact).not.toHaveBeenCalled();
+
+    await regenerateThumbnailNow(nodeId);
+
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
+
+    // A partial image would never be replaced, so a late result has to stay dropped.
+    finishStuckRender(new Blob(['late']));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
 
     unregister();
   });
