@@ -9,6 +9,7 @@ import type { CanvasViewport } from './canvas-viewport';
 import type { DrawableElement } from './elements/drawable-element';
 import { isBackgroundElement } from './elements/element-type';
 import type { Vector2 } from './geometry';
+import { InkTileCache } from './ink-tile-cache';
 import type { PlacementController } from './placement-controller';
 import type { Ruler } from './ruler';
 import type { SelectionController } from './selection-controller';
@@ -78,6 +79,7 @@ export class CanvasRenderer {
   // clearRect invalidates a full-viewport layer as thoroughly as drawing does, so an
   // unconditional clear re-uploads it for a transparent frame. Half of ~11ms/frame on iPad.
   private overlayHasContent = false;
+  private readonly inkTiles = new InkTileCache();
 
   public constructor(
     foregroundCtx: CanvasRenderingContext2D,
@@ -96,6 +98,7 @@ export class CanvasRenderer {
       // The theme grid color is read at draw time.
       this.bgDrawnKey = '';
       // Adaptive ink resolves against the theme.
+      this.inkTiles.clear();
       this.requestRedraw();
     });
     // Pane width also changes on sidebar toggle/resize and pane splits, not just window resize.
@@ -165,18 +168,36 @@ export class CanvasRenderer {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.ctx.clearRect(0, 0, logicalW, logicalH);
 
+    const tiles = this.inkTiles.beginFrame(
+      elements,
+      zoom,
+      offset,
+      dpr,
+      this.canvas.width,
+      this.canvas.height,
+    );
+    const drawOffset = tiles?.offset ?? offset;
     this.ctx.save();
     this.ctx.scale(zoom, zoom);
-    this.ctx.translate(offset.x, offset.y);
+    this.ctx.translate(drawOffset.x, drawOffset.y);
 
     const viewRect = viewport.getWorldRect();
     const cullMargin = cullMarginWorld(zoom);
     const visibleElements: DrawableElement[] = [];
-    for (const element of elements) {
+    let tilesDrawn = false;
+    for (let index = 0; index < elements.length; index++) {
+      const element = elements[index];
       if (!element.intersectsWorldRect(viewRect, cullMargin)) {
         continue;
       }
       visibleElements.push(element);
+      if (tiles?.ready && index >= tiles.start && index < tiles.end) {
+        if (!tilesDrawn) {
+          this.inkTiles.blit(this.ctx);
+          tilesDrawn = true;
+        }
+        continue;
+      }
       element.draw(this.ctx, deltaTime);
     }
     // Cursor: compute fresh from screen position so it's correct even if
@@ -218,7 +239,7 @@ export class CanvasRenderer {
       reorderDomOverlay(domOverlayHost, this.canvas, elements, visibleElements);
     }
 
-    return selection.isOverlayAnimating;
+    return selection.isOverlayAnimating || this.inkTiles.pending;
   }
 
   private drawBackground(viewport: CanvasViewport): void {
@@ -306,6 +327,7 @@ export class CanvasRenderer {
     this.unsubTheme = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.inkTiles.destroy();
   }
 
   // The canvas is stretched to its pane by CSS, so clientWidth/Height is the visible viewport
