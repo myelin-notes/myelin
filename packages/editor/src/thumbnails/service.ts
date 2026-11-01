@@ -85,6 +85,25 @@ export function requestThumbnailRegeneration(
   debounceTimers.set(nodeId, timer);
 }
 
+/**
+ * The cache is local and only edits write to it, so notes that were imported, synced in, or opened
+ * after a cache wipe have no thumbnail until this schedules one.
+ */
+export async function ensureThumbnail(
+  nodeId: VFSNodeId,
+  options: ThumbnailRegenerationOptions = {},
+): Promise<void> {
+  const url = await getPlatform().artifactCache.getUrl(cachePath(nodeId));
+  if (url === null) {
+    requestThumbnailRegeneration(nodeId, options);
+  }
+}
+
+/** Callers must keep the note's elements alive until this resolves. */
+export async function settleThumbnail(nodeId: VFSNodeId): Promise<void> {
+  await inflight.get(nodeId);
+}
+
 export async function regenerateThumbnailNow(nodeId: VFSNodeId): Promise<void> {
   const timer = debounceTimers.get(nodeId);
   if (timer !== undefined) {

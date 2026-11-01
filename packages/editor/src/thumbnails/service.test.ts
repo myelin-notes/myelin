@@ -3,6 +3,7 @@ import { setPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
 import { createFakePlatform } from '../test/fake-platform';
 import {
+  ensureThumbnail,
   regenerateThumbnailNow,
   registerThumbnailProducer,
   requestThumbnailRegeneration,
@@ -149,6 +150,43 @@ describe('thumbnail service', () => {
     expect(newRender).toHaveBeenCalledTimes(2);
 
     unregisterNew();
+  });
+
+  it('renders a note with no cached thumbnail, even if it closes before the delay', async () => {
+    const nodeId = 'thumbnail-missing' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    await ensureThumbnail(nodeId, { delayMs: 3_000 });
+    expect(render).not.toHaveBeenCalled();
+
+    unregister();
+    await vi.waitFor(() => {
+      expect(writeArtifact).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('leaves an existing thumbnail alone', async () => {
+    const nodeId = 'thumbnail-present' as VFSNodeId;
+    setPlatform(
+      createFakePlatform({
+        artifactCache: {
+          getUrl: async () => 'asset://thumbnail.png',
+          read: async () => null,
+          write: writeArtifact,
+          remove: async () => {},
+        },
+      }),
+    );
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    await ensureThumbnail(nodeId, { delayMs: 3_000 });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(render).not.toHaveBeenCalled();
+
+    unregister();
   });
 
   it('does not render on unregister without a pending regeneration', () => {

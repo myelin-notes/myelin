@@ -19,6 +19,7 @@ import {
 } from '@myelin/editor/page-frame/note-link/resolution';
 import { buildRenamePageFrameLinkReferencesTransaction } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { schema as pageFrameSchema } from '@myelin/editor/page-frame/pm/schema';
+import { settleThumbnail } from '@myelin/editor/thumbnails';
 import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -291,6 +292,8 @@ export class CanvasSessionController {
       activeSession.unsubscribeViewport();
       activeSession.unsubscribeReplacement();
       await flushViewportStates();
+      // Destroying mid-render drops PDF pages from the thumbnail, and nothing replaces that file.
+      await settleThumbnail(activeSession.noteSession.id);
       activeSession.drawableCanvas.destroy();
 
       if (

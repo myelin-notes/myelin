@@ -9,8 +9,8 @@ import type {
 } from '@/lib/sync';
 import { CanvasSessionController } from './use-session-controller';
 
-const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
-  () => ({
+const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock, settleThumbnail } =
+  vi.hoisted(() => ({
     drawableCanvasCtor: vi.fn().mockImplementation(function DrawableCanvas() {
       return {
         elements: [],
@@ -29,12 +29,14 @@ const { drawableCanvasCtor, resolveNoteLinkRefByTitleMock } = vi.hoisted(
       };
     }),
     resolveNoteLinkRefByTitleMock: vi.fn(),
-  }),
-);
+    settleThumbnail: vi.fn(async () => {}),
+  }));
 
 vi.mock('@myelin/editor/drawable-canvas', () => ({
   DrawableCanvas: drawableCanvasCtor,
 }));
+
+vi.mock('@myelin/editor/thumbnails', () => ({ settleThumbnail }));
 
 vi.mock('@myelin/editor/page-frame/note-link/resolution', () => ({
   resolveNoteLinkRefByTitle: resolveNoteLinkRefByTitleMock,
@@ -123,6 +125,38 @@ describe('CanvasSessionController', () => {
     expect(first.close).toHaveBeenCalledOnce();
     expect(controller.getSnapshot().ready).toBe(true);
     await controller.dispose();
+  });
+
+  it('keeps the canvas alive until an in-flight thumbnail render settles', async () => {
+    const session = createSession('note');
+    const render = createDeferred<void>();
+    settleThumbnail.mockReturnValueOnce(render.promise);
+    const repository = {
+      kind: 'local',
+      openSession: vi.fn().mockResolvedValue(session),
+      getNode: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+    await controller.open('note');
+    const canvas = drawableCanvasCtor.mock.results.at(-1)?.value;
+
+    const disposed = controller.dispose();
+    await vi.waitFor(() =>
+      expect(settleThumbnail).toHaveBeenCalledWith('note'),
+    );
+    expect(canvas.destroy).not.toHaveBeenCalled();
+
+    render.resolve();
+    await disposed;
+    expect(canvas.destroy).toHaveBeenCalledOnce();
   });
 
   it('restores the selected tool when switching notes in a pane', async () => {
