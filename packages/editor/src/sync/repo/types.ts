@@ -60,6 +60,7 @@ export type VFSNode = VFSFileNode | VFSFolderNode;
 
 export type VFSSystemMetadata =
   | { kind: 'version-history-root' }
+  | { kind: 'media'; byteLength: number }
   | {
       kind: 'file-version';
       sourceFileId: VFSNodeId;

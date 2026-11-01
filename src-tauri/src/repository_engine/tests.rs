@@ -1777,14 +1777,20 @@ async fn native_drive_pull_upload_retry_reopen_and_idle_metadata_check_preserve_
     assert!(reopened.store.lock().unwrap().outbox.is_empty());
     assert_document(&read(&reopened, "canvas").await);
     let remote = state.lock().unwrap();
-    assert_document(
-        &remote
+    let canvas = &remote
+        .files
+        .iter()
+        .find(|file| file.id == "canvas-entry")
+        .unwrap()
+        .bytes;
+    assert!(canvas.len() < 8192);
+    assert_document(&media::inline(canvas, |hash| {
+        remote
             .files
             .iter()
-            .find(|file| file.id == "canvas-entry")
-            .unwrap()
-            .bytes,
-    );
+            .find(|file| file.name == format!("{hash}.media"))
+            .map(|file| file.bytes.clone())
+    }));
     let manifest = remote.manifest();
     assert_eq!(
         manifest["linksBySource"]["canvas"],
@@ -1909,7 +1915,14 @@ async fn native_github_upload_retains_newer_deltas_retries_and_reuses_a_single_r
     assert!(fields["http_request_count"].as_u64().unwrap() > 0);
     assert!(!fields.contains_key("last_failed_stage"));
     assert!(engine.store.lock().unwrap().outbox.is_empty());
-    assert_document(&state.lock().unwrap().files["canvas"]);
+    {
+        let remote = state.lock().unwrap();
+        // The document arrived holding its media inline; the upload moved it out.
+        assert!(remote.files["canvas"].len() < 8192);
+        assert_document(&media::inline(&remote.files["canvas"], |hash| {
+            remote.files.get(hash).cloned()
+        }));
+    }
     let basis_root = engine
         .cache_dir
         .join("repository-bases")
@@ -3208,4 +3221,193 @@ async fn initial_sync_installs_files_before_a_metadata_only_recovery_journal() {
     assert!(reopened.store.lock().unwrap().outbox.is_empty());
     seed(&reopened, "picture", "png", b"edited".to_vec()).await;
     assert_eq!(fs::read(cached.join("files/picture.png")).unwrap(), picture);
+}
+
+fn media_fixture(key: &str) -> Vec<u8> {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/yjs-media.json")).unwrap();
+    STANDARD.decode(fixture[key].as_str().unwrap()).unwrap()
+}
+
+fn media_value(document: &[u8], index: u32, key: &str) -> Vec<u8> {
+    let doc = document::decode(document).unwrap();
+    let txn = doc.transact();
+    let Some(Out::YMap(element)) = txn.get_array("elements").unwrap().get(&txn, index) else {
+        panic!("missing element");
+    };
+    let Some(Out::Any(Any::Buffer(bytes))) = element.get(&txn, key) else {
+        panic!("missing bytes");
+    };
+    bytes.to_vec()
+}
+
+fn stored_file(directory: &TestDirectory, name: &str) -> Vec<u8> {
+    fs::read(directory.0.join("data/files").join(name)).unwrap()
+}
+
+async fn update_media_document(engine: &RepositoryEngine, update: &[u8]) {
+    engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "drawing".into(),
+            update_base64: STANDARD.encode(update),
+            origin: "local".into(),
+            generation: None,
+            source_session: None,
+        })
+        .await
+        .unwrap();
+}
+
+// A second device must receive whole documents, on first download and in the updates sent to an
+// open editor, although the remote holds only references.
+async fn second_device_receives_media(source: RepositorySource, endpoints: &RemoteEndpoints) {
+    let first_directory = TestDirectory::new();
+    let first = first_directory.engine(true);
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    seed(&first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+
+    let second_directory = TestDirectory::new();
+    let second = second_directory.engine(true);
+    second.cycle(source.clone(), endpoints).await.unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    let downloaded = read(&second, "drawing").await;
+    assert_eq!(media_value(&downloaded, 0, "imageData").len(), 2048);
+    assert_eq!(media_value(&downloaded, 1, "pdfData").len(), 2048);
+    assert!(stored_file(&second_directory, "drawing.myelin").len() < 2048);
+
+    second
+        .operate(RepositoryOperation::Subscribe {
+            node_id: "drawing".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    let (opened, _) = second
+        .operate(RepositoryOperation::Document {
+            node_id: "drawing".into(),
+            state_vector_base64: None,
+        })
+        .await
+        .unwrap();
+    let editor = STANDARD
+        .decode(opened["updateBase64"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(media_value(&editor, 0, "imageData").len(), 2048);
+
+    update_media_document(&first, &media_fixture("edit")).await;
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    let changes = second.cycle(source, endpoints).await.unwrap();
+    let delta = &changes
+        .documents
+        .iter()
+        .find(|change| change.node_id == "drawing")
+        .unwrap()
+        .bytes;
+    let edited = document::merge(&editor, delta).unwrap();
+    assert_eq!(media_value(&edited, 1, "pdfData").len(), 3000);
+    assert_eq!(
+        media_value(&read(&second, "drawing").await, 1, "pdfData").len(),
+        3000
+    );
+}
+
+#[tokio::test]
+async fn github_stores_each_media_file_once_and_a_second_device_receives_it() {
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), fixture_bytes("baseUpdate"))]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    second_device_receives_media(github_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote.files["drawing"].len() < 2048);
+    let mut media = remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .filter(|node| node["system"]["kind"] == "media")
+        .map(|node| remote.files[node["id"].as_str().unwrap()].len())
+        .collect::<Vec<_>>();
+    media.sort();
+    // The image and PDF first shared one file; the edit's replacement PDF is the other.
+    assert_eq!(media, [2048, 3000]);
+}
+
+#[tokio::test]
+async fn google_drive_stores_each_media_file_once_and_a_second_device_receives_it() {
+    let state = Arc::new(Mutex::new(DriveFixture::new()));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    second_device_receives_media(drive_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    let drawing = remote
+        .files
+        .iter()
+        .find(|file| file.name == "drawing.myelin")
+        .unwrap();
+    assert!(drawing.bytes.len() < 2048);
+    let mut media = remote
+        .files
+        .iter()
+        .filter(|file| file.name.ends_with(".media"))
+        .map(|file| file.bytes.len())
+        .collect::<Vec<_>>();
+    media.sort();
+    assert_eq!(media, [2048, 3000]);
+}
+
+#[tokio::test]
+async fn a_document_whose_media_is_missing_stays_usable_and_recovers_when_it_arrives() {
+    let original = media_fixture("document");
+    let extracted = media::extract(&original);
+    let (hash, bytes) = extracted.media[0].clone();
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["drawing"] = node("drawing", "mcanvas");
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), fixture_bytes("baseUpdate")),
+            ("drawing".into(), extracted.document.to_vec()),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    // The reference stands in for the bytes, and an edit neither fails nor drops it.
+    let missing = read(&engine, "drawing").await;
+    assert_eq!(media_value(&missing, 0, "imageData").len(), 78);
+    update_media_document(&engine, &media_fixture("edit")).await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(
+        media_value(&state.lock().unwrap().files["drawing"], 0, "imageData").len(),
+        78
+    );
+
+    {
+        let mut remote = state.lock().unwrap();
+        remote.manifest["nodes"][&hash] = media::node(&hash, bytes.len());
+        remote.files.insert(hash.clone(), bytes.to_vec());
+        remote.head = "f".repeat(40);
+    }
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    engine.store.lock().unwrap().documents.clear();
+    let restored = read(&engine, "drawing").await;
+    assert_eq!(media_value(&restored, 0, "imageData").len(), 2048);
+    assert_eq!(media_value(&restored, 1, "pdfData").len(), 3000);
 }

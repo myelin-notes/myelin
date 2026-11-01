@@ -1,4 +1,4 @@
-use super::document;
+use super::{document, media};
 use crate::repository_bootstrap::{reject_symlink, sync_directory, valid_component};
 use crate::repository_metadata as metadata;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
@@ -419,6 +420,9 @@ impl Store {
             Err(error) => return Err(io(error)),
         };
         if node["fileType"] == "mcanvas" {
+            if let Cow::Owned(inlined) = media::inline(&bytes, |hash| self.read_media(hash)) {
+                bytes = inlined;
+            }
             let id = node["id"].as_str().ok_or("Invalid repository node ID")?;
             let directory = self.root.join(".native-updates").join(id);
             reject_symlink(&self.root.join(".native-updates"))?;
@@ -440,6 +444,15 @@ impl Store {
             }
         }
         Ok(bytes)
+    }
+
+    pub fn read_media(&self, hash: &str) -> Option<Vec<u8>> {
+        let path = self
+            .root
+            .join("files")
+            .join(file_name(&media::node(hash, 0)).ok()?);
+        reject_symlink(&path).ok()?;
+        fs::read(path).ok()
     }
 
     pub fn doc(&mut self, id: &str) -> Result<&Doc, String> {
