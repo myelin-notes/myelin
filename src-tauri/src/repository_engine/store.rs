@@ -455,6 +455,37 @@ impl Store {
         fs::read(path).ok()
     }
 
+    // Media reaches disk before the journal that references it, so a crash leaves only an
+    // unreferenced file that the next write reuses.
+    fn extract_media(&mut self, files: &mut [FileWrite]) -> Result<(), String> {
+        for file in files {
+            let (true, Some(encoded)) = (file.name.ends_with(".myelin"), &file.bytes) else {
+                continue;
+            };
+            let bytes = STANDARD
+                .decode(encoded)
+                .map_err(|_| "Invalid repository file bytes")?;
+            let extracted = media::extract(&bytes);
+            if extracted.media.is_empty() {
+                continue;
+            }
+            for (hash, bytes) in &extracted.media {
+                let node = media::node(hash, bytes.len());
+                let path = self.root.join("files").join(file_name(&node)?);
+                if !path.exists() {
+                    atomic_write(&path, bytes)?;
+                }
+                if self.manifest["nodes"][hash].is_null() {
+                    self.manifest["nodes"][hash] = node;
+                    self.queue("upsert-manifest-node", Some(hash), json!({}));
+                    self.queue("push-note", Some(hash), json!({"baseFileRevision": null}));
+                }
+            }
+            file.bytes = Some(STANDARD.encode(&extracted.document));
+        }
+        Ok(())
+    }
+
     pub fn doc(&mut self, id: &str) -> Result<&Doc, String> {
         if !self.documents.contains_key(id) {
             let node = &self.manifest["nodes"][id];
@@ -566,10 +597,11 @@ impl Store {
 
     fn commit_journal(
         &mut self,
-        files: Vec<FileWrite>,
+        mut files: Vec<FileWrite>,
         updates: Vec<DeltaWrite>,
     ) -> Result<(), String> {
         self.transaction_active = true;
+        self.extract_media(&mut files)?;
         let dirty: Vec<_> = self.dirty_nodes.iter().cloned().collect();
         let mut records = HashMap::new();
         for id in &dirty {

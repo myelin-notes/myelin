@@ -110,6 +110,11 @@ async fn read(engine: &RepositoryEngine, id: &str) -> Vec<u8> {
         .decode(saved["bytesBase64"].as_str().unwrap())
         .unwrap()
 }
+fn stored_document(directory: &TestDirectory) -> Vec<u8> {
+    let files = directory.0.join("data/files");
+    let bytes = fs::read(files.join("canvas.myelin")).unwrap();
+    media::inline(&bytes, |hash| fs::read(files.join(format!("{hash}.media"))).ok()).into_owned()
+}
 fn assert_document(bytes: &[u8]) {
     let expected = fixture()["expected"].clone();
     let doc = document::decode(bytes).unwrap();
@@ -473,7 +478,7 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
     drop(engine);
     let reopened = directory.engine(true);
     assert_document(&read(&reopened, "canvas").await);
-    assert_document(&fs::read(directory.0.join("data/files/canvas.myelin")).unwrap());
+    assert_document(&stored_document(&directory));
     assert!(!directory.0.join("data/.native-updates/canvas").exists());
     assert_eq!(
         reopened
@@ -482,7 +487,7 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
             .unwrap()
             .outbox
             .iter()
-            .filter(|op| op["kind"] == "push-note")
+            .filter(|op| op["kind"] == "push-note" && op["nodeId"] == "canvas")
             .count(),
         1
     );
@@ -688,7 +693,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     let checkpoint = engine.checkpoint_pending().await.unwrap();
     assert_eq!(checkpoint.changed, vec!["canvas"]);
     assert!(!checkpoint.wake_remote);
-    assert_document(&fs::read(directory.0.join("data/files/canvas.myelin")).unwrap());
+    assert_document(&stored_document(&directory));
     let (_, replacement) = engine
         .operate(RepositoryOperation::WriteFile {
             node: file,
@@ -3410,4 +3415,72 @@ async fn a_document_whose_media_is_missing_stays_usable_and_recovers_when_it_arr
     let restored = read(&engine, "drawing").await;
     assert_eq!(media_value(&restored, 0, "imageData").len(), 2048);
     assert_eq!(media_value(&restored, 1, "pdfData").len(), 3000);
+}
+
+#[tokio::test]
+async fn versions_and_documents_share_one_stored_copy_of_their_media() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let whole = read(&engine, "drawing").await;
+    let version = capture_version(&engine, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+
+    let media = fs::read_dir(directory.0.join("data/files"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|kind| kind == "media"))
+        .collect::<Vec<_>>();
+    assert_eq!(media.len(), 1);
+    assert_eq!(fs::read(&media[0]).unwrap().len(), 2048);
+    assert!(stored_file(&directory, "drawing.myelin").len() < 2048);
+    assert!(stored_file(&directory, &format!("{version_id}.myelin")).len() < 2048);
+
+    assert_eq!(version["byteLength"], whole.len());
+    assert_eq!(read(&engine, version_id).await, whole);
+    drop(engine);
+    let reopened = directory.engine(false);
+    assert_eq!(read(&reopened, "drawing").await, whole);
+    assert_eq!(read(&reopened, version_id).await, whole);
+
+    let manifest = reopened.store.lock().unwrap().manifest.clone();
+    let node = manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|node| node["system"]["kind"] == "media")
+        .unwrap();
+    assert_eq!(node["system"]["byteLength"], 2048);
+    assert_eq!(
+        media[0].file_name().unwrap().to_string_lossy(),
+        format!("{}.media", node["id"].as_str().unwrap())
+    );
+}
+
+#[tokio::test]
+async fn restoring_a_version_returns_its_media_after_the_document_moves_on() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let original = read(&engine, "drawing").await;
+    let version = capture_version(&engine, "drawing", true).await;
+    update_media_document(&engine, &media_fixture("edit")).await;
+    assert_eq!(
+        media_value(&read(&engine, "drawing").await, 1, "pdfData").len(),
+        3000
+    );
+
+    engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "drawing".into(),
+            version_id: version["id"].as_str().unwrap().into(),
+        })
+        .await
+        .unwrap();
+    let restored = read(&engine, "drawing").await;
+    assert_eq!(
+        media_value(&restored, 1, "pdfData"),
+        media_value(&original, 1, "pdfData")
+    );
+    assert!(stored_file(&directory, "drawing.myelin").len() < 2048);
 }
