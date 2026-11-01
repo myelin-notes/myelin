@@ -42,6 +42,12 @@ export class StrokeElement extends AnchorableElement {
 
   /** Wall-clock of the last Yjs flush, for throttling live writes. */
   private lastFlush: number = 0;
+  private live = false;
+
+  /** Receiving samples from the local pen, from the first until {@link commit}. */
+  public get isLive(): boolean {
+    return this.live;
+  }
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
@@ -165,6 +171,7 @@ export class StrokeElement extends AnchorableElement {
   }
 
   public addPoint(x: number, y: number, pressure: number | undefined) {
+    this.live = true;
     const isFirst = this.points.length === 0;
     this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
@@ -209,6 +216,7 @@ export class StrokeElement extends AnchorableElement {
 
   /** Persist the full point buffer to Yjs. Called when the stroke is finished. */
   public commit(): void {
+    this.live = false;
     this.flushPoints();
   }
 
@@ -341,13 +349,17 @@ export class StrokeElement extends AnchorableElement {
     if (this.points.length < 3) {
       return;
     }
+    ctx.fillStyle = resolveInkColor(this.style.color);
+    ctx.fill(this.paintPath);
+  }
+
+  /** Replaced whenever the shape changes, so its identity shows a cached paint is stale. */
+  public get paintPath(): Path2D {
     if (this.dirty) {
       // Unsimplified: the kept points change as the tip moves, which would make live ink wobble.
       this.cachePath(this.strokeOutline());
     }
-
-    ctx.fillStyle = resolveInkColor(this.style.color);
-    ctx.fill(this.cachedPath);
+    return this.cachedPath;
   }
 
   // The outline is only needed to build the Path2D; it is not retained.
