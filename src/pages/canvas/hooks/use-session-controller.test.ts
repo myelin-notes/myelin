@@ -2,6 +2,7 @@ import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { CanvasUiServices } from '@myelin/editor/elements/canvas-element-context';
+import { Logger } from '@myelin/shared/logger';
 import type {
   NativeRepository,
   NoteSessionStatus,
@@ -157,6 +158,44 @@ describe('CanvasSessionController', () => {
     render.resolve();
     await disposed;
     expect(canvas.destroy).toHaveBeenCalledOnce();
+  });
+
+  it('closes the session and opens the next note when destroying the canvas throws', async () => {
+    const logged = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    const first = createSession('first');
+    const second = createSession('second');
+    const repository = {
+      kind: 'local',
+      openSession: vi
+        .fn()
+        .mockResolvedValueOnce(first)
+        .mockResolvedValueOnce(second),
+      getNode: vi.fn().mockResolvedValue(undefined),
+    };
+    const controller = new CanvasSessionController(
+      repository as unknown as ControllerRepository,
+      { current: {} as HTMLCanvasElement },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: null },
+      { current: [] },
+    );
+    await controller.open('first');
+    drawableCanvasCtor.mock.results
+      .at(-1)
+      ?.value.destroy.mockImplementation(() => {
+        throw new Error('destroy failed');
+      });
+
+    await controller.open('second');
+
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot().noteSession).toBe(second);
+    await controller.dispose();
+    logged.mockRestore();
   });
 
   it('restores the selected tool when switching notes in a pane', async () => {
