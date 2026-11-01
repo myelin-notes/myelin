@@ -350,6 +350,8 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
     ctx.fillStyle = resolveInkColor(this.style.color);
+    // One fill per stroke on purpose. Merging same-colored strokes into one Path2D took a dense note
+    // from 47 to 16 fps in WKWebView, and saves under 1ms a frame on simplified outlines.
     ctx.fill(this.paintPath);
   }
 
