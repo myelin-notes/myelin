@@ -56,13 +56,13 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_DEV } from '@/lib/env';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import type { TabId } from '@/lib/tabs/types';
 import { useCanvasStyle } from '@/lib/use-canvas-style';
-import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CameraCapture } from './components/camera-capture';
@@ -94,6 +94,8 @@ const logger = new Logger('CanvasView');
 // The wheel's rings sit at fixed offsets outside this radius, so the default 100 spans 478px —
 // wider than any phone. 52 brings the outer ring to 382px, clearing a 390px portrait screen.
 const COMPACT_WHEEL_RADIUS = 52;
+// Not just phones: a tablet in split screen or a small desktop window can't fit the full wheel either.
+const COMPACT_WHEEL_QUERY = '(max-width: 519px), (max-height: 519px)';
 
 interface CanvasViewProps {
   id: VFSNodeId;
@@ -145,6 +147,7 @@ function CanvasViewInner({
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
   useVisibleCanvasSize(canvasRootRef);
+  const compactWheel = useMediaQuery(COMPACT_WHEEL_QUERY);
   const toolState = useToolState(drawableCanvasRef);
   usePencilGestures({
     drawableCanvasRef,
@@ -799,7 +802,7 @@ function CanvasViewInner({
       >
         <WheelPicker
           ref={wheelRef}
-          radius={IS_PHONE_BUILD ? COMPACT_WHEEL_RADIUS : 100}
+          radius={compactWheel ? COMPACT_WHEEL_RADIUS : 100}
           items={toolState.wheelItems}
         >
           {wheelCenterIcon}
