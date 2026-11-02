@@ -182,6 +182,80 @@ async fn github_server(archive: Vec<u8>) -> TestServer {
     .await
 }
 
+// Serves the branch, then the tarball in three parts with `pause` between them; `None` stalls after
+// the first part.
+async fn slow_github_endpoints(pause: Option<std::time::Duration>) -> download::RemoteEndpoints {
+    let tarball = archive(vec![
+        ("manifest.json", serde_json::to_vec(&manifest()).unwrap()),
+        ("files/canvas.myelin", vec![7; 150_000]),
+        ("files/version.pdf", b"pdf".to_vec()),
+    ]);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let tarball = tarball.clone();
+            tokio::spawn(async move {
+                let mut buffer = [0; 4096];
+                let count = socket.read(&mut buffer).await.unwrap();
+                let slow = String::from_utf8_lossy(&buffer[..count]).contains("/tarball/");
+                let body = if slow {
+                    tarball
+                } else {
+                    br#"{"commit":{"sha":"1111111111111111111111111111111111111111"}}"#.to_vec()
+                };
+                let header = format!(
+                    "HTTP/1.1 200 Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                );
+                socket.write_all(header.as_bytes()).await.unwrap();
+                for part in body.chunks(body.len().div_ceil(3)) {
+                    socket.write_all(part).await.unwrap();
+                    match pause {
+                        Some(pause) if slow => tokio::time::sleep(pause).await,
+                        None if slow => std::future::pending().await,
+                        _ => {}
+                    }
+                }
+            });
+        }
+    });
+    download::RemoteEndpoints {
+        github: format!("{base}/github"),
+        drive: format!("{base}/drive"),
+        drive_upload: format!("{base}/upload"),
+    }
+}
+
+#[tokio::test]
+async fn github_tarball_outlasting_the_stall_timeout_still_downloads() {
+    let directory = TestDirectory::new();
+    let stage = directory.0.join("download");
+    fs::create_dir_all(stage.join("files")).unwrap();
+    let endpoints = slow_github_endpoints(Some(std::time::Duration::from_secs(3))).await;
+    let prepared = download_repository(&stage, github_source(), &endpoints)
+        .await
+        .unwrap();
+    assert_eq!(prepared, (2, 150_003));
+}
+
+#[tokio::test]
+async fn github_tarball_that_stalls_fails_instead_of_holding_the_sync() {
+    let directory = TestDirectory::new();
+    let stage = directory.0.join("download");
+    fs::create_dir_all(stage.join("files")).unwrap();
+    let endpoints = slow_github_endpoints(None).await;
+    let error = download_repository(&stage, github_source(), &endpoints)
+        .await
+        .err()
+        .expect("a stalled tarball must fail");
+    assert_eq!(
+        error,
+        "GitHub tarball download failed while receiving content"
+    );
+}
+
 #[tokio::test]
 async fn github_downloads_one_revision_without_changing_existing_cache() {
     let directory = TestDirectory::new();
