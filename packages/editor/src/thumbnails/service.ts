@@ -150,10 +150,21 @@ export function subscribeThumbnail(
 }
 
 export async function clearAllThumbnails(): Promise<void> {
+  // A pending or running render would write its file back, and nothing else ever deletes it.
+  for (const timer of debounceTimers.values()) {
+    globalThis.clearTimeout(timer);
+  }
+  debounceTimers.clear();
+  await Promise.all(inflight.values());
   await getPlatform().artifactCache.remove(THUMBNAILS_DIR);
 }
 
 export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {
+  // Callers remove before the note's tab closes, and that close would flush a render back to disk.
+  globalThis.clearTimeout(debounceTimers.get(nodeId));
+  debounceTimers.delete(nodeId);
+  producers.delete(nodeId);
+  await settleThumbnail(nodeId);
   await getPlatform().artifactCache.remove(cachePath(nodeId));
   bumpVersion(nodeId);
   notify(nodeId);

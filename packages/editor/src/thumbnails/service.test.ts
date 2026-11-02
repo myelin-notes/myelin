@@ -3,26 +3,30 @@ import { setPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
 import { createFakePlatform } from '../test/fake-platform';
 import {
+  clearAllThumbnails,
   ensureThumbnail,
   regenerateThumbnailNow,
   registerThumbnailProducer,
+  removeThumbnail,
   requestThumbnailRegeneration,
   settleThumbnail,
 } from './service';
 
 const writeArtifact = vi.fn(async () => {});
+const removeArtifact = vi.fn(async () => {});
 
 describe('thumbnail service', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     writeArtifact.mockClear();
+    removeArtifact.mockClear();
     setPlatform(
       createFakePlatform({
         artifactCache: {
           getUrl: async () => null,
           read: async () => null,
           write: writeArtifact,
-          remove: async () => {},
+          remove: removeArtifact,
         },
       }),
     );
@@ -220,6 +224,62 @@ describe('thumbnail service', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(writeArtifact).toHaveBeenCalledTimes(1);
+
+    unregister();
+  });
+
+  it('does not write a deleted note back when its tab closes', async () => {
+    const nodeId = 'thumbnail-removed-pending' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    requestThumbnailRegeneration(nodeId);
+    await removeThumbnail(nodeId);
+    unregister();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(removeArtifact).toHaveBeenCalledWith(`Thumbnails/${nodeId}.png`);
+    expect(render).not.toHaveBeenCalled();
+    expect(writeArtifact).not.toHaveBeenCalled();
+  });
+
+  it('deletes the file after a render already writing it', async () => {
+    const nodeId = 'thumbnail-removed-inflight' as VFSNodeId;
+    let finishRender!: (blob: Blob) => void;
+    const unregister = registerThumbnailProducer(nodeId, {
+      render: () =>
+        new Promise<Blob>((resolve) => {
+          finishRender = resolve;
+        }),
+    });
+
+    const rendering = regenerateThumbnailNow(nodeId);
+    const removing = removeThumbnail(nodeId);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(removeArtifact).not.toHaveBeenCalled();
+
+    finishRender(new Blob(['thumbnail']));
+    await Promise.all([rendering, removing]);
+
+    expect(writeArtifact.mock.invocationCallOrder[0]).toBeLessThan(
+      removeArtifact.mock.invocationCallOrder[0],
+    );
+
+    unregister();
+  });
+
+  it('does not write a thumbnail back after clearing them all', async () => {
+    const nodeId = 'thumbnail-cleared-pending' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    requestThumbnailRegeneration(nodeId);
+    await clearAllThumbnails();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(removeArtifact).toHaveBeenCalledWith('Thumbnails');
+    expect(writeArtifact).not.toHaveBeenCalled();
 
     unregister();
   });
