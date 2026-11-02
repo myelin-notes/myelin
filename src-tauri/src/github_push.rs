@@ -179,7 +179,8 @@ pub(crate) fn fetch_head(
         true
     });
     let mut fetch_options = FetchOptions::new();
-    if url.starts_with("https://") {
+    // libgit2's local transport can't serve shallow fetches.
+    if url.contains("://") {
         fetch_options.depth(1);
     }
     fetch_options
@@ -217,7 +218,9 @@ pub(crate) fn fetch_head(
         std::fs::create_dir_all(repo_path.parent().ok_or("Git cache path unavailable")?)
             .map_err(|_| "Git cache unavailable")?;
         std::fs::rename(scratch.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
-        Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
+        // Not open_bare: it leaves the shallow boundary unloaded until a fetch, so a push from this
+        // clone walks to parents it doesn't have and fails with Odb/GenericError.
+        Repository::open(repo_path).map_err(|_| "Git cache unavailable")?
     };
     drop(fetching);
     trace.add("git_received_bytes", received.get() as u64);
@@ -587,6 +590,122 @@ mod tests {
         drop(root_tree);
         drop(files);
         drop(seed);
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn pushes_from_a_fresh_shallow_clone() {
+        struct Daemon(std::process::Child);
+        impl Drop for Daemon {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+
+        let root = std::env::temp_dir().join(format!(
+            "myelin-git-shallow-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let remote = Repository::init_bare(root.join("notes.git")).expect("remote repository");
+        let tree_id = remote
+            .treebuilder(None)
+            .expect("tree")
+            .write()
+            .expect("tree id");
+        let tree = remote.find_tree(tree_id).expect("tree");
+        let signature = Signature::now("Test", "test@example.invalid").expect("identity");
+        let first = remote
+            .commit(None, &signature, &signature, "first", &tree, &[])
+            .expect("first commit");
+        let first = remote.find_commit(first).expect("first commit");
+        let head = remote
+            .commit(
+                Some("refs/heads/main"),
+                &signature,
+                &signature,
+                "second",
+                &tree,
+                &[&first],
+            )
+            .expect("second commit");
+
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .expect("free port")
+            .port();
+        let exec_path = std::process::Command::new("git")
+            .arg("--exec-path")
+            .output()
+            .expect("git exec path")
+            .stdout;
+        // Not `git daemon`: killing that wrapper orphans the real server.
+        let daemon = Daemon(
+            std::process::Command::new(
+                Path::new(String::from_utf8_lossy(&exec_path).trim()).join("git-daemon"),
+            )
+            .args([
+                "--reuseaddr",
+                "--export-all",
+                "--enable=receive-pack",
+                "--listen=127.0.0.1",
+            ])
+            .arg(format!("--port={port}"))
+            .arg(format!("--base-path={}", root.display()))
+            .spawn()
+            .expect("git daemon"),
+        );
+        for _ in 0..100 {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        let stage = root.join("stage");
+        fs::create_dir_all(&stage).expect("stage directory");
+        fs::write(stage.join("0"), b"note").expect("note file");
+        let cache_path = root.join("cache.git");
+        let response = push_batch_to_url(
+            &stage,
+            &cache_path,
+            &format!("git://127.0.0.1:{port}/notes.git"),
+            GitPushRequest {
+                owner: "example".into(),
+                repo: "notes".into(),
+                branch: "main".into(),
+                token: String::new(),
+                expected_head_oid: head.to_string(),
+                message: "Sync notes".into(),
+                staging_id: "00000000-0000-0000-0000-000000000005".into(),
+                additions: vec![GitPushFile {
+                    path: "files/note.myelin".into(),
+                    index: 0,
+                }],
+                deletions: vec![],
+            },
+        )
+        .expect("push response");
+        assert!(Repository::open_bare(&cache_path)
+            .expect("cache")
+            .is_shallow());
+        assert_eq!(response.failure_reason, None);
+        assert_eq!(
+            response.commit_oid,
+            Some(
+                remote
+                    .refname_to_id("refs/heads/main")
+                    .expect("pushed head")
+                    .to_string()
+            )
+        );
+        drop(daemon);
+        drop(first);
+        drop(tree);
+        drop(remote);
         fs::remove_dir_all(root).expect("remove test directory");
     }
 

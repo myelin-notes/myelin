@@ -1963,6 +1963,29 @@ async fn github_sync_initializes_an_empty_repository_branch() {
 }
 
 #[tokio::test]
+async fn github_commit_unknown_to_remote_is_a_failed_push_not_a_failed_verification() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        crate::repository_metadata::empty_manifest(),
+        HashMap::new(),
+    )));
+    let server = TestServer::new(move |request| {
+        if request.method == "PATCH" && request.path.contains("/git/refs/heads/") {
+            return (422, b"{}".to_vec());
+        }
+        if request.path.contains("/compare/") {
+            return (404, b"{}".to_vec());
+        }
+        state.lock().unwrap().handle(request)
+    })
+    .await;
+    seed(&engine, "picture", "png", b"local".to_vec()).await;
+    let error = engine.cycle(github_source(), &server.endpoints).await.err();
+    assert_eq!(error.as_deref(), Some("GitHub branch update failed (422)"));
+}
+
+#[tokio::test]
 async fn native_raw_sync_preserves_legacy_content_bases_and_makes_conflict_copies_before_extensions(
 ) {
     let directory = TestDirectory::new();

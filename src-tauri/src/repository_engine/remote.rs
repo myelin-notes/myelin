@@ -1356,7 +1356,12 @@ async fn observed_commit(
             )?,
             None,
         )
-        .await?;
+        .await;
+    // GitHub 404s a commit it never received, which is a failed push rather than a failed check.
+    if compare.as_ref().is_err_and(|error| error.contains("(404)")) {
+        return Ok(false);
+    }
+    let compare = compare?;
     Ok(compare["status"] == "ahead" || compare["status"] == "identical")
 }
 
