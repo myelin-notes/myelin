@@ -18,6 +18,7 @@ import { toggleMark } from 'prosemirror-commands';
 import type { MarkType } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { AddColorSwatch } from '../../components/add-color-swatch';
 import { ColorSwatch } from '../../components/color-swatch';
 import { CustomColorSwatch } from '../../components/custom-color-swatch';
@@ -196,18 +197,19 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     const width = toolbar?.offsetWidth ?? 260;
     const height = toolbar?.offsetHeight ?? 40;
 
+    const visible = getVisibleViewportBounds();
     let left = rect.centerX - width / 2;
     left = Math.max(
-      EDGE_MARGIN,
-      Math.min(left, window.innerWidth - width - EDGE_MARGIN),
+      visible.left + EDGE_MARGIN,
+      Math.min(left, visible.right - width - EDGE_MARGIN),
     );
 
     const above = rect.top - height - SELECTION_GAP;
     const below = rect.bottom + SELECTION_GAP;
     const top =
-      above >= EDGE_MARGIN
+      above >= visible.top + EDGE_MARGIN
         ? above
-        : Math.min(below, window.innerHeight - height - EDGE_MARGIN);
+        : Math.min(below, visible.bottom - height - EDGE_MARGIN);
 
     const nextStyle = { left, top };
     setStyle((current) =>
@@ -339,7 +341,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   return createPortal(
     <div
       ref={ref}
-      className="fade-in-0 zoom-in-95 fixed z-50 flex animate-in items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
+      className="fade-in-0 zoom-in-95 fixed z-50 flex w-max max-w-[calc(100vw-1rem)] animate-in flex-wrap items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
       style={{
         ...style,
         border: '1px solid var(--border-ghost)',
