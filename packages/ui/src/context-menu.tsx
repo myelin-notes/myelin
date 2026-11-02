@@ -3,6 +3,7 @@
 import type * as React from 'react';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { ContextMenu as ContextMenuPrimitive } from '@base-ui/react/context-menu';
+import { getSafeCollisionPadding } from '@myelin/shared/visible-viewport';
 import { cn } from './utils';
 
 function ContextMenu({ ...props }: ContextMenuPrimitive.Root.Props) {
@@ -49,6 +50,7 @@ function ContextMenuContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
+        collisionPadding={getSafeCollisionPadding()}
       >
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-content"

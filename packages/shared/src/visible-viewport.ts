@@ -30,6 +30,17 @@ export function getSafeAreaInsets(): SafeAreaInsets {
   };
 }
 
+/** Collision padding for Base UI popups: its default 5px, measured from the system bars. */
+export function getSafeCollisionPadding(): SafeAreaInsets {
+  const { top, right, bottom, left } = getSafeAreaInsets();
+  return {
+    top: top + 5,
+    right: right + 5,
+    bottom: bottom + 5,
+    left: left + 5,
+  };
+}
+
 /**
  * The part of the window content can occupy, in viewport coords: the visual viewport, which stops
  * at an open keyboard, clipped to the area clear of the system bars. Clipped rather than subtracted
