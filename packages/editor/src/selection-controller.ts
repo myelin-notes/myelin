@@ -173,11 +173,13 @@ export class SelectionController {
   }
 
   private showsRotateKnob(selected: readonly DrawableElement[]): boolean {
+    // Locked members stay put, as they do for group move and scale.
+    const unlocked = selected.filter((element) => !element.locked);
     return (
-      selected.length === 1 &&
-      selected[0].rotatable &&
-      !selected[0].locked &&
-      !selected[0].hasControlPoints
+      unlocked.length > 0 &&
+      unlocked.every(
+        (element) => element.rotatable && !element.hasControlPoints,
+      )
     );
   }
 

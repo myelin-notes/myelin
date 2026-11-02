@@ -726,6 +726,107 @@ describe('SelectTool rotation', () => {
     expect(stillPinned.y).toBeCloseTo(pinned.y);
   });
 
+  describe('of a group', () => {
+    // Bounds x 0..300, y 0..180, so the pivot is (150, 90) and the knob sits above it at y = -24.
+    function makeGroup() {
+      const ydoc = new YDocManager();
+      const { image: a } = makeImageElement('a', 0, 0, ydoc);
+      const { image: b } = makeImageElement('b', 200, 100, ydoc);
+      a.select();
+      b.select();
+      return { a, b, ydoc };
+    }
+    const knob = { x: 150, y: -24 };
+    // A quarter turn clockwise of the knob, about the pivot.
+    const quarterTurn = { x: 264, y: 90 };
+
+    it('orbits members rigidly about the center of the selection bounds, and undoes as one', () => {
+      const { a, b, ydoc } = makeGroup();
+      ydoc.undoManager.stopCapturing();
+      const { canvas } = makeCanvas([a, b], knob);
+      const tool = new SelectTool(() => catalogs.en);
+
+      tool.start(canvas, event);
+      tool.update(canvas, event, quarterTurn);
+      tool.finish(canvas, event);
+
+      expect(a.rotation).toBeCloseTo(Math.PI / 2);
+      expect(b.rotation).toBeCloseTo(Math.PI / 2);
+      const centerA = a.localToWorld(50, 40);
+      expect(centerA.x).toBeCloseTo(200);
+      expect(centerA.y).toBeCloseTo(-10);
+      const centerB = b.localToWorld(50, 40);
+      expect(centerB.x).toBeCloseTo(100);
+      expect(centerB.y).toBeCloseTo(190);
+
+      ydoc.undoManager.undo();
+      for (const image of [a, b]) {
+        image.syncFromYMap(['rotation', 'offsetX', 'offsetY']);
+        expect(image.rotation).toBe(0);
+      }
+      expect(a.offset).toEqual({ x: 0, y: 0 });
+      expect(b.offset).toEqual({ x: 200, y: 100 });
+    });
+
+    it('snaps the shared turn with shift, keeping relative rotation between members', () => {
+      const { a, b } = makeGroup();
+      // 10° is off the 15° grid, so snapping each member's absolute rotation would land elsewhere.
+      const tilt = (10 * Math.PI) / 180;
+      turnAboutCenter(a, tilt);
+      const bounds = new SelectionController(() => [a, b]).getBounds()!;
+      const pivot = {
+        x: bounds.x + bounds.width / 2,
+        y: bounds.y + bounds.height / 2,
+      };
+      const { canvas } = makeCanvas([a, b], { x: pivot.x, y: bounds.y - 24 });
+      const tool = new SelectTool(() => catalogs.en);
+
+      tool.start(canvas, event);
+      // 40° clockwise of straight up from the pivot.
+      const angle = (40 * Math.PI) / 180;
+      tool.update(canvas, { ...event, shiftKey: true } as PointerEvent, {
+        x: pivot.x + Math.sin(angle) * 100,
+        y: pivot.y - Math.cos(angle) * 100,
+      });
+      tool.finish(canvas, event);
+
+      expect(b.rotation).toBeCloseTo((45 * Math.PI) / 180);
+      expect(a.rotation).toBeCloseTo((55 * Math.PI) / 180);
+    });
+
+    it('leaves locked members in place while turning the rest', () => {
+      const { a, b } = makeGroup();
+      b.setLocked(true);
+      const { canvas } = makeCanvas([a, b], knob);
+      const tool = new SelectTool(() => catalogs.en);
+
+      tool.start(canvas, event);
+      tool.update(canvas, event, quarterTurn);
+      tool.finish(canvas, event);
+
+      expect(a.rotation).toBeCloseTo(Math.PI / 2);
+      expect(b.rotation).toBe(0);
+      expect(b.offset).toEqual({ x: 200, y: 100 });
+    });
+
+    it('offers no knob when a member cannot turn', () => {
+      const { image } = makeImageElement('image', 0, 0);
+      const frame = makePageFrame('frame', 0, 0);
+      image.select();
+      frame.select();
+      const selection = new SelectionController(() => [frame, image]);
+      const bounds = selection.getBounds()!;
+
+      expect(
+        selection.hitHandle(
+          { x: bounds.x + bounds.width / 2, y: bounds.y - 24 },
+          1,
+          'mouse',
+        ),
+      ).toBeNull();
+    });
+  });
+
   it('does not select a rotated image from the empty corner of its world bounds', () => {
     const { image } = makeImageElement();
     turnAboutCenter(image, Math.PI / 4);
