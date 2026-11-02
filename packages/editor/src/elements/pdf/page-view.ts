@@ -56,6 +56,14 @@ interface PdfPageDom extends PdfPageSurface {
   textLayer: PdfTextLayerDom | null;
 }
 
+function getLivePageIndex(pageDom: PdfPageDom): number | undefined {
+  return (
+    pageDom.rendered?.pageIndex ??
+    pageDom.rendering?.pageIndex ??
+    pageDom.pendingRender?.key.pageIndex
+  );
+}
+
 export class PdfPageView {
   private readonly scheduler: PdfPageRenderScheduler;
   private pageDoms = new Map<number, PdfPageDom>();
@@ -254,6 +262,16 @@ export class PdfPageView {
     this.pageDoms = nextPageDoms;
   }
 
+  /** Whether a page surface is showing, rendering or queued to render this document page. */
+  public isPageLive(pageIndex: number): boolean {
+    for (const pageDom of this.pageDoms.values()) {
+      if (getLivePageIndex(pageDom) === pageIndex) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   public invalidate(): void {
     for (const pageDom of this.pageDoms.values()) {
       this.scheduler.release(pageDom, true);
@@ -383,10 +401,7 @@ export class PdfPageView {
       if (!activePositions.has(position)) {
         continue;
       }
-      const pageIndex =
-        pageDom.rendered?.pageIndex ??
-        pageDom.rendering?.pageIndex ??
-        pageDom.pendingRender?.key.pageIndex;
+      const pageIndex = getLivePageIndex(pageDom);
       if (pageIndex !== undefined) {
         livePageIndices.add(pageIndex);
       }
