@@ -1,5 +1,7 @@
 mod document;
 mod flags;
+mod media;
+mod media_cleanup;
 mod onenote;
 mod references;
 mod remote;
@@ -399,6 +401,31 @@ impl RepositoryEngine {
         for session in sessions {
             emit(&format!("repository-document-{session}"), &payload);
         }
+    }
+
+    // Documents written before media storage keep their bytes until something rewrites them. Taking
+    // the store once per document leaves the editor responsive between them.
+    async fn extract_existing_media(engine: std::sync::Weak<Self>) -> Result<(), String> {
+        let Some(owner) = engine.upgrade() else {
+            return Ok(());
+        };
+        let documents = owner
+            .with_store(|state| state.documents_large_enough_for_media())
+            .await?;
+        drop(owner);
+        let mut extracted = false;
+        for id in documents {
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            extracted |= owner
+                .with_store(move |state| state.extract_document_media(&id))
+                .await?;
+        }
+        if let (true, Some(owner)) = (extracted, engine.upgrade()) {
+            owner.wake.notify_one();
+        }
+        Ok(())
     }
 
     fn schedule(engine: &Arc<Self>, app: &AppHandle) {
@@ -943,7 +970,7 @@ pub async fn repository_open(
         engines.insert(id, engine.clone());
         engine
     };
-    engine.references.fetch_add(1, Ordering::SeqCst);
+    let first_handle = engine.references.fetch_add(1, Ordering::SeqCst) == 0;
     drop(engines);
     let handle_id = uuid::Uuid::new_v4().to_string();
     manager.handles.lock().await.insert(
@@ -971,6 +998,10 @@ pub async fn repository_open(
     RepositoryEngine::schedule(&engine, &app);
     if has_local_state {
         engine.wake.notify_one();
+    }
+    if first_handle {
+        let weak = Arc::downgrade(&engine);
+        tauri::async_runtime::spawn(RepositoryEngine::extract_existing_media(weak));
     }
     Ok(json!({"handle": handle_id, "status": engine.status().await}))
 }

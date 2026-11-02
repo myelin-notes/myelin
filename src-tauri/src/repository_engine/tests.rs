@@ -110,6 +110,14 @@ async fn read(engine: &RepositoryEngine, id: &str) -> Vec<u8> {
         .decode(saved["bytesBase64"].as_str().unwrap())
         .unwrap()
 }
+fn stored_document(directory: &TestDirectory) -> Vec<u8> {
+    let files = directory.0.join("data/files");
+    let bytes = fs::read(files.join("canvas.myelin")).unwrap();
+    media::inline(&bytes, |hash| {
+        fs::read(files.join(format!("{hash}.media"))).ok()
+    })
+    .into_owned()
+}
 fn assert_document(bytes: &[u8]) {
     let expected = fixture()["expected"].clone();
     let doc = document::decode(bytes).unwrap();
@@ -473,7 +481,7 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
     drop(engine);
     let reopened = directory.engine(true);
     assert_document(&read(&reopened, "canvas").await);
-    assert_document(&fs::read(directory.0.join("data/files/canvas.myelin")).unwrap());
+    assert_document(&stored_document(&directory));
     assert!(!directory.0.join("data/.native-updates/canvas").exists());
     assert_eq!(
         reopened
@@ -482,7 +490,7 @@ async fn real_yjs_deltas_persist_peer_edits_and_deletions_without_full_binary_re
             .unwrap()
             .outbox
             .iter()
-            .filter(|op| op["kind"] == "push-note")
+            .filter(|op| op["kind"] == "push-note" && op["nodeId"] == "canvas")
             .count(),
         1
     );
@@ -688,7 +696,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     let checkpoint = engine.checkpoint_pending().await.unwrap();
     assert_eq!(checkpoint.changed, vec!["canvas"]);
     assert!(!checkpoint.wake_remote);
-    assert_document(&fs::read(directory.0.join("data/files/canvas.myelin")).unwrap());
+    assert_document(&stored_document(&directory));
     let (_, replacement) = engine
         .operate(RepositoryOperation::WriteFile {
             node: file,
@@ -1777,14 +1785,20 @@ async fn native_drive_pull_upload_retry_reopen_and_idle_metadata_check_preserve_
     assert!(reopened.store.lock().unwrap().outbox.is_empty());
     assert_document(&read(&reopened, "canvas").await);
     let remote = state.lock().unwrap();
-    assert_document(
-        &remote
+    let canvas = &remote
+        .files
+        .iter()
+        .find(|file| file.id == "canvas-entry")
+        .unwrap()
+        .bytes;
+    assert!(canvas.len() < 8192);
+    assert_document(&media::inline(canvas, |hash| {
+        remote
             .files
             .iter()
-            .find(|file| file.id == "canvas-entry")
-            .unwrap()
-            .bytes,
-    );
+            .find(|file| file.name == format!("{hash}.media"))
+            .map(|file| file.bytes.clone())
+    }));
     let manifest = remote.manifest();
     assert_eq!(
         manifest["linksBySource"]["canvas"],
@@ -1909,7 +1923,14 @@ async fn native_github_upload_retains_newer_deltas_retries_and_reuses_a_single_r
     assert!(fields["http_request_count"].as_u64().unwrap() > 0);
     assert!(!fields.contains_key("last_failed_stage"));
     assert!(engine.store.lock().unwrap().outbox.is_empty());
-    assert_document(&state.lock().unwrap().files["canvas"]);
+    {
+        let remote = state.lock().unwrap();
+        // The document arrived holding its media inline; the upload moved it out.
+        assert!(remote.files["canvas"].len() < 8192);
+        assert_document(&media::inline(&remote.files["canvas"], |hash| {
+            remote.files.get(hash).cloned()
+        }));
+    }
     let basis_root = engine
         .cache_dir
         .join("repository-bases")
@@ -3114,6 +3135,36 @@ async fn native_github_sync_does_not_read_unchanged_document_contents() {
 }
 
 #[tokio::test]
+async fn sync_diagnostics_report_version_history_and_media_size() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let bytes = fixture_bytes("baseUpdate");
+    seed(&engine, "canvas", "mcanvas", bytes.clone()).await;
+    let version_bytes = read(&engine, "canvas").await.len() as u64;
+    capture_version(&engine, "canvas", true).await;
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), bytes.clone())]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let trace = telemetry::SyncTrace::new();
+    trace
+        .scope(engine.cycle(github_source(), &server.endpoints))
+        .await
+        .unwrap();
+    let fields = trace.fields();
+    assert_eq!(fields["document_count"], 2);
+    assert_eq!(fields["version_count"], 1);
+    assert_eq!(fields["version_bytes"], version_bytes);
+    assert_eq!(fields["media_count"], 1);
+    assert_eq!(
+        fields["media_bytes"],
+        fixture()["expected"]["pdfByteLength"]
+    );
+}
+
+#[tokio::test]
 async fn sync_diagnostics_include_recovered_http_retries() {
     let requests = Arc::new(AtomicUsize::new(0));
     let seen = requests.clone();
@@ -3215,4 +3266,891 @@ async fn initial_sync_installs_files_before_a_metadata_only_recovery_journal() {
     assert!(reopened.store.lock().unwrap().outbox.is_empty());
     seed(&reopened, "picture", "png", b"edited".to_vec()).await;
     assert_eq!(fs::read(cached.join("files/picture.png")).unwrap(), picture);
+}
+
+fn media_fixture(key: &str) -> Vec<u8> {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/yjs-media.json")).unwrap();
+    STANDARD.decode(fixture[key].as_str().unwrap()).unwrap()
+}
+
+fn media_value(document: &[u8], index: u32, key: &str) -> Vec<u8> {
+    let doc = document::decode(document).unwrap();
+    let txn = doc.transact();
+    let Some(Out::YMap(element)) = txn.get_array("elements").unwrap().get(&txn, index) else {
+        panic!("missing element");
+    };
+    let Some(Out::Any(Any::Buffer(bytes))) = element.get(&txn, key) else {
+        panic!("missing bytes");
+    };
+    bytes.to_vec()
+}
+
+fn stored_file(directory: &TestDirectory, name: &str) -> Vec<u8> {
+    fs::read(directory.0.join("data/files").join(name)).unwrap()
+}
+
+async fn update_media_document(engine: &RepositoryEngine, update: &[u8]) {
+    engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "drawing".into(),
+            update_base64: STANDARD.encode(update),
+            origin: "local".into(),
+            generation: None,
+            source_session: None,
+        })
+        .await
+        .unwrap();
+}
+
+// A second device must receive whole documents, on first download and in the updates sent to an
+// open editor, although the remote holds only references.
+async fn second_device_receives_media(source: RepositorySource, endpoints: &RemoteEndpoints) {
+    let first_directory = TestDirectory::new();
+    let first = first_directory.engine(true);
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    seed(&first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+
+    let second_directory = TestDirectory::new();
+    let second = second_directory.engine(true);
+    second.cycle(source.clone(), endpoints).await.unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    let downloaded = read(&second, "drawing").await;
+    assert_eq!(media_value(&downloaded, 0, "imageData").len(), 2048);
+    assert_eq!(media_value(&downloaded, 1, "pdfData").len(), 2048);
+    assert!(stored_file(&second_directory, "drawing.myelin").len() < 2048);
+
+    second
+        .operate(RepositoryOperation::Subscribe {
+            node_id: "drawing".into(),
+            session_id: "editor".into(),
+        })
+        .await
+        .unwrap();
+    let (opened, _) = second
+        .operate(RepositoryOperation::Document {
+            node_id: "drawing".into(),
+            state_vector_base64: None,
+        })
+        .await
+        .unwrap();
+    let editor = STANDARD
+        .decode(opened["updateBase64"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(media_value(&editor, 0, "imageData").len(), 2048);
+
+    update_media_document(&first, &media_fixture("edit")).await;
+    first.cycle(source.clone(), endpoints).await.unwrap();
+    let changes = second.cycle(source, endpoints).await.unwrap();
+    let delta = &changes
+        .documents
+        .iter()
+        .find(|change| change.node_id == "drawing")
+        .unwrap()
+        .bytes;
+    let edited = document::merge(&editor, delta).unwrap();
+    assert_eq!(media_value(&edited, 1, "pdfData").len(), 3000);
+    assert_eq!(
+        media_value(&read(&second, "drawing").await, 1, "pdfData").len(),
+        3000
+    );
+}
+
+#[tokio::test]
+async fn github_stores_each_media_file_once_and_a_second_device_receives_it() {
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), fixture_bytes("baseUpdate"))]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    second_device_receives_media(github_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote.files["drawing"].len() < 2048);
+    let mut media = remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .filter(|node| node["system"]["kind"] == "media")
+        .map(|node| remote.files[node["id"].as_str().unwrap()].len())
+        .collect::<Vec<_>>();
+    media.sort();
+    // The image and PDF first shared one file; the edit's replacement PDF is the other.
+    assert_eq!(media, [2048, 3000]);
+}
+
+#[tokio::test]
+async fn google_drive_stores_each_media_file_once_and_a_second_device_receives_it() {
+    let state = Arc::new(Mutex::new(DriveFixture::new()));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    second_device_receives_media(drive_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    let drawing = remote
+        .files
+        .iter()
+        .find(|file| file.name == "drawing.myelin")
+        .unwrap();
+    assert!(drawing.bytes.len() < 2048);
+    let mut media = remote
+        .files
+        .iter()
+        .filter(|file| file.name.ends_with(".media"))
+        .map(|file| file.bytes.len())
+        .collect::<Vec<_>>();
+    media.sort();
+    assert_eq!(media, [2048, 3000]);
+}
+
+#[tokio::test]
+async fn a_document_whose_media_is_missing_stays_usable_and_recovers_when_it_arrives() {
+    let original = media_fixture("document");
+    let extracted = media::extract(&original);
+    let (hash, bytes) = extracted.media[0].clone();
+    let mut manifest = manifest_with("canvas", "mcanvas");
+    manifest["nodes"]["drawing"] = node("drawing", "mcanvas");
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("canvas".into(), fixture_bytes("baseUpdate")),
+            ("drawing".into(), extracted.document.to_vec()),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    // The reference stands in for the bytes, and an edit neither fails nor drops it.
+    let missing = read(&engine, "drawing").await;
+    assert_eq!(media_value(&missing, 0, "imageData").len(), 78);
+    update_media_document(&engine, &media_fixture("edit")).await;
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(
+        media_value(&state.lock().unwrap().files["drawing"], 0, "imageData").len(),
+        78
+    );
+
+    {
+        let mut remote = state.lock().unwrap();
+        remote.manifest["nodes"][&hash] = media::node(&hash, bytes.len());
+        remote.files.insert(hash.clone(), bytes.to_vec());
+        remote.head = "f".repeat(40);
+    }
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    engine.store.lock().unwrap().documents.clear();
+    let restored = read(&engine, "drawing").await;
+    assert_eq!(media_value(&restored, 0, "imageData").len(), 2048);
+    assert_eq!(media_value(&restored, 1, "pdfData").len(), 3000);
+}
+
+#[tokio::test]
+async fn versions_and_documents_share_one_stored_copy_of_their_media() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let whole = read(&engine, "drawing").await;
+    let version = capture_version(&engine, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+
+    let media = fs::read_dir(directory.0.join("data/files"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|kind| kind == "media"))
+        .collect::<Vec<_>>();
+    assert_eq!(media.len(), 1);
+    assert_eq!(fs::read(&media[0]).unwrap().len(), 2048);
+    assert!(stored_file(&directory, "drawing.myelin").len() < 2048);
+    assert!(stored_file(&directory, &format!("{version_id}.myelin")).len() < 2048);
+
+    assert_eq!(version["byteLength"], whole.len());
+    assert_eq!(read(&engine, version_id).await, whole);
+    drop(engine);
+    let reopened = directory.engine(false);
+    assert_eq!(read(&reopened, "drawing").await, whole);
+    assert_eq!(read(&reopened, version_id).await, whole);
+
+    let manifest = reopened.store.lock().unwrap().manifest.clone();
+    let node = manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|node| node["system"]["kind"] == "media")
+        .unwrap();
+    assert_eq!(node["system"]["byteLength"], 2048);
+    assert_eq!(
+        media[0].file_name().unwrap().to_string_lossy(),
+        format!("{}.media", node["id"].as_str().unwrap())
+    );
+}
+
+#[tokio::test]
+async fn restoring_a_version_returns_its_media_after_the_document_moves_on() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let original = read(&engine, "drawing").await;
+    let version = capture_version(&engine, "drawing", true).await;
+    update_media_document(&engine, &media_fixture("edit")).await;
+    assert_eq!(
+        media_value(&read(&engine, "drawing").await, 1, "pdfData").len(),
+        3000
+    );
+
+    engine
+        .operate(RepositoryOperation::RestoreFileVersion {
+            node_id: "drawing".into(),
+            version_id: version["id"].as_str().unwrap().into(),
+        })
+        .await
+        .unwrap();
+    let restored = read(&engine, "drawing").await;
+    assert_eq!(
+        media_value(&restored, 1, "pdfData"),
+        media_value(&original, 1, "pdfData")
+    );
+    assert!(stored_file(&directory, "drawing.myelin").len() < 2048);
+}
+
+#[tokio::test]
+async fn documents_and_versions_written_before_media_storage_are_rewritten_and_uploaded() {
+    let inline = media_fixture("document");
+    let mut version = node("old-version", "mcanvas");
+    version["system"] = json!({
+        "kind": "file-version", "sourceFileId": "drawing", "sourceFileType": "mcanvas",
+        "sourceName": "drawing", "sourceRevision": "old", "capturedAt": 1,
+        "byteLength": inline.len()
+    });
+    let mut manifest = manifest_with("drawing", "mcanvas");
+    manifest["nodes"]["old-version"] = version;
+    let state = Arc::new(Mutex::new(GitHubFixture::new(
+        manifest,
+        HashMap::from([
+            ("drawing".into(), inline.clone()),
+            ("old-version".into(), inline.clone()),
+        ]),
+    )));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(stored_file(&directory, "drawing.myelin"), inline);
+    let before = read(&engine, "drawing").await;
+
+    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
+        .await
+        .unwrap();
+    for name in ["drawing.myelin", "old-version.myelin"] {
+        assert!(stored_file(&directory, name).len() < 2048, "{name}");
+    }
+    assert_eq!(read(&engine, "drawing").await, before);
+    assert_eq!(read(&engine, "old-version").await, before);
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert!(remote.files["drawing"].len() < 2048);
+        assert!(remote.files["old-version"].len() < 2048);
+        assert_eq!(
+            remote
+                .files
+                .values()
+                .filter(|bytes| bytes.len() == 2048)
+                .count(),
+            1
+        );
+    }
+
+    // Finding nothing left to do must not queue another upload.
+    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
+        .await
+        .unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
+
+// Across devices, compare content: yrs re-encodes JSON maps with their keys in no fixed order.
+fn assert_media_intact(document: &[u8]) {
+    let image = media_value(document, 0, "imageData");
+    assert_eq!(image.len(), 2048);
+    assert_eq!(media_value(document, 1, "pdfData"), image);
+}
+
+// Two devices sharing a document that points at one media file, plus that file's hash.
+async fn devices_sharing_media(
+    state: &Arc<Mutex<GitHubFixture>>,
+    endpoints: &RemoteEndpoints,
+    first: &RepositoryEngine,
+    second: &RepositoryEngine,
+) -> String {
+    first.cycle(github_source(), endpoints).await.unwrap();
+    seed(first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    second.cycle(github_source(), endpoints).await.unwrap();
+    let remote = state.lock().unwrap();
+    remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .find(|node| node["system"]["kind"] == "media")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned()
+}
+
+// What a remote looks like after another device removed this media.
+fn remove_media_from_remote(state: &Arc<Mutex<GitHubFixture>>, hash: &str, head: &str) {
+    let mut remote = state.lock().unwrap();
+    remote.manifest["nodes"]
+        .as_object_mut()
+        .unwrap()
+        .remove(hash);
+    remote.manifest["deletedNodes"][hash] = json!("removal");
+    remote.files.remove(hash);
+    remote.head = head.repeat(40);
+}
+
+fn media_github_fixture() -> Arc<Mutex<GitHubFixture>> {
+    Arc::new(Mutex::new(GitHubFixture::new(
+        manifest_with("canvas", "mcanvas"),
+        HashMap::from([("canvas".into(), fixture_bytes("baseUpdate"))]),
+    )))
+}
+
+#[tokio::test]
+async fn a_device_whose_documents_still_use_removed_media_publishes_it_again() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&second, "drawing").await);
+    assert!(second
+        .store
+        .lock()
+        .unwrap()
+        .outbox
+        .iter()
+        .any(|op| op["kind"] == "push-note" && op["nodeId"] == hash.as_str()));
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert_eq!(remote.files[&hash].len(), 2048);
+        assert!(remote.manifest["deletedNodes"][&hash].is_null());
+        assert_eq!(remote.manifest["restoredNodes"][&hash], "removal");
+    }
+
+    // The restore must not be taken for an edit to a deleted file on the device that never saw it.
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "drawing").await);
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+}
+
+#[tokio::test]
+async fn a_pending_document_brings_back_removed_media_it_needs() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    // Offline, the second device saves a version that points at the media.
+    let version = capture_version(&second, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    {
+        let remote = state.lock().unwrap();
+        assert_eq!(remote.files[&hash].len(), 2048);
+        assert_eq!(remote.manifest["restoredNodes"][&hash], "removal");
+        assert!(remote.manifest["deletedNodes"][&hash].is_null());
+        assert!(remote.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .all(|id| !id.starts_with("conflict-")));
+    }
+    assert_media_intact(&read(&second, version_id).await);
+
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, version_id).await);
+}
+
+#[tokio::test]
+async fn removed_media_nothing_uses_is_deleted_from_the_device_that_applies_the_removal() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    let (saved, _) = first.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["nodes"].as_object_mut().unwrap().remove("drawing");
+    save_manifest(&first, manifest).await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    remove_media_from_remote(&state, &hash, "d");
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert!(second.store.lock().unwrap().manifest["nodes"][&hash].is_null());
+    assert!(!second_directory
+        .0
+        .join(format!("data/files/{hash}.media"))
+        .exists());
+}
+
+const DAY_MS: u64 = 24 * 60 * 60 * 1000;
+
+async fn clean_media(engine: &RepositoryEngine, at: u64) -> Result<usize, String> {
+    engine
+        .with_store(move |state| media_cleanup::clean(state, at))
+        .await
+}
+
+async fn empty_media_document(engine: &RepositoryEngine) {
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    engine
+        .operate(RepositoryOperation::WriteFile {
+            node: saved["manifest"]["nodes"]["drawing"].clone(),
+            bytes_base64: STANDARD.encode(document::bytes(&yrs::Doc::new())),
+            replace: true,
+            overwrite_remote: true,
+        })
+        .await
+        .unwrap();
+}
+
+async fn delete_node(engine: &RepositoryEngine, id: &str) {
+    let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
+    let mut manifest = saved["manifest"].clone();
+    manifest["nodes"].as_object_mut().unwrap().remove(id);
+    save_manifest(engine, manifest).await;
+}
+
+fn local_media(directory: &TestDirectory) -> usize {
+    fs::read_dir(directory.0.join("data/files"))
+        .unwrap()
+        .filter(|entry| {
+            entry
+                .as_ref()
+                .unwrap()
+                .path()
+                .extension()
+                .is_some_and(|kind| kind == "media")
+        })
+        .count()
+}
+
+// A version protects media after the document moves on. Once nothing points at it, the file lasts
+// thirty days and is then removed locally and from the remote.
+async fn unused_media_is_removed_after_thirty_days(
+    source: RepositorySource,
+    endpoints: &RemoteEndpoints,
+) {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    let version = capture_version(&engine, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    empty_media_document(&engine).await;
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert_eq!(clean_media(&engine, start + 40 * DAY_MS).await, Ok(0));
+    assert_media_intact(&read(&engine, version_id).await);
+
+    delete_node(&engine, version_id).await;
+    engine.cycle(source.clone(), endpoints).await.unwrap();
+    let unused = start + 41 * DAY_MS;
+    assert_eq!(clean_media(&engine, unused).await, Ok(0));
+    assert_eq!(clean_media(&engine, unused + 29 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+
+    assert_eq!(clean_media(&engine, unused + 30 * DAY_MS).await, Ok(1));
+    assert_eq!(local_media(&directory), 0);
+    engine.cycle(source, endpoints).await.unwrap();
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+}
+
+#[tokio::test]
+async fn github_removes_media_unused_for_thirty_days() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    unused_media_is_removed_after_thirty_days(github_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote.files.values().all(|bytes| bytes.len() != 2048));
+    assert!(remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .values()
+        .all(|node| node["system"]["kind"] != "media"));
+    assert_eq!(
+        remote.manifest["deletedNodes"].as_object().unwrap().len(),
+        2
+    );
+}
+
+#[tokio::test]
+async fn google_drive_removes_media_unused_for_thirty_days() {
+    let state = Arc::new(Mutex::new(DriveFixture::new()));
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    unused_media_is_removed_after_thirty_days(drive_source(), &server.endpoints).await;
+
+    let remote = state.lock().unwrap();
+    assert!(remote
+        .files
+        .iter()
+        .all(|file| !file.name.ends_with(".media")));
+}
+
+#[tokio::test]
+async fn cleanup_removes_nothing_while_any_document_is_unreadable() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    empty_media_document(&engine).await;
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+
+    let broken = directory.0.join("data/files/broken.myelin");
+    fs::write(&broken, [0xff; 32]).unwrap();
+    assert!(clean_media(&engine, start + 31 * DAY_MS).await.is_err());
+    assert_eq!(local_media(&directory), 1);
+
+    fs::remove_file(&broken).unwrap();
+    assert_eq!(clean_media(&engine, start + 31 * DAY_MS).await, Ok(1));
+    assert_eq!(local_media(&directory), 0);
+}
+
+#[tokio::test]
+async fn cleanup_waits_for_pending_changes_and_a_first_sync() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert!(!directory.0.join("data/.native-media-unused.json").exists());
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    seed(&engine, "drawing", "mcanvas", media_fixture("document")).await;
+    empty_media_document(&engine).await;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert!(!directory.0.join("data/.native-media-unused.json").exists());
+
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(clean_media(&engine, start + 40 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+}
+
+#[tokio::test]
+async fn media_removed_by_one_device_returns_for_an_offline_device_that_needs_it() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    let version = capture_version(&second, "drawing", true).await;
+    let version_id = version["id"].as_str().unwrap();
+    delete_node(&first, "drawing").await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&first, start).await, Ok(0));
+    assert_eq!(clean_media(&first, start + 30 * DAY_MS).await, Ok(1));
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(!state.lock().unwrap().files.contains_key(&hash));
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_media_intact(&read(&second, version_id).await);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+    assert_media_intact(&read(&first, version_id).await);
+}
+
+#[tokio::test]
+async fn media_added_again_after_removal_reaches_every_device() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    let hash = devices_sharing_media(&state, &server.endpoints, &first, &second).await;
+
+    delete_node(&first, "drawing").await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&first, start).await, Ok(0));
+    assert_eq!(clean_media(&first, start + 30 * DAY_MS).await, Ok(1));
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_eq!(local_media(&second_directory), 0);
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+
+    seed(
+        &first,
+        "drawing-again",
+        "mcanvas",
+        media_fixture("document"),
+    )
+    .await;
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(first.store.lock().unwrap().outbox.is_empty());
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&second, "drawing-again").await);
+}
+
+#[tokio::test]
+async fn media_referenced_only_by_unsaved_updates_is_kept() {
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    let original = media_fixture("document");
+    seed(&engine, "drawing", "mcanvas", original.clone()).await;
+    seed(&engine, "other", "mcanvas", Vec::new()).await;
+    // An editor that loaded a document while its media was missing copies references around.
+    engine
+        .operate(RepositoryOperation::UpdateDocument {
+            node_id: "other".into(),
+            update_base64: STANDARD.encode(media::extract(&original).document),
+            origin: "local".into(),
+            generation: None,
+            source_session: None,
+        })
+        .await
+        .unwrap();
+    assert!(directory.0.join("data/.native-updates/other").exists());
+    empty_media_document(&engine).await;
+
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(&engine, start).await, Ok(0));
+    assert_eq!(clean_media(&engine, start + 31 * DAY_MS).await, Ok(0));
+    assert_eq!(local_media(&directory), 1);
+}
+
+// The first device adds, deletes and cleans up media the second has never seen.
+async fn remove_media_the_other_device_never_saw(
+    state: &Arc<Mutex<GitHubFixture>>,
+    endpoints: &RemoteEndpoints,
+    first: &RepositoryEngine,
+) -> String {
+    seed(first, "drawing", "mcanvas", media_fixture("document")).await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    let hash = {
+        let remote = state.lock().unwrap();
+        remote.manifest["nodes"]
+            .as_object()
+            .unwrap()
+            .values()
+            .find(|node| node["system"]["kind"] == "media")
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    delete_node(first, "drawing").await;
+    first.cycle(github_source(), endpoints).await.unwrap();
+    let start = 1_000 * DAY_MS;
+    assert_eq!(clean_media(first, start).await, Ok(0));
+    assert_eq!(clean_media(first, start + 30 * DAY_MS).await, Ok(1));
+    first.cycle(github_source(), endpoints).await.unwrap();
+    assert!(!state.lock().unwrap().files.contains_key(&hash));
+    hash
+}
+
+fn assert_no_conflict_copies(state: &Arc<Mutex<GitHubFixture>>) {
+    let remote = state.lock().unwrap();
+    assert!(remote.manifest["nodes"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .all(|id| !id.starts_with("conflict-")));
+}
+
+#[tokio::test]
+async fn an_offline_device_adding_the_same_bytes_restores_them_without_a_conflict_copy() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    // Deleting the first document leaves the media queued ahead of the one that still uses it.
+    seed(&second, "discarded", "mcanvas", media_fixture("document")).await;
+    delete_node(&second, "discarded").await;
+    seed(&second, "offline", "mcanvas", media_fixture("document")).await;
+    let hash = remove_media_the_other_device_never_saw(&state, &server.endpoints, &first).await;
+
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_no_conflict_copies(&state);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+    assert_media_intact(&read(&second, "offline").await);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "offline").await);
+}
+
+#[tokio::test]
+async fn media_added_while_a_sync_applies_its_removal_survives() {
+    let state = media_github_fixture();
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let (first_directory, second_directory) = (TestDirectory::new(), TestDirectory::new());
+    let first = first_directory.engine(true);
+    let second = second_directory.engine(true);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let hash = remove_media_the_other_device_never_saw(&state, &server.endpoints, &first).await;
+
+    // The upload is paused after the plan has seen the removal, then the same bytes arrive.
+    update(&second, "localUpdate", "local").await;
+    server.pause_blob.store(true, Ordering::SeqCst);
+    let syncing = second.clone();
+    let endpoints = server.endpoints.clone();
+    let sync = tokio::spawn(async move { syncing.cycle(github_source(), &endpoints).await });
+    tokio::time::timeout(std::time::Duration::from_secs(10), server.paused.notified())
+        .await
+        .unwrap();
+    seed(&second, "during-sync", "mcanvas", media_fixture("document")).await;
+    server.resume.notify_one();
+    sync.await.unwrap().unwrap();
+
+    assert_media_intact(&read(&second, "during-sync").await);
+    assert!(second_directory
+        .0
+        .join(format!("data/files/{hash}.media"))
+        .exists());
+    second
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert!(second.store.lock().unwrap().outbox.is_empty());
+    assert_no_conflict_copies(&state);
+    assert_eq!(state.lock().unwrap().files[&hash].len(), 2048);
+    first
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    assert_media_intact(&read(&first, "during-sync").await);
 }

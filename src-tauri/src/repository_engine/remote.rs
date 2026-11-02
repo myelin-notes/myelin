@@ -1,5 +1,5 @@
 use super::{
-    document,
+    document, media, media_cleanup,
     store::{file_name, now, FileWrite, Store, SyncState},
     telemetry, Changes, RepositoryEngine, RepositoryManager,
 };
@@ -346,6 +346,28 @@ fn blob_sha(bytes: &[u8]) -> Result<String, String> {
         .map_err(|_| "GitHub blob revision unavailable".into())
 }
 
+fn inline_media<'a>(store: &Store, snapshot: &Snapshot, document: &'a [u8]) -> Cow<'a, [u8]> {
+    media::inline(document, |hash| match snapshot.files.get(hash) {
+        Some(file) => file.read().ok().map(Cow::into_owned),
+        None => store.read_media(hash),
+    })
+}
+
+// Clears a tombstone from a device that removed this media after finding it unused: that device only
+// saw what had been synced. Recording the revision lets every other device accept the restore.
+fn restore_media_node(manifest: &mut Value, hash: &str, node: Value) {
+    let deletion = manifest["deletedNodes"]
+        .as_object_mut()
+        .and_then(|deleted| deleted.remove(hash));
+    if let Some(deletion) = deletion {
+        if !manifest["restoredNodes"].is_object() {
+            manifest["restoredNodes"] = json!({});
+        }
+        manifest["restoredNodes"][hash] = deletion;
+    }
+    manifest["nodes"][hash] = node;
+}
+
 fn capture(store: &mut Store) -> Result<Captured, String> {
     if let Some(error) = &store.recovery_error {
         return Err(error.clone());
@@ -500,6 +522,10 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
         if node["type"] != "file" {
             continue;
         }
+        // Media is named by content, so it comes back under its own ID, never as a recovered copy.
+        if node["system"]["kind"] == "media" && remote.manifest["nodes"][&id].is_null() {
+            restore_media_node(&mut remote.manifest, &id, node.clone());
+        }
         let recovered = remote.manifest["nodes"][&id].is_null()
             && !remote.manifest["deletedNodes"][&id].is_null();
         if recovered {
@@ -536,13 +562,26 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
             .map(SnapshotFile::read)
             .transpose()?
             .unwrap_or_default();
-        let replacement = recovered || op["replaceFile"] == true;
+        // Named by content, so the local bytes are right whatever the remote holds.
+        let replacement =
+            recovered || op["replaceFile"] == true || node["system"]["kind"] == "media";
+        let mut new_media = Vec::new();
         let bytes = if node["fileType"] == "mcanvas" {
-            if replacement {
+            let merged = if replacement {
                 local.to_vec()
             } else {
                 document::merge(&old, &local)?
+            };
+            let extracted = media::extract(&merged);
+            for (hash, bytes) in &extracted.media {
+                if remote.manifest["nodes"][hash].is_null() {
+                    let media_node = media::node(hash, bytes.len());
+                    additions.insert(format!("files/{}", file_name(&media_node)?), bytes.to_vec());
+                    new_media.push((hash.clone(), bytes.to_vec()));
+                    restore_media_node(&mut remote.manifest, hash, media_node);
+                }
             }
+            extracted.document.into_owned()
         } else {
             let base = op.get("baseFileRevision").cloned().unwrap_or(Value::Null);
             let current = if old.is_empty() {
@@ -592,6 +631,9 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
         };
         if old != bytes {
             additions.insert(format!("files/{}", file_name(&node)?), bytes.clone());
+        }
+        for (hash, bytes) in new_media {
+            remote.files.insert(hash, SnapshotFile::Loaded(bytes));
         }
         remote
             .files
@@ -680,6 +722,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
         if op["kind"] != "push-note"
             || plan.snapshot.manifest["deletedNodes"][id].is_null()
             || store.manifest["nodes"][id]["type"] != "file"
+            || store.manifest["nodes"][id]["system"]["kind"] == "media"
         {
             continue;
         }
@@ -795,9 +838,14 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
                     .entry(id.clone())
                     .or_insert_with(|| uuid::Uuid::new_v4().to_string())
                     .clone();
+                let update = if node["system"].is_null() {
+                    inline_media(store, &plan.snapshot, &bytes).into_owned()
+                } else {
+                    Vec::new()
+                };
                 changes.documents.push(super::DocumentNotification {
                     node_id: id.clone(),
-                    bytes: bytes.into_owned(),
+                    bytes: update,
                     source_session: None,
                     origin: "repository".into(),
                     generation,
@@ -822,6 +870,13 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             continue;
         };
         let downloaded = downloaded.read()?;
+        // Open editors receive what this applies, so it must hold bytes rather than references.
+        // Versions are never open and are stored as they arrive.
+        let downloaded = if node["fileType"] == "mcanvas" && node["system"].is_null() {
+            inline_media(store, &plan.snapshot, &downloaded)
+        } else {
+            Cow::Borrowed(downloaded.as_ref())
+        };
         let mut canvas_doc = None;
         let mut canvas_update = Vec::new();
         let bytes = if node["fileType"] == "mcanvas" {
@@ -894,8 +949,13 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
             plan.snapshot.manifest["linksBySource"][&id] = json!(links);
         }
     }
+    let mut removed_media = Vec::new();
     for (id, node) in previous["nodes"].as_object().unwrap() {
         if plan.snapshot.manifest["nodes"][id].is_null() {
+            if node["system"]["kind"] == "media" {
+                removed_media.push(node.clone());
+                continue;
+            }
             changes.deleted.push(id.clone());
             if node["type"] == "file" {
                 writes.push(FileWrite {
@@ -922,6 +982,7 @@ fn publish(store: &mut Store, captured: Captured, mut plan: Plan) -> Result<Chan
     store.sync.document_generations = generations;
     store.sync.last_remote_sync_at = Some(now());
     store.commit(writes)?;
+    changes.wake_remote |= media_cleanup::settle_removed(store, removed_media)?;
     Ok(changes)
 }
 
@@ -982,6 +1043,16 @@ impl RepositoryEngine {
             }
         };
         let status = self.status().await;
+        // Inside the network lock, so no sync can change what this scan is looking at.
+        if result.is_ok() && status.last_error.is_none() {
+            let cleaned = self
+                .with_store(|state| media_cleanup::clean(state, now()))
+                .await;
+            if let Ok(removed @ 1..) = cleaned {
+                trace.set("media_removed", removed as u64);
+                self.wake.notify_one();
+            }
+        }
         trace.set("duration_ms", started.elapsed().as_millis() as u64);
         trace.set("pending_writes_end", status.pending_remote_writes as u64);
         trace.set(
@@ -1001,6 +1072,7 @@ impl RepositoryEngine {
             .unwrap_or(0)
             > 0
             || fields.contains_key("plan_ms")
+            || fields.contains_key("media_removed")
             || result.is_err()
             || status.last_error.is_some()
             || started.elapsed().as_secs() >= 5
@@ -1066,6 +1138,9 @@ impl RepositoryEngine {
         *self.error.lock().unwrap() = result.as_ref().err().cloned();
         match result {
             Ok(changes) => {
+                if changes.wake_remote {
+                    self.wake.notify_one();
+                }
                 self.last_checked_at.store(now(), Ordering::Relaxed);
                 let _ = app.emit("repository-status", self.status().await);
                 let _ = app.emit("repository-data", json!({"repositoryId": self.id, "changed": changes.changed, "deleted": changes.deleted}));
@@ -1113,9 +1188,27 @@ impl RepositoryEngine {
                 .as_object()
                 .unwrap()
                 .values()
-                .filter(|node| node["type"] == "file")
+                .filter(|node| node["type"] == "file" && node["system"]["kind"] != "media")
                 .count() as u64,
         );
+        for (kind, count_field, bytes_field) in [
+            ("file-version", "version_count", "version_bytes"),
+            ("media", "media_count", "media_bytes"),
+        ] {
+            let (count, bytes) = captured.snapshot.manifest["nodes"]
+                .as_object()
+                .unwrap()
+                .values()
+                .filter(|node| node["system"]["kind"] == kind)
+                .fold((0u64, 0u64), |(count, bytes), node| {
+                    (
+                        count + 1,
+                        bytes + node["system"]["byteLength"].as_u64().unwrap_or(0),
+                    )
+                });
+            trace.set(count_field, count);
+            trace.set(bytes_field, bytes);
+        }
         let head_check = trace.phase("remote_check");
         let mut unchanged_head = false;
         let mut pending_drive_deletions = false;

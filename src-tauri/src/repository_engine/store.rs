@@ -1,4 +1,4 @@
-use super::document;
+use super::{document, media};
 use crate::repository_bootstrap::{reject_symlink, sync_directory, valid_component};
 use crate::repository_metadata as metadata;
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
@@ -419,6 +420,9 @@ impl Store {
             Err(error) => return Err(io(error)),
         };
         if node["fileType"] == "mcanvas" {
+            if let Cow::Owned(inlined) = media::inline(&bytes, |hash| self.read_media(hash)) {
+                bytes = inlined;
+            }
             let id = node["id"].as_str().ok_or("Invalid repository node ID")?;
             let directory = self.root.join(".native-updates").join(id);
             reject_symlink(&self.root.join(".native-updates"))?;
@@ -440,6 +444,80 @@ impl Store {
             }
         }
         Ok(bytes)
+    }
+
+    pub fn read_media(&self, hash: &str) -> Option<Vec<u8>> {
+        let path = self
+            .root
+            .join("files")
+            .join(file_name(&media::node(hash, 0)).ok()?);
+        reject_symlink(&path).ok()?;
+        fs::read(path).ok()
+    }
+
+    // Media reaches disk before the journal that references it, so a crash leaves only an
+    // unreferenced file that the next write reuses.
+    fn extract_media(&mut self, files: &mut [FileWrite]) -> Result<(), String> {
+        for file in files {
+            let (true, Some(encoded)) = (file.name.ends_with(".myelin"), &file.bytes) else {
+                continue;
+            };
+            let bytes = STANDARD
+                .decode(encoded)
+                .map_err(|_| "Invalid repository file bytes")?;
+            let extracted = media::extract(&bytes);
+            if extracted.media.is_empty() {
+                continue;
+            }
+            for (hash, bytes) in &extracted.media {
+                let node = media::node(hash, bytes.len());
+                let path = self.root.join("files").join(file_name(&node)?);
+                if !path.exists() {
+                    atomic_write(&path, bytes)?;
+                }
+                if self.manifest["nodes"][hash].is_null() {
+                    self.manifest["nodes"][hash] = node;
+                    self.queue("upsert-manifest-node", Some(hash), json!({}));
+                    self.queue("push-note", Some(hash), json!({"baseFileRevision": null}));
+                }
+            }
+            file.bytes = Some(STANDARD.encode(&extracted.document));
+        }
+        Ok(())
+    }
+
+    pub fn documents_large_enough_for_media(&self) -> Result<Vec<String>, String> {
+        let mut documents = Vec::new();
+        for (id, node) in self.manifest["nodes"].as_object().unwrap() {
+            if node["type"] == "file" && node["fileType"] == "mcanvas" {
+                let path = self.root.join("files").join(file_name(node)?);
+                if fs::metadata(path).is_ok_and(|file| file.len() as usize >= media::MIN_BYTES) {
+                    documents.push(id.clone());
+                }
+            }
+        }
+        Ok(documents)
+    }
+
+    /// Rewrites a document stored with inline media and queues it for upload. Returns whether it did.
+    pub fn extract_document_media(&mut self, id: &str) -> Result<bool, String> {
+        let node = self.manifest["nodes"][id].clone();
+        if node["fileType"] != "mcanvas" {
+            return Ok(false);
+        }
+        let name = file_name(&node)?;
+        let path = self.root.join("files").join(&name);
+        reject_symlink(&path)?;
+        if !fs::read(path).is_ok_and(|stored| media::has_inline_media(&stored)) {
+            return Ok(false);
+        }
+        let bytes = self.read_file(&node)?;
+        self.queue("push-note", Some(id), json!({}));
+        self.commit(vec![FileWrite {
+            name,
+            bytes: Some(STANDARD.encode(bytes)),
+        }])?;
+        Ok(true)
     }
 
     pub fn doc(&mut self, id: &str) -> Result<&Doc, String> {
@@ -553,10 +631,11 @@ impl Store {
 
     fn commit_journal(
         &mut self,
-        files: Vec<FileWrite>,
+        mut files: Vec<FileWrite>,
         updates: Vec<DeltaWrite>,
     ) -> Result<(), String> {
         self.transaction_active = true;
+        self.extract_media(&mut files)?;
         let dirty: Vec<_> = self.dirty_nodes.iter().cloned().collect();
         let mut records = HashMap::new();
         for id in &dirty {
