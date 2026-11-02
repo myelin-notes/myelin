@@ -85,6 +85,7 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
+import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -133,6 +134,7 @@ function CanvasViewInner({
   const repository = useRepository();
   const strings = useMessages();
   const { types: flagTypes } = useFlagTypes();
+  const canvasRootRef = useRef<HTMLDivElement>(null);
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -141,6 +143,7 @@ function CanvasViewInner({
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
+  useVisibleCanvasSize(canvasRootRef);
   const toolState = useToolState(drawableCanvasRef);
   usePencilGestures({
     drawableCanvasRef,
@@ -632,6 +635,7 @@ function CanvasViewInner({
   // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
+      ref={canvasRootRef}
       data-canvas-root
       className="relative h-full w-full overflow-clip bg-page"
       style={surfaceStyle}

@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useRef } from 'react';
 import {
   Plus as PlusIcon,
   Ruler as RulerIcon,
@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
+import { ToolbarPanel } from './toolbar-panel';
 
 interface CanvasToolbarProps {
   tools: ITool[];
@@ -50,8 +51,6 @@ interface CanvasToolbarProps {
   insertPopover?: React.ReactNode;
   embedComposer?: React.ReactNode;
 }
-
-const PANEL_VIEWPORT_MARGIN = 16;
 
 function getCustomColorTool(tool: ITool | undefined): CustomColorTool | null {
   switch (tool?.id) {
@@ -99,8 +98,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
   const insertButtonRef = useRef<HTMLElement | null>(null);
-  const optionsPanelRef = useRef<HTMLDivElement>(null);
-  const optionsPanelContentRef = useRef<HTMLDivElement>(null);
   // Compact stacks the panels above a bottom bar, where they span its width and
   // need no per-button alignment.
   const getButtonOffset = (btn: HTMLElement | null) => {
@@ -109,9 +106,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     }
     return btn.offsetTop - toolbarInnerRef.current.offsetTop;
   };
-  const optionsPanelOffset = getButtonOffset(
-    toolButtonRefs.current[selectedToolIndex],
-  );
   const insertPanelOffset = getButtonOffset(insertButtonRef.current);
   const tooltipSide = IS_PHONE_BUILD ? 'top' : onRight ? 'left' : 'right';
   // Panels hang off the rail's inner edge, or off the top of the bottom bar.
@@ -131,56 +125,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
     : 'my-1 h-px w-4 bg-border-divider';
   // 44px touch target on compact, against 36px for a cursor.
   const buttonPadClass = IS_PHONE_BUILD ? 'p-3.5' : 'p-2.5';
-
-  useLayoutEffect(() => {
-    if (IS_PHONE_BUILD || !optionsPresence.mounted) {
-      return;
-    }
-
-    const panel = optionsPanelRef.current;
-    const panelContent = optionsPanelContentRef.current;
-    const toolbar = toolbarRef.current;
-    const button = toolButtonRefs.current[selectedToolIndex];
-    if (!(panel && panelContent && toolbar && button)) {
-      return;
-    }
-
-    const syncPosition = () => {
-      const viewportTop = window.visualViewport?.offsetTop ?? 0;
-      const viewportHeight =
-        window.visualViewport?.height ?? window.innerHeight;
-      const viewportBottom = viewportTop + viewportHeight;
-      panelContent.style.setProperty(
-        '--tool-options-available-height',
-        `${Math.max(0, viewportHeight - PANEL_VIEWPORT_MARGIN * 2)}px`,
-      );
-      const panelHeight = panel.getBoundingClientRect().height;
-      const toolbarTop = toolbar.getBoundingClientRect().top;
-      const anchorTop = button.getBoundingClientRect().top;
-      const maxTop = viewportBottom - PANEL_VIEWPORT_MARGIN - panelHeight;
-      const top = Math.max(
-        viewportTop + PANEL_VIEWPORT_MARGIN,
-        Math.min(anchorTop, maxTop),
-      );
-
-      panel.style.top = `${Math.round(top - toolbarTop)}px`;
-    };
-
-    syncPosition();
-    const resizeObserver = new ResizeObserver(syncPosition);
-    resizeObserver.observe(panelContent);
-    resizeObserver.observe(toolbar);
-    window.addEventListener('resize', syncPosition);
-    window.visualViewport?.addEventListener('resize', syncPosition);
-    window.visualViewport?.addEventListener('scroll', syncPosition);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', syncPosition);
-      window.visualViewport?.removeEventListener('resize', syncPosition);
-      window.visualViewport?.removeEventListener('scroll', syncPosition);
-    };
-  }, [optionsPresence.mounted, selectedToolIndex]);
 
   return (
     <TooltipProvider>
@@ -205,10 +149,10 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         ref={toolbarRef}
         className={
           IS_PHONE_BUILD
-            ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+            ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-6rem)]'
             : onRight
-              ? 'fade-in-0 slide-in-from-right-3 absolute top-1/2 right-6 z-[100] max-h-[calc(100dvh-10rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
-              : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+              ? 'fade-in-0 slide-in-from-right-3 absolute top-1/2 right-6 z-[100] max-h-[calc(100dvh-10rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
+              : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
         }
         role="toolbar"
         aria-label="Canvas tools"
@@ -343,8 +287,12 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         </div>
 
         {optionsPresence.mounted && (
-          <div
-            ref={optionsPanelRef}
+          <ToolbarPanel
+            toolbarRef={toolbarRef}
+            getDesiredTop={() =>
+              toolButtonRefs.current[selectedToolIndex]?.getBoundingClientRect()
+                .top ?? 0
+            }
             {...optionsPresence.state}
             onAnimationEnd={optionsPresence.onAnimationEnd}
             className={`data-closed:fade-out-0 data-open:fade-in-0 duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${
@@ -354,17 +302,15 @@ export const CanvasToolbar = memo(function CanvasToolbar({
                   ? 'data-closed:slide-out-to-right-2 data-open:slide-in-from-right-2 mr-2'
                   : 'data-closed:slide-out-to-left-2 data-open:slide-in-from-left-2 ml-2'
             } ${optionsAnchorClass}`}
-            style={IS_PHONE_BUILD ? undefined : { top: optionsPanelOffset }}
           >
             <ToolOptionsPanel
               options={activeOptions}
               customColorTool={getCustomColorTool(tools[selectedToolIndex])}
-              containerRef={optionsPanelContentRef}
               savePresetDisabledReason={savePresetDisabledReason}
               onSavePreset={onSavePreset}
               editingPreset={editingPresetId !== null}
             />
-          </div>
+          </ToolbarPanel>
         )}
 
         {shelfOpen && (
