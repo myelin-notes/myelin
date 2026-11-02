@@ -40,8 +40,8 @@ function FontPicker({
   onChange: (family: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // On compact the whole panel sits just above the bottom bar, so a list
-  // dropping below the button would land off the bottom of the screen.
+  // On compact the panel is a short scroller above the bottom bar, which would
+  // clip a list floating either side of the button, so it expands in place.
   const containerRef = useRef<HTMLDivElement>(null);
   const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
     if (!containerRef.current?.contains(event.target as Node)) {
@@ -81,8 +81,10 @@ function FontPicker({
 
       {open && (
         <div
-          className={`absolute left-0 z-50 max-h-60 w-52 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
-            IS_PHONE_BUILD ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          className={`z-50 mt-1.5 max-h-60 overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
+            IS_PHONE_BUILD
+              ? 'w-full'
+              : 'absolute top-full left-0 w-52 max-w-[calc(100vw-2rem)]'
           }`}
         >
           {fonts.map((font) => (
