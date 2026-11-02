@@ -5,7 +5,11 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { ActiveRepository, RepositoryConfig } from './repo/config';
+import type {
+  ActiveRepository,
+  RepositoryConfig,
+  RepositoryRuntimeStatus,
+} from './repo/config';
 
 export interface RepositoryStatus {
   config: RepositoryConfig;
@@ -15,6 +19,7 @@ export interface RepositoryStatus {
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
   syncing: boolean;
+  mediaMigration: RepositoryRuntimeStatus['mediaMigration'];
   /** Bumped on every local repository mutation so views can refresh in sync. */
   dataVersion: number;
 }

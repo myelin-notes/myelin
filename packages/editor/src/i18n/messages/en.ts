@@ -1258,6 +1258,18 @@ const en = {
       },
     },
   },
+  mediaMigration: {
+    title: 'Optimizing storage',
+    description:
+      'Please keep Myelin open until this finishes. Also update Myelin on your other devices, or images, PDFs and audio may appear blank there.',
+    preparing: 'Preparing…',
+    progress: (completed: number, total: number) =>
+      `${completed} of ${total} documents`,
+    finishing: 'Finishing upload…',
+    unreachable:
+      'Your repository can’t be reached right now. This will finish by itself once it’s back.',
+    continueWithoutWaiting: 'Continue without waiting',
+  },
   shutdown: {
     title: 'Saving changes…',
     description: 'Syncing pending changes to your repository before quitting.',

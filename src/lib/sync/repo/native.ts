@@ -320,6 +320,7 @@ export class NativeRepository implements Repository {
       pendingRemoteWrites: status.pendingRemoteWrites,
       lastRemoteSyncAt: status.lastRemoteSyncAt,
       syncing: status.syncing,
+      mediaMigration: status.mediaMigration,
       dataVersion,
       lastError: status.lastError
         ? this.syncError(status.lastError, invalidateAuth)
@@ -694,6 +695,7 @@ export class NativeRepository implements Repository {
     lastRemoteSyncAt: null,
     lastError: null,
     syncing: false,
+    mediaMigration: null,
     dataVersion: 0,
   };
 

@@ -34,6 +34,8 @@ export interface RepositoryRuntimeStatus {
   lastError: Error | null;
   /** True while a sync has been running for over a second; quick checks never set it. */
   syncing: boolean;
+  /** Set while existing documents move to media storage. A `total` of 0 means still counting. */
+  mediaMigration: { completed: number; total: number } | null;
   /**
    * Incremented on every local repository mutation — including ones made outside the current view,
    * such as the tab bar creating a file for a new tab. Unlike `lastRemoteSyncAt`, this advances for

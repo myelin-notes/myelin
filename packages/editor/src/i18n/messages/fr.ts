@@ -1282,6 +1282,18 @@ const fr: typeof en = {
       },
     },
   },
+  mediaMigration: {
+    title: 'Optimisation du stockage',
+    description:
+      'Gardez Myelin ouvert jusqu’à la fin. Mettez aussi à jour Myelin sur vos autres appareils, sinon les images, les PDF et l’audio risquent d’y apparaître vides.',
+    preparing: 'Préparation…',
+    progress: (completed: number, total: number) =>
+      `${completed} documents sur ${total}`,
+    finishing: 'Fin de l’envoi…',
+    unreachable:
+      'Votre dépôt est inaccessible pour le moment. L’opération se terminera d’elle-même dès qu’il sera de nouveau disponible.',
+    continueWithoutWaiting: 'Continuer sans attendre',
+  },
   shutdown: {
     title: 'Enregistrement des modifications…',
     description:

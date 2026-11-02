@@ -1268,6 +1268,18 @@ const es: typeof en = {
       },
     },
   },
+  mediaMigration: {
+    title: 'Optimizando el almacenamiento',
+    description:
+      'Mantén Myelin abierto hasta que termine. Actualiza también Myelin en tus otros dispositivos; de lo contrario, las imágenes, los PDF y el audio podrían aparecer en blanco.',
+    preparing: 'Preparando…',
+    progress: (completed: number, total: number) =>
+      `${completed} de ${total} documentos`,
+    finishing: 'Terminando la subida…',
+    unreachable:
+      'No se puede acceder a tu repositorio en este momento. Esto terminará por sí solo cuando vuelva a estar disponible.',
+    continueWithoutWaiting: 'Continuar sin esperar',
+  },
   shutdown: {
     title: 'Guardando cambios…',
     description:
