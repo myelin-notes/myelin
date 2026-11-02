@@ -310,13 +310,18 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         )}
 
         {shelfOpen && (
-          <div
+          <ToolbarPanel
+            toolbarRef={toolbarRef}
+            getDesiredTop={(panelHeight) =>
+              (toolbarRef.current?.getBoundingClientRect().bottom ?? 0) -
+              panelHeight
+            }
             className={
               IS_PHONE_BUILD
                 ? panelAnchorClass
                 : onRight
-                  ? 'absolute right-full bottom-0 mr-2'
-                  : 'absolute bottom-0 left-full ml-2'
+                  ? 'absolute top-0 right-full mr-2'
+                  : 'absolute top-0 left-full ml-2'
             }
           >
             <ToolShelf
@@ -332,7 +337,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               onClose={onCloseShelf}
               containerRef={toolbarRef}
             />
-          </div>
+          </ToolbarPanel>
         )}
 
         {!shelfOpen && embedComposer && (
