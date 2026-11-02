@@ -22,6 +22,7 @@ import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { AddColorSwatch } from '../../components/add-color-swatch';
 import { ColorSwatch } from '../../components/color-swatch';
 import { CustomColorSwatch } from '../../components/custom-color-swatch';
+import { useKeepPopoverOnScreen } from '../../components/use-keep-popover-on-screen';
 import { useCustomColors } from '../../custom-colors';
 import { PM_UPDATE_EVENT } from '../../events';
 import {
@@ -506,8 +507,11 @@ function Divider() {
 }
 
 function Popover({ children }: { children: React.ReactNode }) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  useKeepPopoverOnScreen(popoverRef);
   return (
     <div
+      ref={popoverRef}
       className="fade-in-0 zoom-in-95 absolute top-full left-1/2 z-[51] mt-1 min-w-[180px] animate-in overflow-hidden rounded-xl bg-popover/95 p-1 shadow-ambient backdrop-blur-2xl duration-100"
       style={{
         transform: 'translateX(-50%)',

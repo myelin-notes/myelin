@@ -9,6 +9,7 @@ import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { CustomColorSwatch } from '@myelin/editor/components/custom-color-swatch';
 import { FontSizeField } from '@myelin/editor/components/font-size-field';
+import { useKeepPopoverOnScreen } from '@myelin/editor/components/use-keep-popover-on-screen';
 import { useCustomColors } from '@myelin/editor/custom-colors';
 import type {
   TextElement,
@@ -252,8 +253,11 @@ function StyleButton({
 }
 
 function Popover({ children }: { children: React.ReactNode }) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  useKeepPopoverOnScreen(popoverRef);
   return (
     <div
+      ref={popoverRef}
       className="fade-in-0 zoom-in-95 absolute top-full left-1/2 z-[111] mt-1.5 min-w-[160px] animate-in overflow-hidden rounded-xl bg-popover/95 p-1 shadow-ambient backdrop-blur-2xl duration-100"
       style={{
         transform: 'translateX(-50%)',
