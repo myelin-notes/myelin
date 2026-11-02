@@ -486,38 +486,40 @@ impl Store {
         Ok(())
     }
 
-    pub fn documents_large_enough_for_media(&self) -> Result<Vec<String>, String> {
+    /// Documents big enough to hold inline media, with where each is stored.
+    pub fn documents_large_enough_for_media(&self) -> Result<Vec<(String, PathBuf)>, String> {
         let mut documents = Vec::new();
         for (id, node) in self.manifest["nodes"].as_object().unwrap() {
             if node["type"] == "file" && node["fileType"] == "mcanvas" {
                 let path = self.root.join("files").join(file_name(node)?);
-                if fs::metadata(path).is_ok_and(|file| file.len() as usize >= media::MIN_BYTES) {
-                    documents.push(id.clone());
+                if fs::metadata(&path).is_ok_and(|file| file.len() as usize >= media::MIN_BYTES) {
+                    documents.push((id.clone(), path));
                 }
             }
         }
         Ok(documents)
     }
 
-    /// Rewrites a document stored with inline media and queues it for upload. Returns whether it did.
-    pub fn extract_document_media(&mut self, id: &str) -> Result<bool, String> {
+    /// Rewrites a document stored with inline media and queues it for upload. Returns the size of the
+    /// complete document, which is what a sync has to hold in memory to upload it.
+    pub fn extract_document_media(&mut self, id: &str) -> Result<usize, String> {
         let node = self.manifest["nodes"][id].clone();
         if node["fileType"] != "mcanvas" {
-            return Ok(false);
+            return Ok(0);
         }
         let name = file_name(&node)?;
         let path = self.root.join("files").join(&name);
         reject_symlink(&path)?;
         if !fs::read(path).is_ok_and(|stored| media::has_inline_media(&stored)) {
-            return Ok(false);
+            return Ok(0);
         }
         let bytes = self.read_file(&node)?;
         self.queue("push-note", Some(id), json!({}));
         self.commit(vec![FileWrite {
             name,
-            bytes: Some(STANDARD.encode(bytes)),
+            bytes: Some(STANDARD.encode(&bytes)),
         }])?;
-        Ok(true)
+        Ok(bytes.len())
     }
 
     pub fn doc(&mut self, id: &str) -> Result<&Doc, String> {

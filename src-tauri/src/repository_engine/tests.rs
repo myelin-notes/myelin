@@ -34,6 +34,7 @@ impl TestDirectory {
             syncing: AtomicBool::new(false),
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
+            media_migration: Mutex::new(None),
             cache_dir: self.0.join("cache"),
         })
     }
@@ -3522,21 +3523,14 @@ async fn documents_and_versions_written_before_media_storage_are_rewritten_and_u
         .await
         .unwrap();
     assert_eq!(stored_file(&directory, "drawing.myelin"), inline);
-    let before = read(&engine, "drawing").await;
 
-    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
-        .await
-        .unwrap();
+    migrate_with_scheduler(&engine, &server.endpoints).await;
     for name in ["drawing.myelin", "old-version.myelin"] {
         assert!(stored_file(&directory, name).len() < 2048, "{name}");
     }
-    assert_eq!(read(&engine, "drawing").await, before);
-    assert_eq!(read(&engine, "old-version").await, before);
+    assert_media_intact(&read(&engine, "drawing").await);
+    assert_media_intact(&read(&engine, "old-version").await);
 
-    engine
-        .cycle(github_source(), &server.endpoints)
-        .await
-        .unwrap();
     assert!(engine.store.lock().unwrap().outbox.is_empty());
     {
         let remote = state.lock().unwrap();
@@ -3552,11 +3546,124 @@ async fn documents_and_versions_written_before_media_storage_are_rewritten_and_u
         );
     }
 
-    // Finding nothing left to do must not queue another upload.
-    RepositoryEngine::extract_existing_media(Arc::downgrade(&engine))
+    // Finding nothing left to do must not queue another upload or show progress.
+    RepositoryEngine::migrate_media(Arc::downgrade(&engine), None)
         .await
         .unwrap();
     assert!(engine.store.lock().unwrap().outbox.is_empty());
+    assert!(engine.media_migration.lock().unwrap().is_none());
+}
+
+// Runs the migration with a stand-in for the scheduler, syncing whenever the migration asks. Returns
+// the most documents any one sync had queued.
+async fn migrate_with_scheduler(
+    engine: &Arc<RepositoryEngine>,
+    endpoints: &RemoteEndpoints,
+) -> usize {
+    let migration = tokio::spawn(RepositoryEngine::migrate_media(
+        Arc::downgrade(engine),
+        None,
+    ));
+    let mut largest_sync = 0;
+    while !migration.is_finished() {
+        tokio::select! {
+            _ = engine.wake.notified() => {
+                let queued = engine
+                    .store
+                    .lock()
+                    .unwrap()
+                    .outbox
+                    .iter()
+                    .filter(|op| {
+                        op["kind"] == "push-note"
+                            && op["nodeId"].as_str().is_some_and(|id| id.starts_with("doc-"))
+                    })
+                    .count();
+                largest_sync = largest_sync.max(queued);
+                engine.cycle(github_source(), endpoints).await.unwrap();
+            }
+            _ = tokio::time::sleep(std::time::Duration::from_millis(50)) => {}
+        }
+    }
+    migration.await.unwrap().unwrap();
+    largest_sync
+}
+
+fn inline_documents(count: usize) -> Arc<Mutex<GitHubFixture>> {
+    let mut manifest = manifest_with("doc-0", "mcanvas");
+    let mut files = HashMap::new();
+    for index in 0..count {
+        let id = format!("doc-{index}");
+        manifest["nodes"][&id] = node(&id, "mcanvas");
+        files.insert(id, media_fixture("document"));
+    }
+    Arc::new(Mutex::new(GitHubFixture::new(manifest, files)))
+}
+
+#[tokio::test]
+async fn migration_uploads_each_batch_before_rewriting_more() {
+    let state = inline_documents(7);
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+
+    // The fixture is 4.5 KB and a batch closes at 8 KB, so at most two documents share a sync.
+    let largest_sync = migrate_with_scheduler(&engine, &server.endpoints).await;
+    assert!(largest_sync > 0);
+    assert!(largest_sync <= 2, "one sync held {largest_sync} documents");
+
+    assert!(engine.store.lock().unwrap().outbox.is_empty());
+    assert!(engine.media_migration.lock().unwrap().is_none());
+    let remote = state.lock().unwrap();
+    for index in 0..7 {
+        assert!(remote.files[&format!("doc-{index}")].len() < 2048);
+    }
+}
+
+#[tokio::test]
+async fn migration_rewrites_no_more_until_a_stuck_upload_goes_through() {
+    let state = inline_documents(7);
+    let remote = state.clone();
+    let server = TestServer::new(move |request| remote.lock().unwrap().handle(request)).await;
+    let directory = TestDirectory::new();
+    let engine = directory.engine(true);
+    engine
+        .cycle(github_source(), &server.endpoints)
+        .await
+        .unwrap();
+    let migration = tokio::spawn(RepositoryEngine::migrate_media(
+        Arc::downgrade(&engine),
+        None,
+    ));
+
+    // Nothing syncs here, as on a device that is offline.
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    let rewritten = (0..7)
+        .filter(|index| stored_file(&directory, &format!("doc-{index}.myelin")).len() < 2048)
+        .count();
+    assert_eq!(rewritten, 2);
+    let progress = engine.media_migration.lock().unwrap().clone().unwrap();
+    assert_eq!((progress.completed, progress.total), (1, 7));
+    assert!(!migration.is_finished());
+
+    let mut synced = false;
+    while !migration.is_finished() {
+        engine
+            .cycle(github_source(), &server.endpoints)
+            .await
+            .unwrap();
+        synced = true;
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    migration.await.unwrap().unwrap();
+    assert!(synced);
+    assert!(engine.media_migration.lock().unwrap().is_none());
+    assert!(state.lock().unwrap().files["doc-6"].len() < 2048);
 }
 
 // Across devices, compare content: yrs re-encodes JSON maps with their keys in no fixed order.
