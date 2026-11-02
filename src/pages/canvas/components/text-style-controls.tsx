@@ -221,7 +221,7 @@ interface StyleButtonProps {
   onClick: () => void;
 }
 
-function StyleButton({
+export function StyleButton({
   children,
   label,
   active,

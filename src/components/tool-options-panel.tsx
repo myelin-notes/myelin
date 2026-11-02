@@ -17,10 +17,11 @@ interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
   containerRef?: Ref<HTMLDivElement>;
-  /** Null when the live tool can be saved as a preset; otherwise why it can't. */
-  savePresetDisabledReason: string | null;
-  onSavePreset: () => void;
+  /** Null when the live tool can be saved as a preset; otherwise why it can't. Omit to hide saving. */
+  savePresetDisabledReason?: string | null;
+  onSavePreset?: () => void;
   editingPreset?: boolean;
+  onSwatchMenuOpenChange?: (open: boolean) => void;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -127,6 +128,7 @@ export function ToolOptionsPanel({
   savePresetDisabledReason,
   onSavePreset,
   editingPreset = false,
+  onSwatchMenuOpenChange,
 }: ToolOptionsPanelProps) {
   const strings = useMessages();
   const {
@@ -179,6 +181,7 @@ export function ToolOptionsPanel({
                         }
                         void removeColor(color);
                       }}
+                      onMenuOpenChange={onSwatchMenuOpenChange}
                     />
                   ))}
                 {customColorTool && canAddColor && (

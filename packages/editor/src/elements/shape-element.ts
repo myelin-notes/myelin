@@ -15,7 +15,7 @@ import {
   type SelectionToolbarItem,
 } from './drawable-element';
 import { ElementType } from './element-type';
-import type { StrokeStyle } from './stroke-element';
+import type { StrokeStyle, StrokeStyleUpdate } from './stroke-element';
 
 /** Number of segments used to approximate an ellipse outline in PDF export. */
 const ELLIPSE_PDF_SEGMENTS = 32;
@@ -58,6 +58,13 @@ export class ShapeElement extends AnchorableElement {
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
+  }
+
+  public setStrokeStyle(updates: StrokeStyleUpdate): void {
+    this.style = { ...this.style, ...updates };
+    this.updateBounds();
+    this.syncToYMap(updates);
+    this.onTransformChanged?.();
   }
 
   public toStrokePointRuns(maxWorldSpacing = 2): number[][] {
@@ -122,11 +129,15 @@ export class ShapeElement extends AnchorableElement {
         this.shapeType = v as ShapeType;
         this.updateBounds();
       },
+      // Undo and remote edits land here; setStrokeStyle handles local ones.
       color: (v) => {
         this.style.color = v as string;
+        this.onTransformChanged?.();
       },
       size: (v) => {
         this.style.size = v as number;
+        this.updateBounds();
+        this.onTransformChanged?.();
       },
       geom: (v) => {
         this.geom = normalizeGeom(this.shapeType, v as number[]);
