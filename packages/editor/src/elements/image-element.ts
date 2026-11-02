@@ -38,6 +38,7 @@ export class ImageElement extends AnchorableElement {
   // So a render that starts before the bitmap lands can await it instead of drawing nothing.
   // Settles (never rejects) once the decode finishes or fails.
   private _bitmapDecode: Promise<void> | null = null;
+  private _disposed: boolean = false;
   private _naturalWidth: number = 0;
   private _naturalHeight: number = 0;
   private _cropX: number = 0;
@@ -101,8 +102,9 @@ export class ImageElement extends AnchorableElement {
         const blob = new Blob([(v as Uint8Array).slice()]);
         this._bitmapDecode = createImageBitmap(blob).then(
           (bmp) => {
-            this._bitmap = bmp;
-            this.onRedrawNeeded?.();
+            if (this.adoptBitmap(bmp)) {
+              this.onRedrawNeeded?.();
+            }
           },
           () => {
             // A corrupt blob leaves _bitmap null; draw passes already no-op.
@@ -131,11 +133,36 @@ export class ImageElement extends AnchorableElement {
     return !this._cropMode;
   }
 
+  // Bitmaps are closed rather than left to GC, which is late to reclaim their decoded pixels.
+  // Returns false if this element was disposed while the bitmap decoded.
+  private adoptBitmap(bitmap: ImageBitmap): boolean {
+    if (this._disposed) {
+      bitmap.close();
+      return false;
+    }
+    this._bitmap?.close();
+    this._bitmap = bitmap;
+    return true;
+  }
+
+  public override disposeCanvas(): void {
+    this._disposed = true;
+    // Crop mode entered from the toolbar has no edit session to exit it, and its document listener
+    // would keep this element alive.
+    this.exitCropMode();
+    this._bitmap?.close();
+    this._bitmap = null;
+    super.disposeCanvas();
+  }
+
   public async setImageData(data: ArrayBuffer, sourceUrl?: string) {
     const blob = new Blob([data]);
-    this._bitmap = await createImageBitmap(blob);
-    this._naturalWidth = this._bitmap.width;
-    this._naturalHeight = this._bitmap.height;
+    const bitmap = await createImageBitmap(blob);
+    if (!this.adoptBitmap(bitmap)) {
+      return;
+    }
+    this._naturalWidth = bitmap.width;
+    this._naturalHeight = bitmap.height;
     this._cropX = 0;
     this._cropY = 0;
     this._cropW = this._naturalWidth;
