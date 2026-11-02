@@ -40,12 +40,14 @@ export const TitleBar = memo(function TitleBar({ trailing }: TitleBarProps) {
   // Compact drops these into the thumb zone just above the tool bar: undo and
   // redo live here, and the top corners of a tall phone are the hardest point
   // to reach one-handed.
+  // Chip popovers position against this bar, not their chip: a wide popover
+  // hung off a chip mid-bar would run past the left edge of a narrow canvas.
   return (
     <div
       className={
         IS_PHONE_BUILD
-          ? 'fade-in-0 slide-in-from-bottom-2 absolute right-3 bottom-[5rem] z-[100] flex animate-in items-center gap-2 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border-subtle/70 duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
-          : 'fade-in-0 slide-in-from-top-2 absolute top-6 right-6 z-[100] flex animate-in items-center gap-2 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border-subtle/70 duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]'
+          ? 'fade-in-0 slide-in-from-bottom-2 absolute right-3 bottom-[5rem] z-[100] flex animate-in items-center gap-2 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border-subtle/70 duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--title-popover-room:calc(var(--canvas-visible-height)-9.5rem)]'
+          : 'fade-in-0 slide-in-from-top-2 absolute top-6 right-6 z-[100] flex animate-in items-center gap-2 rounded-xl bg-card px-3 py-2.5 ring-1 ring-border-subtle/70 duration-[350ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--title-popover-room:calc(var(--canvas-visible-height)-6rem)]'
       }
     >
       {trailing}
