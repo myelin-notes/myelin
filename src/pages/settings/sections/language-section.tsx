@@ -14,7 +14,7 @@ export function LanguageSection() {
           {strings.settings.language.eyebrow}
         </span>
       </div>
-      <LanguagePicker collisionPadding={{ bottom: -200 }} />
+      <LanguagePicker />
     </section>
   );
 }

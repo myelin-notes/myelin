@@ -49,7 +49,7 @@ export function CommandPaletteList({
   return (
     <div
       ref={viewportRef}
-      className="max-h-[min(26rem,56vh)] space-y-1 overflow-y-auto"
+      className="max-h-[min(26rem,56dvh,calc(var(--palette-visible-bottom,100dvh)-12dvh-8rem))] space-y-1 overflow-y-auto"
       onMouseLeave={() => {
         setHoveredIndex(null);
         lastPointerPositionRef.current = null;

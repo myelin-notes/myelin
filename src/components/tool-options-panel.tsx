@@ -1,4 +1,4 @@
-import { type Ref, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { ChevronDown as ChevronDownIcon, Plus as PlusIcon } from 'lucide-react';
 import { AddColorSwatch } from '@myelin/editor/components/add-color-swatch';
 import { ColorSwatch } from '@myelin/editor/components/color-swatch';
@@ -16,7 +16,6 @@ import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
-  containerRef?: Ref<HTMLDivElement>;
   /** Null when the live tool can be saved as a preset; otherwise why it can't. */
   savePresetDisabledReason: string | null;
   onSavePreset: () => void;
@@ -41,8 +40,8 @@ function FontPicker({
   onChange: (family: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  // On compact the whole panel sits just above the bottom bar, so a list
-  // dropping below the button would land off the bottom of the screen.
+  // On compact the panel is a short scroller above the bottom bar, which would
+  // clip a list floating either side of the button, so it expands in place.
   const containerRef = useRef<HTMLDivElement>(null);
   const handleWindowPointerDown = useEffectEvent((event: PointerEvent) => {
     if (!containerRef.current?.contains(event.target as Node)) {
@@ -82,8 +81,10 @@ function FontPicker({
 
       {open && (
         <div
-          className={`absolute left-0 z-50 max-h-60 w-52 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
-            IS_PHONE_BUILD ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
+          className={`z-50 mt-1.5 max-h-60 overflow-y-auto rounded-xl bg-card py-1 shadow-ambient ${
+            IS_PHONE_BUILD
+              ? 'w-full'
+              : 'absolute top-full left-0 w-52 max-w-[calc(100vw-2rem)]'
           }`}
         >
           {fonts.map((font) => (
@@ -123,7 +124,6 @@ function FontPicker({
 export function ToolOptionsPanel({
   options,
   customColorTool,
-  containerRef,
   savePresetDisabledReason,
   onSavePreset,
   editingPreset = false,
@@ -141,10 +141,7 @@ export function ToolOptionsPanel({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="flex max-h-[min(44rem,var(--tool-options-available-height,calc(100dvh-6rem)))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md"
-    >
+    <div className="flex max-h-[min(44rem,var(--toolbar-panel-room))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
       {options.map((option) => {
         if (option.type === 'color') {
           return (

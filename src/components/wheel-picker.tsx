@@ -6,7 +6,14 @@ import {
   useRef,
   useState,
 } from 'react';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
+
+// Centres rather than clamps when the range is inverted: the window is too small to fit the wheel,
+// and pinning it to one edge would push the whole overflow off the other.
+function clampOrCenter(value: number, min: number, max: number): number {
+  return min > max ? (min + max) / 2 : Math.min(Math.max(value, min), max);
+}
 
 const TWO_PI = 2 * Math.PI;
 // Ring 0 divides the circle evenly, so adjacent centres are a chord of 2r·sin(π/n) apart. At the
@@ -140,10 +147,17 @@ export const WheelPicker = memo(function WheelPicker({
       // Clamp center within viewport so outermost ring (R2) stays on-screen.
       // Pointer still tracks absolute motion against the clamped center.
       const outer = radius + 60 + 55 + 24;
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const cx = Math.min(Math.max(event.clientX, outer), vw - outer);
-      const cy = Math.min(Math.max(event.clientY, outer), vh - outer);
+      const visible = getVisibleViewportBounds();
+      const cx = clampOrCenter(
+        event.clientX,
+        visible.left + outer,
+        visible.right - outer,
+      );
+      const cy = clampOrCenter(
+        event.clientY,
+        visible.top + outer,
+        visible.bottom - outer,
+      );
       if (groupRef.current) {
         // groupRef is absolutely positioned within a container that may be offset from the viewport (e.g.
         // by the sidebar), so convert the pointer position into container-local space. Hit-testing

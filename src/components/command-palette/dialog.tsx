@@ -1,5 +1,10 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Command } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
+import {
+  getVisibleViewportBounds,
+  subscribeVisibleViewport,
+} from '@myelin/shared/visible-viewport';
 import { usePresence } from '@myelin/ui';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { CommandPaletteList } from './list';
@@ -23,6 +28,23 @@ export function CommandPaletteDialog({
 }: CommandPaletteDialogProps) {
   const strings = useMessages();
   const presence = usePresence(open);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // The palette opens with the keyboard up on touch devices, and 100dvh doesn't shrink for it on iOS.
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    if (!(presence.mounted && overlay)) {
+      return;
+    }
+    const sync = () => {
+      overlay.style.setProperty(
+        '--palette-visible-bottom',
+        `${getVisibleViewportBounds().bottom}px`,
+      );
+    };
+    sync();
+    return subscribeVisibleViewport(sync);
+  }, [presence.mounted]);
 
   if (!presence.mounted) {
     return null;
@@ -30,9 +52,10 @@ export function CommandPaletteDialog({
 
   return (
     <div
+      ref={overlayRef}
       {...presence.state}
       onAnimationEnd={presence.onAnimationEnd}
-      className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-200 flex items-start justify-center bg-overlay-strong px-4 pt-[12vh] duration-150 data-closed:animate-out data-open:animate-in"
+      className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-200 flex items-start justify-center bg-overlay-strong px-4 pt-[max(12dvh,env(safe-area-inset-top))] duration-150 data-closed:animate-out data-open:animate-in"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();

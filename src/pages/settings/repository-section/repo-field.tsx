@@ -57,7 +57,10 @@ export function RepoField({
         )}
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-text-muted transition-transform duration-200 group-data-popup-open:rotate-180" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-80 min-w-56">
+      <DropdownMenuContent
+        align="start"
+        className="max-h-[min(20rem,var(--available-height))] min-w-56"
+      >
         {loading && !hasRepos ? (
           <MenuLoadingRow
             label={strings.settings.repository.fields.repo.loading}

@@ -108,7 +108,7 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div
         role="dialog"
         aria-modal="true"
@@ -133,13 +133,13 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             <XIcon className="size-4" />
           </button>
         </div>
-        <div className="relative flex min-h-56 items-center justify-center bg-black">
+        <div className="relative flex min-h-[min(14rem,calc(var(--app-height)-9rem))] items-center justify-center bg-black">
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
-            className="max-h-[65vh] w-full object-contain"
+            className="max-h-[min(65vh,calc(var(--app-height)-9rem))] w-full object-contain"
           />
           {!ready && !error && (
             <span className="absolute flex items-center gap-2 text-sm text-white">
