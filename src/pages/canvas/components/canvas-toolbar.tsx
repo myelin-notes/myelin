@@ -95,18 +95,10 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   const optionsPresence = usePresence(optionsOpen);
   const onRight = useUserPref('toolbarSide') === 'right' && !IS_PHONE_BUILD;
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const toolbarInnerRef = useRef<HTMLDivElement>(null);
   const toolButtonRefs = useRef<(HTMLElement | null)[]>([]);
   const insertButtonRef = useRef<HTMLElement | null>(null);
-  // Compact stacks the panels above a bottom bar, where they span its width and
-  // need no per-button alignment.
-  const getButtonOffset = (btn: HTMLElement | null) => {
-    if (IS_PHONE_BUILD || !(btn && toolbarInnerRef.current)) {
-      return 0;
-    }
-    return btn.offsetTop - toolbarInnerRef.current.offsetTop;
-  };
-  const insertPanelOffset = getButtonOffset(insertButtonRef.current);
+  const getInsertButtonTop = () =>
+    insertButtonRef.current?.getBoundingClientRect().top ?? 0;
   const tooltipSide = IS_PHONE_BUILD ? 'top' : onRight ? 'left' : 'right';
   // Panels hang off the rail's inner edge, or off the top of the bottom bar.
   // Insert and embed bring their own ml-2, so only the right rail adds a gap.
@@ -119,7 +111,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
   // mostly empty. On compact it sizes to its content and centres over the bar.
   const optionsAnchorClass = IS_PHONE_BUILD
     ? 'absolute right-0 bottom-full left-0 mx-auto mb-2 w-[calc(100vw-1.5rem)] max-w-72'
-    : `absolute top-0 w-60 max-w-[calc(100vw-5rem)] ${onRight ? 'right-full' : 'left-full'}`;
+    : `absolute top-0 w-60 max-w-[calc(var(--canvas-visible-width)-5rem)] ${onRight ? 'right-full' : 'left-full'}`;
   const dividerClass = IS_PHONE_BUILD
     ? 'mx-1 h-4 w-px bg-border-divider'
     : 'my-1 h-px w-4 bg-border-divider';
@@ -159,7 +151,6 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         aria-label="Canvas tools"
       >
         <div
-          ref={toolbarInnerRef}
           className={
             IS_PHONE_BUILD
               ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
@@ -341,25 +332,23 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         )}
 
         {!shelfOpen && embedComposer && (
-          <div
+          <ToolbarPanel
+            toolbarRef={toolbarRef}
+            getDesiredTop={getInsertButtonTop}
             className={panelAnchorClass}
-            style={
-              IS_PHONE_BUILD ? undefined : { paddingTop: insertPanelOffset }
-            }
           >
             {embedComposer}
-          </div>
+          </ToolbarPanel>
         )}
 
         {insertOpen && !shelfOpen && (
-          <div
+          <ToolbarPanel
+            toolbarRef={toolbarRef}
+            getDesiredTop={getInsertButtonTop}
             className={panelAnchorClass}
-            style={
-              IS_PHONE_BUILD ? undefined : { paddingTop: insertPanelOffset }
-            }
           >
             {insertPopover}
-          </div>
+          </ToolbarPanel>
         )}
       </div>
     </TooltipProvider>

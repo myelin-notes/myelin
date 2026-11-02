@@ -186,7 +186,7 @@ export function InsertPopover({
   return (
     <div
       ref={panelRef}
-      className="fade-in-0 slide-in-from-left-2 zoom-in-95 ml-2 w-[260px] animate-in overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] duration-[220ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+      className="fade-in-0 slide-in-from-left-2 zoom-in-95 ml-2 max-h-[var(--toolbar-panel-room,calc(var(--canvas-visible-height)-2rem))] w-[260px] animate-in overflow-y-auto overscroll-contain rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] duration-[220ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
       role="menu"
       onKeyDown={onPanelKeyDown}
     >
