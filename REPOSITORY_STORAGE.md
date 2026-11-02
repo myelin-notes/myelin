@@ -24,9 +24,13 @@ Media that is missing, or does not match its hash, leaves the reference in the d
 
 ### Upgrading existing repositories
 
-After opening, a background pass rewrites documents that still hold inline media, one at a time, and queues them for upload. It keeps no state: documents below the size threshold cannot hold inline media and are skipped, and rewriting an already extracted document changes nothing.
+After opening, a background pass rewrites documents that still hold inline media and queues them for upload. It keeps no state: documents below the size threshold cannot hold inline media and are skipped, and rewriting an already extracted document changes nothing, so an interrupted upgrade simply continues the next time the repository opens.
 
-Older app versions load references as corrupt media and show those elements blank. They keep references intact when saving, and anything they push with inline media is extracted by the next device running a current version. Update every device using a repository to avoid blank media.
+A sync holds every queued document in memory with its media restored, so the pass stops after about 64 MB of documents and waits for them to upload before rewriting more. A big repository therefore takes several syncs and appears as several GitHub commits, and is valid at every point along the way. A device that cannot sync stops after one batch instead of queueing the whole repository.
+
+While this runs, a dialog blocks the app and asks people to update their other devices. It closes when every document is rewritten and uploaded. If the repository cannot be reached it offers a way to continue, because signing back in happens behind the dialog, and the upgrade carries on in the background.
+
+Older app versions load references as corrupt media and show those elements blank. They keep references intact when saving, and anything they push with inline media is extracted by the next device running a current version. A device that already held a document keeps showing its media, so this mostly affects fresh downloads. Update every device using a repository to avoid blank media.
 
 ### Cleanup
 
