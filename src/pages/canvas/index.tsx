@@ -70,6 +70,7 @@ import { CanvasSearch } from './components/canvas-search';
 import { CanvasStyleButton } from './components/canvas-style-button';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
+import { ContextInsertAnchor } from './components/context-insert-anchor';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
 import { FlagsChip } from './components/flags-chip';
@@ -773,12 +774,9 @@ function CanvasViewInner({
       />
 
       {inserts.contextInsert && (
-        <div
-          className="pointer-events-auto absolute z-20"
-          style={{
-            left: inserts.contextInsert.screenX,
-            top: inserts.contextInsert.screenY,
-          }}
+        <ContextInsertAnchor
+          screenX={inserts.contextInsert.screenX}
+          screenY={inserts.contextInsert.screenY}
         >
           <InsertPopover
             onPaste={() => {
@@ -792,7 +790,7 @@ function CanvasViewInner({
             onTakePhoto={inserts.onContextTakePhoto}
             onClose={inserts.closeContextInsert}
           />
-        </div>
+        </ContextInsertAnchor>
       )}
 
       <div
