@@ -150,9 +150,10 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         className={
           IS_PHONE_BUILD
             ? 'fade-in-0 slide-in-from-bottom-3 absolute inset-x-0 bottom-0 z-[100] flex animate-in justify-center px-3 pb-3 duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-6rem)]'
-            : onRight
-              ? 'fade-in-0 slide-in-from-right-3 absolute top-1/2 right-6 z-[100] max-h-[calc(100dvh-10rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
-              : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
+            : // Shorter on the right, where the title bar and status bar share the edge.
+              onRight
+              ? 'fade-in-0 slide-in-from-right-3 absolute top-1/2 right-6 z-[100] flex max-h-[calc(100%-10rem)] -translate-y-1/2 animate-in flex-col duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
+              : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] flex max-h-[calc(100%-2rem)] -translate-y-1/2 animate-in flex-col duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
         }
         role="toolbar"
         aria-label="Canvas tools"
@@ -162,12 +163,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
           className={
             IS_PHONE_BUILD
               ? 'flex max-w-full flex-row items-center gap-1 overflow-x-auto rounded-xl bg-card px-2 py-2 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-              : `flex flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                  // Shorter on the right, where the title bar and status bar share the edge.
-                  onRight
-                    ? 'max-h-[calc(100dvh-10rem)]'
-                    : 'max-h-[calc(100dvh-6rem)]'
-                }`
+              : 'flex min-h-0 flex-col items-center gap-1 overflow-y-auto rounded-xl bg-card px-2 py-3 ring-1 ring-border-subtle/70 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
           }
         >
           <Tooltip>
