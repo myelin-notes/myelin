@@ -1,6 +1,7 @@
 import { Logger } from '@myelin/shared/logger';
 import { getPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
+import { withTimeout } from '../utils/with-timeout';
 
 export interface ThumbnailProducer {
   render(
@@ -19,6 +20,8 @@ export interface ThumbnailRegenerationOptions {
 
 const MAX_SIZE = 600;
 const SCHEDULED_DEBOUNCE_MS = 30_000;
+// Note teardown waits on renders, so one that never settles would pin the canvas and session.
+const RENDER_TIMEOUT_MS = 10_000;
 const THUMBNAILS_DIR = 'Thumbnails';
 
 function cachePath(nodeId: VFSNodeId): string {
@@ -85,6 +88,25 @@ export function requestThumbnailRegeneration(
   debounceTimers.set(nodeId, timer);
 }
 
+/**
+ * The cache is local and only edits write to it, so notes that were imported, synced in, or opened
+ * after a cache wipe have no thumbnail until this schedules one.
+ */
+export async function ensureThumbnail(
+  nodeId: VFSNodeId,
+  options: ThumbnailRegenerationOptions = {},
+): Promise<void> {
+  const url = await getPlatform().artifactCache.getUrl(cachePath(nodeId));
+  if (url === null) {
+    requestThumbnailRegeneration(nodeId, options);
+  }
+}
+
+/** Callers must keep the note's elements alive until this resolves, at most `RENDER_TIMEOUT_MS`. */
+export async function settleThumbnail(nodeId: VFSNodeId): Promise<void> {
+  await inflight.get(nodeId);
+}
+
 export async function regenerateThumbnailNow(nodeId: VFSNodeId): Promise<void> {
   const timer = debounceTimers.get(nodeId);
   if (timer !== undefined) {
@@ -128,10 +150,21 @@ export function subscribeThumbnail(
 }
 
 export async function clearAllThumbnails(): Promise<void> {
+  // A pending or running render would write its file back, and nothing else ever deletes it.
+  for (const timer of debounceTimers.values()) {
+    globalThis.clearTimeout(timer);
+  }
+  debounceTimers.clear();
+  await Promise.all(inflight.values());
   await getPlatform().artifactCache.remove(THUMBNAILS_DIR);
 }
 
 export async function removeThumbnail(nodeId: VFSNodeId): Promise<void> {
+  // Callers remove before the note's tab closes, and that close would flush a render back to disk.
+  globalThis.clearTimeout(debounceTimers.get(nodeId));
+  debounceTimers.delete(nodeId);
+  producers.delete(nodeId);
+  await settleThumbnail(nodeId);
   await getPlatform().artifactCache.remove(cachePath(nodeId));
   bumpVersion(nodeId);
   notify(nodeId);
@@ -158,7 +191,10 @@ async function runGenerate(
 
   const task = (async () => {
     try {
-      const blob = await producer.render(MAX_SIZE, { reason });
+      const blob = await withTimeout(
+        producer.render(MAX_SIZE, { reason }),
+        RENDER_TIMEOUT_MS,
+      );
       if (blob === null) {
         return;
       }

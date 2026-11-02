@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   repository: {
     createFileVersionIfDue: vi.fn(),
   },
+  ensureThumbnail: vi.fn(async () => {}),
   regenerateThumbnailNow: vi.fn(async () => {}),
   requestThumbnailRegeneration: vi.fn(),
   saveSessionAndCreateVersion: vi.fn(async () => true),
@@ -34,6 +35,7 @@ vi.mock('@/lib/sync', () => ({
 }));
 
 vi.mock('@myelin/editor/thumbnails', () => ({
+  ensureThumbnail: mocks.ensureThumbnail,
   regenerateThumbnailNow: mocks.regenerateThumbnailNow,
   requestThumbnailRegeneration: mocks.requestThumbnailRegeneration,
 }));
@@ -46,6 +48,7 @@ import { useCanvasSessionSaving } from './use-session-saving';
 
 interface MockNoteSession {
   id: string;
+  ydoc: { elements: { length: number } };
   hasUnsyncedChanges: () => boolean;
   save: () => Promise<void>;
   subscribeLocalChanges: (listener: () => void) => () => void;
@@ -69,10 +72,12 @@ function createSession(
   id: string,
   hasUnsyncedChanges = true,
   isWriter = false,
+  elementCount = 1,
 ) {
   let localChangeListener = () => {};
   const session: MockNoteSession = {
     id,
+    ydoc: { elements: { length: elementCount } },
     hasUnsyncedChanges: vi.fn(() => hasUnsyncedChanges),
     save: vi.fn(async () => {}),
     subscribeLocalChanges: vi.fn((listener) => {
@@ -167,6 +172,28 @@ describe('useCanvasSessionSaving', () => {
 
     visibility.setVisibility('visible');
     expect(window.setInterval).toHaveBeenCalledTimes(2);
+  });
+
+  it('requests a missing thumbnail when opening a note without any edit', () => {
+    stubDocument();
+    const note = createSession('note-a', false);
+
+    renderSaving('note-a', note.session);
+    mocks.effects[0]?.();
+
+    expect(mocks.ensureThumbnail).toHaveBeenCalledWith('note-a', {
+      delayMs: 3_000,
+    });
+  });
+
+  it('leaves an empty note on the placeholder', () => {
+    stubDocument();
+    const note = createSession('note-a', false, false, 0);
+
+    renderSaving('note-a', note.session);
+    mocks.effects[0]?.();
+
+    expect(mocks.ensureThumbnail).not.toHaveBeenCalled();
   });
 
   it('does not regenerate the thumbnail when leaving an unchanged note', async () => {

@@ -83,11 +83,13 @@ beforeEach(() => {
 
 vi.mock('@myelin/editor/thumbnails', () => ({
   clearAllThumbnails: async () => {},
+  ensureThumbnail: async () => {},
   getThumbnailUrl: async () => null,
   regenerateThumbnailNow: async () => {},
   registerThumbnailProducer: () => () => {},
   removeThumbnail: async () => {},
   requestThumbnailRegeneration: () => {},
+  settleThumbnail: async () => {},
   subscribeThumbnail: () => () => {},
 }));
 

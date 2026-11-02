@@ -19,6 +19,7 @@ import {
 } from '@myelin/editor/page-frame/note-link/resolution';
 import { buildRenamePageFrameLinkReferencesTransaction } from '@myelin/editor/page-frame/pm/markdown/note-links';
 import { schema as pageFrameSchema } from '@myelin/editor/page-frame/pm/schema';
+import { settleThumbnail } from '@myelin/editor/thumbnails';
 import type { ITool } from '@myelin/editor/tools/tool';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -291,7 +292,12 @@ export class CanvasSessionController {
       activeSession.unsubscribeViewport();
       activeSession.unsubscribeReplacement();
       await flushViewportStates();
-      activeSession.drawableCanvas.destroy();
+      // Destroying mid-render drops PDF pages from the thumbnail, and nothing replaces that file.
+      await settleThumbnail(activeSession.noteSession.id);
+      this.destroyCanvas(
+        activeSession.drawableCanvas,
+        activeSession.noteSession.id,
+      );
 
       if (
         !activeSession.noteSession.documentReplaced &&
@@ -403,11 +409,25 @@ export class CanvasSessionController {
     }
   }
 
+  // A throw here must not skip closing the session, or fail the open that follows this teardown.
+  private destroyCanvas(
+    drawableCanvas: DrawableCanvas,
+    id: VFSNodeId | undefined,
+  ): void {
+    try {
+      drawableCanvas.destroy();
+    } catch (error) {
+      logger.error('Failed to destroy canvas', error, { id });
+    }
+  }
+
   private async cleanupAbandonedSession(
     noteSession: NoteSession | null,
     drawableCanvas: DrawableCanvas | null = null,
   ): Promise<void> {
-    drawableCanvas?.destroy();
+    if (drawableCanvas) {
+      this.destroyCanvas(drawableCanvas, noteSession?.id);
+    }
 
     if (!noteSession) {
       return;
