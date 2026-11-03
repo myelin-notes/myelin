@@ -35,6 +35,19 @@ const report = {
   address: '0x0',
   panics:
     '2026-10-04T12:34:50+00:00 [main] panicked at src/lib.rs:1:1:\nit broke',
+  exit: {
+    reason: 5,
+    status: 6,
+    importance: 100,
+    pssKb: 1024,
+    rssKb: 2048,
+    description: 'crash',
+    signal: 'SIGABRT (SI_TKILL)',
+    abortMessage: 'fdsan: double close',
+    cause: null,
+    thread: 'tokio-runtime-w',
+    backtrace: '#00 pc 000000000005b1f4  libc.so (abort+164)',
+  },
 };
 
 async function launch(enabled: boolean) {
@@ -76,6 +89,11 @@ it('hands a saved crash to the SDK and immediately acknowledges it', async () =>
       crash_report_id: report.id,
       crash_timestamp: report.timestamp,
       native_panics: report.panics,
+      native_abort_message: 'fdsan: double close',
+      native_thread: 'tokio-runtime-w',
+      native_backtrace: '#00 pc 000000000005b1f4  libc.so (abort+164)',
+      exit_reason: 5,
+      exit_rss_kb: 2048,
       $exception_list: [
         {
           type: 'NativeCrash',

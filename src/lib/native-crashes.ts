@@ -2,6 +2,20 @@ import posthog from 'posthog-js';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { invoke } from '@tauri-apps/api/core';
 
+interface ExitDetails {
+  reason: number;
+  status: number;
+  importance: number;
+  pssKb: number;
+  rssKb: number;
+  description: string | null;
+  signal: string | null;
+  abortMessage: string | null;
+  cause: string | null;
+  thread: string | null;
+  backtrace: string | null;
+}
+
 interface CrashReport {
   id: string;
   kind: 'native_crash' | 'webview_termination';
@@ -15,6 +29,7 @@ interface CrashReport {
   detail: string;
   address: string;
   panics: string | null;
+  exit: ExitDetails | null;
 }
 
 let configuration = Promise.resolve();
@@ -70,6 +85,17 @@ export function applyNativeCrashConsent(
           native_detail: report.detail,
           native_address: report.address,
           native_panics: report.panics,
+          native_signal: report.exit?.signal,
+          native_abort_message: report.exit?.abortMessage,
+          native_cause: report.exit?.cause,
+          native_thread: report.exit?.thread,
+          native_backtrace: report.exit?.backtrace,
+          exit_reason: report.exit?.reason,
+          exit_status: report.exit?.status,
+          exit_importance: report.exit?.importance,
+          exit_description: report.exit?.description,
+          exit_pss_kb: report.exit?.pssKb,
+          exit_rss_kb: report.exit?.rssKb,
           reported_after_restart: true,
         });
         await invoke('acknowledge_crash_report', { id: report.id });

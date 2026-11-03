@@ -1,3 +1,4 @@
+use crate::android_exit::ExitDetails;
 use crate::native_crash::{self, CrashWriter};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -26,10 +27,17 @@ pub struct CrashReport {
     address: String,
     #[serde(default)]
     panics: Option<String>,
+    #[serde(default)]
+    pid: Option<u32>,
+    #[serde(default, skip_deserializing)]
+    exit: Option<ExitDetails>,
 }
 
 const MAX_PANICS: usize = 4;
 const MAX_PANIC_CHARS: usize = 2048;
+// Pids get reused, so an exit only belongs to a report if it happened around the crash.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+const EXIT_MATCH_WINDOW_MS: i64 = 60_000;
 
 pub struct CrashReports(Mutex<ReportStore>);
 
@@ -123,6 +131,8 @@ impl ReportStore {
             detail: "0x0".to_string(),
             address: "0x0".to_string(),
             panics: None,
+            pid: Some(std::process::id()),
+            exit: None,
         };
         let file = OpenOptions::new()
             .create_new(true)
@@ -231,6 +241,25 @@ impl ReportStore {
     }
 }
 
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn attach_exits(reports: &mut [CrashReport], exits: &[(u32, i64, ExitDetails)]) {
+    for report in reports
+        .iter_mut()
+        .filter(|report| report.kind == "native_crash")
+    {
+        let Ok(crashed) = chrono::DateTime::parse_from_rfc3339(&report.timestamp) else {
+            continue;
+        };
+        report.exit = exits
+            .iter()
+            .find(|(pid, at, _)| {
+                Some(*pid) == report.pid
+                    && (at - crashed.timestamp_millis()).abs() < EXIT_MATCH_WINDOW_MS
+            })
+            .map(|(_, _, details)| details.clone());
+    }
+}
+
 // A panic that aborts leaves nothing else behind: stderr goes nowhere on Android and stripped builds
 // can't name frames. Most panics are caught by their task, so reports only read this after a crash.
 fn install_panic_hook(path: PathBuf, enabled: Arc<AtomicBool>) {
@@ -311,17 +340,43 @@ pub fn webview_terminated(app: &AppHandle, label: &str, reason: &str) {
 }
 
 #[tauri::command]
-pub fn configure_crash_reporting(
+pub async fn configure_crash_reporting(
+    webview: tauri::Webview,
     state: State<'_, CrashReports>,
     enabled: bool,
     distinct_id: Option<String>,
     session_id: Option<String>,
 ) -> Result<Vec<CrashReport>, String> {
-    state
+    let reports = state
         .0
         .lock()
         .map_err(|error| error.to_string())?
-        .configure(enabled, distinct_id, session_id)
+        .configure(enabled, distinct_id, session_id)?;
+    #[cfg(target_os = "android")]
+    {
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut reports = reports;
+            let pids: Vec<u32> = reports
+                .iter()
+                .filter(|report| report.kind == "native_crash")
+                .filter_map(|report| report.pid)
+                .collect();
+            if !pids.is_empty() {
+                match crate::android_exit::read_exits(&webview, pids) {
+                    Ok(exits) => attach_exits(&mut reports, &exits),
+                    Err(error) => eprintln!("could not read Android exit records: {error}"),
+                }
+            }
+            reports
+        })
+        .await
+        .map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = webview;
+        Ok(reports)
+    }
 }
 
 #[tauri::command]
@@ -357,6 +412,71 @@ mod tests {
             .unwrap()
             .join();
         std::process::abort();
+    }
+
+    fn saved_report(pid: Option<u32>, timestamp: &str) -> CrashReport {
+        CrashReport {
+            id: uuid::Uuid::new_v4().to_string(),
+            kind: "native_crash".into(),
+            reason: String::new(),
+            app_version: "1.0.0".into(),
+            platform: "android".into(),
+            timestamp: timestamp.into(),
+            distinct_id: None,
+            session_id: None,
+            code: 6,
+            detail: "0x0".into(),
+            address: "0x0".into(),
+            panics: None,
+            pid,
+            exit: None,
+        }
+    }
+
+    #[test]
+    fn matches_android_exits_by_pid_and_time_and_serializes_their_details() {
+        let crashed_at = chrono::DateTime::parse_from_rfc3339("2026-11-03T00:04:54Z")
+            .unwrap()
+            .timestamp_millis();
+        let details = ExitDetails {
+            reason: 5,
+            rss_kb: 2048,
+            tombstone: crate::android_exit::Tombstone {
+                abort_message: Some("fdsan: double close".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut reports = [
+            saved_report(Some(10), "2026-11-03T00:04:54Z"),
+            saved_report(Some(11), "2026-11-03T00:04:54Z"),
+            saved_report(None, "2026-11-03T00:04:54Z"),
+        ];
+        attach_exits(
+            &mut reports,
+            &[
+                (10, crashed_at + 900, details.clone()),
+                // The same pid dying again hours later is a different process.
+                (11, crashed_at + 7_200_000, details),
+            ],
+        );
+        let sent = serde_json::to_value(&reports[0]).unwrap();
+        assert_eq!(sent["exit"]["reason"], 5);
+        assert_eq!(sent["exit"]["rssKb"], 2048);
+        assert_eq!(sent["exit"]["abortMessage"], "fdsan: double close");
+        assert!(reports[1].exit.is_none());
+        assert!(reports[2].exit.is_none());
+    }
+
+    #[test]
+    fn loads_reports_saved_by_older_versions() {
+        let report: CrashReport = serde_json::from_str(
+            r#"{"id":"a","kind":"native_crash","reason":"","appVersion":"0.3.3",
+                "platform":"android","timestamp":"2026-11-03T00:04:54Z","distinctId":null,
+                "sessionId":null,"code":6,"detail":"0x0","address":"0x0"}"#,
+        )
+        .unwrap();
+        assert!(report.panics.is_none() && report.pid.is_none());
     }
 
     #[test]
