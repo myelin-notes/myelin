@@ -33,6 +33,8 @@ const report = {
   code: 1,
   detail: '0x1',
   address: '0x0',
+  panics:
+    '2026-10-04T12:34:50+00:00 [main] panicked at src/lib.rs:1:1:\nit broke',
 };
 
 async function launch(enabled: boolean) {
@@ -73,6 +75,7 @@ it('hands a saved crash to the SDK and immediately acknowledges it', async () =>
       app_version: '1.2.0',
       crash_report_id: report.id,
       crash_timestamp: report.timestamp,
+      native_panics: report.panics,
       $exception_list: [
         {
           type: 'NativeCrash',

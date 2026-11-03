@@ -24,7 +24,12 @@ pub struct CrashReport {
     code: u64,
     detail: String,
     address: String,
+    #[serde(default)]
+    panics: Option<String>,
 }
+
+const MAX_PANICS: usize = 4;
+const MAX_PANIC_CHARS: usize = 2048;
 
 pub struct CrashReports(Mutex<ReportStore>);
 
@@ -88,6 +93,7 @@ impl ReportStore {
                 if bytes.len() < 32 {
                     fs::remove_file(&path).map_err(|error| error.to_string())?;
                     let _ = fs::remove_file(path.with_extension("bin"));
+                    let _ = fs::remove_file(path.with_extension("panics"));
                     continue;
                 }
                 let values = [0, 8, 16, 24].map(|offset| {
@@ -100,6 +106,7 @@ impl ReportStore {
                 report.detail = format!("{:#x}", values[2]);
                 report.address = format!("{:#x}", values[3]);
                 report.reason = native_reason(&report.platform, report.code);
+                report.panics = fs::read_to_string(path.with_extension("panics")).ok();
             }
             pending.push(report);
         }
@@ -115,6 +122,7 @@ impl ReportStore {
             code: 0,
             detail: "0x0".to_string(),
             address: "0x0".to_string(),
+            panics: None,
         };
         let file = OpenOptions::new()
             .create_new(true)
@@ -133,6 +141,10 @@ impl ReportStore {
             _handler: None,
         };
         store.save(&store.current)?;
+        install_panic_hook(
+            store.directory.join(format!("{}.panics", store.current.id)),
+            store.enabled.clone(),
+        );
         #[cfg(not(target_os = "ios"))]
         {
             Ok(Self {
@@ -199,6 +211,7 @@ impl ReportStore {
         fs::remove_file(self.directory.join(format!("{id}.json")))
             .map_err(|error| error.to_string())?;
         let _ = fs::remove_file(self.directory.join(format!("{id}.bin")));
+        let _ = fs::remove_file(self.directory.join(format!("{id}.panics")));
         self.pending.remove(index);
         Ok(())
     }
@@ -216,6 +229,32 @@ impl ReportStore {
         };
         self.save(&report)
     }
+}
+
+// A panic that aborts leaves nothing else behind: stderr goes nowhere on Android and stripped builds
+// can't name frames. Most panics are caught by their task, so reports only read this after a crash.
+fn install_panic_hook(path: PathBuf, enabled: Arc<AtomicBool>) {
+    let previous = std::panic::take_hook();
+    let recent = Mutex::new(Vec::new());
+    std::panic::set_hook(Box::new(move |info| {
+        if enabled.load(Ordering::Relaxed) {
+            if let Ok(mut recent) = recent.try_lock() {
+                // Keeps the first panic, often the root cause, and the latest, which is what aborted.
+                if recent.len() == MAX_PANICS {
+                    recent.remove(1);
+                }
+                let thread = std::thread::current();
+                let entry = format!(
+                    "{} [{}] {info}",
+                    chrono::Utc::now().to_rfc3339(),
+                    thread.name().unwrap_or("unnamed"),
+                );
+                recent.push(entry.chars().take(MAX_PANIC_CHARS).collect::<String>());
+                let _ = fs::write(&path, recent.join("\n"));
+            }
+        }
+        previous(info);
+    }));
 }
 
 fn native_reason(platform: &str, code: u64) -> String {
@@ -312,6 +351,11 @@ mod tests {
                 Some("crashed-session".into()),
             )
             .unwrap();
+        let _ = std::thread::Builder::new()
+            .name("caught-panic".into())
+            .spawn(|| panic!("worker failed"))
+            .unwrap()
+            .join();
         std::process::abort();
     }
 
@@ -340,21 +384,32 @@ mod tests {
                 assert_eq!(report.session_id.as_deref(), Some("crashed-session"));
                 assert!(report.reason.contains("abort"));
                 assert_ne!(report.code, 0);
+                let panics = report.panics.as_deref().unwrap();
+                assert!(panics.contains("[caught-panic]"));
+                assert!(panics.contains("crash_reports.rs"));
+                assert!(panics.contains("worker failed"));
                 let id = report.id.clone();
                 store.acknowledge("../../unrelated").unwrap();
                 assert_eq!(store.pending.len(), 1);
                 store.acknowledge(&id).unwrap();
                 assert!(!store.directory.join(format!("{id}.json")).exists());
+                assert!(!store.directory.join(format!("{id}.panics")).exists());
                 store
                     .configure(true, Some("new-person".into()), Some("new-session".into()))
                     .unwrap();
                 store
                     .webview_terminated("main", "renderer crashed")
                     .unwrap();
+                let _ = std::thread::spawn(|| panic!("caught before a clean exit")).join();
             }
         }
         let mut store = ReportStore::new(&directory, "3.0.0").unwrap();
         assert_eq!(store.pending.len(), 1);
+        assert!(!fs::read_dir(&store.directory).unwrap().any(|entry| entry
+            .unwrap()
+            .path()
+            .extension()
+            .is_some_and(|ext| ext == "panics")));
         assert_eq!(store.pending[0].kind, "webview_termination");
         assert_eq!(store.pending[0].app_version, "2.0.0");
         store.configure(false, None, None).unwrap();

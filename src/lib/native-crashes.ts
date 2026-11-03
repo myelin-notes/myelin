@@ -14,6 +14,7 @@ interface CrashReport {
   code: number;
   detail: string;
   address: string;
+  panics: string | null;
 }
 
 let configuration = Promise.resolve();
@@ -68,6 +69,7 @@ export function applyNativeCrashConsent(
           native_code: report.code,
           native_detail: report.detail,
           native_address: report.address,
+          native_panics: report.panics,
           reported_after_restart: true,
         });
         await invoke('acknowledge_crash_report', { id: report.id });
