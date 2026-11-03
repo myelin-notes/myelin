@@ -46,7 +46,7 @@ const bulletListItem: NodeSpec = {
         class: 'bullet-list-item',
         ...(indent > 0 ? { 'data-indent': indent } : {}),
       },
-      0,
+      ['span', 0],
     ];
   },
   parseDOM: [
@@ -81,7 +81,7 @@ const orderedListItem: NodeSpec = {
         'data-order': node.attrs.order,
         ...(indent > 0 ? { 'data-indent': indent } : {}),
       },
-      0,
+      ['span', 0],
     ];
   },
   parseDOM: [

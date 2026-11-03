@@ -311,13 +311,25 @@ function splitTextNodeIntoLines(node: Text): HarvestedLine[] {
   return lines.map((rect, k) => ({ text: texts[k], rect }));
 }
 
+// A `::before` has no rect, so measure a hidden stand-in sharing its grid cell and baseline alignment.
+function measureListMarker(item: HTMLElement): DOMRect {
+  const standIn = document.createElement('span');
+  standIn.style.gridArea = '1 / 1';
+  standIn.style.visibility = 'hidden';
+  standIn.textContent = '\u200b';
+  item.append(standIn);
+  const rect = standIn.getBoundingClientRect();
+  standIn.remove();
+  return rect;
+}
+
 function harvestDecorations(h: Harvester, root: HTMLElement): void {
   // List markers.
   for (const el of root.querySelectorAll<HTMLElement>('.bullet-list-item')) {
     const r = el.getBoundingClientRect();
     const em = Number.parseFloat(getComputedStyle(el).fontSize) || 16;
     const cx = r.left - h.originX + 0.35 * em + 0.18 * em;
-    const cy = r.top - h.originY + em * 0.95;
+    const cy = measureListMarker(el).top - h.originY + em * 0.95;
     const radius = 0.11 * em;
     pushAt(h, cx - radius, cy - radius, (x, y) =>
       circlePath(x + pxToPt(radius), y + pxToPt(radius), pxToPt(radius)),
@@ -330,7 +342,7 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
     const order = el.getAttribute('data-order') ?? '1';
     const { rgb } = parseCssColor(style.color);
     const localX = r.left - h.originX + 0.1 * em;
-    const baselineY = r.top - h.originY + em * 0.95;
+    const baselineY = measureListMarker(el).top - h.originY + em * 0.95;
     pushAt(h, localX, baselineY, (x, y) => ({
       t: 'text',
       x,
