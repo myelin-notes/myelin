@@ -1,5 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { paginateParagraph } from './core';
 import {
   DomParagraphLineMeasurer,
   type ParagraphLineMeasurement,
@@ -119,6 +120,7 @@ describe('DomParagraphLineMeasurer', () => {
         dom: {
           clientWidth: 100,
           querySelector: () => null,
+          querySelectorAll: () => [],
         } as unknown as HTMLElement,
         height: 40,
         measuredTop: 0,
@@ -160,6 +162,132 @@ describe('DomParagraphLineMeasurer', () => {
     expect(createRange.mock.calls.length).toBeGreaterThan(
       rangeCallsAfterFirstMeasurement,
     );
+  });
+});
+
+describe('DomParagraphLineMeasurer with a second font on a line', () => {
+  type TestRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'width' | 'height'>;
+  const rect = (top: number, bottom: number): TestRect => ({
+    top,
+    bottom,
+    left: 0,
+    width: 50,
+    height: bottom - top,
+  });
+
+  // Each text node holds one rect per visual line it touches, as `Range#getClientRects` reports them.
+  function measureRuns(
+    runs: TestRect[][],
+    breakWidgets: Array<{ bottom: number; height: number }> = [],
+  ) {
+    class TestText {
+      public readonly data = 'x'.repeat(40);
+      public constructor(public readonly rects: TestRect[]) {}
+      public get length(): number {
+        return this.data.length;
+      }
+    }
+    const textNodes = runs.map((rects) => new TestText(rects));
+    vi.stubGlobal('Text', TestText);
+    vi.stubGlobal('NodeFilter', { SHOW_TEXT: 4 });
+    vi.stubGlobal('getComputedStyle', () => ({ lineHeight: '26px' }));
+    vi.stubGlobal('document', {
+      createRange: () => {
+        let node: TestText;
+        let end: number | null = null;
+        return {
+          selectNodeContents: (next: TestText) => {
+            node = next;
+          },
+          setStart: (next: TestText) => {
+            node = next;
+          },
+          setEnd: (_next: TestText, offset: number) => {
+            end = offset;
+          },
+          getClientRects: () =>
+            end === null
+              ? node.rects
+              : node.rects.slice(
+                  0,
+                  Math.ceil((end / node.length) * node.rects.length),
+                ),
+        };
+      },
+      createTreeWalker: () => {
+        let index = 0;
+        return { nextNode: () => textNodes[index++] ?? null };
+      },
+    });
+    const measurement: ParagraphLineMeasurement = {
+      block: {
+        pos: 10,
+        dom: {
+          clientWidth: 584,
+          querySelector: () => null,
+          querySelectorAll: () =>
+            breakWidgets.map((widget) => ({
+              getBoundingClientRect: () => widget,
+            })),
+        } as unknown as HTMLElement,
+        height: 78,
+        measuredTop: 0,
+        nodeSize: 200,
+        isBreakableTextBlock: true,
+        isBreakableTableBlock: false,
+        isPageHeightConstrained: false,
+      },
+      view: {
+        state: {
+          doc: {
+            nodeAt: () => ({
+              content: { size: 198 },
+              forEach: (visit: (child: { isText: boolean }) => void) =>
+                visit({ isText: true }),
+              textContent: 'x'.repeat(198),
+            }),
+          },
+        },
+      } as unknown as EditorView,
+      editorScreenTop: 0,
+      invScale: 1,
+      blockNaturalTop: 739,
+      blockShift: 0,
+      metrics: null,
+      measurementCacheGeneration: 1,
+    };
+    return new DomParagraphLineMeasurer().measure(measurement);
+  }
+
+  // Rects captured from the iPad simulator: mono text starts 1px above the sans text beside it.
+  const sans = [rect(741, 762), rect(767, 788), rect(793, 814)];
+  const mono = [rect(740, 762), rect(766, 788), rect(792, 814)];
+
+  it('breaks a paragraph that crosses the page instead of collapsing its lines', () => {
+    const lines = measureRuns([
+      [sans[0]],
+      [mono[0]],
+      [sans[0]],
+      [mono[1]],
+      [sans[1]],
+      [mono[2]],
+      [sans[2]],
+    ]);
+
+    expect(lines.map((line) => line.naturalTop)).toEqual([741, 767, 793]);
+    expect(lines.map((line) => line.naturalBottom)).toEqual([762, 788, 814]);
+    const { breaks } = paginateParagraph(lines, 10, 210, 0, 784, 0);
+    expect(breaks).toHaveLength(1);
+    expect(breaks[0].kind).toBe('inline');
+  });
+
+  it('subtracts only the break widgets rendered above a line', () => {
+    const lines = measureRuns(
+      [[sans[0]], [rect(767 + 150, 788 + 150)]],
+      [{ bottom: 915, height: 150 }],
+    );
+
+    expect(lines.map((line) => line.naturalTop)).toEqual([741, 767]);
   });
 });
 

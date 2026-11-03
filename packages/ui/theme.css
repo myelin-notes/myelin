@@ -38,6 +38,14 @@
   src: url("./fonts/Newsreader-Italic.woff2") format("woff2");
 }
 
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./fonts/JetBrainsMono.ttf") format("truetype");
+}
+
 @theme inline {
   @keyframes accordion-down {
     from {
@@ -138,6 +146,7 @@
 @theme inline {
   --font-heading: "Newsreader", "Georgia", serif;
   --font-sans: "Hanken Grotesk", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --color-icons: #65558F;
   --color-low-contrast: #DFDFDF;
   --color-sidebar-ring: var(--sidebar-ring);

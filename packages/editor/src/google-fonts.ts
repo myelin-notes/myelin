@@ -12,7 +12,11 @@ import { getPlatform } from './platform';
 const logger = new Logger('GoogleFonts');
 
 /** Families shipped with the app's CSS (`@font-face` in foundations.css). */
-const LOCAL_DISPLAY_FAMILIES = new Set(['hanken grotesk', 'newsreader']);
+const LOCAL_DISPLAY_FAMILIES = new Set([
+  'hanken grotesk',
+  'newsreader',
+  'jetbrains mono',
+]);
 
 // Families whose bundled export font IS the display font (see `src-tauri/src/pdf_export/fonts.rs`).
 // Embedding would only bloat the PDF.
