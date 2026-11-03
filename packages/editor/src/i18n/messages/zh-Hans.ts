@@ -1218,6 +1218,17 @@ const zhHans: typeof en = {
       },
     },
   },
+  mediaMigration: {
+    title: '正在优化存储',
+    description:
+      '请在完成前保持 Myelin 打开。同时请更新其他设备上的 Myelin，否则图片、PDF 和音频可能显示为空白。',
+    preparing: '正在准备…',
+    progress: (completed: number, total: number) =>
+      `第 ${completed} 个，共 ${total} 个文档`,
+    finishing: '正在完成上传…',
+    unreachable: '当前无法连接到你的仓库。恢复连接后将自动完成。',
+    continueWithoutWaiting: '继续，不再等待',
+  },
   shutdown: {
     title: '正在保存更改…',
     description: '退出前正在将待同步的更改推送到仓库。',
