@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { cn } from '../../utils';
 import type { NoteLinkPreview, NoteLinkPreviewTarget } from './preview';
 import { NoteLinkPreviewCard } from './preview-card';
@@ -49,24 +50,25 @@ interface NoteLinkPreviewPopoverProps {
 }
 
 function computePosition(rect: DOMRect): PopoverPosition {
+  const visible = getVisibleViewportBounds();
   const left = Math.max(
-    PREVIEW_MARGIN,
-    Math.min(rect.left, window.innerWidth - PREVIEW_WIDTH - PREVIEW_MARGIN),
+    visible.left + PREVIEW_MARGIN,
+    Math.min(rect.left, visible.right - PREVIEW_WIDTH - PREVIEW_MARGIN),
   );
 
-  const spaceBelow = window.innerHeight - rect.bottom - PREVIEW_GAP;
-  const spaceAbove = rect.top - PREVIEW_GAP;
+  const spaceBelow = visible.bottom - rect.bottom - PREVIEW_GAP;
+  const spaceAbove = rect.top - visible.top - PREVIEW_GAP;
   const flipped =
     spaceBelow < PREVIEW_ESTIMATED_HEIGHT + PREVIEW_MARGIN &&
     spaceAbove > spaceBelow;
 
   const top = flipped
     ? Math.max(
-        PREVIEW_MARGIN,
+        visible.top + PREVIEW_MARGIN,
         rect.top - PREVIEW_ESTIMATED_HEIGHT - PREVIEW_GAP,
       )
     : Math.min(
-        window.innerHeight - PREVIEW_ESTIMATED_HEIGHT - PREVIEW_MARGIN,
+        visible.bottom - PREVIEW_ESTIMATED_HEIGHT - PREVIEW_MARGIN,
         rect.bottom + PREVIEW_GAP,
       );
 
@@ -271,7 +273,7 @@ export function NoteLinkPreviewPopover({
       data-thumbnail-exclude="true"
       data-page-frame-preserve-focus
       className={cn(
-        'pointer-events-none fixed z-[80] w-[320px] overflow-hidden rounded-2xl bg-popover/95 shadow-ambient backdrop-blur-2xl',
+        'pointer-events-none fixed z-[80] w-[320px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl bg-popover/95 shadow-ambient backdrop-blur-2xl',
         'fade-in-0 animate-in duration-150',
         state.position.flipped
           ? 'slide-in-from-bottom-1'

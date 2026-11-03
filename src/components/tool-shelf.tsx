@@ -113,8 +113,8 @@ export function ToolShelf({
     presets.every((preset) => !wheelPresetIds.has(preset.id));
 
   return (
-    <div className="fade-in slide-in-from-left-2 w-56 animate-in overflow-hidden rounded-xl bg-popover/85 shadow-ambient backdrop-blur-md duration-200">
-      <div className="flex items-center justify-between px-4 py-3">
+    <div className="fade-in slide-in-from-left-2 flex max-h-[var(--toolbar-panel-room)] w-56 animate-in flex-col overflow-hidden rounded-xl bg-popover/85 shadow-ambient backdrop-blur-md duration-200">
+      <div className="flex shrink-0 items-center justify-between px-4 py-3">
         <span className="font-bold text-[10px] text-text-primary uppercase tracking-[0.1em]">
           {strings.canvas.toolShelf.title}
         </span>
@@ -137,7 +137,7 @@ export function ToolShelf({
           </svg>
         </button>
       </div>
-      <div className="flex flex-col gap-0.5 px-2 pb-2">
+      <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto overscroll-contain px-2 pb-2">
         <SectionHeading>{strings.canvas.toolShelf.tools}</SectionHeading>
         {tools.map((tool, index) => {
           const Icon = tool.icon;

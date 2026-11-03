@@ -10,8 +10,12 @@ import {
 } from '@myelin/editor/elements/pdf/quote';
 import { TextElement } from '@myelin/editor/elements/text/element';
 import { useMessages } from '@myelin/editor/i18n';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 
 const SELECTION_GAP = 8;
+const BUTTON_HEIGHT = 32;
+// Roughly half the labelled button: only needs to keep it clear of the screen edges.
+const BUTTON_HALF_WIDTH = 60;
 // World units, sized like a short quote in a page.
 const GHOST_SIZE = { x: 0, y: 0, width: 240, height: 48 };
 
@@ -76,10 +80,21 @@ export function PdfQuoteButton({ drawableCanvasRef }: PdfQuoteButtonProps) {
         return;
       }
       const rect = selection.getRangeAt(0).getBoundingClientRect();
+      const visible = getVisibleViewportBounds();
+      const below = rect.bottom + SELECTION_GAP;
       setShown({
         quote,
-        left: rect.left + rect.width / 2,
-        top: rect.bottom + SELECTION_GAP,
+        left: Math.max(
+          visible.left + BUTTON_HALF_WIDTH,
+          Math.min(
+            rect.left + rect.width / 2,
+            visible.right - BUTTON_HALF_WIDTH,
+          ),
+        ),
+        top:
+          below + BUTTON_HEIGHT <= visible.bottom
+            ? below
+            : Math.max(visible.top, rect.top - SELECTION_GAP - BUTTON_HEIGHT),
       });
     };
     const schedule = () => {

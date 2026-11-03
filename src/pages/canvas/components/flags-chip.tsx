@@ -11,6 +11,7 @@ import { formatNumber } from '@myelin/editor/i18n/format';
 import type { FlagType } from '@myelin/editor/sync/repo/types';
 import { cn } from '@myelin/editor/utils';
 import { usePresence } from '@myelin/ui';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface FlagsChipProps {
   canvas: DrawableCanvas | null;
@@ -76,7 +77,7 @@ export function FlagsChip({ canvas }: FlagsChipProps) {
     .filter((group) => group.flags.length > 0);
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef}>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -98,7 +99,7 @@ export function FlagsChip({ canvas }: FlagsChipProps) {
           onAnimationEnd={presence.onAnimationEnd}
           role="dialog"
           aria-label={labels.title}
-          className="data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute top-full right-0 z-[110] mt-2 flex max-h-[60vh] w-[20rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+          className={`data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute right-0 z-[110] flex max-h-[min(60vh,var(--title-popover-room))] w-[20rem] max-w-[calc(var(--canvas-visible-width)-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${IS_PHONE_BUILD ? 'bottom-full mb-2' : 'top-full mt-2'}`}
         >
           <div className="flex items-center gap-1 px-3 pt-3 pb-2">
             <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">

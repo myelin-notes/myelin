@@ -528,7 +528,7 @@ export function SelectionToolbar({
       <div
         ref={toolbarRef}
         data-selection-toolbar="true"
-        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex items-center gap-1 rounded-xl bg-popover/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
+        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex max-w-[calc(var(--canvas-visible-width)-1.5rem)] flex-wrap items-center gap-1 rounded-xl bg-popover/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
           state.visible ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         role="toolbar"

@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useCanvasStyle } from '@/lib/use-canvas-style';
+import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { CanvasStyleEditor } from '@/pages/settings/components/canvas-style-editor';
 
 export function CanvasStyleButton({ doc }: { doc: Y.Doc | null }) {
@@ -51,7 +52,7 @@ export function CanvasStyleButton({ doc }: { doc: Y.Doc | null }) {
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef}>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -77,7 +78,7 @@ export function CanvasStyleButton({ doc }: { doc: Y.Doc | null }) {
           onAnimationEnd={presence.onAnimationEnd}
           role="dialog"
           aria-label={perCanvas.button}
-          className="data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute top-full right-0 z-[110] mt-2 flex max-h-[80vh] w-[28rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in"
+          className={`data-closed:slide-out-to-top-1 data-closed:fade-out-0 data-open:slide-in-from-top-1 data-open:fade-in-0 absolute right-0 z-[110] flex max-h-[min(80vh,var(--title-popover-room))] w-[28rem] max-w-[calc(var(--canvas-visible-width)-3rem)] flex-col overflow-hidden rounded-xl bg-popover/95 shadow-ambient backdrop-blur-[24px] duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] data-closed:animate-out data-open:animate-in ${IS_PHONE_BUILD ? 'bottom-full mb-2' : 'top-full mt-2'}`}
         >
           <div className="px-4 pt-3 pb-3">
             <div className="flex items-center gap-2">
