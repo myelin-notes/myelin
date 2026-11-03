@@ -332,6 +332,9 @@ export abstract class DrawableElement {
   private worldBounds: DOMRect | null = null;
   private _hidden: boolean = false;
   private _locked: boolean = false;
+  // Yjs keeps a ~14 byte tombstone per overwritten value, forever: writing a selection's transform on
+  // every pointer move grew a 3 MB note to 32 MB in one drag, so gestures hold their writes here.
+  private _heldYWrites: Record<string, unknown> | null = null;
   public onSelectionChanged?: () => void;
   public onLockChanged?: () => void;
   public onTransformChanged?: () => void;
@@ -430,8 +433,36 @@ export abstract class DrawableElement {
     updates: Record<string, unknown>,
     origin?: SyncOrigin,
   ): void {
+    // An explicit origin is an async result, which isn't part of the gesture or its undo step.
+    if (this._heldYWrites && origin === undefined) {
+      Object.assign(this._heldYWrites, updates);
+      return;
+    }
     if (this._yMap) {
       writeYMap(this._yMap, updates, origin);
+    }
+  }
+
+  /** Until `commitYWrites` or `discardYWrites`, local writes reach only the element's cache. */
+  public holdYWrites(): void {
+    this._heldYWrites ??= {};
+  }
+
+  /** Wrap in one transaction when committing several elements, so a gesture is one doc update. */
+  public commitYWrites(): void {
+    const held = this._heldYWrites;
+    this._heldYWrites = null;
+    if (held && Object.keys(held).length > 0) {
+      this.syncToYMap(held);
+    }
+  }
+
+  public discardYWrites(): void {
+    const held = this._heldYWrites;
+    this._heldYWrites = null;
+    if (held && Object.keys(held).length > 0) {
+      this.syncFromYMap(Object.keys(held));
+      this.onTransformChanged?.();
     }
   }
 

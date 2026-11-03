@@ -9,7 +9,7 @@ import { ShapeElement } from '../elements/shape-element';
 import { catalogs } from '../i18n/messages';
 import { SelectionController } from '../selection-controller';
 import { CollisionHelper } from '../utils/collision-helper';
-import { YDocManager } from '../ydoc-manager';
+import { ASYNC_RESULT_ORIGIN, YDocManager } from '../ydoc-manager';
 import { SelectTool } from './select-tool';
 import { setToolOption } from './tool';
 
@@ -842,5 +842,137 @@ describe('SelectTool rotation', () => {
     tool.start(center, event);
     tool.finish(center, event);
     expect(image.isSelected).toBe(true);
+  });
+});
+
+describe('SelectTool gesture writes', () => {
+  const event = { pointerType: 'mouse' } as PointerEvent;
+  const transformKeys = ['offsetX', 'offsetY', 'scaleX', 'scaleY', 'rotation'];
+
+  const gestures = [
+    { name: 'move', start: { x: 150, y: 40 }, count: 2 },
+    { name: 'group scale', start: { x: 304, y: 84 }, count: 2 },
+    { name: 'group rotation', start: { x: 150, y: -24 }, count: 2 },
+    { name: 'resize', start: { x: 104, y: 84 }, count: 1 },
+    { name: 'rotation', start: { x: 50, y: -24 }, count: 1 },
+  ];
+
+  function setup(start: Vector2, count: number) {
+    const ydoc = new YDocManager();
+    const images = Array.from(
+      { length: count },
+      (_, index) =>
+        makeImageElement(`image-${index}`, index * 200, 0, ydoc).image,
+    );
+    for (const image of images) {
+      image.select();
+    }
+    ydoc.undoManager.stopCapturing();
+    const { canvas } = makeCanvas(images, start);
+    canvas.transact = (fn) => ydoc.transact(fn);
+    canvas.undo = () => ydoc.undoManager.undo();
+    return {
+      ydoc,
+      images,
+      canvas,
+      tool: new SelectTool(() => catalogs.en),
+    };
+  }
+
+  function transformOf(image: ImageElement) {
+    return {
+      offset: { ...image.offset },
+      scale: { ...image.scale },
+      rotation: image.rotation,
+    };
+  }
+
+  function dragThrough(
+    tool: SelectTool,
+    canvas: DrawableCanvas,
+    start: Vector2,
+  ) {
+    tool.start(canvas, event);
+    for (let step = 1; step <= 20; step++) {
+      tool.update(canvas, event, {
+        x: start.x + step * 10,
+        y: start.y + step * 5,
+      });
+    }
+  }
+
+  it.each(
+    gestures,
+  )('writes a $name to the document once, however many pointer moves it takes', ({
+    start,
+    count,
+  }) => {
+    const { ydoc, images, canvas, tool } = setup(start, count);
+    const before = images.map(transformOf);
+    const docUpdate = vi.fn();
+    ydoc.doc.on('update', docUpdate);
+
+    dragThrough(tool, canvas, start);
+    expect(docUpdate).not.toHaveBeenCalled();
+    tool.finish(canvas, event);
+
+    expect(docUpdate).toHaveBeenCalledTimes(1);
+    expect(images.map(transformOf)).not.toEqual(before);
+    for (const image of images) {
+      expect(image.yMap?.get('offsetX')).toBe(image.offset.x);
+      expect(image.yMap?.get('offsetY')).toBe(image.offset.y);
+      expect(image.yMap?.get('scaleX')).toBe(image.scale.x);
+      expect(image.yMap?.get('rotation') ?? 0).toBe(image.rotation);
+    }
+
+    ydoc.undoManager.undo();
+    for (const image of images) {
+      image.syncFromYMap(transformKeys);
+    }
+    expect(images.map(transformOf)).toEqual(before);
+  });
+
+  it.each(
+    gestures,
+  )('restores a cancelled $name without touching earlier undo history', ({
+    start,
+    count,
+  }) => {
+    const { ydoc, images, canvas, tool } = setup(start, count);
+    const before = images.map(transformOf);
+    ydoc.transact(() => images[0].yMap?.set('earlierEdit', true));
+    ydoc.undoManager.stopCapturing();
+    const undoSteps = ydoc.undoManager.undoStack.length;
+    const redraw = vi.fn();
+    images[0].onTransformChanged = redraw;
+    const docUpdate = vi.fn();
+    ydoc.doc.on('update', docUpdate);
+
+    dragThrough(tool, canvas, start);
+    expect(images.map(transformOf)).not.toEqual(before);
+    redraw.mockClear();
+    tool.interrupt(canvas);
+
+    expect(images.map(transformOf)).toEqual(before);
+    expect(redraw).toHaveBeenCalled();
+    expect(docUpdate).not.toHaveBeenCalled();
+    expect(images[0].yMap?.get('earlierEdit')).toBe(true);
+    expect(ydoc.undoManager.undoStack).toHaveLength(undoSteps);
+  });
+
+  it('does not hold back async results written while a gesture is running', () => {
+    const start = { x: 150, y: 40 };
+    const { images, canvas, tool } = setup(start, 2);
+
+    dragThrough(tool, canvas, start);
+    (
+      images[0] as unknown as {
+        syncToYMap(updates: object, origin: string): void;
+      }
+    ).syncToYMap({ asyncResult: 'done' }, ASYNC_RESULT_ORIGIN);
+
+    expect(images[0].yMap?.get('asyncResult')).toBe('done');
+    tool.interrupt(canvas);
+    expect(images[0].yMap?.get('asyncResult')).toBe('done');
   });
 });

@@ -75,6 +75,7 @@ export class SelectTool implements ITool {
   private lastPoint: Vector2 = { x: 0, y: 0 };
   private totalDelta: Vector2 = { x: 0, y: 0 };
   private movingElements: DrawableElement[] = [];
+  private gestureElements: DrawableElement[] = [];
 
   // Cycle-through state
   private lastCycledElement: DrawableElement | null = null;
@@ -85,7 +86,6 @@ export class SelectTool implements ITool {
 
   // Scale state
   private scaleInteraction: ScaleInteraction | null = null;
-  private scaleChanged = false;
 
   private rotateInteraction: RotateInteraction | null = null;
 
@@ -188,6 +188,9 @@ export class SelectTool implements ITool {
           point.x - worldPivot.x,
         ),
       };
+      this.holdGestureWrites(
+        this.rotateInteraction.transforms.map(({ element }) => element),
+      );
       return;
     }
     if (handle) {
@@ -215,6 +218,9 @@ export class SelectTool implements ITool {
               scale: { ...element.scale },
             })),
         };
+        this.holdGestureWrites(
+          this.scaleInteraction.transforms.map(({ element }) => element),
+        );
       } else {
         const element = selectedElements[0];
         if (!element) {
@@ -230,6 +236,7 @@ export class SelectTool implements ITool {
           anchorWorld: handle.anchor,
           originalDraggedWorld: handle.position,
         };
+        this.holdGestureWrites([element]);
         element.beginResize();
       }
       return;
@@ -408,21 +415,17 @@ export class SelectTool implements ITool {
         const movingIds = new Set(
           this.movingElements.map((element) => element.uuid),
         );
-        // One transaction per pointer move, not per element: each emits a doc update that the
-        // native save queue later merges — 2000 elements cost ~45ms per move unbatched.
-        canvas.transact(() => {
-          for (const e of this.movingElements) {
-            if (
-              e instanceof AnchorableElement &&
-              e.pageAnchor &&
-              movingIds.has(e.pageAnchor.frameId)
-            ) {
-              continue;
-            }
-            e.translate(dx, dy);
+        for (const e of this.movingElements) {
+          if (
+            e instanceof AnchorableElement &&
+            e.pageAnchor &&
+            movingIds.has(e.pageAnchor.frameId)
+          ) {
+            continue;
           }
-          canvas.anchoring?.dragTransform(this.movingElements);
-        });
+          e.translate(dx, dy);
+        }
+        canvas.anchoring?.dragTransform(this.movingElements);
         this.lastPoint = position;
         break;
       }
@@ -432,7 +435,7 @@ export class SelectTool implements ITool {
           break;
         }
         if (interaction.kind === 'group') {
-          canvas.transact(() => this.updateGroupScale(interaction, position));
+          this.updateGroupScale(interaction, position);
           break;
         }
         const e = interaction.element;
@@ -476,12 +479,6 @@ export class SelectTool implements ITool {
           anchorWorld: interaction.anchorWorld,
           pointerWorld: position,
         });
-        if (
-          position.x !== this.startPoint.x ||
-          position.y !== this.startPoint.y
-        ) {
-          this.scaleChanged = true;
-        }
         break;
       }
       case SelectMode.Rotating: {
@@ -498,16 +495,14 @@ export class SelectTool implements ITool {
           const base = transforms.length === 1 ? transforms[0].rotation : 0;
           turn = Math.round((base + turn) / ROTATE_SNAP) * ROTATE_SNAP - base;
         }
-        canvas.transact(() => {
-          for (const { element, offset, rotation } of transforms) {
-            const arm = rotateVector(
-              { x: offset.x - worldPivot.x, y: offset.y - worldPivot.y },
-              turn,
-            );
-            element.setRotation(rotation + turn);
-            element.setOffset(worldPivot.x + arm.x, worldPivot.y + arm.y);
-          }
-        });
+        for (const { element, offset, rotation } of transforms) {
+          const arm = rotateVector(
+            { x: offset.x - worldPivot.x, y: offset.y - worldPivot.y },
+            turn,
+          );
+          element.setRotation(rotation + turn);
+          element.setOffset(worldPivot.x + arm.x, worldPivot.y + arm.y);
+        }
         break;
       }
       case SelectMode.Marquee: {
@@ -571,7 +566,6 @@ export class SelectTool implements ITool {
           canvas.anchoring?.finishTransform(this.movingElements);
         }
         canvas.anchoring?.endDrag();
-        // Yjs captures translate() mutations automatically — no command needed
         break;
       }
       case SelectMode.Scaling: {
@@ -580,7 +574,6 @@ export class SelectTool implements ITool {
             this.scaleInteraction.transforms.map((item) => item.element),
           );
         }
-        // Yjs captures mutations automatically — no command needed
         if (this.scaleInteraction?.kind === 'element') {
           this.scaleInteraction.element.endResize();
           canvas.anchoring?.finishTransform([this.scaleInteraction.element]);
@@ -617,57 +610,26 @@ export class SelectTool implements ITool {
       }
     }
 
+    canvas.transact(() => {
+      for (const element of this.gestureElements) {
+        element.commitYWrites();
+      }
+    });
     this.lastClickTime = Date.now();
     this.lastClickPos = { ...this.startPoint };
     this.reset();
   }
 
   public interrupt(canvas: DrawableCanvas): void {
-    if (
-      this.mode === SelectMode.Moving &&
-      this.movingElements.length > 0 &&
-      (this.totalDelta.x !== 0 || this.totalDelta.y !== 0)
-    ) {
-      canvas.undo();
+    // Not canvas.undo(): nothing reached the document yet, so that would revert the previous action.
+    for (const element of this.gestureElements) {
+      element.discardYWrites();
     }
     if (this.mode === SelectMode.Moving) {
       canvas.anchoring?.endDrag();
     }
-    if (this.mode === SelectMode.Scaling && this.scaleInteraction) {
-      const interaction = this.scaleInteraction;
-      let changed: boolean;
-      if (interaction.kind === 'element') {
-        const e = interaction.element;
-        changed =
-          this.scaleChanged ||
-          e.scale.x !== interaction.originalScale.x ||
-          e.scale.y !== interaction.originalScale.y ||
-          e.offset.x !== interaction.originalOffset.x ||
-          e.offset.y !== interaction.originalOffset.y;
-        e.endResize();
-      } else {
-        changed = interaction.transforms.some(
-          ({ element, offset, scale }) =>
-            element.scale.x !== scale.x ||
-            element.scale.y !== scale.y ||
-            element.offset.x !== offset.x ||
-            element.offset.y !== offset.y,
-        );
-      }
-      if (changed) {
-        canvas.undo();
-      }
-    }
-    if (this.mode === SelectMode.Rotating && this.rotateInteraction) {
-      const changed = this.rotateInteraction.transforms.some(
-        ({ element, offset, rotation }) =>
-          element.rotation !== rotation ||
-          element.offset.x !== offset.x ||
-          element.offset.y !== offset.y,
-      );
-      if (changed) {
-        canvas.undo();
-      }
+    if (this.scaleInteraction?.kind === 'element') {
+      this.scaleInteraction.element.endResize();
     }
     this.lastCycledElement = null;
     this.reset();
@@ -709,8 +671,8 @@ export class SelectTool implements ITool {
   private reset() {
     this.mode = SelectMode.None;
     this.movingElements = [];
+    this.gestureElements = [];
     this.scaleInteraction = null;
-    this.scaleChanged = false;
     this.rotateInteraction = null;
     this.lassoPath = [];
     this.pendingCycle = null;
@@ -723,6 +685,14 @@ export class SelectTool implements ITool {
     this.lastPoint = point;
     this.totalDelta = { x: 0, y: 0 };
     this.movingElements = elements.filter((element) => !element.locked);
+    this.holdGestureWrites(this.movingElements);
+  }
+
+  private holdGestureWrites(elements: DrawableElement[]): void {
+    this.gestureElements = elements;
+    for (const element of elements) {
+      element.holdYWrites();
+    }
   }
 
   private updateGroupScale(
