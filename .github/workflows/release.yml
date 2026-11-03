@@ -428,6 +428,21 @@ jobs:
           fi
           gh release upload "$TAG" "${files[@]}" --clobber
 
+      # Gradle strips the libs in the APK, so crash reports give offsets into our library. These
+      # resolve them: ndk-stack -sym <dir> < backtrace. Separate from the upload above so a problem
+      # here can't stop a release shipping. x86 is left out because no customer device runs it.
+      - name: Upload Android symbols to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          archive="myelin-android-symbols-$TAG.tar.gz"
+          tar -czf "$archive" \
+            src-tauri/target/aarch64-linux-android/release/libmyelin_lib.so \
+            src-tauri/target/armv7-linux-androideabi/release/libmyelin_lib.so
+          gh release upload "$TAG" "$archive" --clobber
+
   ios:
     name: Build (ios)
     needs: test
