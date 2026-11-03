@@ -32,6 +32,18 @@
   margin: 0 0 0.9em;
 }
 
+/* WebKit floors line-height to whole px and Chromium keeps the fraction, so 1.65 is 26 vs 26.4px: the
+   same document runs ~12px a page taller on Chromium and can paginate differently. Inherits as a
+   length, so inline children that change font must set their own (see .pm-md-inline-code). */
+.pm-editor .ProseMirror p,
+.pm-editor .ProseMirror blockquote,
+.pm-editor .ProseMirror .pm-math-block,
+.pm-editor .ProseMirror .bullet-list-item,
+.pm-editor .ProseMirror .ordered-list-item,
+.pm-editor .ProseMirror .check-list-item {
+  line-height: 26px;
+}
+
 .pm-editor .ProseMirror .bullet-list-item,
 .pm-editor .ProseMirror .ordered-list-item,
 .pm-editor .ProseMirror .check-list-item {
@@ -85,20 +97,22 @@
   color: var(--text-primary);
   font-family: var(--font-heading);
   font-weight: 560;
-  line-height: 1.12;
   letter-spacing: -0.025em;
 }
 
 .pm-editor .ProseMirror h1 {
   font-size: 2.35rem;
+  line-height: 42px;
 }
 
 .pm-editor .ProseMirror h2 {
   font-size: 1.8rem;
+  line-height: 32px;
 }
 
 .pm-editor .ProseMirror h3 {
   font-size: 1.4rem;
+  line-height: 25px;
 }
 
 .pm-editor .ProseMirror blockquote {
