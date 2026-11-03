@@ -23,6 +23,12 @@ import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
 import { FlagElement } from '@myelin/editor/elements/flag-element';
+import {
+  applyInkStyle,
+  type InkStyle,
+  type InkStyleUpdate,
+  readInkStyle,
+} from '@myelin/editor/elements/ink-style';
 import { LatexElement } from '@myelin/editor/elements/latex/element';
 import { PdfElement } from '@myelin/editor/elements/pdf';
 import {
@@ -47,6 +53,7 @@ import {
   getPdfPageJumpOffset,
 } from './pdf-page-navigator-utils';
 import { getSelectionToolbarPosition } from './selection-toolbar-position';
+import { StrokeStyleControls } from './stroke-style-controls';
 import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
@@ -66,6 +73,8 @@ interface ToolbarState {
   /** Set when exactly one LaTeX block is selected, so its scale is editable as text size. */
   latexElement: LatexElement | null;
   latexFontSize: number | null;
+  /** Set when the selection holds ink, however many strokes: a written word is many of them. */
+  inkStyle: InkStyle | null;
   pdfElement: PdfElement | null;
   pdfCurrentPage: number | null;
   flagElement: FlagElement | null;
@@ -80,6 +89,7 @@ const HIDDEN_STATE: ToolbarState = {
   textStyle: null,
   latexElement: null,
   latexFontSize: null,
+  inkStyle: null,
   pdfElement: null,
   pdfCurrentPage: null,
   flagElement: null,
@@ -88,6 +98,7 @@ const HIDDEN_STATE: ToolbarState = {
 const VIEWPORT_MARGIN = 12;
 const SELECTION_GAP = 10;
 const PDF_PAGE_VIEWPORT_MARGIN = 48;
+const STROKE_MENU_ROOM = 240;
 
 function sameElementItems(
   a: SelectionToolbarItem[],
@@ -125,6 +136,17 @@ function sameTextStyle(a: TextStyle | null, b: TextStyle | null): boolean {
   );
 }
 
+function sameInkStyle(a: InkStyle | null, b: InkStyle | null): boolean {
+  if (!(a && b)) {
+    return a === b;
+  }
+  return (
+    a.color === b.color &&
+    a.thickness === b.thickness &&
+    a.highlighter === b.highlighter
+  );
+}
+
 function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
   return (
     a.visible === b.visible &&
@@ -135,6 +157,7 @@ function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
     sameTextStyle(a.textStyle, b.textStyle) &&
     a.latexElement === b.latexElement &&
     a.latexFontSize === b.latexFontSize &&
+    sameInkStyle(a.inkStyle, b.inkStyle) &&
     a.pdfElement === b.pdfElement &&
     a.pdfCurrentPage === b.pdfCurrentPage &&
     a.flagElement === b.flagElement
@@ -263,6 +286,11 @@ function positionToolbar(toolbar: HTMLDivElement, bounds: DOMRect): void {
   });
 
   toolbar.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+  // Opens away from the selection when it fits, so the ink being restyled stays in view.
+  toolbar.dataset.menuSide =
+    top < bounds.top && top - visibleTop >= STROKE_MENU_ROOM
+      ? 'above'
+      : 'below';
 }
 
 export function SelectionToolbar({
@@ -316,6 +344,7 @@ export function SelectionToolbar({
               : null,
             latexElement,
             latexFontSize: latexElement ? latexElement.fontSize : null,
+            inkStyle: readInkStyle(canvas.getSelectedElements()),
             pdfElement: pdfPageState?.element ?? null,
             pdfCurrentPage: pdfPageState?.currentPage ?? null,
             flagElement: findFlagTarget(canvas),
@@ -401,6 +430,23 @@ export function SelectionToolbar({
       setEditingPdf(null);
     },
     [drawableCanvasRef, state.pdfElement],
+  );
+
+  const setInkStyle = useCallback(
+    (updates: InkStyleUpdate) => {
+      const canvas = drawableCanvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      const selected = canvas.getSelectedElements();
+      canvas.transact(() => applyInkStyle(selected, updates));
+      // In this event rather than the next frame's sync: a controlled slider would snap back mid-drag.
+      setState((current) => ({
+        ...current,
+        inkStyle: readInkStyle(selected),
+      }));
+    },
+    [drawableCanvasRef],
   );
 
   const moveHigher = useCallback(() => {
@@ -536,6 +582,15 @@ export function SelectionToolbar({
               step={TEXT_FONT_SIZE_STEP}
               onChange={(fontSize) => state.latexElement?.setFontSize(fontSize)}
               preserveFocus
+            />
+            <Divider />
+          </>
+        )}
+        {state.inkStyle && (
+          <>
+            <StrokeStyleControls
+              style={state.inkStyle}
+              onChange={setInkStyle}
             />
             <Divider />
           </>

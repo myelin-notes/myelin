@@ -16,10 +16,11 @@ import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 interface ToolOptionsPanelProps {
   options: ToolOption[];
   customColorTool: CustomColorTool | null;
-  /** Null when the live tool can be saved as a preset; otherwise why it can't. */
-  savePresetDisabledReason: string | null;
-  onSavePreset: () => void;
+  /** Null when the live tool can be saved as a preset; otherwise why it can't. Omit to hide saving. */
+  savePresetDisabledReason?: string | null;
+  onSavePreset?: () => void;
   editingPreset?: boolean;
+  onSwatchMenuOpenChange?: (open: boolean) => void;
 }
 
 function preloadAllFonts(fonts: FontEntry[]) {
@@ -127,6 +128,7 @@ export function ToolOptionsPanel({
   savePresetDisabledReason,
   onSavePreset,
   editingPreset = false,
+  onSwatchMenuOpenChange,
 }: ToolOptionsPanelProps) {
   const strings = useMessages();
   const {
@@ -141,7 +143,7 @@ export function ToolOptionsPanel({
   }
 
   return (
-    <div className="flex max-h-[min(44rem,var(--toolbar-panel-room))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
+    <div className="flex max-h-[min(44rem,var(--toolbar-panel-room,calc(var(--canvas-visible-height)-2rem)))] w-full flex-col gap-3 overflow-y-auto overscroll-contain rounded-xl bg-popover/85 px-3.5 py-3 shadow-ambient backdrop-blur-md">
       {options.map((option) => {
         if (option.type === 'color') {
           return (
@@ -176,6 +178,7 @@ export function ToolOptionsPanel({
                         }
                         void removeColor(color);
                       }}
+                      onMenuOpenChange={onSwatchMenuOpenChange}
                     />
                   ))}
                 {customColorTool && canAddColor && (

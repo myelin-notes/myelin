@@ -16,6 +16,8 @@ export interface StrokeStyle {
   simulatePressure?: boolean;
 }
 
+export type StrokeStyleUpdate = Partial<Pick<StrokeStyle, 'color' | 'size'>>;
+
 export const DEFAULT_STABILIZATION = 0.5;
 
 // perfect-freehand uses fixed 3-unit end filtering and a 1-unit dot offset. Normalize to its
@@ -51,6 +53,15 @@ export class StrokeElement extends AnchorableElement {
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
+  }
+
+  public setStrokeStyle(updates: StrokeStyleUpdate): void {
+    this.style = { ...this.style, ...updates };
+    if (updates.size !== undefined) {
+      this.updateBounds();
+    }
+    this.syncToYMap(updates);
+    this.onTransformChanged?.();
   }
 
   /** World-space [x, y] coordinates of the recorded stroke points. */
@@ -143,12 +154,16 @@ export class StrokeElement extends AnchorableElement {
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
     this.bindYFields(yMap, {
+      // Undo and remote edits land here; setStrokeStyle handles local ones.
       color: (v) => {
         this.style.color = v as string;
+        this.onTransformChanged?.();
       },
       size: (v) => {
         this.style.size = v as number;
         this.dirty = true;
+        this.updateBounds();
+        this.onTransformChanged?.();
       },
       stabilization: (v) => {
         this.style.stabilization = v as number;
