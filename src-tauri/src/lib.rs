@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod android_exit;
 mod clipboard;
 mod code_runner;
 mod crash_reports;
