@@ -58,26 +58,10 @@ const { path } = splitLocalePath(Astro.url.pathname);
       )
     }
   </div>
-  {/* Hidden on phones: five links plus picker and CTA overflow the bar, and the
-      footer carries the same links. */}
-  <nav
-    class="flex items-center gap-5 max-[640px]:hidden"
-    aria-label={copy.topbar.nav}
-  >
-    {
-      navLinks.map((id) => (
-        <a
-          href={linkHref(id, locale)}
-          class="text-[0.8rem] text-text-secondary no-underline transition-colors hover:text-ink"
-        >
-          {copy.linkLabels[id]}
-        </a>
-      ))
-    }
-  </nav>
   {
     translated && (
-      /* `details` rather than a scripted menu: this needs no JavaScript. */
+      /* First in the right-hand group so hiding it on English-only pages leaves the
+         nav and CTA in place. `details` rather than a scripted menu: no JavaScript. */
       <details class="lang-picker group relative">
         <summary
           aria-label={copy.topbar.language}
@@ -115,6 +99,23 @@ const { path } = splitLocalePath(Astro.url.pathname);
       </details>
     )
   }
+  {/* Hidden on phones: five links plus picker and CTA overflow the bar, and the
+      footer carries the same links. */}
+  <nav
+    class="flex items-center gap-5 max-[640px]:hidden"
+    aria-label={copy.topbar.nav}
+  >
+    {
+      navLinks.map((id) => (
+        <a
+          href={linkHref(id, locale)}
+          class="text-[0.8rem] text-text-secondary no-underline transition-colors hover:text-ink"
+        >
+          {copy.linkLabels[id]}
+        </a>
+      ))
+    }
+  </nav>
   <a
     href={`${localizePath('/', locale)}#download`}
     class={cn(buttonVariants(), 'h-8 px-3.5 text-[0.8rem]')}
