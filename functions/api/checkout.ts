@@ -25,6 +25,17 @@ function json(body: { url: string } | { message: string }, status = 200) {
   });
 }
 
+// Dev and *.pages.dev previews use sandbox, so a preview can never take a real payment.
+export function polarFor(request: Request, accessToken: string) {
+  return createPolar({
+    accessToken,
+    environment:
+      new URL(request.url).hostname === 'trymyelin.app'
+        ? 'production'
+        : 'sandbox',
+  });
+}
+
 export async function onRequestPost({
   request,
   env,
@@ -49,14 +60,7 @@ export async function onRequestPost({
     }
   }
 
-  // Dev and *.pages.dev previews use sandbox, so a preview can never take a real payment.
-  const polar = createPolar({
-    accessToken,
-    environment:
-      new URL(request.url).hostname === 'trymyelin.app'
-        ? 'production'
-        : 'sandbox',
-  });
+  const polar = polarFor(request, accessToken);
   try {
     const checkout = await polar.checkouts.create({
       products: [env.POLAR_PRO_PRODUCT_ID],

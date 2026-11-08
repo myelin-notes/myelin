@@ -95,7 +95,7 @@ function fromBase64url(value: string): Uint8Array<ArrayBuffer> {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-function hmacKey(secret: string): Promise<CryptoKey> {
+export function hmacKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -105,13 +105,14 @@ function hmacKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-async function signLink(
+export async function signLink(
   email: string,
   secret: string,
   now: number,
+  ttl = LINK_TTL_MS,
 ): Promise<string> {
   const payload = new TextEncoder().encode(
-    JSON.stringify({ email, exp: now + LINK_TTL_MS }),
+    JSON.stringify({ email, exp: now + ttl }),
   );
   const signature = await crypto.subtle.sign(
     'HMAC',
@@ -152,7 +153,7 @@ export async function verifyLink(
 function studentEmailText(link: string): string {
   return `Hi,
 
-Your school email address is verified. Use this link to buy Myelin Pro at the student price of $29.99:
+Your school email address is verified. Use this link to buy Myelin Notes Pro at the student price of $29.99:
 
 ${link}
 
@@ -219,7 +220,7 @@ export async function onRequestPost({
       body: JSON.stringify({
         from: STUDENT_FROM,
         to: [email],
-        subject: 'Your Myelin Pro student price',
+        subject: 'Your Myelin Notes Pro student price',
         text: studentEmailText(link.href),
       }),
     });

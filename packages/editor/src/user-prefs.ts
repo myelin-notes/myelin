@@ -76,6 +76,8 @@ const PREFS = {
   mcpPort: pref<number>('mcp-port', 3846),
   mcpAllowDirectWrites: pref<boolean>('mcp-allow-direct-writes', false),
   plan: pref<'free' | 'pro'>('plan', 'free'),
+  // `activationId` is this device's slot on the key; Polar allows 3 per key.
+  license: pref<{ key: string; activationId: string } | null>('license', null),
   analyticsEnabled: pref<boolean>('analytics-enabled', false),
   onboardingCompleted: pref<boolean>('onboarding-completed', false),
   whatsNewSeen: pref<string>('whats-new-seen', ''),

@@ -13,8 +13,9 @@ const zhHans: typeof en = {
     or: '或',
   },
   plan: {
-    proRequired: '此功能需要 Myelin Pro。',
+    proRequired: '此功能需要 Myelin Notes Pro。',
     upgrade: '升级',
+    purchaseFailed: '无法完成购买。',
   },
   tabBar: {
     library: '资料库',
@@ -719,6 +720,46 @@ const zhHans: typeof en = {
           label: '代码',
           description: '切换行内代码格式',
         },
+      },
+    },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: '升级',
+      active: '已激活',
+      key: {
+        label: '许可证密钥',
+        description: '粘贴购买邮件中的密钥。一个密钥最多可用于 3 台设备。',
+        action: '激活',
+      },
+      buy: {
+        label: '购买 Pro',
+        description: '在 Myelin 网站一次性购买。',
+        descriptionIos: '一次性购买，在你的 Apple 设备上解锁 Pro。',
+        action: '购买 Pro',
+      },
+      restore: {
+        label: '恢复购买',
+        description: '解锁你已用此 Apple ID 购买的 Pro。',
+        action: '恢复',
+        none: '未找到此 Apple ID 的 App Store 购买记录。',
+      },
+      email: {
+        label: '已经拥有 Pro？',
+        description: '输入购买时使用的邮箱地址，我们会给你发送验证码。',
+        codeSent: '输入我们通过邮件发送的 8 位验证码。',
+        codeLabel: '验证码',
+        send: '发送验证码',
+        verify: '验证',
+      },
+      deactivate: {
+        label: '此设备',
+        description: '从此设备移除 Pro，为其他设备腾出名额。',
+        action: '停用',
+      },
+      errors: {
+        invalid: '该密钥或验证码无效。',
+        limit: '此密钥已在 3 台设备上激活。请先在其中一台上停用。',
+        failed: '无法连接许可证服务器，请重试。',
       },
     },
     about: {

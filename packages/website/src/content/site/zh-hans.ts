@@ -181,7 +181,7 @@ const zhHans: SiteCopy = {
 
 ## 真的免费吗？
 
-是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
+是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
 
 ## 我的笔记保存在哪里？
 
@@ -289,7 +289,7 @@ const zhHans: SiteCopy = {
       agents: {
         label: 'AI 智能体',
         heading: '用你自己的 AI，在你自己的电脑上',
-        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。AI 智能体属于 Myelin Pro 功能。',
+        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。AI 智能体属于 Myelin Notes Pro 功能。',
         details: [
           '服务器只监听 127.0.0.1，端口由你选择',
           '从设置中复制安装提示，即可连接你的智能体',
@@ -423,7 +423,7 @@ const zhHans: SiteCopy = {
     meta: {
       title: '价格 | Myelin Notes',
       description:
-        'Myelin Notes 个人使用免费。Myelin Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。',
+        'Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。',
     },
     eyebrow: '价格',
     headline: '免费使用，需要更多时再升级 Pro',
@@ -461,7 +461,7 @@ const zhHans: SiteCopy = {
       ],
       cta: '购买 Pro',
       licenseNote:
-        '许可证密钥会通过邮件发送给你，可在最多 3 台设备上解锁 Pro。',
+        '许可证密钥会通过邮件发送给你，可在任意平台的最多 3 台设备上解锁 Pro。',
       checkoutFailed: '无法打开结账页面，请重试。',
     },
     student: {
@@ -483,11 +483,17 @@ const zhHans: SiteCopy = {
       {
         question: '如何解锁 Pro？',
         answer:
-          '购买 Pro 后，你会通过邮件收到许可证密钥。在 Myelin 应用中输入密钥，即可在该设备上解锁 Pro。',
+          '在此购买 Pro 后，你会通过邮件收到许可证密钥。在“设置 → Myelin Notes Pro”中输入即可。在 iPhone 和 iPad 上，请改为输入购买时使用的邮箱。',
       },
       {
         question: '可以在几台设备上使用？',
-        answer: '一个许可证密钥最多可在 3 台设备上解锁 Pro。',
+        answer:
+          '一个密钥最多可在任意平台的 3 台设备上解锁 Pro。如需换设备，请先在其中一台上停用。',
+      },
+      {
+        question: '如果在 App Store 购买 Pro 呢？',
+        answer:
+          '在 App Store 购买只会在你的 Apple 设备上解锁 Pro，不包含可用于 Windows、Linux 或 Android 的许可证密钥。它与在此处的购买相互独立，请在能覆盖你设备的地方购买。',
       },
       {
         question: '这是订阅吗？',

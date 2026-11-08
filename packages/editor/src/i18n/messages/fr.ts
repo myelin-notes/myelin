@@ -13,8 +13,9 @@ const fr: typeof en = {
     or: 'ou',
   },
   plan: {
-    proRequired: 'Cette fonctionnalité fait partie de Myelin Pro.',
+    proRequired: 'Cette fonctionnalité fait partie de Myelin Notes Pro.',
     upgrade: 'Passer à Pro',
+    purchaseFailed: 'L’achat n’a pas pu aboutir.',
   },
   tabBar: {
     library: 'Bibliothèque',
@@ -762,6 +763,51 @@ const fr: typeof en = {
           label: 'Code',
           description: 'Activer/désactiver le code en ligne',
         },
+      },
+    },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Passer à Pro',
+      active: 'Actif',
+      key: {
+        label: 'Clé de licence',
+        description:
+          'Collez la clé reçue par e-mail après l’achat. Une clé fonctionne sur 3 appareils maximum.',
+        action: 'Activer',
+      },
+      buy: {
+        label: 'Acheter Pro',
+        description: 'Un achat unique sur le site de Myelin.',
+        descriptionIos:
+          'Un achat unique qui débloque Pro sur vos appareils Apple.',
+        action: 'Acheter Pro',
+      },
+      restore: {
+        label: 'Restaurer les achats',
+        description: 'Débloquez le Pro déjà acheté avec cet identifiant Apple.',
+        action: 'Restaurer',
+        none: 'Aucun achat App Store trouvé pour cet identifiant Apple.',
+      },
+      email: {
+        label: 'Vous avez déjà Pro ?',
+        description:
+          'Saisissez l’adresse e-mail utilisée pour l’achat et nous vous enverrons un code.',
+        codeSent: 'Saisissez le code à 8 chiffres reçu par e-mail.',
+        codeLabel: 'Code',
+        send: 'Envoyer le code',
+        verify: 'Vérifier',
+      },
+      deactivate: {
+        label: 'Cet appareil',
+        description:
+          'Retirez Pro de cet appareil pour libérer une place pour un autre.',
+        action: 'Désactiver',
+      },
+      errors: {
+        invalid: 'Cette clé ou ce code n’est pas valide.',
+        limit:
+          'Cette clé est déjà active sur 3 appareils. Désactivez-la d’abord sur l’un d’eux.',
+        failed: 'Impossible de joindre le serveur de licences. Réessayez.',
       },
     },
     about: {

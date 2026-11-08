@@ -13,8 +13,9 @@ const es: typeof en = {
     or: 'o',
   },
   plan: {
-    proRequired: 'Esta función es de Myelin Pro.',
+    proRequired: 'Esta función es de Myelin Notes Pro.',
     upgrade: 'Mejorar',
+    purchaseFailed: 'No se pudo completar la compra.',
   },
   tabBar: {
     library: 'Biblioteca',
@@ -753,6 +754,52 @@ const es: typeof en = {
           label: 'Código',
           description: 'Alternar código en línea',
         },
+      },
+    },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Mejorar',
+      active: 'Activo',
+      key: {
+        label: 'Clave de licencia',
+        description:
+          'Pega la clave del correo de tu compra. Una clave sirve en hasta 3 dispositivos.',
+        action: 'Activar',
+      },
+      buy: {
+        label: 'Comprar Pro',
+        description: 'Un pago único en el sitio web de Myelin.',
+        descriptionIos:
+          'Un pago único que desbloquea Pro en tus dispositivos Apple.',
+        action: 'Comprar Pro',
+      },
+      restore: {
+        label: 'Restaurar compras',
+        description: 'Desbloquea el Pro que ya compraste con este Apple ID.',
+        action: 'Restaurar',
+        none: 'No se encontró ninguna compra en la App Store para este Apple ID.',
+      },
+      email: {
+        label: '¿Ya tienes Pro?',
+        description:
+          'Escribe el correo con el que lo compraste y te enviaremos un código.',
+        codeSent: 'Escribe el código de 8 dígitos que te enviamos.',
+        codeLabel: 'Código',
+        send: 'Enviar código',
+        verify: 'Verificar',
+      },
+      deactivate: {
+        label: 'Este dispositivo',
+        description:
+          'Quita Pro de este dispositivo para liberar un lugar para otro.',
+        action: 'Desactivar',
+      },
+      errors: {
+        invalid: 'Esa clave o código no es válido.',
+        limit:
+          'Esta clave ya está activa en 3 dispositivos. Desactívala primero en uno de ellos.',
+        failed:
+          'No se pudo conectar con el servidor de licencias. Inténtalo de nuevo.',
       },
     },
     about: {

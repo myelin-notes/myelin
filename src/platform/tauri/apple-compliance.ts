@@ -21,3 +21,18 @@ export function cancelWebAuthentication(sessionId: string): Promise<void> {
     sessionId,
   });
 }
+
+interface EntitlementResult {
+  active: boolean;
+}
+
+export function purchasePro(productId: string): Promise<EntitlementResult> {
+  return invoke('plugin:apple-compliance|purchase_pro', { productId });
+}
+
+export function proEntitlement(
+  productId: string,
+  sync: boolean,
+): Promise<EntitlementResult> {
+  return invoke('plugin:apple-compliance|pro_entitlement', { productId, sync });
+}

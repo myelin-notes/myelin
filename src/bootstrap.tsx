@@ -13,7 +13,9 @@ import {
   setLogSink,
 } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
+import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
+import { buyOnAppStore, refreshPlan } from '@/lib/license';
 import { tauriPlatform } from '@/platform/tauri';
 import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';
@@ -26,8 +28,6 @@ import {
 import { initRustErrorReporting } from './lib/rust-errors';
 import { RepositoryProvider } from './lib/sync';
 import './index.css';
-
-const PRICING_URL = 'https://trymyelin.app/pricing';
 
 // Loaded via dynamic import from main.tsx so that a throw while *importing* any
 // of the above (e.g. a Web API missing on an older OS) rejects that import and
@@ -47,7 +47,15 @@ try {
     toast(strings.proRequired, {
       action: {
         label: strings.upgrade,
-        onClick: () => void tauriPlatform.openExternal(PRICING_URL),
+        // App Review 3.1.1: iOS may not point to the website checkout, so it sells through IAP.
+        onClick: () =>
+          MOBILE_PLATFORM === 'ios'
+            ? void buyOnAppStore().catch((error: unknown) =>
+                toast.error(strings.purchaseFailed, {
+                  description: String(error),
+                }),
+              )
+            : void tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`),
       },
     });
   });
@@ -58,6 +66,7 @@ try {
     posthog.captureException(error, context);
   });
   initRustErrorReporting();
+  void refreshPlan();
   disableNativePinchZoom();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>

@@ -8,8 +8,7 @@ export const PLAN_LIMITS = {
 };
 
 export function isPro(): boolean {
-  // return UserPrefs.get('plan') === 'pro';
-  return false;
+  return UserPrefs.get('plan') === 'pro';
 }
 
 export function planLimit(limit: PlanLimit): number {

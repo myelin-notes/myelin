@@ -192,7 +192,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
+Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
 
 ## ¿Dónde se guardan mis notas?
 
@@ -301,7 +301,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       agents: {
         label: 'Agentes de IA',
         heading: 'Trae tu propia IA, en tu propio equipo.',
-        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas. Los agentes de IA forman parte de Myelin Pro.',
+        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas. Los agentes de IA forman parte de Myelin Notes Pro.',
         details: [
           'El servidor solo escucha en 127.0.0.1, en el puerto que elijas',
           'Copia la instrucción de instalación desde Ajustes para conectar tu agente',
@@ -435,7 +435,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
     meta: {
       title: 'Precios | Myelin Notes',
       description:
-        'Myelin Notes es gratis para uso personal. Myelin Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.',
+        'Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.',
     },
     eyebrow: 'Precios',
     headline: 'Gratis para usar. Pro cuando quieras más.',
@@ -473,7 +473,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       ],
       cta: 'Comprar Pro',
       licenseNote:
-        'Recibes una clave de licencia por correo. Desbloquea Pro en hasta 3 de tus dispositivos.',
+        'Recibes una clave de licencia por correo. Desbloquea Pro en hasta 3 de tus dispositivos, en cualquier plataforma.',
       checkoutFailed: 'No hemos podido abrir el pago. Inténtalo de nuevo.',
     },
     student: {
@@ -497,12 +497,17 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       {
         question: '¿Cómo desbloqueo Pro?',
         answer:
-          'Compra Pro y recibirás una clave de licencia por correo. Introdúcela en la app de Myelin para desbloquear Pro en ese dispositivo.',
+          'Compra Pro aquí y recibirás una clave de licencia por correo. Introdúcela en Ajustes → Myelin Notes Pro. En iPhone y iPad, introduce en su lugar el correo con el que compraste.',
       },
       {
         question: '¿En cuántos dispositivos puedo usarlo?',
         answer:
-          'Una clave de licencia desbloquea Pro en hasta 3 de tus dispositivos.',
+          'Una clave desbloquea Pro en hasta 3 de tus dispositivos, en cualquier plataforma. Para moverla, desactívala antes en uno de ellos.',
+      },
+      {
+        question: '¿Y si compro Pro en la App Store?',
+        answer:
+          'Una compra en la App Store desbloquea Pro solo en tus dispositivos Apple y no incluye clave de licencia para Windows, Linux ni Android. Es independiente de una compra aquí, así que compra donde cubra tus dispositivos.',
       },
       {
         question: '¿Es una suscripción?',

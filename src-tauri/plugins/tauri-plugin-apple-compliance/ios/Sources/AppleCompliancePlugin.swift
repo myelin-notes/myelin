@@ -1,4 +1,5 @@
 import AuthenticationServices
+import StoreKit
 import Tauri
 import UIKit
 import WebKit
@@ -15,6 +16,20 @@ private struct CancelWebAuthenticationArgs: Decodable {
 
 private struct WebAuthenticationResult: Encodable {
   let callbackUrl: String
+}
+
+private struct PurchaseArgs: Decodable {
+  let productId: String
+}
+
+private struct EntitlementArgs: Decodable {
+  let productId: String
+  /// Asks the App Store for this Apple ID's purchases first; this may show a sign-in sheet.
+  let sync: Bool
+}
+
+private struct EntitlementResult: Encodable {
+  let active: Bool
 }
 
 class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
@@ -111,6 +126,67 @@ class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProvi
       authenticationInvoke?.reject(
         "OAuth sign-in was cancelled.", code: "canceled")
       invoke.resolve()
+    }
+  }
+
+  @objc public func purchasePro(_ invoke: Invoke) {
+    let args: PurchaseArgs
+    do {
+      args = try invoke.parseArgs(PurchaseArgs.self)
+    } catch {
+      invoke.reject("Invalid purchase request.", error: error)
+      return
+    }
+
+    Task {
+      do {
+        guard let product = try await Product.products(for: [args.productId]).first else {
+          invoke.reject("Pro is not available in the App Store right now.")
+          return
+        }
+        // Cancelled and pending (Ask to Buy) purchases resolve inactive; a pending one
+        // shows up in `currentEntitlements` once approved.
+        guard case .success(let verification) = try await product.purchase(),
+          case .verified(let transaction) = verification
+        else {
+          invoke.resolve(EntitlementResult(active: false))
+          return
+        }
+        await transaction.finish()
+        invoke.resolve(EntitlementResult(active: true))
+      } catch {
+        invoke.reject("The purchase failed.", error: error)
+      }
+    }
+  }
+
+  @objc public func proEntitlement(_ invoke: Invoke) {
+    let args: EntitlementArgs
+    do {
+      args = try invoke.parseArgs(EntitlementArgs.self)
+    } catch {
+      invoke.reject("Invalid entitlement request.", error: error)
+      return
+    }
+
+    Task {
+      do {
+        if args.sync {
+          try await AppStore.sync()
+        }
+        for await result in Transaction.currentEntitlements {
+          if case .verified(let transaction) = result,
+            transaction.productID == args.productId,
+            transaction.revocationDate == nil
+          {
+            invoke.resolve(EntitlementResult(active: true))
+            return
+          }
+        }
+        invoke.resolve(EntitlementResult(active: false))
+      } catch {
+        invoke.reject("Could not restore purchases.", error: error)
+      }
     }
   }
 

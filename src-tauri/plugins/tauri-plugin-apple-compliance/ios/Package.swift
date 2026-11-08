@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
   name: "tauri-plugin-apple-compliance",
-  platforms: [.iOS(.v14)],
+  platforms: [.iOS(.v15)],
   products: [
     .library(
       name: "tauri-plugin-apple-compliance",
@@ -20,7 +20,8 @@ let package = Package(
       dependencies: [.byName(name: "Tauri")],
       path: "Sources",
       linkerSettings: [
-        .linkedFramework("AuthenticationServices")
+        .linkedFramework("AuthenticationServices"),
+        .linkedFramework("StoreKit"),
       ])
   ]
 )

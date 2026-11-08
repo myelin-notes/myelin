@@ -184,7 +184,7 @@ const fr: SiteCopy = {
 
 ## Est-ce vraiment gratuit ?
 
-Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Pro est un achat unique de 49,99 USD, ou 29,99 USD pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
+Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Notes Pro est un achat unique de 49,99 USD, ou 29,99 USD pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
 
 ## Où sont stockées mes notes ?
 
@@ -294,7 +294,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       agents: {
         label: 'Agents IA',
         heading: 'Votre propre IA, sur votre propre machine.',
-        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire. Les agents IA font partie de Myelin Pro.',
+        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire. Les agents IA font partie de Myelin Notes Pro.',
         details: [
           'Le serveur n’écoute que sur 127.0.0.1, sur le port de votre choix',
           'Copiez l’invite d’installation depuis les Réglages pour connecter votre agent',
@@ -428,7 +428,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
     meta: {
       title: 'Tarifs | Myelin Notes',
       description:
-        'Myelin Notes est gratuit pour un usage personnel. Myelin Pro est un achat unique de 49,99 USD, ou 29,99 USD pour les étudiants, pour les agents IA via MCP, l’exécution de code et des limites plus élevées.',
+        'Myelin Notes est gratuit pour un usage personnel. Myelin Notes Pro est un achat unique de 49,99 USD, ou 29,99 USD pour les étudiants, pour les agents IA via MCP, l’exécution de code et des limites plus élevées.',
     },
     eyebrow: 'Tarifs',
     headline: 'Gratuit à l’usage. Pro quand vous voulez plus.',
@@ -466,7 +466,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       ],
       cta: 'Acheter Pro',
       licenseNote:
-        'Vous recevez une clé de licence par e-mail. Elle débloque Pro sur jusqu’à 3 de vos appareils.',
+        'Vous recevez une clé de licence par e-mail. Elle débloque Pro sur jusqu’à 3 de vos appareils, sur toutes les plateformes.',
       checkoutFailed:
         'Nous n’avons pas pu ouvrir le paiement. Veuillez réessayer.',
     },
@@ -491,12 +491,17 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       {
         question: 'Comment débloquer Pro ?',
         answer:
-          'Achetez Pro et vous recevez une clé de licence par e-mail. Saisissez-la dans l’app Myelin pour débloquer Pro sur cet appareil.',
+          'Achetez Pro ici et vous recevez une clé de licence par e-mail. Saisissez-la dans Réglages → Myelin Notes Pro. Sur iPhone et iPad, saisissez plutôt l’adresse e-mail utilisée pour l’achat.',
       },
       {
         question: 'Sur combien d’appareils puis-je l’utiliser ?',
         answer:
-          'Une clé de licence débloque Pro sur jusqu’à 3 de vos appareils.',
+          'Une clé débloque Pro sur jusqu’à 3 de vos appareils, sur toutes les plateformes. Pour la déplacer, désactivez-la d’abord sur l’un d’eux.',
+      },
+      {
+        question: 'Et si j’achète Pro sur l’App Store ?',
+        answer:
+          'Un achat sur l’App Store débloque Pro uniquement sur vos appareils Apple, sans clé de licence pour Windows, Linux ou Android. Il est distinct d’un achat ici : achetez là où vos appareils sont couverts.',
       },
       {
         question: 'Est-ce un abonnement ?',

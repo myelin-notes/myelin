@@ -14,6 +14,8 @@
 //     use the app's custom URI scheme (see sync/repo/google-drive/credentials.ts).
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for live sync peer discovery
 //   - VITE_POSTHOG_KEY / VITE_POSTHOG_HOST (defaults to us.i.posthog.com)
+//   - VITE_WEBSITE_URL — site serving /api/license and /api/restore; a *.pages.dev preview
+//     talks to Polar's sandbox
 
 export const IS_DEV = import.meta.env.DEV;
 export const MODE = import.meta.env.MODE;
@@ -65,6 +67,12 @@ export const POSTHOG_KEY = (
 
 export const POSTHOG_HOST = (
   import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com'
+)
+  .trim()
+  .replace(/\/+$/, '');
+
+export const WEBSITE_URL = (
+  import.meta.env.VITE_WEBSITE_URL ?? 'https://trymyelin.app'
 )
   .trim()
   .replace(/\/+$/, '');

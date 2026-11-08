@@ -11,8 +11,9 @@ const en = {
     or: 'or',
   },
   plan: {
-    proRequired: 'This is a Myelin Pro feature.',
+    proRequired: 'This is a Myelin Notes Pro feature.',
     upgrade: 'Upgrade',
+    purchaseFailed: 'The purchase could not be completed.',
   },
   tabBar: {
     library: 'Library',
@@ -744,6 +745,51 @@ const en = {
           label: 'Code',
           description: 'Toggle inline code formatting',
         },
+      },
+    },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Upgrade',
+      active: 'Active',
+      key: {
+        label: 'License key',
+        description:
+          'Paste the key from your purchase email. One key works on up to 3 devices.',
+        action: 'Activate',
+      },
+      buy: {
+        label: 'Buy Pro',
+        description: 'A one-time purchase from the Myelin website.',
+        descriptionIos:
+          'A one-time purchase that unlocks Pro on your Apple devices.',
+        action: 'Buy Pro',
+      },
+      restore: {
+        label: 'Restore purchases',
+        description: 'Unlock Pro you already bought with this Apple ID.',
+        action: 'Restore',
+        none: 'No App Store purchase was found for this Apple ID.',
+      },
+      email: {
+        label: 'Already have Pro?',
+        description:
+          'Enter the email address you bought it with and we will send you a code.',
+        codeSent: 'Enter the 8-digit code we emailed you.',
+        codeLabel: 'Code',
+        send: 'Send code',
+        verify: 'Verify',
+      },
+      deactivate: {
+        label: 'This device',
+        description:
+          'Remove Pro from this device to free a slot for another one.',
+        action: 'Deactivate',
+      },
+      errors: {
+        invalid: 'That key or code is not valid.',
+        limit:
+          'This key is already active on 3 devices. Deactivate it on one of them first.',
+        failed: 'Could not reach the license server. Please try again.',
       },
     },
     about: {
