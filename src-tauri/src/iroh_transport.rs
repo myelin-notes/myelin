@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use bytes::Bytes;
@@ -16,18 +17,42 @@ use n0_future::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, MutexGuard};
 const GOSSIP_MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 
 pub struct IrohState {
     runtime: Mutex<Option<IrohRuntime>>,
+    // Host/join calls waiting on `online()` without the lock; leave must not shut the runtime
+    // down under them. Only changed while holding `runtime`.
+    connecting: AtomicUsize,
 }
 
 impl IrohState {
     pub fn new() -> Self {
         Self {
             runtime: Mutex::new(None),
+            connecting: AtomicUsize::new(0),
         }
+    }
+
+    /// Starts the runtime if needed and returns it locked once its endpoint is online.
+    async fn lock_online(&self) -> Result<MutexGuard<'_, Option<IrohRuntime>>, String> {
+        let endpoint = {
+            let mut runtime = self.runtime.lock().await;
+            if runtime.is_none() {
+                *runtime = Some(IrohRuntime::start().await?);
+            }
+            self.connecting.fetch_add(1, Ordering::SeqCst);
+            runtime
+                .as_ref()
+                .expect("runtime initialized")
+                .endpoint
+                .clone()
+        };
+        endpoint.online().await;
+        let runtime = self.runtime.lock().await;
+        self.connecting.fetch_sub(1, Ordering::SeqCst);
+        Ok(runtime)
     }
 }
 
@@ -394,20 +419,9 @@ pub async fn iroh_host(
         }
         None => None,
     };
-    let endpoint = {
-        let mut runtime = state.runtime.lock().await;
-        if runtime.is_none() {
-            *runtime = Some(IrohRuntime::start().await?);
-        }
-        runtime
-            .as_ref()
-            .expect("runtime initialized")
-            .endpoint
-            .clone()
-    };
-    endpoint.online().await;
-    let mut runtime = state.runtime.lock().await;
-    runtime
+    state
+        .lock_online()
+        .await?
         .as_mut()
         .expect("runtime initialized")
         .host(&app, &note_id, &transport_id, repository)
@@ -430,20 +444,9 @@ pub async fn iroh_join(
         }
         None => None,
     };
-    let endpoint = {
-        let mut runtime = state.runtime.lock().await;
-        if runtime.is_none() {
-            *runtime = Some(IrohRuntime::start().await?);
-        }
-        runtime
-            .as_ref()
-            .expect("runtime initialized")
-            .endpoint
-            .clone()
-    };
-    endpoint.online().await;
-    let mut runtime = state.runtime.lock().await;
-    runtime
+    state
+        .lock_online()
+        .await?
         .as_mut()
         .expect("runtime initialized")
         .join(&app, &note_id, &transport_id, &ticket, repository)
@@ -520,7 +523,7 @@ pub async fn iroh_leave(
     active.leave(&note_id, &transport_id);
     // An idle endpoint still pings its relay every 15s and re-probes the network every ~20s, which
     // keeps a mobile radio awake. Host and join start a fresh one on demand.
-    if active.topics.is_empty() {
+    if active.topics.is_empty() && state.connecting.load(Ordering::SeqCst) == 0 {
         if let Some(idle) = runtime.take() {
             idle.shutdown().await;
         }
