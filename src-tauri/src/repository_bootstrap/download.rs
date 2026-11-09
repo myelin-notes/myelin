@@ -267,6 +267,7 @@ pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+#[cfg(test)]
 pub(crate) async fn download_repository(
     stage: &Path,
     source: RepositorySource,

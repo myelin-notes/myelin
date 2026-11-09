@@ -1,4 +1,3 @@
-import * as Y from 'yjs';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { VFSNodeId } from '@/lib/sync';
@@ -352,25 +351,4 @@ export async function createCanvasNoteState(
     update: ydoc.encodeState(),
     stateVector: ydoc.encodeStateVector(),
   };
-}
-
-export function createNoteState(text: string): {
-  update: Uint8Array;
-  stateVector: Uint8Array;
-} {
-  const doc = new Y.Doc();
-  doc.getText('content').insert(0, text);
-  return {
-    update: Y.encodeStateAsUpdate(doc),
-    stateVector: Y.encodeStateVector(doc),
-  };
-}
-
-export function readNoteText(update: Uint8Array | null): string {
-  if (!update) {
-    return '';
-  }
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, update);
-  return doc.getText('content').toString();
 }
