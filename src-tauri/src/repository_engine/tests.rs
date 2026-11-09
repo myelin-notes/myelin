@@ -35,6 +35,7 @@ impl TestDirectory {
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
             media_migration: Mutex::new(None),
+            reported_errors: Mutex::new(HashMap::new()),
             cache_dir: self.0.join("cache"),
         })
     }
@@ -4283,4 +4284,30 @@ async fn media_added_while_a_sync_applies_its_removal_survives() {
         .await
         .unwrap();
     assert_media_intact(&read(&first, "during-sync").await);
+}
+
+#[test]
+fn background_errors_report_once_until_the_task_recovers() {
+    use tauri::Listener;
+    let app = tauri::test::mock_builder()
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .unwrap();
+    let reports = Arc::new(Mutex::new(Vec::new()));
+    let seen = reports.clone();
+    app.listen("rust-error", move |event| {
+        seen.lock().unwrap().push(event.payload().to_string());
+    });
+    let directory = TestDirectory::new();
+    let engine = directory.engine(false);
+    let failed: Result<(), String> = Err("GitHub token is not configured.".into());
+
+    engine.report_background_error(app.handle(), "Background sync failed", &failed);
+    engine.report_background_error(app.handle(), "Background sync failed", &failed);
+    assert_eq!(reports.lock().unwrap().len(), 1);
+
+    engine.report_background_error(app.handle(), "Background sync failed", &Ok(()));
+    engine.report_background_error(app.handle(), "Background sync failed", &failed);
+    let reports = reports.lock().unwrap();
+    assert_eq!(reports.len(), 2);
+    assert!(reports[1].contains("GitHub token is not configured."));
 }

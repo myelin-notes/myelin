@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushLogs, Logger, resetLoggingForTests, setLogSink } from './logger';
+import {
+  flushLogs,
+  Logger,
+  resetLoggingForTests,
+  setLogErrorReporter,
+  setLogSink,
+} from './logger';
 
 describe('Logger', () => {
   let written: string[];
@@ -109,5 +115,27 @@ describe('Logger', () => {
     expect(infoSpy).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports string rejections (Tauri command errors) as the error message', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reporter = vi.fn();
+    setLogErrorReporter(reporter);
+
+    new Logger('NoteSession').error(
+      'Transport send error',
+      'No active iroh topic for this note',
+      { noteId: 'n1' },
+    );
+    setLogErrorReporter(null);
+
+    expect(reporter).toHaveBeenCalledWith(
+      new Error('No active iroh topic for this note'),
+      {
+        subsystem: 'NoteSession',
+        message: 'Transport send error',
+        noteId: 'n1',
+      },
+    );
   });
 });

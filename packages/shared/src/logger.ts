@@ -321,10 +321,19 @@ function reportError(
       return;
     }
 
-    const extra = isPlainObject(errorOrMeta) ? errorOrMeta : {};
-    errorReporter(new Error(message), {
+    if (isPlainObject(errorOrMeta) || errorOrMeta === undefined) {
+      errorReporter(new Error(message), {
+        subsystem,
+        ...(errorOrMeta ?? {}),
+        ...(maybeMeta ?? {}),
+      });
+      return;
+    }
+
+    // Tauri commands reject with plain strings; report them as the error, not as dropped metadata.
+    errorReporter(new Error(String(errorOrMeta)), {
       subsystem,
-      ...extra,
+      message,
       ...(maybeMeta ?? {}),
     });
   } catch {
