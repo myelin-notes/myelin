@@ -12,7 +12,8 @@ const en = {
   },
   plan: {
     title: 'Upgrade to Myelin Notes Pro',
-    description: 'A one-time purchase. Your notes are never paywalled.',
+    description:
+      'A one-time purchase, support the development and unlock some cool features!',
     haveLicense: 'I have a license',
     features: {
       agents: {

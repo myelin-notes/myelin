@@ -14,7 +14,7 @@ const zhHans: typeof en = {
   },
   plan: {
     title: '升级到 Myelin Notes Pro',
-    description: '一次性购买。你的笔记永远不会被付费墙挡住。',
+    description: '一次性购买，支持开发并解锁一些超酷的功能！',
     haveLicense: '我有许可证',
     features: {
       agents: {

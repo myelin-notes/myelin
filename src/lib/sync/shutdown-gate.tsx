@@ -127,12 +127,7 @@ export function RepositoryShutdownGate() {
 
   return (
     <Dialog open modal>
-      {/* Above canvas chrome (z-100), its popovers (z-110/111) and context menus (z-120). */}
-      <DialogContent
-        showCloseButton={false}
-        className="z-[130] sm:max-w-[360px]"
-        overlayClassName="z-[130]"
-      >
+      <DialogContent showCloseButton={false} className="sm:max-w-[360px]">
         <DialogHeader>
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>{copy.description}</DialogDescription>

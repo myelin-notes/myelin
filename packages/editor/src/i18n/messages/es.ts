@@ -14,7 +14,8 @@ const es: typeof en = {
   },
   plan: {
     title: 'Mejora a Myelin Notes Pro',
-    description: 'Un pago único. Tus notas nunca quedan tras un muro de pago.',
+    description:
+      'Un pago único: apoya el desarrollo y desbloquea funciones geniales.',
     haveLicense: 'Tengo una licencia',
     features: {
       agents: {

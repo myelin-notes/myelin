@@ -14,7 +14,8 @@ const fr: typeof en = {
   },
   plan: {
     title: 'Passez à Myelin Notes Pro',
-    description: 'Un achat unique. Vos notes ne sont jamais payantes.',
+    description:
+      'Un achat unique : soutenez le développement et débloquez des fonctionnalités sympas !',
     haveLicense: 'J’ai une licence',
     features: {
       agents: {
