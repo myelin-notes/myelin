@@ -10,7 +10,7 @@ const logger = new Logger('License');
 // Must match the non-consumable in App Store Connect.
 const APP_STORE_PRO_PRODUCT_ID = 'com.github.wintersteve25.myelin.pro';
 
-/** `status` 404: the key or this device's activation is gone. 409: the key is on 3 devices. */
+/** `status` 404: the key or this device's activation is gone. 409: the key is on 3 devices. 0: offline. */
 export class LicenseError extends Error {
   constructor(
     readonly status: number,
@@ -25,6 +25,8 @@ async function post<T>(path: string, body: object): Promise<T> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+  }).catch((error: unknown) => {
+    throw new LicenseError(0, String(error));
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

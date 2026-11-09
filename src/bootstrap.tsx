@@ -52,7 +52,8 @@ try {
           MOBILE_PLATFORM === 'ios'
             ? void buyOnAppStore().catch((error: unknown) =>
                 toast.error(strings.purchaseFailed, {
-                  description: String(error),
+                  description:
+                    error instanceof Error ? error.message : String(error),
                 }),
               )
             : void tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`),

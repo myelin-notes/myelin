@@ -55,11 +55,15 @@ export function ProSection() {
     try {
       await action();
     } catch (error) {
-      const status = error instanceof LicenseError ? error.status : 0;
+      if (!(error instanceof LicenseError)) {
+        // App Store failures reject with the plugin's own message.
+        toast.error(error instanceof Error ? error.message : String(error));
+        return;
+      }
       toast.error(
-        status === 409
+        error.status === 409
           ? strings.errors.limit
-          : status === 404 || status === 400
+          : error.status === 404 || error.status === 400
             ? strings.errors.invalid
             : strings.errors.failed,
       );
