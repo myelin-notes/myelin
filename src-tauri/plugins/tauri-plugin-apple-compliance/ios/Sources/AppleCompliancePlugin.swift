@@ -32,6 +32,11 @@ private struct EntitlementResult: Encodable {
   let active: Bool
 }
 
+private struct StorefrontResult: Encodable {
+  /// ISO 3166-1 alpha-3, e.g. "USA"; nil when the App Store is unreachable.
+  let countryCode: String?
+}
+
 class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProviding {
   private weak var webview: WKWebView?
   private var webAuthenticationSession: ASWebAuthenticationSession?
@@ -187,6 +192,12 @@ class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProvi
       } catch {
         invoke.reject("Could not restore purchases.", error: error)
       }
+    }
+  }
+
+  @objc public func storefront(_ invoke: Invoke) {
+    Task {
+      invoke.resolve(StorefrontResult(countryCode: await Storefront.current?.countryCode))
     }
   }
 

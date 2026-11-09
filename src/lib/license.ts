@@ -3,7 +3,12 @@ import { Logger } from '@myelin/shared/logger';
 import { isMac, isWindows } from '@myelin/shared/os';
 import { fetch } from '@tauri-apps/plugin-http';
 import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
-import { proEntitlement, purchasePro } from '@/platform/tauri/apple-compliance';
+import { tauriPlatform } from '@/platform/tauri';
+import {
+  proEntitlement,
+  purchasePro,
+  storefrontCountry,
+} from '@/platform/tauri/apple-compliance';
 
 const logger = new Logger('License');
 
@@ -82,8 +87,33 @@ export async function redeemRestoreCode(
   await activateLicense(key);
 }
 
-/** Resolves whether Pro is now active; `false` for a cancelled or pending purchase. */
-export async function buyOnAppStore(): Promise<boolean> {
+type ProCheckout = 'website' | 'appStore';
+
+/** Where this device sells Pro. Every buy-Pro button goes through this. */
+async function proCheckout(): Promise<ProCheckout> {
+  switch (MOBILE_PLATFORM) {
+    case 'ios': {
+      // App Review 3.1.1 only allows linking out to the website checkout in the US storefront.
+      const country = await storefrontCountry().catch(() => null);
+      return country === 'USA' ? 'website' : 'appStore';
+    }
+    case 'android':
+      return 'website';
+    default:
+      return 'website';
+  }
+}
+
+/** Resolves whether Pro is now active; `false` for the website checkout or a cancelled or pending purchase. */
+export async function buyPro(): Promise<boolean> {
+  if ((await proCheckout()) === 'website') {
+    await tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`);
+    return false;
+  }
+  return buyOnAppStore();
+}
+
+async function buyOnAppStore(): Promise<boolean> {
   const { active } = await purchasePro(APP_STORE_PRO_PRODUCT_ID);
   if (active) {
     UserPrefs.set('plan', 'pro');

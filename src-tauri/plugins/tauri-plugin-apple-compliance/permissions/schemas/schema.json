@@ -343,10 +343,22 @@
           "markdownDescription": "Denies the purchase_pro command without any pre-configured scope."
         },
         {
-          "description": "Allows Apple system authentication and App Store purchase APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-purchase-pro`\n- `allow-pro-entitlement`",
+          "description": "Enables the storefront command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-storefront",
+          "markdownDescription": "Enables the storefront command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the storefront command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-storefront",
+          "markdownDescription": "Denies the storefront command without any pre-configured scope."
+        },
+        {
+          "description": "Allows Apple system authentication and App Store purchase APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-purchase-pro`\n- `allow-pro-entitlement`\n- `allow-storefront`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Allows Apple system authentication and App Store purchase APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-purchase-pro`\n- `allow-pro-entitlement`"
+          "markdownDescription": "Allows Apple system authentication and App Store purchase APIs.\n#### This default permission set includes:\n\n- `allow-authenticate-web`\n- `allow-cancel-web-authentication`\n- `allow-purchase-pro`\n- `allow-pro-entitlement`\n- `allow-storefront`"
         }
       ]
     }

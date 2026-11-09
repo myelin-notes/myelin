@@ -48,3 +48,11 @@ export function proEntitlement(
     sync,
   }).catch(toError);
 }
+
+/** ISO 3166-1 alpha-3 App Store country, e.g. `USA`; `null` when the App Store is unreachable. */
+export async function storefrontCountry(): Promise<string | null> {
+  const { countryCode } = await invoke<{ countryCode: string | null }>(
+    'plugin:apple-compliance|storefront',
+  ).catch(toError);
+  return countryCode;
+}

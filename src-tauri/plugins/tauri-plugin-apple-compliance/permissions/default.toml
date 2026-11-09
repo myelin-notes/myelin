@@ -7,4 +7,5 @@ permissions = [
   "allow-cancel-web-authentication",
   "allow-purchase-pro",
   "allow-pro-entitlement",
+  "allow-storefront",
 ]

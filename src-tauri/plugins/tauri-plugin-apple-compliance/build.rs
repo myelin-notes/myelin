@@ -3,6 +3,7 @@ const COMMANDS: &[&str] = &[
     "cancel_web_authentication",
     "purchase_pro",
     "pro_entitlement",
+    "storefront",
 ];
 
 fn main() {

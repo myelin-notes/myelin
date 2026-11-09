@@ -8,6 +8,7 @@ Allows Apple system authentication and App Store purchase APIs.
 - `allow-cancel-web-authentication`
 - `allow-purchase-pro`
 - `allow-pro-entitlement`
+- `allow-storefront`
 
 ## Permission Table
 
@@ -118,6 +119,32 @@ Enables the purchase_pro command without any pre-configured scope.
 <td>
 
 Denies the purchase_pro command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`apple-compliance:allow-storefront`
+
+</td>
+<td>
+
+Enables the storefront command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`apple-compliance:deny-storefront`
+
+</td>
+<td>
+
+Denies the storefront command without any pre-configured scope.
 
 </td>
 </tr>

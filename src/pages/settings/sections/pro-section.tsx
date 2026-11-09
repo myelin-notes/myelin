@@ -2,10 +2,10 @@ import { type FormEvent, type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { Button } from '@myelin/ui/button';
-import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
+import { MOBILE_PLATFORM } from '@/lib/env';
 import {
   activateLicense,
-  buyOnAppStore,
+  buyPro,
   deactivateLicense,
   LicenseError,
   redeemRestoreCode,
@@ -13,7 +13,6 @@ import {
   restoreAppStorePurchase,
 } from '@/lib/license';
 import { useUserPref } from '@/lib/use-user-pref';
-import { tauriPlatform } from '@/platform/tauri';
 
 const INPUT_CLASS =
   'h-9 min-w-0 flex-1 rounded-lg bg-card px-3 text-sm text-text-primary outline-none ring-1 ring-border-subtle/70 transition-shadow focus:ring-2 focus:ring-accent-navy/20';
@@ -115,7 +114,7 @@ export function ProSection() {
               <Button
                 size="sm"
                 disabled={busy}
-                onClick={() => void run(buyOnAppStore)}
+                onClick={() => void run(buyPro)}
               >
                 {strings.buy.action}
               </Button>
@@ -211,9 +210,8 @@ export function ProSection() {
             >
               <Button
                 size="sm"
-                onClick={() =>
-                  void tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`)
-                }
+                disabled={busy}
+                onClick={() => void run(buyPro)}
               >
                 {strings.buy.action}
               </Button>

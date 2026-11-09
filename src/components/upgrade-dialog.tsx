@@ -15,10 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
-import { buyOnAppStore } from '@/lib/license';
+import { buyPro } from '@/lib/license';
 import { useTabController } from '@/lib/tabs/context';
-import { tauriPlatform } from '@/platform/tauri';
 
 // Same encoding as the What's New demos (see WhatsNewPage.image).
 const DEMOS: Record<ProFeature, string> = {
@@ -48,14 +46,9 @@ export function UpgradeDialog() {
   const page = planStrings.features[feature];
 
   const buy = async () => {
-    // App Review 3.1.1: iOS may not point to the website checkout, so it sells through IAP.
-    if (MOBILE_PLATFORM !== 'ios') {
-      void tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`);
-      return;
-    }
     setBusy(true);
     try {
-      if (await buyOnAppStore()) {
+      if (await buyPro()) {
         setOpen(false);
       }
     } catch (error) {
