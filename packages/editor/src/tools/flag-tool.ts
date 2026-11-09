@@ -64,7 +64,7 @@ export class FlagTool implements ITool {
       (element) => element instanceof FlagElement,
     ).length;
     if (flagCount >= planLimit('flagsPerNote')) {
-      promptUpgrade();
+      promptUpgrade('limits');
       return;
     }
     const { point } = down;

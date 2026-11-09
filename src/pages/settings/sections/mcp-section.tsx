@@ -26,7 +26,7 @@ export function McpSection() {
 
   const handleEnabled = () => {
     if (!isPro()) {
-      promptUpgrade();
+      promptUpgrade('agents');
       return;
     }
     UserPrefs.set('mcpEnabled', !mcpEnabled);

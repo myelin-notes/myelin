@@ -1,10 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { toast } from 'sonner';
 import { CustomColorsProvider } from '@myelin/editor/custom-colors';
 import { FlagTypesProvider } from '@myelin/editor/flag-types';
-import { getMessages, I18nProvider } from '@myelin/editor/i18n';
-import { setUpgradePrompt } from '@myelin/editor/plan';
+import { I18nProvider } from '@myelin/editor/i18n';
 import { setPlatform } from '@myelin/editor/platform';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
 import {
@@ -13,9 +11,8 @@ import {
   setLogSink,
 } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
-import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
-import { buyOnAppStore, refreshPlan } from '@/lib/license';
+import { refreshPlan } from '@/lib/license';
 import { tauriPlatform } from '@/platform/tauri';
 import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';
@@ -42,24 +39,6 @@ try {
   // Editor-package seams: product events and error-level log reports flow to
   // PostHog through these host-installed hooks.
   setAnalyticsSink(trackEvent);
-  setUpgradePrompt(() => {
-    const strings = getMessages().plan;
-    toast(strings.proRequired, {
-      action: {
-        label: strings.upgrade,
-        // App Review 3.1.1: iOS may not point to the website checkout, so it sells through IAP.
-        onClick: () =>
-          MOBILE_PLATFORM === 'ios'
-            ? void buyOnAppStore().catch((error: unknown) =>
-                toast.error(strings.purchaseFailed, {
-                  description:
-                    error instanceof Error ? error.message : String(error),
-                }),
-              )
-            : void tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`),
-      },
-    });
-  });
   setLogErrorReporter((error, context) => {
     if (!isErrorTrackingEnabled()) {
       return;

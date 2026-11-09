@@ -157,7 +157,7 @@ export function CanvasStyleEditor({
   // An image chosen before the user lost Pro stays selectable; only picking a new one is gated.
   const chooseImage = () => {
     if (!isPro()) {
-      promptUpgrade();
+      promptUpgrade('canvasImage');
       return;
     }
     fileInputRef.current?.click();

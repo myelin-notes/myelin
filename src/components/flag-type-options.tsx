@@ -153,7 +153,7 @@ export function FlagTypeOptions({
           type="button"
           onClick={() => {
             if (types.length >= planLimit('flagTypes')) {
-              promptUpgrade();
+              promptUpgrade('limits');
               return;
             }
             const used = new Set(types.map((type) => type.color));

@@ -11,7 +11,30 @@ const en = {
     or: 'or',
   },
   plan: {
-    proRequired: 'This is a Myelin Notes Pro feature.',
+    title: 'Upgrade to Myelin Notes Pro',
+    description: 'A one-time purchase. Your notes are never paywalled.',
+    haveLicense: 'I have a license',
+    features: {
+      agents: {
+        title: 'AI agents over MCP',
+        description:
+          'Let the AI app you already use read your notes and, when you allow it, write to them.',
+      },
+      code: {
+        title: 'Run code blocks',
+        description:
+          'Run the code in a page and see its output right beside it.',
+      },
+      canvasImage: {
+        title: 'Your own canvas background',
+        description: 'Use any image as the background behind your notes.',
+      },
+      limits: {
+        title: 'Higher limits',
+        description:
+          'Up to 8 flag types, unlimited flags per note, and 16 pen presets.',
+      },
+    },
     upgrade: 'Upgrade',
     purchaseFailed: 'The purchase could not be completed.',
   },

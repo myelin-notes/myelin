@@ -15,12 +15,16 @@ export function planLimit(limit: PlanLimit): number {
   return PLAN_LIMITS[isPro() ? 'pro' : 'free'][limit];
 }
 
-let upgradePrompt: (() => void) | null = null;
+export type ProFeature = 'agents' | 'code' | 'canvasImage' | 'limits';
 
-export function setUpgradePrompt(next: (() => void) | null): void {
+let upgradePrompt: ((feature: ProFeature) => void) | null = null;
+
+export function setUpgradePrompt(
+  next: ((feature: ProFeature) => void) | null,
+): void {
   upgradePrompt = next;
 }
 
-export function promptUpgrade(): void {
-  upgradePrompt?.();
+export function promptUpgrade(feature: ProFeature): void {
+  upgradePrompt?.(feature);
 }

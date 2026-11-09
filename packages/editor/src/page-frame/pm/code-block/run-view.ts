@@ -111,7 +111,7 @@ export class CodeBlockRunView {
       return;
     }
     if (!isPro()) {
-      promptUpgrade();
+      promptUpgrade('code');
       return;
     }
     const payload = this.options.collectSource();

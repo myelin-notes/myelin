@@ -13,7 +13,30 @@ const es: typeof en = {
     or: 'o',
   },
   plan: {
-    proRequired: 'Esta función es de Myelin Notes Pro.',
+    title: 'Mejora a Myelin Notes Pro',
+    description: 'Un pago único. Tus notas nunca quedan tras un muro de pago.',
+    haveLicense: 'Tengo una licencia',
+    features: {
+      agents: {
+        title: 'Agentes de IA por MCP',
+        description:
+          'Deja que la app de IA que ya usas lea tus notas y, si lo permites, escriba en ellas.',
+      },
+      code: {
+        title: 'Ejecuta bloques de código',
+        description:
+          'Ejecuta el código de una página y ve el resultado justo al lado.',
+      },
+      canvasImage: {
+        title: 'Tu propio fondo de lienzo',
+        description: 'Usa cualquier imagen como fondo detrás de tus notas.',
+      },
+      limits: {
+        title: 'Límites más altos',
+        description:
+          'Hasta 8 tipos de bandera, banderas ilimitadas por nota y 16 ajustes de lápiz.',
+      },
+    },
     upgrade: 'Mejorar',
     purchaseFailed: 'No se pudo completar la compra.',
   },

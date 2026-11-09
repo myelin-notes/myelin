@@ -443,7 +443,7 @@ export function useToolState(
       return;
     }
     if (presets.length >= planLimit('penPresets')) {
-      promptUpgrade();
+      promptUpgrade('limits');
       return;
     }
     // An exact duplicate is a no-op in the repository, so this can't stack.

@@ -13,7 +13,28 @@ const zhHans: typeof en = {
     or: '或',
   },
   plan: {
-    proRequired: '此功能需要 Myelin Notes Pro。',
+    title: '升级到 Myelin Notes Pro',
+    description: '一次性购买。你的笔记永远不会被付费墙挡住。',
+    haveLicense: '我有许可证',
+    features: {
+      agents: {
+        title: '通过 MCP 使用 AI 代理',
+        description: '让你已在使用的 AI 应用读取你的笔记，并在你允许时写入。',
+      },
+      code: {
+        title: '运行代码块',
+        description: '运行页面中的代码，并在旁边查看输出。',
+      },
+      canvasImage: {
+        title: '自定义画布背景',
+        description: '将任意图片用作笔记背后的背景。',
+      },
+      limits: {
+        title: '更高的上限',
+        description:
+          '最多 8 种旗标类型、每篇笔记不限旗标数量，以及 16 个笔预设。',
+      },
+    },
     upgrade: '升级',
     purchaseFailed: '无法完成购买。',
   },
