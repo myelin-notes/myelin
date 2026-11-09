@@ -501,7 +501,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       {
         question: 'Et si j’achète Pro sur l’App Store ?',
         answer:
-          'Un achat sur l’App Store débloque Pro uniquement sur vos appareils Apple, sans clé de licence pour Windows, Linux ou Android. Il est distinct d’un achat ici : achetez là où vos appareils sont couverts.',
+          'Un achat sur l’App Store débloque Pro sur votre iPhone et votre iPad, et inclut aussi une clé de licence pour 1 ordinateur Mac, Windows ou Linux. Pour la recevoir, ouvrez Réglages → Myelin Notes Pro sur votre iPhone ou iPad et saisissez votre adresse e-mail. Un achat ici couvre plutôt jusqu’à 3 appareils, sur toutes les plateformes.',
       },
       {
         question: 'Est-ce un abonnement ?',

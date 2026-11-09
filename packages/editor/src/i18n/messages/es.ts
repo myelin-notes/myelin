@@ -816,6 +816,13 @@ const es: typeof en = {
         send: 'Enviar código',
         verify: 'Verificar',
       },
+      desktop: {
+        label: 'Usa Pro en tu ordenador',
+        description:
+          'Escribe tu correo y te enviaremos una clave de licencia para Mac, Windows o Linux. Sirve en 1 ordenador.',
+        send: 'Enviar clave',
+        sent: 'Revisa tu bandeja de entrada para ver tu clave de licencia.',
+      },
       deactivate: {
         label: 'Este dispositivo',
         description:
@@ -825,7 +832,7 @@ const es: typeof en = {
       errors: {
         invalid: 'Esa clave o código no es válido.',
         limit:
-          'Esta clave ya está activa en 3 dispositivos. Desactívala primero en uno de ellos.',
+          'Esta clave ya está activa en todos los dispositivos que permite. Desactívala primero en uno de ellos.',
         failed:
           'No se pudo conectar con el servidor de licencias. Inténtalo de nuevo.',
       },

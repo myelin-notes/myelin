@@ -807,6 +807,13 @@ const en = {
         send: 'Send code',
         verify: 'Verify',
       },
+      desktop: {
+        label: 'Use Pro on your computer',
+        description:
+          'Enter your email and we will send you a license key for Mac, Windows, or Linux. It works on 1 computer.',
+        send: 'Send key',
+        sent: 'Check your inbox for your license key.',
+      },
       deactivate: {
         label: 'This device',
         description:
@@ -816,7 +823,7 @@ const en = {
       errors: {
         invalid: 'That key or code is not valid.',
         limit:
-          'This key is already active on 3 devices. Deactivate it on one of them first.',
+          'This key is already active on as many devices as it allows. Deactivate it on one of them first.',
         failed: 'Could not reach the license server. Please try again.',
       },
     },

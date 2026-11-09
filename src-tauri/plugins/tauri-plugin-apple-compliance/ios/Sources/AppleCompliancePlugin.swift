@@ -30,6 +30,8 @@ private struct EntitlementArgs: Decodable {
 
 private struct EntitlementResult: Encodable {
   let active: Bool
+  /// The purchase's `originalID`, for the server to look up; nil when inactive.
+  var transactionId: String? = nil
 }
 
 private struct StorefrontResult: Encodable {
@@ -158,7 +160,8 @@ class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProvi
           return
         }
         await transaction.finish()
-        invoke.resolve(EntitlementResult(active: true))
+        invoke.resolve(
+          EntitlementResult(active: true, transactionId: String(transaction.originalID)))
       } catch {
         invoke.reject("The purchase failed.", error: error)
       }
@@ -184,7 +187,8 @@ class AppleCompliancePlugin: Plugin, ASWebAuthenticationPresentationContextProvi
             transaction.productID == args.productId,
             transaction.revocationDate == nil
           {
-            invoke.resolve(EntitlementResult(active: true))
+            invoke.resolve(
+              EntitlementResult(active: true, transactionId: String(transaction.originalID)))
             return
           }
         }

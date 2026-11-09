@@ -83,14 +83,14 @@ async function isAcademic(domain: string): Promise<boolean> {
   return listed(tlds) || schools.some((school) => school !== null);
 }
 
-function base64url(bytes: Uint8Array): string {
+export function base64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 }
 
-function fromBase64url(value: string): Uint8Array<ArrayBuffer> {
+export function fromBase64url(value: string): Uint8Array<ArrayBuffer> {
   const binary = atob(value.replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }

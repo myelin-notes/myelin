@@ -826,6 +826,13 @@ const fr: typeof en = {
         send: 'Envoyer le code',
         verify: 'Vérifier',
       },
+      desktop: {
+        label: 'Utilisez Pro sur votre ordinateur',
+        description:
+          'Saisissez votre adresse e-mail et nous vous enverrons une clé de licence pour Mac, Windows ou Linux. Elle fonctionne sur 1 ordinateur.',
+        send: 'Envoyer la clé',
+        sent: 'Consultez votre boîte de réception pour votre clé de licence.',
+      },
       deactivate: {
         label: 'Cet appareil',
         description:
@@ -835,7 +842,7 @@ const fr: typeof en = {
       errors: {
         invalid: 'Cette clé ou ce code n’est pas valide.',
         limit:
-          'Cette clé est déjà active sur 3 appareils. Désactivez-la d’abord sur l’un d’eux.',
+          'Cette clé est déjà active sur tous les appareils autorisés. Désactivez-la d’abord sur l’un d’eux.',
         failed: 'Impossible de joindre le serveur de licences. Réessayez.',
       },
     },

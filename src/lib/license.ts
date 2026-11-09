@@ -15,7 +15,7 @@ const logger = new Logger('License');
 // Must match the non-consumable in App Store Connect.
 const APP_STORE_PRO_PRODUCT_ID = 'com.github.wintersteve25.myelin.pro';
 
-/** `status` 404: the key or this device's activation is gone. 409: the key is on 3 devices. 0: offline. */
+/** `status` 404: the key or this device's activation is gone. 409: the key is on all the devices it allows. 0: offline. */
 export class LicenseError extends Error {
   constructor(
     readonly status: number,
@@ -127,6 +127,18 @@ export async function restoreAppStorePurchase(): Promise<boolean> {
     UserPrefs.set('plan', 'pro');
   }
   return active;
+}
+
+/** Emails a desktop license key for this Apple ID's App Store purchase to `email`. */
+export async function emailDesktopLicense(email: string): Promise<void> {
+  const { transactionId } = await proEntitlement(
+    APP_STORE_PRO_PRODUCT_ID,
+    false,
+  );
+  if (!transactionId) {
+    throw new LicenseError(404, 'No App Store purchase was found.');
+  }
+  await post('app-store-transfer', { transactionId, email: email.trim() });
 }
 
 // Offline or server errors keep the last known plan, so Pro keeps working without network.

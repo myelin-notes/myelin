@@ -776,6 +776,13 @@ const zhHans: typeof en = {
         send: '发送验证码',
         verify: '验证',
       },
+      desktop: {
+        label: '在电脑上使用 Pro',
+        description:
+          '输入你的邮箱，我们会发送适用于 Mac、Windows 或 Linux 的许可证密钥。可用于 1 台电脑。',
+        send: '发送密钥',
+        sent: '请查看收件箱中的许可证密钥。',
+      },
       deactivate: {
         label: '此设备',
         description: '从此设备移除 Pro，为其他设备腾出名额。',
@@ -783,7 +790,7 @@ const zhHans: typeof en = {
       },
       errors: {
         invalid: '该密钥或验证码无效。',
-        limit: '此密钥已在 3 台设备上激活。请先在其中一台上停用。',
+        limit: '此密钥已在允许的所有设备上激活。请先在其中一台上停用。',
         failed: '无法连接许可证服务器，请重试。',
       },
     },

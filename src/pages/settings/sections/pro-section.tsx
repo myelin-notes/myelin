@@ -7,6 +7,7 @@ import {
   activateLicense,
   buyPro,
   deactivateLicense,
+  emailDesktopLicense,
   LicenseError,
   redeemRestoreCode,
   requestRestoreCode,
@@ -109,6 +110,38 @@ export function ProSection() {
             >
               {strings.deactivate.action}
             </Button>
+          </Row>
+        )}
+
+        {plan === 'pro' && ios && !license && (
+          <Row
+            label={strings.desktop.label}
+            description={strings.desktop.description}
+          >
+            <form
+              className="flex w-full gap-2 sm:w-72"
+              onSubmit={(event) =>
+                submit(event, async () => {
+                  await emailDesktopLicense(draft);
+                  setDraft('');
+                  toast(strings.desktop.sent);
+                })
+              }
+            >
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                aria-label={strings.desktop.label}
+                placeholder="you@example.com"
+                value={draft}
+                onChange={(event) => setDraft(event.currentTarget.value)}
+                className={INPUT_CLASS}
+              />
+              <Button type="submit" size="sm" disabled={busy}>
+                {strings.desktop.send}
+              </Button>
+            </form>
           </Row>
         )}
 

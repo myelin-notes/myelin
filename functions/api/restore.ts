@@ -68,25 +68,46 @@ async function findLicenseKey(
       continue;
     }
     const order = await polar.orders.get(payment.order_id);
-    const grants = await polar.benefitGrants.list({
-      organization_id: organizationId,
-      customer_id: order.customer_id,
-      is_granted: true,
-    });
-    for (const grant of grants.items) {
-      if (
-        'license_key_id' in grant.properties &&
-        grant.properties.license_key_id
-      ) {
-        return (await polar.licenseKeys.get(grant.properties.license_key_id))
-          .key;
-      }
+    const key = await customerLicenseKey(
+      polar,
+      organizationId,
+      order.customer_id,
+    );
+    if (key) {
+      return key;
     }
   }
   return null;
 }
 
-async function sendEmail(apiKey: string, to: string, text: string) {
+// `null` until Polar has granted the customer a license key benefit.
+export async function customerLicenseKey(
+  polar: Polar,
+  organizationId: string,
+  customerId: string,
+): Promise<string | null> {
+  const grants = await polar.benefitGrants.list({
+    organization_id: organizationId,
+    customer_id: customerId,
+    is_granted: true,
+  });
+  for (const grant of grants.items) {
+    if (
+      'license_key_id' in grant.properties &&
+      grant.properties.license_key_id
+    ) {
+      return (await polar.licenseKeys.get(grant.properties.license_key_id)).key;
+    }
+  }
+  return null;
+}
+
+export async function sendEmail(
+  apiKey: string,
+  to: string,
+  text: string,
+  subject = 'Your Myelin Notes Pro code',
+) {
   const result = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
@@ -96,7 +117,7 @@ async function sendEmail(apiKey: string, to: string, text: string) {
     body: JSON.stringify({
       from: RESTORE_FROM,
       to: [to],
-      subject: 'Your Myelin Notes Pro code',
+      subject,
       text,
     }),
   });

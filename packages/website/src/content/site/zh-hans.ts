@@ -493,7 +493,7 @@ const zhHans: SiteCopy = {
       {
         question: '如果在 App Store 购买 Pro 呢？',
         answer:
-          '在 App Store 购买只会在你的 Apple 设备上解锁 Pro，不包含可用于 Windows、Linux 或 Android 的许可证密钥。它与在此处的购买相互独立，请在能覆盖你设备的地方购买。',
+          '在 App Store 购买会在你的 iPhone 和 iPad 上解锁 Pro，并额外包含一个可用于 1 台 Mac、Windows 或 Linux 电脑的许可证密钥。在 iPhone 或 iPad 上打开“设置 → Myelin Notes Pro”并输入邮箱即可领取。在此处购买则可在任意平台的最多 3 台设备上使用。',
       },
       {
         question: '这是订阅吗？',

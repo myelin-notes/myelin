@@ -24,6 +24,8 @@ export function cancelWebAuthentication(sessionId: string): Promise<void> {
 
 interface EntitlementResult {
   active: boolean;
+  /** Set when `active`. */
+  transactionId?: string;
 }
 
 // The iOS plugin rejects with a plain `{ message }` object, not an Error.
