@@ -15,7 +15,7 @@
 //   - VITE_LIVE_DISCOVERY_URL — Cloudflare Worker URL for live sync peer discovery
 //   - VITE_POSTHOG_KEY / VITE_POSTHOG_HOST (defaults to us.i.posthog.com)
 //   - VITE_WEBSITE_URL — site serving /api/license and /api/restore; a *.pages.dev preview
-//     talks to Polar's sandbox
+//     talks to Polar's sandbox. `yarn tauri dev` on a preview-* branch defaults it to the branch's preview.
 
 export const IS_DEV = import.meta.env.DEV;
 export const MODE = import.meta.env.MODE;

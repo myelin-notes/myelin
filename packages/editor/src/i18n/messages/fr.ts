@@ -794,6 +794,10 @@ const fr: typeof en = {
       title: 'Myelin Notes Pro',
       eyebrow: 'Passer à Pro',
       active: 'Actif',
+      thanks: {
+        label: 'Pro est activé',
+        description: 'Merci de soutenir Myelin. Bonne utilisation !',
+      },
       key: {
         label: 'Clé de licence',
         description:

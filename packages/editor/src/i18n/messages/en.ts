@@ -775,6 +775,10 @@ const en = {
       title: 'Myelin Notes Pro',
       eyebrow: 'Upgrade',
       active: 'Active',
+      thanks: {
+        label: 'Pro is active',
+        description: 'Thanks for supporting Myelin. Enjoy!',
+      },
       key: {
         label: 'License key',
         description:

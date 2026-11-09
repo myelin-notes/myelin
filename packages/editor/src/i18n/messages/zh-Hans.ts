@@ -747,6 +747,10 @@ const zhHans: typeof en = {
       title: 'Myelin Notes Pro',
       eyebrow: '升级',
       active: '已激活',
+      thanks: {
+        label: 'Pro 已激活',
+        description: '感谢你支持 Myelin，祝使用愉快！',
+      },
       key: {
         label: '许可证密钥',
         description: '粘贴购买邮件中的密钥。一个密钥最多可用于 3 台设备。',

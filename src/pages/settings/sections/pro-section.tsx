@@ -89,6 +89,13 @@ export function ProSection() {
         </span>
       </div>
       <div className="space-y-2">
+        {plan === 'pro' && (
+          <Row
+            label={strings.thanks.label}
+            description={strings.thanks.description}
+          />
+        )}
+
         {license && (
           <Row
             label={strings.deactivate.label}

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
@@ -43,6 +43,22 @@ if (args[0] === 'dev' && port !== DEFAULT_TAURI_DEV_PORT) {
     '--config',
     JSON.stringify({ build: { devUrl: `http://localhost:${port}` } }),
   );
+}
+
+// Point dev builds at this branch's Cloudflare Pages preview, whose API talks to Polar's sandbox.
+if (args[0] === 'dev' && !env.VITE_WEBSITE_URL) {
+  const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: rootDir })
+    .toString()
+    .trim();
+  // Only preview-* branches get a Pages preview deployment.
+  if (branch.startsWith('preview-')) {
+    // Cloudflare's branch alias rule: lowercase, non-alphanumerics to '-', max 28 chars.
+    const alias = branch
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .slice(0, 28);
+    env.VITE_WEBSITE_URL = `https://${alias}.myelin-3lc.pages.dev`;
+  }
 }
 
 const child = spawn(
