@@ -21,6 +21,17 @@ describe('peer presence messages', () => {
     expect(decodeMessage(encodeMessage(message))).toEqual(message);
   });
 
+  it('encodes repeated peer messages as distinct bytes', () => {
+    const message: SyncMessage = {
+      type: 'peer',
+      peerId: 'peer-a',
+      kind: 'heartbeat',
+      mode: 'owner-device',
+    };
+
+    expect(encodeMessage(message)).not.toEqual(encodeMessage(message));
+  });
+
   it('ignores unknown fields', () => {
     const decoded = decodeMessage(
       encodePeerJson({

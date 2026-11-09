@@ -232,6 +232,10 @@ pub(crate) fn fetch_head(
 // costs one download of the current tree, so wait until stale versions outweigh it about twice;
 // the 64 MiB floor keeps small repositories from re-cloning on most syncs.
 fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
+    let size = directory_size(repo_path);
+    if size <= 64 * 1024 * 1024 {
+        return false;
+    }
     let Some(tree) = find_parent(repo, branch, true)
         .or_else(|_| find_parent(repo, branch, false))
         .ok()
@@ -251,7 +255,7 @@ fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
         }
         TreeWalkResult::Ok
     });
-    walked.is_ok() && directory_size(repo_path) > current * 3 + 64 * 1024 * 1024
+    walked.is_ok() && size > current * 3 + 64 * 1024 * 1024
 }
 
 fn directory_size(path: &Path) -> u64 {

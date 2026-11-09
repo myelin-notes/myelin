@@ -85,6 +85,9 @@ export function encodeMessage(message: SyncMessage): Uint8Array {
         peerId: message.peerId,
         kind: message.kind,
         mode: message.mode,
+        // iroh-gossip drops any message whose bytes it saw in the last 90s, so repeated
+        // heartbeats must differ or peers time out while still connected.
+        nonce: Math.random(),
       }),
     ),
   );
