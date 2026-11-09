@@ -59,6 +59,8 @@ pub(crate) struct RepositoryEngine {
     last_checked_at: AtomicU64,
     error: Mutex<Option<String>>,
     media_migration: Mutex<Option<MediaMigration>>,
+    // Last error reported per background task, so a retry loop reports each failure once.
+    reported_errors: Mutex<HashMap<&'static str, String>>,
     cache_dir: PathBuf,
 }
 
@@ -420,6 +422,25 @@ impl RepositoryEngine {
         }
     }
 
+    fn report_background_error<T, R: tauri::Runtime>(
+        &self,
+        app: &AppHandle<R>,
+        message: &'static str,
+        result: &Result<T, String>,
+    ) {
+        let mut reported = self.reported_errors.lock().unwrap();
+        match result {
+            Err(error) if reported.get(message) != Some(error) => {
+                crate::error_report::report_error(app, "RepositoryEngine", message, error);
+                reported.insert(message, error.clone());
+            }
+            Err(_) => {}
+            Ok(_) => {
+                reported.remove(message);
+            }
+        }
+    }
+
     async fn set_media_migration(&self, app: Option<&AppHandle>, progress: Option<MediaMigration>) {
         *self.media_migration.lock().unwrap() = progress;
         if let Some(app) = app {
@@ -552,6 +573,11 @@ impl RepositoryEngine {
                         return;
                     }
                     let checkpoint = engine.checkpoint_pending().await;
+                    engine.report_background_error(
+                        &checkpoint_app,
+                        "Checkpointing pending documents failed",
+                        &checkpoint,
+                    );
                     if let Ok(changes) = checkpoint {
                         if !changes.changed.is_empty() {
                             engine.emit_changes(&checkpoint_app, changes).await;
@@ -580,7 +606,8 @@ impl RepositoryEngine {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {}
                 }
                 if engine.references.load(Ordering::SeqCst) != 0 {
-                    let _ = engine.synchronize(&app, true).await;
+                    let result = engine.synchronize(&app, true).await;
+                    engine.report_background_error(&app, "Background sync failed", &result);
                 }
             }
         });
@@ -1066,6 +1093,7 @@ pub async fn repository_open(
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
             media_migration: Mutex::new(None),
+            reported_errors: Mutex::new(HashMap::new()),
             cache_dir: app
                 .path()
                 .app_cache_dir()
@@ -1098,7 +1126,8 @@ pub async fn repository_open(
         })
         .await?;
     if !has_local_state {
-        let _ = engine.synchronize(&app, false).await;
+        let result = engine.synchronize(&app, false).await;
+        engine.report_background_error(&app, "Background sync failed", &result);
     }
     RepositoryEngine::schedule(&engine, &app);
     if has_local_state {
@@ -1106,7 +1135,17 @@ pub async fn repository_open(
     }
     if first_handle {
         let weak = Arc::downgrade(&engine);
-        tauri::async_runtime::spawn(RepositoryEngine::migrate_media(weak, Some(app.clone())));
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = RepositoryEngine::migrate_media(weak, Some(app.clone())).await {
+                crate::error_report::report_error(
+                    &app,
+                    "RepositoryEngine",
+                    "Media migration failed",
+                    error,
+                );
+            }
+        });
     }
     Ok(json!({"handle": handle_id, "status": engine.status().await}))
 }

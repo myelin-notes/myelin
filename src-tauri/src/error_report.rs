@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Runtime};
 
 /// Event carrying a Rust background-task failure to the frontend. The JS listener
 /// forwards it to the shared logger, which writes the log file and reports to
@@ -20,8 +20,8 @@ struct RustErrorPayload {
 /// stderr for local debugging and emits [`RUST_ERROR_EVENT`] so the failure
 /// still lands in the log file and PostHog. `subsystem` groups the error (it
 /// becomes the JS logger subsystem); `detail` is the underlying cause.
-pub fn report_error(
-    app: &AppHandle,
+pub fn report_error<R: Runtime>(
+    app: &AppHandle<R>,
     subsystem: &str,
     message: &str,
     detail: impl std::fmt::Display,
