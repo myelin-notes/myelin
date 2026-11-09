@@ -469,7 +469,12 @@ pub(crate) async fn broadcast_document(
         let mut data = vec![1];
         data.extend(update);
         if let Err(error) = sender.broadcast(Bytes::from(data)).await {
-            eprintln!("[iroh] native document broadcast failed: {error}");
+            crate::error_report::report_error(
+                app,
+                "IrohTransport",
+                "Native document broadcast failed",
+                error,
+            );
         }
     }
 }
