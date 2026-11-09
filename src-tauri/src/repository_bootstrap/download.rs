@@ -153,7 +153,7 @@ impl RemoteClient {
             {
                 return Ok(response);
             }
-            return Err(format!("{label} ({status})"));
+            return Err(status_error(response, label).await);
         }
         Err(format!("{label}: exhausted retries"))
     }
@@ -165,7 +165,8 @@ impl RemoteClient {
         url: Url,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let response = require_success(self.request(label, method, url, body).await?, label)?;
+        let response =
+            require_success(self.request(label, method, url, body).await?, label).await?;
         let bytes = response
             .bytes()
             .await
@@ -199,11 +200,30 @@ fn retry_delay(response: &Response, attempt: usize, github: bool) -> Option<Dura
     ))
 }
 
-pub(crate) fn require_success(response: Response, label: &str) -> Result<Response, String> {
+pub(crate) async fn require_success(response: Response, label: &str) -> Result<Response, String> {
     if response.status().is_success() {
         Ok(response)
     } else {
-        Err(format!("{label} ({})", response.status().as_u16()))
+        Err(status_error(response, label).await)
+    }
+}
+
+// GitHub puts the reason in `message`, Drive in `error.message`; the status alone can't tell a
+// missing repository from a rule violation or an oversized file.
+async fn status_error(response: Response, label: &str) -> String {
+    let status = response.status().as_u16();
+    let body = response
+        .bytes()
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .unwrap_or_default();
+    match body["message"]
+        .as_str()
+        .or(body["error"]["message"].as_str())
+    {
+        Some(message) => format!("{label} ({status}): {message}"),
+        None => format!("{label} ({status})"),
     }
 }
 
@@ -395,7 +415,7 @@ async fn download_github(
     }
     let archive = stage.join(".archive.tar.gz");
     save_response(
-        require_success(response, "GitHub tarball request failed")?,
+        require_success(response, "GitHub tarball request failed").await?,
         &archive,
         "GitHub tarball download failed",
     )
@@ -895,7 +915,8 @@ async fn download_drive_entry(
             .request("Google Drive download failed", Method::GET, url, None)
             .await?,
         "Google Drive download failed",
-    )?;
+    )
+    .await?;
     save_response(response, destination, "Google Drive download failed").await
 }
 

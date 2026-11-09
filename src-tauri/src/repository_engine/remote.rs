@@ -1392,8 +1392,10 @@ async fn github_head(
                     None,
                 )
                 .await;
-            if !branches.is_ok_and(|branches| branches.as_array().is_some_and(Vec::is_empty)) {
-                return Err(error);
+            match branches {
+                Ok(branches) if branches.as_array().is_some_and(Vec::is_empty) => {}
+                Ok(_) => return Err(format!("{error}; the repository has no such branch")),
+                Err(list_error) => return Err(format!("{error}; {list_error}")),
             }
             // A new repository has no branch to read or push onto until its first commit, and
             // GitHub's Git Data API refuses empty repositories; the contents API creates one.
@@ -1797,7 +1799,8 @@ async fn drive_push(
                             .request("Google Drive download failed", Method::GET, url, None)
                             .await?,
                         "Google Drive download failed",
-                    )?
+                    )
+                    .await?
                     .bytes()
                     .await
                     .map_err(|_| "Google Drive download unreadable")?;
@@ -2009,7 +2012,8 @@ async fn drive_push(
                     )
                     .await?,
                 "Google Drive delete failed",
-            )?;
+            )
+            .await?;
         }
     }
     if deletion_journal.exists() {
@@ -2134,7 +2138,8 @@ async fn drive_write(
         .send()
         .await
         .map_err(|_| "Google Drive upload failed before receiving a response")?;
-    let response = require_success(response, "Google Drive upload failed")?
+    let response = require_success(response, "Google Drive upload failed")
+        .await?
         .bytes()
         .await
         .map_err(|_| "Google Drive upload response unreadable")?;
@@ -2162,7 +2167,8 @@ async fn drive_bytes_match(
             )
             .await?,
         "Google Drive metadata download failed",
-    )?;
+    )
+    .await?;
     let remote = response
         .bytes()
         .await
@@ -2204,7 +2210,8 @@ async fn drive_metadata_write(
         .send()
         .await
         .map_err(|_| "Google Drive metadata upload failed before receiving a response")?;
-    let bytes = require_success(response, "Google Drive metadata upload failed")?
+    let bytes = require_success(response, "Google Drive metadata upload failed")
+        .await?
         .bytes()
         .await
         .map_err(|_| "Google Drive metadata upload response unreadable")?;

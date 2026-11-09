@@ -1995,7 +1995,7 @@ async fn github_commit_unknown_to_remote_is_a_failed_push_not_a_failed_verificat
     )));
     let server = TestServer::new(move |request| {
         if request.method == "PATCH" && request.path.contains("/git/refs/heads/") {
-            return (422, b"{}".to_vec());
+            return (422, br#"{"message":"Reference update failed"}"#.to_vec());
         }
         if request.path.contains("/compare/") {
             return (404, b"{}".to_vec());
@@ -2005,7 +2005,7 @@ async fn github_commit_unknown_to_remote_is_a_failed_push_not_a_failed_verificat
     .await;
     seed(&engine, "picture", "png", b"local".to_vec()).await;
     let error = engine.cycle(github_source(), &server.endpoints).await.err();
-    assert_eq!(error.as_deref(), Some("GitHub branch update failed (422)"));
+    assert_eq!(error.as_deref(), Some("GitHub branch update failed (422): Reference update failed"));
 }
 
 #[tokio::test]
