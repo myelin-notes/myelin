@@ -33,11 +33,12 @@ async function post<T>(path: string, body: object): Promise<T> {
   }).catch((error: unknown) => {
     throw new LicenseError(0, String(error));
   });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
+  // `null` for non-JSON, e.g. a Cloudflare Access login page that fetch followed a redirect to.
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data) {
     throw new LicenseError(
       response.status,
-      data.message ?? response.statusText,
+      data?.message ?? response.statusText,
     );
   }
   return data as T;
