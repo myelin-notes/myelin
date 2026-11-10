@@ -12,6 +12,7 @@ import {
 } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
+import { enableTouchWindowDrag } from '@/lib/touch-window-drag';
 import { tauriPlatform } from '@/platform/tauri';
 import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';
@@ -46,6 +47,7 @@ try {
   });
   initRustErrorReporting();
   disableNativePinchZoom();
+  enableTouchWindowDrag();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <I18nProvider>
