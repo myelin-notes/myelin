@@ -46,7 +46,9 @@ if (args[0] === 'dev' && port !== DEFAULT_TAURI_DEV_PORT) {
 }
 
 // Point dev builds at this branch's Cloudflare Pages preview, whose API talks to Polar's sandbox.
-if (args[0] === 'dev' && !env.VITE_WEBSITE_URL) {
+// Covers `dev`, `ios dev`, and `ios build --debug` (used by `yarn ios:device`).
+const isDevBuild = args.includes('dev') || args.includes('--debug');
+if (isDevBuild && !env.VITE_WEBSITE_URL) {
   const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: rootDir })
     .toString()
     .trim();
