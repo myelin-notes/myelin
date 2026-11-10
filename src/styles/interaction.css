@@ -4,3 +4,14 @@
 body.dnd-suppress-hover * {
   pointer-events: none !important;
 }
+
+/* Windows: wry enables WebView2 non-client regions, so this hands the bar to the OS as a real
+   caption. Tauri's drag script is mousedown-only and its startDragging move loop ends without a
+   held mouse button, so touch could never drag the window. Children opt out to keep bare
+   data-tauri-drag-region's direct-hit-only semantics. WebKit (macOS/Linux) ignores app-region. */
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+[data-tauri-drag-region] > :not([data-tauri-drag-region]) {
+  -webkit-app-region: no-drag;
+}
