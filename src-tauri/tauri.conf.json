@@ -66,7 +66,8 @@
       "minimumSystemVersion": "10.15"
     },
     "iOS": {
-      "developmentTeam": "P4Z946QP26"
+      "developmentTeam": "P4Z946QP26",
+      "minimumSystemVersion": "15.0"
     }
   }
 }
