@@ -13,7 +13,31 @@ async function privateKeyPem(): Promise<string> {
   return btoa(String.fromCharCode(...der));
 }
 
-async function validate(appleTransaction: object) {
+async function serviceAccount(): Promise<string> {
+  const { privateKey } = await crypto.subtle.generateKey(
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: 'SHA-256',
+    },
+    true,
+    ['sign'],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey('pkcs8', privateKey),
+  );
+  return JSON.stringify({
+    client_email: 'play@example.iam.gserviceaccount.com',
+    private_key: `-----BEGIN PRIVATE KEY-----\n${btoa(String.fromCharCode(...der))}\n-----END PRIVATE KEY-----\n`,
+  });
+}
+
+async function validate(
+  appleTransaction: object,
+  orderMetadata: object = { apple_original_transaction_id: '2000000100' },
+  playPurchase: object = {},
+) {
   const part = (value: object) =>
     btoa(JSON.stringify(value)).replace(/=+$/, '');
   const writes: { url: string; body: unknown }[] = [];
@@ -22,6 +46,12 @@ async function validate(appleTransaction: object) {
     vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const request = new Request(input, init);
       const url = request.url;
+      if (url.includes('oauth2')) {
+        return Response.json({ access_token: 'google' });
+      }
+      if (url.includes('androidpublisher')) {
+        return Response.json(playPurchase);
+      }
       if (url.includes('storekit')) {
         return Response.json({
           signedTransactionInfo: `${part({})}.${part(appleTransaction)}.sig`,
@@ -36,9 +66,7 @@ async function validate(appleTransaction: object) {
       }
       if (url.includes('/v1/orders/')) {
         return Response.json({
-          items: [
-            { metadata: { apple_original_transaction_id: '2000000100' } },
-          ],
+          items: [{ metadata: orderMetadata }],
           pagination: { total_count: 1, max_page: 1 },
         });
       }
@@ -63,6 +91,7 @@ async function validate(appleTransaction: object) {
       APPLE_IAP_KEY_ID: 'kid',
       APPLE_IAP_ISSUER_ID: 'issuer',
       APPLE_IAP_PRIVATE_KEY: await privateKeyPem(),
+      GOOGLE_PLAY_SERVICE_ACCOUNT: await serviceAccount(),
     },
   });
   return { status: response.status, writes };
@@ -74,7 +103,7 @@ const purchase = {
   originalTransactionId: '2000000100',
 };
 
-describe('license validate for App Store keys', () => {
+describe('license validate for store keys', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -97,5 +126,17 @@ describe('license validate for App Store keys', () => {
     const { status, writes } = await validate(purchase);
     expect(status).toBe(200);
     expect(writes).toEqual([]);
+  });
+
+  it.each([
+    [1, 404],
+    [0, 200],
+  ])('Play purchase state %i gives %i', async (purchaseState, expected) => {
+    const { status } = await validate(
+      {},
+      { google_play_purchase_token: 'tok' },
+      { purchaseState },
+    );
+    expect(status).toBe(expected);
   });
 });

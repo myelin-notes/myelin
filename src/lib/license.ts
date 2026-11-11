@@ -5,15 +5,19 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { MOBILE_PLATFORM, WEBSITE_URL } from '@/lib/env';
 import { tauriPlatform } from '@/platform/tauri';
 import {
-  proEntitlement,
-  purchasePro,
+  proEntitlement as appStoreEntitlement,
+  purchasePro as appStorePurchase,
   storefrontCountry,
 } from '@/platform/tauri/apple-compliance';
+import {
+  proEntitlement as playEntitlement,
+  purchasePro as playPurchase,
+} from '@/platform/tauri/play-billing';
 
 const logger = new Logger('License');
 
-// Must match the non-consumable in App Store Connect.
-const APP_STORE_PRO_PRODUCT_ID = 'com.github.wintersteve25.myelin.pro';
+// Must match the non-consumable in App Store Connect and the one-time product in Play Console.
+const PRO_PRODUCT_ID = 'com.github.wintersteve25.myelin.pro';
 
 /** `status` 404: the key or this device's activation is gone. 409: the key is on all the devices it allows. 0: offline. */
 export class LicenseError extends Error {
@@ -88,7 +92,7 @@ export async function redeemRestoreCode(
   await activateLicense(key);
 }
 
-type ProCheckout = 'website' | 'appStore';
+type ProCheckout = 'website' | 'store';
 
 /** Where this device sells Pro. Every buy-Pro button goes through this. */
 async function proCheckout(): Promise<ProCheckout> {
@@ -96,10 +100,10 @@ async function proCheckout(): Promise<ProCheckout> {
     case 'ios': {
       // App Review 3.1.1 only allows linking out to the website checkout in the US storefront.
       const country = await storefrontCountry().catch(() => null);
-      return country === 'USA' ? 'website' : 'appStore';
+      return country === 'USA' ? 'website' : 'store';
     }
     case 'android':
-      return 'website';
+      return 'store';
     default:
       return 'website';
   }
@@ -111,46 +115,51 @@ export async function buyPro(): Promise<boolean> {
     await tauriPlatform.openExternal(`${WEBSITE_URL}/pricing`);
     return false;
   }
-  return buyOnAppStore();
-}
-
-async function buyOnAppStore(): Promise<boolean> {
-  const { active } = await purchasePro(APP_STORE_PRO_PRODUCT_ID);
+  const { active } = await (MOBILE_PLATFORM === 'android'
+    ? playPurchase(PRO_PRODUCT_ID)
+    : appStorePurchase(PRO_PRODUCT_ID));
   if (active) {
     UserPrefs.set('plan', 'pro');
   }
   return active;
 }
 
-export async function restoreAppStorePurchase(): Promise<boolean> {
-  const { active } = await proEntitlement(APP_STORE_PRO_PRODUCT_ID, true);
+// `sync` asks the App Store for this Apple ID's purchases first; Play always reports them.
+function storeEntitlement(sync: boolean) {
+  return MOBILE_PLATFORM === 'android'
+    ? playEntitlement(PRO_PRODUCT_ID)
+    : appStoreEntitlement(PRO_PRODUCT_ID, sync);
+}
+
+export async function restoreStorePurchase(): Promise<boolean> {
+  const { active } = await storeEntitlement(true);
   if (active) {
     UserPrefs.set('plan', 'pro');
   }
   return active;
 }
 
-/** Emails a desktop license key for this Apple ID's App Store purchase to `email`. */
+/** Emails a desktop license key for this device's store purchase to `email`. */
 export async function emailDesktopLicense(email: string): Promise<void> {
-  const { transactionId } = await proEntitlement(
-    APP_STORE_PRO_PRODUCT_ID,
-    false,
-  );
+  const { transactionId } = await storeEntitlement(false);
   if (!transactionId) {
-    throw new LicenseError(404, 'No App Store purchase was found.');
+    throw new LicenseError(404, 'No store purchase was found.');
   }
-  await post('app-store-transfer', { transactionId, email: email.trim() });
+  await post(
+    MOBILE_PLATFORM === 'android' ? 'play-transfer' : 'app-store-transfer',
+    { transactionId, email: email.trim() },
+  );
 }
 
 // Offline or server errors keep the last known plan, so Pro keeps working without network.
 // shortcut: `plan` lives in localStorage and the app is open source, so this only keeps
 // honest users honest; anything stronger needs server-signed entitlements.
 export async function refreshPlan(): Promise<void> {
-  if (MOBILE_PLATFORM === 'ios') {
-    const active = await proEntitlement(APP_STORE_PRO_PRODUCT_ID, false).then(
+  if (MOBILE_PLATFORM) {
+    const active = await storeEntitlement(false).then(
       (result) => result.active,
       (error: unknown) => {
-        logger.warn('Could not read App Store entitlements', error);
+        logger.warn('Could not read store entitlements', error);
         return UserPrefs.get('plan') === 'pro';
       },
     );

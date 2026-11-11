@@ -805,6 +805,8 @@ const fr: typeof en = {
         label: 'Clé de licence',
         description:
           'Collez la clé reçue par e-mail après l’achat. Une clé fonctionne sur 3 appareils maximum.',
+        descriptionAndroid:
+          'Vous avez déjà une clé de licence ? Saisissez-la ici.',
         action: 'Activer',
       },
       buy: {
@@ -812,6 +814,7 @@ const fr: typeof en = {
         description: 'Un achat unique sur le site de Myelin.',
         descriptionIos:
           'Un achat unique qui débloque Pro sur vos appareils Apple.',
+        descriptionAndroid: 'Un achat unique via Google Play.',
         action: 'Acheter Pro',
       },
       restore: {

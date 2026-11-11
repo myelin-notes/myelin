@@ -22,7 +22,7 @@ import {
   LicenseError,
   redeemRestoreCode,
   requestRestoreCode,
-  restoreAppStorePurchase,
+  restoreStorePurchase,
 } from '@/lib/license';
 import { useUserPref } from '@/lib/use-user-pref';
 import { ActionCard } from '../components/action-card';
@@ -142,6 +142,7 @@ export function ProSection() {
     };
 
   const ios = MOBILE_PLATFORM === 'ios';
+  const android = MOBILE_PLATFORM === 'android';
   const isBusy = busy !== null;
 
   return (
@@ -173,7 +174,7 @@ export function ProSection() {
           />
         )}
 
-        {plan === 'pro' && ios && !license && (
+        {plan === 'pro' && MOBILE_PLATFORM && !license && (
           <Row
             icon={Monitor}
             label={strings.desktop.label}
@@ -218,7 +219,7 @@ export function ProSection() {
               action={strings.restore.action}
               onClick={() =>
                 void run('restore', async () => {
-                  if (!(await restoreAppStorePurchase())) {
+                  if (!(await restoreStorePurchase())) {
                     toast(strings.restore.none);
                   }
                 })
@@ -266,7 +267,11 @@ export function ProSection() {
             <ActionCard
               icon={Sparkles}
               label={strings.buy.label}
-              description={strings.buy.description}
+              description={
+                android
+                  ? strings.buy.descriptionAndroid
+                  : strings.buy.description
+              }
               action={strings.buy.action}
               onClick={() => void run('buy', buyPro)}
               loading={busy === 'buy'}
@@ -275,7 +280,11 @@ export function ProSection() {
             <Row
               icon={KeyRound}
               label={strings.key.label}
-              description={strings.key.description}
+              description={
+                android
+                  ? strings.key.descriptionAndroid
+                  : strings.key.description
+              }
             >
               <InlineForm
                 className="sm:w-80"

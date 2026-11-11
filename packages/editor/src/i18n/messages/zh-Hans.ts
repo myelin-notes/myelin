@@ -756,12 +756,14 @@ const zhHans: typeof en = {
       key: {
         label: '许可证密钥',
         description: '粘贴购买邮件中的密钥。一个密钥最多可用于 3 台设备。',
+        descriptionAndroid: '已有许可证密钥？请在此输入。',
         action: '激活',
       },
       buy: {
         label: '购买 Pro',
         description: '在 Myelin 网站一次性购买。',
         descriptionIos: '一次性购买，在你的 Apple 设备上解锁 Pro。',
+        descriptionAndroid: '通过 Google Play 一次性购买。',
         action: '购买 Pro',
       },
       restore: {

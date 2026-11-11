@@ -2,18 +2,20 @@
 // Status codes are the contract with the app: 404 means the key or activation is gone,
 // 409 means the key is already on as many devices as it allows.
 import type { Polar } from '@polar-sh/sdk/2026-10';
-import { refundedOnAppStore } from './app-store-transfer';
+import { APPLE_METADATA_KEY, appleTransaction } from './app-store-transfer';
 import { polarFor } from './checkout';
+import { PLAY_METADATA_KEY, playPurchase } from './play-transfer';
 
 interface Env {
   POLAR_ACCESS_TOKEN?: string;
   POLAR_ORGANIZATION_ID?: string;
   POLAR_APP_STORE_PRODUCT_ID?: string;
-  /** License key benefit of POLAR_APP_STORE_PRODUCT_ID; only its keys are checked with Apple. */
+  /** License key benefit of POLAR_APP_STORE_PRODUCT_ID; only its keys are checked with the stores. */
   POLAR_APP_STORE_BENEFIT_ID?: string;
   APPLE_IAP_KEY_ID?: string;
   APPLE_IAP_ISSUER_ID?: string;
   APPLE_IAP_PRIVATE_KEY?: string;
+  GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
 }
 
 interface LicenseFunctionContext {
@@ -42,7 +44,41 @@ function polarStatus(error: unknown): number | undefined {
   return (error as { statusCode?: number } | null)?.statusCode;
 }
 
-// Revokes a key from app-store-transfer once its App Store purchase is refunded.
+// True only when the stores report every purchase behind this customer's transferred orders as
+// refunded; a purchase a store can't find is not treated as refunded.
+async function refundedInStores(
+  request: Request,
+  env: Env,
+  polar: Polar,
+  customerId: string,
+): Promise<boolean> {
+  const orders = await polar.orders.list({
+    organization_id: env.POLAR_ORGANIZATION_ID,
+    product_id: env.POLAR_APP_STORE_PRODUCT_ID,
+    customer_id: customerId,
+  });
+  let found = false;
+  for (const { metadata } of orders.items) {
+    const appleId = metadata[APPLE_METADATA_KEY];
+    const playToken = metadata[PLAY_METADATA_KEY];
+    if (typeof appleId === 'string') {
+      const transaction = await appleTransaction(request, env, appleId);
+      if (!transaction?.revocationDate) {
+        return false;
+      }
+      found = true;
+    } else if (typeof playToken === 'string') {
+      const purchase = await playPurchase(env, playToken);
+      if (purchase?.purchaseState !== 1) {
+        return false;
+      }
+      found = true;
+    }
+  }
+  return found;
+}
+
+// Revokes a key from a store transfer once its store purchase is refunded.
 async function revokeIfRefunded(
   request: Request,
   env: Env,
@@ -56,12 +92,12 @@ async function revokeIfRefunded(
     return false;
   }
   try {
-    if (!(await refundedOnAppStore(request, env, polar, key.customer_id))) {
+    if (!(await refundedInStores(request, env, polar, key.customer_id))) {
       return false;
     }
   } catch (error) {
-    // An Apple or Polar outage must not lock out people who paid.
-    console.error('Could not check an App Store refund', error);
+    // A store or Polar outage must not lock out people who paid.
+    console.error('Could not check a store refund', error);
     return false;
   }
   await polar.licenseKeys.update(key.id, { status: 'revoked' });

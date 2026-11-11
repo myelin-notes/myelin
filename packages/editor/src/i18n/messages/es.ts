@@ -795,6 +795,8 @@ const es: typeof en = {
         label: 'Clave de licencia',
         description:
           'Pega la clave del correo de tu compra. Una clave sirve en hasta 3 dispositivos.',
+        descriptionAndroid:
+          '¿Ya tienes una clave de licencia? Introdúcela aquí.',
         action: 'Activar',
       },
       buy: {
@@ -802,6 +804,7 @@ const es: typeof en = {
         description: 'Un pago único en el sitio web de Myelin.',
         descriptionIos:
           'Un pago único que desbloquea Pro en tus dispositivos Apple.',
+        descriptionAndroid: 'Una compra única a través de Google Play.',
         action: 'Comprar Pro',
       },
       restore: {

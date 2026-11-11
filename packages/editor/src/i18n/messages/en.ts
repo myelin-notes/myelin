@@ -786,6 +786,7 @@ const en = {
         label: 'License key',
         description:
           'Paste the key from your purchase email. One key works on up to 3 devices.',
+        descriptionAndroid: 'Already have a license key? Enter it here.',
         action: 'Activate',
       },
       buy: {
@@ -793,6 +794,7 @@ const en = {
         description: 'A one-time purchase from the Myelin website.',
         descriptionIos:
           'A one-time purchase that unlocks Pro on your Apple devices.',
+        descriptionAndroid: 'A one-time purchase through Google Play.',
         action: 'Buy Pro',
       },
       restore: {

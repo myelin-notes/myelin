@@ -2,31 +2,30 @@
 // desktop. Apple's server API confirms the purchase, a $0 checkout for the App Store Pro product
 // creates the Polar order, and the key is emailed so only the inbox owner receives it.
 // One order per `originalTransactionId`: repeat requests re-send the key to the first address.
-import type { Polar } from '@polar-sh/sdk/2026-10';
 import { polarFor } from './checkout';
-import { customerLicenseKey, sendEmail } from './restore';
+import { sendEmail } from './restore';
+import { type StoreTransferEnv, transferKey } from './store-transfer';
 import { base64url, fromBase64url } from './student';
 
 const BUNDLE_ID = 'com.github.wintersteve25.myelin';
 // Must match APP_STORE_PRO_PRODUCT_ID in the app.
 const APP_STORE_PRODUCT_ID = 'com.github.wintersteve25.myelin.pro';
-const METADATA_KEY = 'apple_original_transaction_id';
-// Polar creates the order and grants the license key in background jobs after confirming.
-const GRANT_POLL_MS = 1500;
-const GRANT_POLL_TRIES = 12;
+export const APPLE_METADATA_KEY = 'apple_original_transaction_id';
 
-interface Env {
+interface Env extends StoreTransferEnv {
   RESEND_API_KEY?: string;
   POLAR_ACCESS_TOKEN?: string;
-  POLAR_ORGANIZATION_ID?: string;
-  /** Free one-time product whose license key benefit allows 1 activation. */
-  POLAR_APP_STORE_PRODUCT_ID?: string;
   /** App Store Connect → Users and Access → Integrations → In-App Purchase key. */
   APPLE_IAP_KEY_ID?: string;
   APPLE_IAP_ISSUER_ID?: string;
   /** Contents of the .p8 file. */
   APPLE_IAP_PRIVATE_KEY?: string;
 }
+
+type AppleEnv = Pick<
+  Env,
+  'APPLE_IAP_KEY_ID' | 'APPLE_IAP_ISSUER_ID' | 'APPLE_IAP_PRIVATE_KEY'
+>;
 
 interface TransferFunctionContext {
   request: Request;
@@ -47,7 +46,7 @@ function json(body: { ok: true } | { message: string }, status = 200) {
   });
 }
 
-async function appleToken(env: Env): Promise<string> {
+async function appleToken(env: AppleEnv): Promise<string> {
   const der = fromBase64url(
     (env.APPLE_IAP_PRIVATE_KEY ?? '').replace(/-----[^-]+-----|\s/g, ''),
   );
@@ -81,9 +80,9 @@ async function appleToken(env: Env): Promise<string> {
 
 // `null` when Apple has no such transaction. The payload is trusted without checking its JWS
 // signature because it comes straight from Apple over TLS.
-async function appleTransaction(
+export async function appleTransaction(
   request: Request,
-  env: Env,
+  env: AppleEnv,
   transactionId: string,
 ): Promise<AppleTransaction | null> {
   // Same split as `polarFor`, so sandbox purchases can never mint production keys.
@@ -109,71 +108,6 @@ async function appleTransaction(
       fromBase64url(signedTransactionInfo.split('.')[1]),
     ),
   ) as AppleTransaction;
-}
-
-// True only when Apple reports every App Store purchase behind this customer's transferred
-// orders as refunded; a purchase Apple can't find is not treated as refunded.
-export async function refundedOnAppStore(
-  request: Request,
-  env: Env,
-  polar: Polar,
-  customerId: string,
-): Promise<boolean> {
-  const orders = await polar.orders.list({
-    organization_id: env.POLAR_ORGANIZATION_ID,
-    product_id: env.POLAR_APP_STORE_PRODUCT_ID,
-    customer_id: customerId,
-  });
-  const ids = orders.items
-    .map((order) => order.metadata[METADATA_KEY])
-    .filter((id) => typeof id === 'string');
-  if (!ids.length) {
-    return false;
-  }
-  for (const id of ids) {
-    const transaction = await appleTransaction(request, env, id);
-    if (!transaction?.revocationDate) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// `null` when no order exists for this App Store purchase yet.
-async function transferredOrder(
-  polar: Polar,
-  env: Env,
-  originalTransactionId: string,
-) {
-  const orders = await polar.orders.list({
-    organization_id: env.POLAR_ORGANIZATION_ID,
-    product_id: env.POLAR_APP_STORE_PRODUCT_ID,
-    metadata: { [METADATA_KEY]: originalTransactionId },
-  });
-  return orders.items[0] ?? null;
-}
-
-// Waits out Polar's background jobs; `null` if the order or key is still missing.
-async function waitForKey(
-  polar: Polar,
-  env: Env,
-  originalTransactionId: string,
-): Promise<{ key: string; email: string } | null> {
-  for (let attempt = 0; attempt < GRANT_POLL_TRIES; attempt++) {
-    const order = await transferredOrder(polar, env, originalTransactionId);
-    const key =
-      order &&
-      (await customerLicenseKey(
-        polar,
-        env.POLAR_ORGANIZATION_ID ?? '',
-        order.customer_id,
-      ));
-    if (order?.customer.email && key) {
-      return { key, email: order.customer.email };
-    }
-    await new Promise((resolve) => setTimeout(resolve, GRANT_POLL_MS));
-  }
-  return null;
 }
 
 export async function onRequestPost({
@@ -225,21 +159,13 @@ export async function onRequestPost({
     ) {
       return json({ message: 'No App Store purchase was found.' }, 404);
     }
-    const { originalTransactionId } = transaction;
-
-    // shortcut: two simultaneous first requests can both create an order; add a lock if that shows up.
-    if (!(await transferredOrder(polar, env, originalTransactionId))) {
-      const checkout = await polar.checkouts.create({
-        products: [env.POLAR_APP_STORE_PRODUCT_ID],
-        customer_email: email,
-        metadata: { [METADATA_KEY]: originalTransactionId },
-      });
-      await polar.checkouts.clientConfirm(checkout.client_secret, {
-        customer_email: email,
-      });
-    }
-
-    const found = await waitForKey(polar, env, originalTransactionId);
+    const found = await transferKey(
+      polar,
+      env,
+      APPLE_METADATA_KEY,
+      transaction.originalTransactionId,
+      email,
+    );
     if (!found) {
       return json(
         { message: 'Your key is still being created. Try again in a minute.' },
