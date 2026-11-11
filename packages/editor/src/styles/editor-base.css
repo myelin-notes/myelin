@@ -27,6 +27,25 @@
   margin-bottom: 0;
 }
 
+.pm-editor[data-page-measuring] .ProseMirror [data-page-break] {
+  display: none;
+}
+
+/* A spacer stops the margins around it collapsing. Pagination measures with spacers hidden and
+   sizes each spacer to also cover the gap those margins occupied, so they must not render too. */
+.pm-editor:not([data-page-measuring])
+  .ProseMirror.ProseMirror
+  > [data-page-break="block"]
+  + * {
+  margin-top: 0;
+}
+
+.pm-editor:not([data-page-measuring])
+  .ProseMirror.ProseMirror
+  > :has(+ [data-page-break="block"]) {
+  margin-bottom: 0;
+}
+
 .pm-editor .ProseMirror p,
 .pm-editor .ProseMirror li {
   margin: 0 0 0.9em;

@@ -43,10 +43,7 @@ function pageBounds(frame: PageFrameElement): DOMRect[] {
     { length: frame.pageLayout === 'continuous' ? 1 : frame.numPages },
     (_, page) =>
       new DOMRect(
-        frame.offset.x +
-          (frame.pageLayout === 'horizontal'
-            ? page * (frame.pageWidth + PAGE_GAP) * frame.scale.x
-            : 0),
+        frame.offset.x,
         frame.offset.y +
           (frame.pageLayout === 'vertical'
             ? page * (frame.pageHeight + PAGE_GAP) * frame.scale.y
@@ -182,14 +179,7 @@ export class PageFrameAnchoring {
     if (!local) {
       return null;
     }
-    return {
-      x:
-        frame.pageLayout === 'horizontal'
-          ? Math.max(0, Math.floor(local.x / (frame.pageWidth + PAGE_GAP))) *
-            (frame.pageWidth + PAGE_GAP)
-          : 0,
-      y: local.y,
-    };
+    return { x: 0, y: local.y };
   }
 
   public attach(
@@ -228,13 +218,7 @@ export class PageFrameAnchoring {
     }
     const scale = bounds.width / content.offsetWidth;
     const localX = (point.x - frame.offset.x) / frame.scale.x;
-    const column =
-      frame.pageLayout === 'horizontal'
-        ? Math.max(0, Math.floor(localX / (frame.pageWidth + PAGE_GAP)))
-        : 0;
-    const left =
-      bounds.left +
-      (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
+    const left = bounds.left + PAGE_PADDING * scale;
     const right = left + (frame.pageWidth - PAGE_PADDING * 2) * scale - 1;
     const coords = {
       left: element?.makesSpace

@@ -165,10 +165,6 @@ describe('page frame anchoring', () => {
     expect(
       pageContainsPoint(frame, { x: 20, y: frame.pageHeight + PAGE_GAP + 20 }),
     ).toBe(true);
-    frame.setPageLayout('horizontal');
-    expect(
-      pageContainsPoint(frame, { x: frame.pageWidth + PAGE_GAP + 20, y: 20 }),
-    ).toBe(true);
     frame.setPageLayout('continuous');
     frame.setMeasuredContentHeight(2000);
     expect(pageContainsPoint(frame, { x: 20, y: 1500 })).toBe(true);

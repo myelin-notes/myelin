@@ -26,6 +26,7 @@ import {
 } from './math/block-commands';
 import { mathPreviewPlugin } from './math/plugin';
 import { mermaidPreviewPlugin } from './mermaid/plugin';
+import type { PageGeometry } from './pagination/core';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
 import { searchHighlightPlugin } from './search-highlight';
@@ -84,6 +85,7 @@ export function buildPlugins(
   onLayout?: (pageCount: number, contentHeight: number | null) => void,
   resolveNoteLink?: ResolveNoteLink,
   resolveMedia?: ResolveMediaSrc,
+  getGeometry?: () => PageGeometry,
 ): Plugin[] {
   const plugins: Plugin[] = [
     ySyncPlugin(yXmlFragment),
@@ -104,7 +106,7 @@ export function buildPlugins(
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
     anchorGapsPlugin(),
-    paginationPlugin(onLayout),
+    paginationPlugin(onLayout, getGeometry),
     selectionHighlightPlugin(),
     searchHighlightPlugin(),
     wordSelectionDragPlugin(),

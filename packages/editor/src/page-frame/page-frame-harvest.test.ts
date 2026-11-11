@@ -56,7 +56,6 @@ describe('page-frame PDF overlays', () => {
       numPages: 2,
       pageWidth: 100,
       pageHeight: 100,
-      pageLayout: 'vertical',
       scale: { x: 2, y: 2 },
       offset: { x: 100, y: 50 },
       selfUuid: 'frame',

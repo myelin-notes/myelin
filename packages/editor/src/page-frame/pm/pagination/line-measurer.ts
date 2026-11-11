@@ -13,6 +13,9 @@ export interface PaginationBlockInfo {
   isBreakableTextBlock: boolean;
   isBreakableTableBlock: boolean;
   isPageHeightConstrained: boolean;
+  keepWithNext?: boolean;
+  forcesPageBreak?: boolean;
+  isEmbed?: boolean;
 }
 
 export interface ParagraphLineMeasurement {
@@ -20,10 +23,7 @@ export interface ParagraphLineMeasurement {
   view: EditorView;
   editorScreenTop: number;
   invScale: number;
-  blockNaturalTop: number | null;
-  blockShift: number;
   metrics: PaginationRunMetrics | null;
-  measurementCacheGeneration: number;
 }
 
 export interface ParagraphLineMeasurer {
@@ -46,7 +46,8 @@ export function collectPaginationBlocks(
       return;
     }
     const height = dom.offsetHeight;
-    if (height <= 0) {
+    const forcesPageBreak = node.type.name === 'pageBreak';
+    if (height <= 0 && !forcesPageBreak) {
       return;
     }
     // mathBlock's visible content is the rendered preview; its PM text (the
@@ -54,7 +55,8 @@ export function collectPaginationBlocks(
     const isBreakableTextBlock =
       node.isTextblock &&
       node.type.name !== 'codeBlock' &&
-      node.type.name !== 'mathBlock';
+      node.type.name !== 'mathBlock' &&
+      node.type.name !== 'figure';
     result.push({
       pos,
       dom,
@@ -64,6 +66,8 @@ export function collectPaginationBlocks(
       isBreakableTextBlock,
       isBreakableTableBlock: node.type.name === 'table',
       isPageHeightConstrained: node.type.name === 'codeBlock',
+      keepWithNext: node.type.name === 'heading',
+      forcesPageBreak,
     });
   });
 
@@ -81,9 +85,39 @@ export function collectPaginationBlocks(
       isPageHeightConstrained: false,
     });
   }
+  // Embeds are widgets, not doc nodes, so they need their own entry to break cleanly. Several at one
+  // position move as a unit: a break can only go before the whole run.
+  const embedsByPos = new Map<number, PaginationBlockInfo>();
+  for (const dom of view.dom.querySelectorAll<HTMLElement>(
+    ':scope > .pm-embed-host',
+  )) {
+    const pos = view.posAtDOM(dom, 0);
+    const top = dom.offsetTop - editorOffsetTop;
+    const existing = embedsByPos.get(pos);
+    if (existing) {
+      const bottom = Math.max(
+        existing.measuredTop + existing.height,
+        top + dom.offsetHeight,
+      );
+      existing.measuredTop = Math.min(existing.measuredTop, top);
+      existing.height = bottom - existing.measuredTop;
+      continue;
+    }
+    const embed: PaginationBlockInfo = {
+      pos,
+      dom,
+      height: dom.offsetHeight,
+      measuredTop: top,
+      nodeSize: 0,
+      isBreakableTextBlock: false,
+      isBreakableTableBlock: false,
+      isPageHeightConstrained: false,
+      isEmbed: true,
+    };
+    embedsByPos.set(pos, embed);
+    result.push(embed);
+  }
   return result.sort((a, b) => a.pos - b.pos || a.measuredTop - b.measuredTop);
 }
 
-export { BrowserParagraphLineMeasurer } from './browser-line-measurer';
 export { DomParagraphLineMeasurer } from './dom-line-measurer';
-export { PretextParagraphLineMeasurer } from './pretext-line-measurer';

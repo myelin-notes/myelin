@@ -14,7 +14,6 @@ export interface PageGeometry {
   pageWidth: number;
   pageHeight: number;
   pageGap: number;
-  layout: 'vertical' | 'horizontal';
 }
 
 export interface PageLocalPoint {
@@ -24,21 +23,12 @@ export interface PageLocalPoint {
   yPx: number;
 }
 
-// Content-local space is the cloned editor's, where page p is stacked along the layout axis.
+// Content-local space is the cloned editor's, where page p is stacked downward.
 export function localToPage(
   localX: number,
   localY: number,
   geom: PageGeometry,
 ): PageLocalPoint {
-  if (geom.layout === 'horizontal') {
-    const stride = geom.pageWidth + geom.pageGap;
-    const pageIndex = Math.max(0, Math.floor(localX / stride));
-    return {
-      pageIndex,
-      xPx: localX - pageIndex * stride,
-      yPx: localY,
-    };
-  }
   const stride = geom.pageHeight + geom.pageGap;
   const pageIndex = Math.max(0, Math.floor(localY / stride));
   return {

@@ -136,7 +136,6 @@ export class CodeBlockRunView {
           this.options.view,
           this.options.blockDom,
         ),
-        pageLayout: this.pageLayout(),
       });
     }
 
@@ -263,10 +262,6 @@ export class CodeBlockRunView {
 
   private frameUuid(): string | null {
     return this.editorHost()?.dataset.frameUuid ?? null;
-  }
-
-  private pageLayout(): string {
-    return this.editorHost()?.getAttribute('data-page-layout') ?? 'vertical';
   }
 
   private setRunning(running: boolean): void {

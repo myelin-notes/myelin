@@ -1,5 +1,4 @@
 import {
-  Columns3 as ColumnsIcon,
   GalleryVertical as ContinuousIcon,
   Download as DownloadIcon,
   Rows3 as RowsIcon,
@@ -57,11 +56,13 @@ import {
 import {
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,
+  normalizePageFrameLayout,
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
   PAGE_PADDING,
   PAGE_WIDTH,
+  type PageFrameLayout,
   type PageLayout,
 } from './page-frame-constants';
 import type {
@@ -88,7 +89,7 @@ export class PageFrameElement
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
   private _displayName: string;
-  private _pageLayout: PageLayout;
+  private _pageLayout: PageFrameLayout;
   private _editing = false;
   private _numPages = 1;
   // Reported by the pagination plugin in `continuous` layout. `null` elsewhere, where the frame's
@@ -131,7 +132,7 @@ export class PageFrameElement
   ) {
     super(uuid, ElementType.PAGE_FRAME);
     this._displayName = displayName ?? DEFAULT_PAGE_FRAME_DISPLAY_NAME;
-    this._pageLayout = pageLayout;
+    this._pageLayout = normalizePageFrameLayout(pageLayout);
   }
 
   public setNoteLinkResolver(resolveNoteLink?: NoteLinkResolver): void {
@@ -237,8 +238,7 @@ export class PageFrameElement
         this._pageHeight = v as number;
       },
       pageLayout: (v) => {
-        this._pageLayout =
-          v === 'horizontal' || v === 'continuous' ? v : 'vertical';
+        this._pageLayout = normalizePageFrameLayout(v);
       },
     });
   }
@@ -255,7 +255,7 @@ export class PageFrameElement
   public get displayName(): string {
     return this._displayName;
   }
-  public get pageLayout(): PageLayout {
+  public get pageLayout(): PageFrameLayout {
     return this._pageLayout;
   }
   public setDisplayName(displayName: string): void {
@@ -268,7 +268,7 @@ export class PageFrameElement
     this.syncToYMap({ displayName: next });
     this._onDisplayNameRenamed?.(this.uuid, next, previous);
   }
-  public setPageLayout(pageLayout: PageLayout): void {
+  public setPageLayout(pageLayout: PageFrameLayout): void {
     if (pageLayout === this._pageLayout) {
       return;
     }
@@ -285,7 +285,7 @@ export class PageFrameElement
     this._numPages = n;
     this.onRedrawNeeded?.();
   }
-  // Pass `null` from paginated/column layouts so the geometry getters fall back to page math.
+  // Pass `null` from paginated layouts so the geometry getters fall back to page math.
   public setMeasuredContentHeight(height: number | null): void {
     if (this._measuredContentHeight === height) {
       return;
@@ -295,18 +295,11 @@ export class PageFrameElement
   }
 
   public get totalWidth(): number {
-    const n = this._numPages;
-    if (this._pageLayout === 'horizontal') {
-      return n * this._pageWidth + Math.max(0, n - 1) * PAGE_GAP;
-    }
     return this._pageWidth;
   }
 
   public get totalHeight(): number {
     const n = this._numPages;
-    if (this._pageLayout === 'horizontal') {
-      return this._pageHeight;
-    }
     if (this._pageLayout === 'continuous') {
       return this.continuousStripHeight(this._measuredContentHeight);
     }
@@ -344,17 +337,10 @@ export class PageFrameElement
       return true;
     }
     for (let p = 0; p < this._numPages; p++) {
-      const pageLeft =
-        this._pageLayout === 'horizontal'
-          ? p * (this._pageWidth + PAGE_GAP)
-          : 0;
-      const pageTop =
-        this._pageLayout === 'horizontal'
-          ? 0
-          : p * (this._pageHeight + PAGE_GAP);
+      const pageTop = p * (this._pageHeight + PAGE_GAP);
       if (
-        x >= pageLeft &&
-        x <= pageLeft + this._pageWidth &&
+        x >= 0 &&
+        x <= this._pageWidth &&
         y >= pageTop &&
         y <= pageTop + this._pageHeight
       ) {
@@ -406,12 +392,10 @@ export class PageFrameElement
               x: this.offset.x + (this._pageWidth * sx) / 2,
               y: this.offset.y + (this._pageHeight * sy) / 2,
             };
-      let pageLeft: number;
       let pageTop: number;
       if (this._pageLayout === 'continuous') {
         // No discrete pages to snap to: frame a page-height window centered on
         // the cursor, clamped to the strip.
-        pageLeft = 0;
         const localFocusY = (focusWorld.y - this.offset.y) / sy;
         pageTop = Math.max(
           0,
@@ -421,25 +405,16 @@ export class PageFrameElement
           ),
         );
       } else {
-        const pageStride =
-          this._pageLayout === 'horizontal'
-            ? this._pageWidth + PAGE_GAP
-            : this._pageHeight + PAGE_GAP;
-        const localFocus =
-          this._pageLayout === 'horizontal'
-            ? (focusWorld.x - this.offset.x) / sx
-            : (focusWorld.y - this.offset.y) / sy;
+        const pageStride = this._pageHeight + PAGE_GAP;
+        const localFocus = (focusWorld.y - this.offset.y) / sy;
         const pageIndex = Math.min(
           Math.max(0, this._numPages - 1),
           Math.max(0, Math.floor(localFocus / pageStride)),
         );
-        pageLeft =
-          this._pageLayout === 'horizontal' ? pageIndex * pageStride : 0;
-        pageTop =
-          this._pageLayout === 'horizontal' ? 0 : pageIndex * pageStride;
+        pageTop = pageIndex * pageStride;
       }
       const focusRect = new DOMRect(
-        this.offset.x + pageLeft * sx,
+        this.offset.x,
         this.offset.y + pageTop * sy,
         this._pageWidth * sx,
         this._pageHeight * sy,
@@ -515,13 +490,6 @@ export class PageFrameElement
         icon: ContinuousIcon,
         checked: this._pageLayout === 'continuous',
         onSelect: () => this.setPageLayout('continuous'),
-      },
-      {
-        id: 'layout-horizontal',
-        label: strings.columns,
-        icon: ColumnsIcon,
-        checked: this._pageLayout === 'horizontal',
-        onSelect: () => this.setPageLayout('horizontal'),
       },
       {
         id: 'export',
@@ -639,7 +607,6 @@ export class PageFrameElement
       numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
       pageHeight,
-      pageLayout: this._pageLayout === 'horizontal' ? 'horizontal' : 'vertical',
       scale: { x: this.scale.x, y: this.scale.y },
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,

@@ -4,7 +4,7 @@ import type { DrawableElement } from '../../elements/drawable-element';
 import { ElementType } from '../../elements/element-type';
 import { FrameChrome } from '../../elements/frame/chrome';
 import { getFrameChromeMenuButtonRect } from '../../elements/frame/chrome-layout';
-import type { PageLayout } from '../../elements/page-frame-constants';
+import type { PageFrameLayout } from '../../elements/page-frame-constants';
 import {
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
@@ -167,7 +167,7 @@ function syncPageChrome(
   numPages: number,
   pageWidth: number,
   pageHeight: number,
-  pageLayout: PageLayout,
+  pageLayout: PageFrameLayout,
   stripHeight: number,
 ): void {
   // Continuous layout is a single uninterrupted sheet sized to the whole strip,
@@ -186,16 +186,7 @@ function syncPageChrome(
   // only when the page count or page size does.
   for (let p = 0; p < chromeCount; p++) {
     const div = refs.pageChromeDivs[p];
-    setStyleIfChanged(
-      div,
-      'left',
-      pageLayout === 'horizontal' ? `${p * (pageWidth + PAGE_GAP)}px` : '0px',
-    );
-    setStyleIfChanged(
-      div,
-      'top',
-      pageLayout === 'horizontal' ? '0px' : `${p * (pageHeight + PAGE_GAP)}px`,
-    );
+    setStyleIfChanged(div, 'top', `${p * (pageHeight + PAGE_GAP)}px`);
     setStyleIfChanged(div, 'width', `${pageWidth}px`);
     setStyleIfChanged(
       div,
@@ -205,50 +196,11 @@ function syncPageChrome(
   }
 }
 
-function syncEditorLayout(
-  refs: FrameRefs,
-  pageWidth: number,
-  pageHeight: number,
-  pageLayout: PageLayout,
-): void {
+function syncEditorLayout(refs: FrameRefs, pageLayout: PageFrameLayout): void {
   // Same-value guard: this runs every frame, and the pagination plugin (plus code-block node
   // views) watch this attribute with MutationObservers — unguarded, that repaginates every frame.
   if (refs.contentDiv.dataset.pageLayout !== pageLayout) {
     refs.contentDiv.dataset.pageLayout = pageLayout;
-  }
-
-  const editorDom = refs.frame.pmEditor?.view?.dom;
-  if (!(editorDom instanceof HTMLElement)) {
-    return;
-  }
-
-  // Guarded for the same reason: this is the editor's own root, so an unguarded write — including
-  // clearing a property that was never set — relays out the document on every frame.
-  if (pageLayout === 'horizontal') {
-    const columnWidth = Math.max(1, pageWidth - PAGE_PADDING * 2);
-    const columnHeight = Math.max(1, pageHeight - PAGE_PADDING * 2);
-    setStyleIfChanged(editorDom, 'width', `${columnWidth}px`);
-    setStyleIfChanged(editorDom, 'height', `${columnHeight}px`);
-    setStyleIfChanged(editorDom, 'column-width', `${columnWidth}px`);
-    setStyleIfChanged(
-      editorDom,
-      'column-gap',
-      `${PAGE_GAP + PAGE_PADDING * 2}px`,
-    );
-    setStyleIfChanged(editorDom, 'column-fill', 'auto');
-    setStyleIfChanged(editorDom, 'overflow', 'visible');
-    return;
-  }
-
-  for (const property of [
-    'width',
-    'height',
-    'column-width',
-    'column-gap',
-    'column-fill',
-    'overflow',
-  ]) {
-    removeStyleIfPresent(editorDom, property);
   }
 }
 
@@ -646,7 +598,7 @@ export function PageFrameDomLayer({
             }
           }
         }
-        syncEditorLayout(refs, pageWidth, pageHeight, pageLayout);
+        syncEditorLayout(refs, pageLayout);
         syncPageChrome(
           refs,
           frame.numPages,
@@ -755,32 +707,21 @@ export function PageFrameDomLayer({
       lastDoc = view.state.doc;
 
       const zoom = dc.viewport.zoom;
-      const screenLeft = screenRect.left;
-      const screenRight = screenRect.right;
       const screenBottom = screenRect.bottom;
       const screenTop = screenRect.top;
 
       const margin = 120;
-      const viewportLeft = margin;
-      const viewportRight = window.innerWidth - margin;
       const viewportTop = margin;
       const viewportBottom = window.innerHeight - margin;
 
-      let dx = 0;
       let dy = 0;
-      if (editingElement.pageLayout === 'horizontal') {
-        if (screenRight > viewportRight) {
-          dx = (viewportRight - screenRight) / zoom;
-        } else if (screenLeft < viewportLeft) {
-          dx = (viewportLeft - screenLeft) / zoom;
-        }
-      } else if (screenBottom > viewportBottom) {
+      if (screenBottom > viewportBottom) {
         dy = (viewportBottom - screenBottom) / zoom;
       } else if (screenTop < viewportTop) {
         dy = (viewportTop - screenTop) / zoom;
       }
-      if (dx !== 0 || dy !== 0) {
-        dc.viewport.panBy(dx, dy);
+      if (dy !== 0) {
+        dc.viewport.panBy(0, dy);
       }
     };
 

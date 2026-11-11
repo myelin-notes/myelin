@@ -36,7 +36,6 @@ export interface PageFramePdfSource {
   numPages: number;
   pageWidth: number;
   pageHeight: number;
-  pageLayout: 'vertical' | 'horizontal';
   scale?: { x: number; y: number };
   /** This frame's world offset (content top-left) — needed to place overlays. */
   offset: { x: number; y: number };
@@ -92,7 +91,6 @@ export async function harvestPageFramePdf(
         pageWidth: source.pageWidth,
         pageHeight: source.pageHeight,
         pageGap: PAGE_GAP,
-        layout: source.pageLayout,
       },
       originX: cloneRect.left,
       originY: cloneRect.top,
@@ -129,13 +127,6 @@ function buildOffscreenClone(source: PageFramePdfSource): {
   clone: HTMLElement;
   container: HTMLElement;
 } {
-  const horizontal = source.pageLayout === 'horizontal';
-  // Vertical: a single page-wide column that grows downward. Horizontal: the full
-  // multi-column width; the inner editor's copied column styles flow the pages.
-  const cloneWidth = horizontal
-    ? source.numPages * (source.pageWidth + PAGE_GAP)
-    : source.pageWidth;
-
   const container = document.createElement('div');
   // PDFs always render on a white page, so force the light palette regardless of the live theme.
   // The class re-declares the light tokens on the container, so the subtree inherits them over
@@ -145,7 +136,7 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     position: 'fixed',
     left: '-100000px',
     top: '0px',
-    width: `${cloneWidth}px`,
+    width: `${source.pageWidth}px`,
     pointerEvents: 'none',
     background: '#ffffff',
   });
@@ -157,14 +148,14 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     host.innerHTML = diagrams[i]?.shadowRoot?.innerHTML ?? '';
   });
   // Neutralize dom-layer's live transforms/zoom so the clone lays out at its natural scale-1 size;
-  // the pagination spacer widgets (and horizontal layout's column styles) are already baked in.
+  // the pagination spacer widgets are already baked in.
   Object.assign(clone.style, {
     position: 'static',
     inset: 'auto',
     transform: 'none',
     zoom: 'normal',
-    width: `${cloneWidth}px`,
-    height: horizontal ? `${source.pageHeight}px` : 'auto',
+    width: `${source.pageWidth}px`,
+    height: 'auto',
     overflow: 'visible',
   });
   container.appendChild(clone);
@@ -524,17 +515,13 @@ function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
   if (!overlays || overlays.length === 0) {
     return;
   }
-  const horizontal = source.pageLayout === 'horizontal';
   const scaleX = Math.max(Math.abs(source.scale?.x ?? 1), 0.001);
   const scaleY = Math.max(Math.abs(source.scale?.y ?? 1), 0.001);
 
   for (let p = 0; p < h.pages.length; p++) {
-    const pageWorldX =
-      source.offset.x +
-      (horizontal ? p * (source.pageWidth + PAGE_GAP) : 0) * scaleX;
+    const pageWorldX = source.offset.x;
     const pageWorldY =
-      source.offset.y +
-      (horizontal ? 0 : p * (source.pageHeight + PAGE_GAP)) * scaleY;
+      source.offset.y + p * (source.pageHeight + PAGE_GAP) * scaleY;
     const pageBounds = new DOMRect(
       pageWorldX,
       pageWorldY,

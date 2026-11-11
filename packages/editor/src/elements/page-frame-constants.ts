@@ -7,6 +7,13 @@ export const PAGE_CORNER_RADIUS = 3;
 export const DEFAULT_PAGE_FRAME_DISPLAY_NAME = 'Page Frame';
 
 export type PageLayout = 'vertical' | 'horizontal' | 'continuous';
+/** Page frames stack pages downward or run as one strip; only PDFs lay out in columns. */
+export type PageFrameLayout = Exclude<PageLayout, 'horizontal'>;
+
+// Frames saved with the removed `horizontal` layout open as pages.
+export function normalizePageFrameLayout(layout: unknown): PageFrameLayout {
+  return layout === 'continuous' ? 'continuous' : 'vertical';
+}
 
 export function normalizePageFrameDisplayName(displayName: unknown): string {
   const raw = typeof displayName === 'string' ? displayName : '';
