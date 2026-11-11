@@ -37,6 +37,9 @@ export interface PageFramePdfSource {
   numPages: number;
   pageWidth: number;
   pageHeight: number;
+  /** CSS px on every side. */
+  pageMargin: number;
+  showPageNumbers: boolean;
   scale?: { x: number; y: number };
   /** This frame's world offset (content top-left) — needed to place overlays. */
   offset: { x: number; y: number };
@@ -59,6 +62,8 @@ const RASTERIZED_SELECTOR = [
 // html-to-image never settles if `img.decode()` rejects.
 const RASTERIZE_TIMEOUT_MS = 5_000;
 const ASCENT_RATIO = 0.8;
+const PAGE_NUMBER_SIZE_PX = 12;
+const PAGE_NUMBER_GRAY: [number, number, number] = [90, 94, 98];
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
 const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
 
@@ -112,6 +117,9 @@ export async function harvestPageFramePdf(
     harvestText(h, clone);
     const failedBlocks = await harvestRasterizedBlocks(h, clone);
     harvestOverlays(h, source);
+    if (source.showPageNumbers) {
+      harvestPageNumbers(h, source);
+    }
 
     const warnings: string[] = [];
     if (failedBlocks > 0) {
@@ -568,6 +576,26 @@ function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
       }
     }
   }
+}
+
+function harvestPageNumbers(h: Harvester, source: PageFramePdfSource): void {
+  h.pages.forEach((page, index) => {
+    const text = `${index + 1}`;
+    page.items.push({
+      t: 'text',
+      // The renderer has no centering; digits in the bundled sans are about 0.55em wide.
+      x: pxToPt(
+        source.pageWidth / 2 - (text.length * PAGE_NUMBER_SIZE_PX * 0.55) / 2,
+      ),
+      baselineY: pxToPt(source.pageHeight - source.pageMargin / 2),
+      text,
+      font: 'sans',
+      weight: 400,
+      italic: false,
+      sizePt: pxToPt(PAGE_NUMBER_SIZE_PX),
+      color: PAGE_NUMBER_GRAY,
+    });
+  });
 }
 
 function circlePath(cx: number, cy: number, r: number): PageItem {

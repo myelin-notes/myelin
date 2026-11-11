@@ -436,7 +436,7 @@ const fr: typeof en = {
       defaultPageLayout: {
         label: 'Mise en page par défaut',
         description:
-          'Choisissez comment les nouveaux cadres de page disposent leur contenu. Les PDF n’utilisent que Pages ou Colonnes.',
+          'Choisissez la disposition des nouveaux documents. Colonnes ne s’applique qu’aux PDF, et Continu qu’aux cadres de page.',
         options: {
           vertical: 'Pages',
           horizontal: 'Colonnes',
@@ -785,6 +785,11 @@ const fr: typeof en = {
       continuous: 'Continu',
       columns: 'Colonnes',
       figureCaptionPlaceholder: 'Ajouter une légende',
+      letterSize: 'Lettre',
+      a4Size: 'A4',
+      pageNumbers: 'Numéros de page',
+      pageMargins: (inches: number) => `Marges : ${inches} po`,
+      bodyTextSize: (pt: number) => `Texte : ${pt} pt`,
       export: 'Exporter',
     },
     export: {

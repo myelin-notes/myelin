@@ -1,7 +1,7 @@
 .pm-editor .ProseMirror {
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: var(--pm-body-font-size, 16px);
   line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
@@ -129,17 +129,17 @@
 }
 
 .pm-editor .ProseMirror h1 {
-  font-size: 2.35rem;
+  font-size: 2.35em;
   line-height: 42px;
 }
 
 .pm-editor .ProseMirror h2 {
-  font-size: 1.8rem;
+  font-size: 1.8em;
   line-height: 32px;
 }
 
 .pm-editor .ProseMirror h3 {
-  font-size: 1.4rem;
+  font-size: 1.4em;
   line-height: 25px;
 }
 

@@ -431,7 +431,7 @@ const es: typeof en = {
       defaultPageLayout: {
         label: 'Diseño de página predeterminado',
         description:
-          'Elige cómo los nuevos marcos de página organizan su contenido. Los PDF solo usan Páginas o Columnas.',
+          'Elige cómo se organizan los documentos nuevos. Columnas solo se aplica a los PDF y Continuo solo a los marcos de página.',
         options: {
           vertical: 'Páginas',
           horizontal: 'Columnas',
@@ -776,6 +776,11 @@ const es: typeof en = {
       continuous: 'Continuo',
       columns: 'Columnas',
       figureCaptionPlaceholder: 'Añadir una leyenda',
+      letterSize: 'Carta',
+      a4Size: 'A4',
+      pageNumbers: 'Números de página',
+      pageMargins: (inches: number) => `Márgenes: ${inches} in`,
+      bodyTextSize: (pt: number) => `Texto: ${pt} pt`,
       export: 'Exportar',
     },
     export: {

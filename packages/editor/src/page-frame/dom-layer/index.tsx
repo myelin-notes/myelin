@@ -9,7 +9,6 @@ import {
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
-  PAGE_PADDING,
   type PageFrameElement,
 } from '../../elements/page-frame-element';
 import {
@@ -50,6 +49,7 @@ import {
   type NoteLinkOpenRequestDetail,
 } from '../pm/markdown/note-links';
 import { positionMathBlockSources } from '../pm/math/block-node-view';
+import { PAGE_GEOMETRY_ATTRIBUTE } from '../pm/pagination/invalidation-controller';
 import {
   getPageFramePmScreenRectForNestedCaret,
   getPageFramePmScreenRectForPos,
@@ -80,7 +80,6 @@ const CONTENT_STYLE: Record<string, string> = {
   position: 'absolute',
   inset: '0',
   boxSizing: 'border-box',
-  padding: `${PAGE_PADDING}px`,
 };
 
 interface FrameRefs {
@@ -106,7 +105,17 @@ const PAGE_CHROME_STYLE: Record<string, string> = {
   boxShadow: '0 4px 24px rgb(var(--shadow-rgb) / 0.08)',
   border: '1px solid var(--border-ghost)',
   pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'flex-end',
+  justifyContent: 'center',
+  boxSizing: 'border-box',
+  color: 'var(--text-secondary)',
+  fontSize: '12px',
+  lineHeight: '1',
 };
+
+// Half the page number's line box, so it sits centered in the bottom margin.
+const PAGE_NUMBER_BASELINE_OFFSET = 6;
 
 interface ScreenRect {
   left: number;
@@ -188,6 +197,18 @@ function syncPageChrome(
     const div = refs.pageChromeDivs[p];
     setStyleIfChanged(div, 'top', `${p * (pageHeight + PAGE_GAP)}px`);
     setStyleIfChanged(div, 'width', `${pageWidth}px`);
+    const pageNumber =
+      refs.frame.showPageNumbers && pageLayout !== 'continuous'
+        ? `${p + 1}`
+        : '';
+    if (div.textContent !== pageNumber) {
+      div.textContent = pageNumber;
+    }
+    setStyleIfChanged(
+      div,
+      'padding-bottom',
+      `${refs.frame.pageMargin / 2 - PAGE_NUMBER_BASELINE_OFFSET}px`,
+    );
     setStyleIfChanged(
       div,
       'height',
@@ -197,11 +218,20 @@ function syncPageChrome(
 }
 
 function syncEditorLayout(refs: FrameRefs, pageLayout: PageFrameLayout): void {
+  const { contentDiv, frame } = refs;
   // Same-value guard: this runs every frame, and the pagination plugin (plus code-block node
-  // views) watch this attribute with MutationObservers — unguarded, that repaginates every frame.
-  if (refs.contentDiv.dataset.pageLayout !== pageLayout) {
-    refs.contentDiv.dataset.pageLayout = pageLayout;
+  // views) watch these attributes with MutationObservers — unguarded, that repaginates every frame.
+  if (contentDiv.dataset.pageLayout !== pageLayout) {
+    contentDiv.dataset.pageLayout = pageLayout;
   }
+  const { contentHeight } = frame.pageGeometry;
+  const geometry = `${contentHeight}:${frame.pageMargin}`;
+  if (contentDiv.getAttribute(PAGE_GEOMETRY_ATTRIBUTE) !== geometry) {
+    contentDiv.setAttribute(PAGE_GEOMETRY_ATTRIBUTE, geometry);
+  }
+  setStyleIfChanged(contentDiv, 'padding', `${frame.pageMargin}px`);
+  setStyleIfChanged(contentDiv, '--pm-content-height', `${contentHeight}px`);
+  setStyleIfChanged(contentDiv, '--pm-body-font-size', `${frame.bodyFontPt}pt`);
 }
 
 function createFrameRefs(
@@ -247,6 +277,7 @@ function createFrameRefs(
       frame.numPages = pageCount;
       frame.setMeasuredContentHeight(contentHeight);
     },
+    () => frame.pageGeometry,
   );
 
   // Anchoring reads this editor's layout on canvas frames, and the canvas only draws on demand.

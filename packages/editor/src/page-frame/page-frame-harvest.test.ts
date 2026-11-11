@@ -71,6 +71,8 @@ describe('page-frame PDF rasterized blocks', () => {
     numPages: 1,
     pageWidth: 100,
     pageHeight: 100,
+    pageMargin: 10,
+    showPageNumbers: false,
     offset: { x: 0, y: 0 },
     selfUuid: 'frame',
   });
@@ -153,6 +155,8 @@ describe('page-frame PDF overlays', () => {
       numPages: 2,
       pageWidth: 100,
       pageHeight: 100,
+      pageMargin: 10,
+      showPageNumbers: false,
       scale: { x: 2, y: 2 },
       offset: { x: 100, y: 50 },
       selfUuid: 'frame',

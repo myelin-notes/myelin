@@ -9,11 +9,7 @@ import type {
   SelectionToolbarItem,
 } from '../elements/drawable-element';
 import { FlagElement } from '../elements/flag-element';
-import {
-  PAGE_GAP,
-  PAGE_PADDING,
-  PageFrameElement,
-} from '../elements/page-frame-element';
+import { PAGE_GAP, PageFrameElement } from '../elements/page-frame-element';
 import { PdfElement } from '../elements/pdf';
 import type { StrokeElement } from '../elements/stroke-element';
 import type { Vector2 } from '../geometry';
@@ -218,8 +214,8 @@ export class PageFrameAnchoring {
     }
     const scale = bounds.width / content.offsetWidth;
     const localX = (point.x - frame.offset.x) / frame.scale.x;
-    const left = bounds.left + PAGE_PADDING * scale;
-    const right = left + (frame.pageWidth - PAGE_PADDING * 2) * scale - 1;
+    const left = bounds.left + frame.pageMargin * scale;
+    const right = left + (frame.pageWidth - frame.pageMargin * 2) * scale - 1;
     const coords = {
       left: element?.makesSpace
         ? left
@@ -294,7 +290,7 @@ export class PageFrameAnchoring {
     }
     if (placeAtCursor) {
       element.setOffset(
-        frame.offset.x + (origin.x + PAGE_PADDING) * frame.scale.x,
+        frame.offset.x + (origin.x + frame.pageMargin) * frame.scale.x,
         frame.offset.y + origin.y * frame.scale.y,
       );
     }

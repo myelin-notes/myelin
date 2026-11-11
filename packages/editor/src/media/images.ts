@@ -1,6 +1,6 @@
 import type { DrawableCanvas } from '../drawable-canvas';
 import { ImageElement } from '../elements/image-element';
-import { PAGE_PADDING, PageFrameElement } from '../elements/page-frame-element';
+import { PageFrameElement } from '../elements/page-frame-element';
 import { resolveAnchorPosition } from '../page-frame/pm/anchoring';
 import { getDevicePixelRatio } from '../utils';
 import type { MediaImportOptions } from './index';
@@ -34,9 +34,9 @@ export async function imageImportHandler(
     canvas.transact(() => {
       const scale = Math.min(
         1,
-        ((frame.pageWidth - PAGE_PADDING * 2) * Math.abs(frame.scale.x)) /
+        ((frame.pageWidth - frame.pageMargin * 2) * Math.abs(frame.scale.x)) /
           img.naturalWidth,
-        ((frame.pageHeight - PAGE_PADDING * 2) * Math.abs(frame.scale.y)) /
+        ((frame.pageHeight - frame.pageMargin * 2) * Math.abs(frame.scale.y)) /
           img.naturalHeight,
       );
       img.setScale(scale, scale);

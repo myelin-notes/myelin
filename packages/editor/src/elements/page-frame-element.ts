@@ -1,6 +1,10 @@
 import {
+  Type as BodyTextIcon,
   GalleryVertical as ContinuousIcon,
   Download as DownloadIcon,
+  Square as MarginsIcon,
+  Hash as PageNumbersIcon,
+  FileText as PageSizeIcon,
   Rows3 as RowsIcon,
 } from 'lucide-react';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
@@ -28,6 +32,7 @@ import {
   type ResolveMediaSrc,
 } from '../page-frame/pm/embed/renderer';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
+import type { PageGeometry } from '../page-frame/pm/pagination/core';
 import { schema } from '../page-frame/pm/schema';
 import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
 import {
@@ -57,16 +62,23 @@ import {
   CHROME_SIDE_PADDING,
 } from './frame/chrome';
 import {
+  BODY_FONT_PT_OPTIONS,
+  DEFAULT_BODY_FONT_PT,
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
   normalizePageFrameDisplayName,
   normalizePageFrameLayout,
+  normalizePagePreset,
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
+  PAGE_MARGIN_OPTIONS,
   PAGE_PADDING,
+  PAGE_PRESET_MARGIN,
+  PAGE_PRESETS,
   PAGE_WIDTH,
   type PageFrameLayout,
   type PageLayout,
+  type PagePreset,
 } from './page-frame-constants';
 import type {
   CanvasPdfExportData,
@@ -85,12 +97,24 @@ const MIN_PAGE_WIDTH = 240;
 const EDIT_MODE_WIDTH_RATIO = 0.65;
 const EDIT_MODE_HEIGHT_RATIO = 0.86;
 
+function nextOption<T extends number>(
+  options: readonly T[],
+  current: number,
+): T {
+  return options[(options.indexOf(current as T) + 1) % options.length];
+}
+
 export class PageFrameElement
   extends DrawableElement
   implements PdfExportableElement, SearchableElement
 {
   private _pageWidth = PAGE_WIDTH;
   private _pageHeight = PAGE_HEIGHT;
+  private _pageMargin: number = PAGE_PADDING;
+  // `null` is a free-form page: frames from before paper sizes, or ones dragged to a custom width.
+  private _pagePreset: PagePreset | null = null;
+  private _showPageNumbers = false;
+  private _bodyFontPt: number = DEFAULT_BODY_FONT_PT;
   private _displayName: string;
   private _pageLayout: PageFrameLayout;
   private _editing = false;
@@ -165,7 +189,9 @@ export class PageFrameElement
   }
 
   public override get resizeHandles(): ResizeHandles {
-    return ResizeHandles.HorizontalSides;
+    return this._pagePreset !== null && this._pageLayout === 'vertical'
+      ? ResizeHandles.None
+      : ResizeHandles.HorizontalSides;
   }
 
   private _resizeOriginalPageWidth: number = PAGE_WIDTH;
@@ -193,7 +219,8 @@ export class PageFrameElement
     );
     if (newWidth !== this._pageWidth) {
       this._pageWidth = newWidth;
-      this.syncToYMap({ pageWidth: newWidth });
+      this._pagePreset = null;
+      this.syncToYMap({ pageWidth: newWidth, pagePreset: null });
     }
 
     // _scale stays at 1, so re-derive offset without a scale multiplier.
@@ -210,6 +237,10 @@ export class PageFrameElement
       pageWidth: this._pageWidth,
       pageHeight: this._pageHeight,
       pageLayout: this._pageLayout,
+      pageMargin: this._pageMargin,
+      pagePreset: this._pagePreset,
+      showPageNumbers: this._showPageNumbers,
+      bodyFontPt: this._bodyFontPt,
     };
   }
 
@@ -243,6 +274,18 @@ export class PageFrameElement
       pageLayout: (v) => {
         this._pageLayout = normalizePageFrameLayout(v);
       },
+      pageMargin: (v) => {
+        this._pageMargin = v as number;
+      },
+      pagePreset: (v) => {
+        this._pagePreset = normalizePagePreset(v);
+      },
+      showPageNumbers: (v) => {
+        this._showPageNumbers = v === true;
+      },
+      bodyFontPt: (v) => {
+        this._bodyFontPt = v as number;
+      },
     });
   }
 
@@ -254,6 +297,24 @@ export class PageFrameElement
   }
   public get pageHeight(): number {
     return this._pageHeight;
+  }
+  public get pageMargin(): number {
+    return this._pageMargin;
+  }
+  public get pagePreset(): PagePreset | null {
+    return this._pagePreset;
+  }
+  public get showPageNumbers(): boolean {
+    return this._showPageNumbers;
+  }
+  public get bodyFontPt(): number {
+    return this._bodyFontPt;
+  }
+  public get pageGeometry(): PageGeometry {
+    return {
+      contentHeight: this._pageHeight - this._pageMargin * 2,
+      breakGap: this._pageMargin * 2 + PAGE_GAP,
+    };
   }
   public get displayName(): string {
     return this._displayName;
@@ -277,6 +338,40 @@ export class PageFrameElement
     }
     this._pageLayout = pageLayout;
     this.syncToYMap({ pageLayout });
+  }
+  public setPagePreset(preset: PagePreset): void {
+    if (preset === this._pagePreset) {
+      return;
+    }
+    const { width, height } = PAGE_PRESETS[preset];
+    const pageMargin =
+      this._pagePreset === null ? PAGE_PRESET_MARGIN : this._pageMargin;
+    this._pagePreset = preset;
+    this._pageWidth = width;
+    this._pageHeight = height;
+    this._pageMargin = pageMargin;
+    this.syncToYMap({
+      pagePreset: preset,
+      pageWidth: width,
+      pageHeight: height,
+      pageMargin,
+    });
+    this.onRedrawNeeded?.();
+  }
+  public cyclePageMargin(): void {
+    this._pageMargin = nextOption(PAGE_MARGIN_OPTIONS, this._pageMargin);
+    this.syncToYMap({ pageMargin: this._pageMargin });
+    this.onRedrawNeeded?.();
+  }
+  public cycleBodyFontPt(): void {
+    this._bodyFontPt = nextOption(BODY_FONT_PT_OPTIONS, this._bodyFontPt);
+    this.syncToYMap({ bodyFontPt: this._bodyFontPt });
+    this.onRedrawNeeded?.();
+  }
+  public setShowPageNumbers(show: boolean): void {
+    this._showPageNumbers = show;
+    this.syncToYMap({ showPageNumbers: show });
+    this.onRedrawNeeded?.();
   }
   public get numPages(): number {
     return this._numPages;
@@ -312,7 +407,7 @@ export class PageFrameElement
   // Never shorter than a single page, so an empty frame still reads as a page. `content` is the
   // editor's natural height, or `null` if unmeasured.
   private continuousStripHeight(content: number | null): number {
-    return Math.max(this._pageHeight, (content ?? 0) + PAGE_PADDING * 2);
+    return Math.max(this._pageHeight, (content ?? 0) + this._pageMargin * 2);
   }
 
   public get localBoundingBox(): DOMRect {
@@ -494,12 +589,52 @@ export class PageFrameElement
         checked: this._pageLayout === 'continuous',
         onSelect: () => this.setPageLayout('continuous'),
       },
+      ...(this._pageLayout === 'vertical' ? this.getPageSetupItems() : []),
+      {
+        id: 'body-text-size',
+        label: strings.bodyTextSize(this._bodyFontPt),
+        icon: BodyTextIcon,
+        onSelect: () => this.cycleBodyFontPt(),
+      },
       {
         id: 'export',
         label: strings.export,
         icon: DownloadIcon,
         onSelect: () =>
           this._uiServices?.openExportDialog(this.buildExportTarget()),
+      },
+    ];
+  }
+
+  private getPageSetupItems(): ChromeMenuItem[] {
+    const strings = getMessages().canvas.frame;
+    return [
+      {
+        id: 'page-size-letter',
+        label: strings.letterSize,
+        icon: PageSizeIcon,
+        checked: this._pagePreset === 'letter',
+        onSelect: () => this.setPagePreset('letter'),
+      },
+      {
+        id: 'page-size-a4',
+        label: strings.a4Size,
+        icon: PageSizeIcon,
+        checked: this._pagePreset === 'a4',
+        onSelect: () => this.setPagePreset('a4'),
+      },
+      {
+        id: 'page-margins',
+        label: strings.pageMargins(this._pageMargin / 96),
+        icon: MarginsIcon,
+        onSelect: () => this.cyclePageMargin(),
+      },
+      {
+        id: 'page-numbers',
+        label: strings.pageNumbers,
+        icon: PageNumbersIcon,
+        checked: this._showPageNumbers,
+        onSelect: () => this.setShowPageNumbers(!this._showPageNumbers),
       },
     ];
   }
@@ -624,6 +759,8 @@ export class PageFrameElement
       numPages: continuous ? 1 : this._numPages,
       pageWidth: this._pageWidth,
       pageHeight,
+      pageMargin: this._pageMargin,
+      showPageNumbers: !continuous && this._showPageNumbers,
       scale: { x: this.scale.x, y: this.scale.y },
       offset: { x: this.offset.x, y: this.offset.y },
       selfUuid: this.uuid,
@@ -694,13 +831,13 @@ export class PageFrameElement
     ctx.beginPath();
     ctx.rect(0, 0, this._pageWidth, this._pageHeight);
     ctx.clip();
-    ctx.translate(PAGE_PADDING, PAGE_PADDING);
+    ctx.translate(this._pageMargin, this._pageMargin);
     renderPageFrameThumbnail(
       doc,
       ctx,
       {
-        width: this._pageWidth - PAGE_PADDING * 2,
-        maxHeight: this._pageHeight - PAGE_PADDING * 2,
+        width: this._pageWidth - this._pageMargin * 2,
+        maxHeight: this._pageHeight - this._pageMargin * 2,
       },
       palette,
     );

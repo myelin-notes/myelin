@@ -423,7 +423,7 @@ const en = {
       defaultPageLayout: {
         label: 'Default page layout',
         description:
-          'Choose how new page frames arrange content. PDFs use Pages or Columns only.',
+          'Choose how new documents arrange content. Columns applies to PDFs only, and Continuous to page frames only.',
         options: {
           vertical: 'Pages',
           horizontal: 'Columns',
@@ -767,6 +767,11 @@ const en = {
       continuous: 'Continuous',
       columns: 'Columns',
       figureCaptionPlaceholder: 'Add a caption',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      pageNumbers: 'Page numbers',
+      pageMargins: (inches: number) => `Margins: ${inches} in`,
+      bodyTextSize: (pt: number) => `Body text: ${pt} pt`,
       export: 'Export',
     },
     export: {

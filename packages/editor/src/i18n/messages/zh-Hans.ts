@@ -407,7 +407,8 @@ const zhHans: typeof en = {
       eyebrow: '文档视图',
       defaultPageLayout: {
         label: '默认页面布局',
-        description: '选择新页面框的内容排列方式。PDF 仅支持页面或分栏。',
+        description:
+          '选择新文档的内容排列方式。分栏仅适用于 PDF，连续仅适用于页面框。',
         options: {
           vertical: '页面',
           horizontal: '分栏',
@@ -741,6 +742,11 @@ const zhHans: typeof en = {
       continuous: '连续',
       columns: '分栏',
       figureCaptionPlaceholder: '添加图注',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      pageNumbers: '页码',
+      pageMargins: (inches: number) => `页边距：${inches} 英寸`,
+      bodyTextSize: (pt: number) => `正文：${pt} 磅`,
       export: '导出',
     },
     export: {
