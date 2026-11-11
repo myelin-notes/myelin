@@ -4,6 +4,7 @@ const fr: typeof en = {
   common: {
     close: 'Fermer',
     cancel: 'Annuler',
+    done: 'Terminé',
     clear: 'Effacer',
     copy: 'Copier',
     copied: 'Copié',
@@ -787,9 +788,14 @@ const fr: typeof en = {
       figureCaptionPlaceholder: 'Ajouter une légende',
       letterSize: 'Lettre',
       a4Size: 'A4',
+      customSize: 'Personnalisé',
+      customSizeHint:
+        'Faites glisser les bords latéraux de la page pour régler sa largeur.',
       pageNumbers: 'Numéros de page',
-      pageMargins: (inches: number) => `Marges : ${inches} po`,
-      bodyTextSize: (pt: number) => `Texte : ${pt} pt`,
+      pageSetup: 'Mise en page',
+      pageSize: 'Format',
+      pageMargins: 'Marges',
+      inchesUnit: 'po',
       export: 'Exporter',
     },
     export: {

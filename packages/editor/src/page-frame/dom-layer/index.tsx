@@ -231,7 +231,6 @@ function syncEditorLayout(refs: FrameRefs, pageLayout: PageFrameLayout): void {
   }
   setStyleIfChanged(contentDiv, 'padding', `${frame.pageMargin}px`);
   setStyleIfChanged(contentDiv, '--pm-content-height', `${contentHeight}px`);
-  setStyleIfChanged(contentDiv, '--pm-body-font-size', `${frame.bodyFontPt}pt`);
 }
 
 function createFrameRefs(

@@ -4,6 +4,7 @@ const es: typeof en = {
   common: {
     close: 'Cerrar',
     cancel: 'Cancelar',
+    done: 'Listo',
     clear: 'Limpiar',
     copy: 'Copiar',
     copied: 'Copiado',
@@ -778,9 +779,14 @@ const es: typeof en = {
       figureCaptionPlaceholder: 'Añadir una leyenda',
       letterSize: 'Carta',
       a4Size: 'A4',
+      customSize: 'Personalizado',
+      customSizeHint:
+        'Arrastra los bordes laterales de la página para ajustar su ancho.',
       pageNumbers: 'Números de página',
-      pageMargins: (inches: number) => `Márgenes: ${inches} in`,
-      bodyTextSize: (pt: number) => `Texto: ${pt} pt`,
+      pageSetup: 'Configurar página',
+      pageSize: 'Tamaño',
+      pageMargins: 'Márgenes',
+      inchesUnit: 'in',
       export: 'Exportar',
     },
     export: {

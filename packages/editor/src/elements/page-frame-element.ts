@@ -1,10 +1,7 @@
 import {
-  Type as BodyTextIcon,
   GalleryVertical as ContinuousIcon,
   Download as DownloadIcon,
-  Square as MarginsIcon,
-  Hash as PageNumbersIcon,
-  FileText as PageSizeIcon,
+  FileText as PageSetupIcon,
   Rows3 as RowsIcon,
 } from 'lucide-react';
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
@@ -67,16 +64,14 @@ import {
   CHROME_SIDE_PADDING,
 } from './frame/chrome';
 import {
-  BODY_FONT_PT_OPTIONS,
-  DEFAULT_BODY_FONT_PT,
   DEFAULT_PAGE_FRAME_DISPLAY_NAME,
+  MAX_PAGE_MARGIN,
   normalizePageFrameDisplayName,
   normalizePageFrameLayout,
   normalizePagePreset,
   PAGE_CORNER_RADIUS,
   PAGE_GAP,
   PAGE_HEIGHT,
-  PAGE_MARGIN_OPTIONS,
   PAGE_PADDING,
   PAGE_PRESET_MARGIN,
   PAGE_PRESETS,
@@ -102,13 +97,6 @@ const MIN_PAGE_WIDTH = 240;
 const EDIT_MODE_WIDTH_RATIO = 0.65;
 const EDIT_MODE_HEIGHT_RATIO = 0.86;
 
-function nextOption<T extends number>(
-  options: readonly T[],
-  current: number,
-): T {
-  return options[(options.indexOf(current as T) + 1) % options.length];
-}
-
 export class PageFrameElement
   extends DrawableElement
   implements PdfExportableElement, SearchableElement
@@ -119,7 +107,6 @@ export class PageFrameElement
   // `null` is a free-form page: frames from before paper sizes, or ones dragged to a custom width.
   private _pagePreset: PagePreset | null = null;
   private _showPageNumbers = false;
-  private _bodyFontPt: number = DEFAULT_BODY_FONT_PT;
   private _displayName: string;
   private _pageLayout: PageFrameLayout;
   private _editing = false;
@@ -245,7 +232,6 @@ export class PageFrameElement
       pageMargin: this._pageMargin,
       pagePreset: this._pagePreset,
       showPageNumbers: this._showPageNumbers,
-      bodyFontPt: this._bodyFontPt,
       [CONTENT_FORMAT_KEY]: PAGE_FRAME_CONTENT_FORMAT,
     };
   }
@@ -289,9 +275,6 @@ export class PageFrameElement
       showPageNumbers: (v) => {
         this._showPageNumbers = v === true;
       },
-      bodyFontPt: (v) => {
-        this._bodyFontPt = v as number;
-      },
     });
   }
 
@@ -312,9 +295,6 @@ export class PageFrameElement
   }
   public get showPageNumbers(): boolean {
     return this._showPageNumbers;
-  }
-  public get bodyFontPt(): number {
-    return this._bodyFontPt;
   }
   public get pageGeometry(): PageGeometry {
     return {
@@ -345,8 +325,15 @@ export class PageFrameElement
     this._pageLayout = pageLayout;
     this.syncToYMap({ pageLayout });
   }
-  public setPagePreset(preset: PagePreset): void {
+  /** `null` keeps the current size and unlocks drag-resizing. */
+  public setPagePreset(preset: PagePreset | null): void {
     if (preset === this._pagePreset) {
+      return;
+    }
+    if (preset === null) {
+      this._pagePreset = null;
+      this.syncToYMap({ pagePreset: null });
+      this.onRedrawNeeded?.();
       return;
     }
     const { width, height } = PAGE_PRESETS[preset];
@@ -364,14 +351,14 @@ export class PageFrameElement
     });
     this.onRedrawNeeded?.();
   }
-  public cyclePageMargin(): void {
-    this._pageMargin = nextOption(PAGE_MARGIN_OPTIONS, this._pageMargin);
-    this.syncToYMap({ pageMargin: this._pageMargin });
-    this.onRedrawNeeded?.();
-  }
-  public cycleBodyFontPt(): void {
-    this._bodyFontPt = nextOption(BODY_FONT_PT_OPTIONS, this._bodyFontPt);
-    this.syncToYMap({ bodyFontPt: this._bodyFontPt });
+  /** CSS px; clamped to `[0, MAX_PAGE_MARGIN]`. */
+  public setPageMargin(margin: number): void {
+    const next = Math.min(MAX_PAGE_MARGIN, Math.max(0, margin));
+    if (next === this._pageMargin || Number.isNaN(next)) {
+      return;
+    }
+    this._pageMargin = next;
+    this.syncToYMap({ pageMargin: next });
     this.onRedrawNeeded?.();
   }
   public setShowPageNumbers(show: boolean): void {
@@ -599,52 +586,24 @@ export class PageFrameElement
         checked: this._pageLayout === 'continuous',
         onSelect: () => this.setPageLayout('continuous'),
       },
-      ...(this._pageLayout === 'vertical' ? this.getPageSetupItems() : []),
-      {
-        id: 'body-text-size',
-        label: strings.bodyTextSize(this._bodyFontPt),
-        icon: BodyTextIcon,
-        onSelect: () => this.cycleBodyFontPt(),
-      },
+      ...(this._pageLayout === 'vertical'
+        ? [
+            {
+              id: 'page-setup',
+              label: strings.pageSetup,
+              icon: PageSetupIcon,
+              separatorBefore: true,
+              onSelect: () => this._uiServices?.openPageSetupDialog(this),
+            },
+          ]
+        : []),
       {
         id: 'export',
         label: strings.export,
         icon: DownloadIcon,
+        separatorBefore: true,
         onSelect: () =>
           this._uiServices?.openExportDialog(this.buildExportTarget()),
-      },
-    ];
-  }
-
-  private getPageSetupItems(): ChromeMenuItem[] {
-    const strings = getMessages().canvas.frame;
-    return [
-      {
-        id: 'page-size-letter',
-        label: strings.letterSize,
-        icon: PageSizeIcon,
-        checked: this._pagePreset === 'letter',
-        onSelect: () => this.setPagePreset('letter'),
-      },
-      {
-        id: 'page-size-a4',
-        label: strings.a4Size,
-        icon: PageSizeIcon,
-        checked: this._pagePreset === 'a4',
-        onSelect: () => this.setPagePreset('a4'),
-      },
-      {
-        id: 'page-margins',
-        label: strings.pageMargins(this._pageMargin / 96),
-        icon: MarginsIcon,
-        onSelect: () => this.cyclePageMargin(),
-      },
-      {
-        id: 'page-numbers',
-        label: strings.pageNumbers,
-        icon: PageNumbersIcon,
-        checked: this._showPageNumbers,
-        onSelect: () => this.setShowPageNumbers(!this._showPageNumbers),
       },
     ];
   }

@@ -47,6 +47,7 @@ describe('CanvasElementFactory', () => {
     const uiServices = {
       openChromeMenu: vi.fn(),
       openExportDialog: vi.fn(),
+      openPageSetupDialog: vi.fn(),
     };
     const factory = new CanvasElementFactory({
       ydoc,
@@ -82,10 +83,12 @@ describe('CanvasElementFactory', () => {
     const firstUiServices = {
       openChromeMenu: vi.fn(),
       openExportDialog: vi.fn(),
+      openPageSetupDialog: vi.fn(),
     };
     const secondUiServices = {
       openChromeMenu: vi.fn(),
       openExportDialog: vi.fn(),
+      openPageSetupDialog: vi.fn(),
     };
     const firstFactory = new CanvasElementFactory({
       ydoc: firstYdoc,

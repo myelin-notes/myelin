@@ -2,6 +2,7 @@ const en = {
   common: {
     close: 'Close',
     cancel: 'Cancel',
+    done: 'Done',
     clear: 'Clear',
     copy: 'Copy',
     copied: 'Copied',
@@ -769,9 +770,13 @@ const en = {
       figureCaptionPlaceholder: 'Add a caption',
       letterSize: 'Letter',
       a4Size: 'A4',
+      customSize: 'Custom',
+      customSizeHint: "Drag the page's side edges to set its width.",
       pageNumbers: 'Page numbers',
-      pageMargins: (inches: number) => `Margins: ${inches} in`,
-      bodyTextSize: (pt: number) => `Body text: ${pt} pt`,
+      pageSetup: 'Page setup',
+      pageSize: 'Size',
+      pageMargins: 'Margins',
+      inchesUnit: 'in',
       export: 'Export',
     },
     export: {

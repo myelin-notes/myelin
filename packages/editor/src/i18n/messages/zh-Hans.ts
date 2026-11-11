@@ -4,6 +4,7 @@ const zhHans: typeof en = {
   common: {
     close: '关闭',
     cancel: '取消',
+    done: '完成',
     clear: '清除',
     copy: '复制',
     copied: '已复制',
@@ -744,9 +745,13 @@ const zhHans: typeof en = {
       figureCaptionPlaceholder: '添加图注',
       letterSize: 'Letter',
       a4Size: 'A4',
+      customSize: '自定义',
+      customSizeHint: '拖动页面左右边缘来调整宽度。',
       pageNumbers: '页码',
-      pageMargins: (inches: number) => `页边距：${inches} 英寸`,
-      bodyTextSize: (pt: number) => `正文：${pt} 磅`,
+      pageSetup: '页面设置',
+      pageSize: '尺寸',
+      pageMargins: '页边距',
+      inchesUnit: '英寸',
       export: '导出',
     },
     export: {

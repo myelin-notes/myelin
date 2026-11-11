@@ -11,12 +11,9 @@ export const PAGE_PRESETS = {
 } as const;
 export type PagePreset = keyof typeof PAGE_PRESETS;
 
-// CSS px: 1in, 0.75in, 0.5in.
-export const PAGE_MARGIN_OPTIONS = [96, 72, 48] as const;
+// CSS px (96/in).
 export const PAGE_PRESET_MARGIN = 96;
-
-export const BODY_FONT_PT_OPTIONS = [10, 11, 12, 14] as const;
-export const DEFAULT_BODY_FONT_PT = 12;
+export const MAX_PAGE_MARGIN = 192;
 
 export function normalizePagePreset(preset: unknown): PagePreset | null {
   return preset === 'letter' || preset === 'a4' ? preset : null;
