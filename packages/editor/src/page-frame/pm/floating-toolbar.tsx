@@ -22,6 +22,7 @@ import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { AddColorSwatch } from '../../components/add-color-swatch';
 import { ColorSwatch } from '../../components/color-swatch';
 import { CustomColorSwatch } from '../../components/custom-color-swatch';
+import { FontSizeField } from '../../components/font-size-field';
 import { useKeepPopoverOnScreen } from '../../components/use-keep-popover-on-screen';
 import { useCustomColors } from '../../custom-colors';
 import { PM_UPDATE_EVENT } from '../../events';
@@ -69,6 +70,10 @@ const FONTS: { label: string; value: string | null }[] = [
     value: 'ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", monospace',
   },
 ];
+
+const MIN_FONT_PT = 6;
+const MAX_FONT_PT = 96;
+const PT_PER_PX = 0.75;
 
 const EDGE_MARGIN = 8;
 const SELECTION_GAP = 8;
@@ -162,6 +167,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const [colorAttrs, setColorAttrs] = useState<Record<string, unknown> | null>(
     null,
   );
+  const [fontSizePt, setFontSizePt] = useState(12);
 
   const sync = useEffectEvent(() => {
     const rect = selectionScreenRect(view);
@@ -192,6 +198,24 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     );
     setColorAttrs((current) =>
       attrsEqual(current, nextColorAttrs) ? current : nextColorAttrs,
+    );
+
+    // Without a uniform size mark, show the size of the text at the selection start.
+    const sizeMark = uniformSelectionMarkAttrs(
+      view.state,
+      schema.marks.fontSize,
+    );
+    const startDom = view.domAtPos(view.state.selection.from).node;
+    const startElement =
+      startDom instanceof Element ? startDom : startDom.parentElement;
+    setFontSizePt(
+      (sizeMark?.size as number | undefined) ??
+        (startElement
+          ? Math.round(
+              Number.parseFloat(getComputedStyle(startElement).fontSize) *
+                PT_PER_PX,
+            )
+          : 12),
     );
 
     const toolbar = ref.current;
@@ -399,6 +423,18 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
           </Popover>
         )}
       </div>
+
+      <FontSizeField
+        value={fontSizePt}
+        min={MIN_FONT_PT}
+        max={MAX_FONT_PT}
+        step={1}
+        preserveFocus
+        touchTargets
+        onChange={(size) =>
+          setAttributedMark(view, schema.marks.fontSize, { size })
+        }
+      />
 
       <div className="relative">
         <ToolbarButton
