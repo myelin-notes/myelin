@@ -258,8 +258,9 @@ export class PageFrameAnchoring {
     }
     let pos = position;
     const resolved = view.state.doc.resolve(pos);
+    // A figure is a textblock only for its caption; a gap there would split it from the image.
     const isSource = (name: string) =>
-      name === 'codeBlock' || name === 'mathBlock';
+      name === 'codeBlock' || name === 'mathBlock' || name === 'figure';
     // Gaps inside tables, lists, and source editors would reserve only a cell or nested block.
     if (
       element.makesSpace &&
