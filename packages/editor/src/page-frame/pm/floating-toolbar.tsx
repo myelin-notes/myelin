@@ -379,14 +379,17 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   return createPortal(
     <div
       ref={ref}
+      data-page-frame-preserve-focus
       className="fade-in-0 zoom-in-95 fixed z-50 flex w-max max-w-[calc(100vw-1rem)] animate-in flex-wrap items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
       style={{
         ...style,
         border: '1px solid var(--border-ghost)',
       }}
       onPointerDown={(e) => {
-        // Keep PM selection intact when interacting with the toolbar.
-        e.preventDefault();
+        // Keep PM selection intact when interacting with the toolbar. Inputs still need focus to type.
+        if (!(e.target instanceof HTMLInputElement)) {
+          e.preventDefault();
+        }
       }}
     >
       {TOGGLE_MARKS.map(({ key, icon: Icon, mark, label }) => (
