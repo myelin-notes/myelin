@@ -20,10 +20,8 @@ export function positionBlockSourcePanels(
   viewDom: HTMLElement,
   panelSelector: string,
 ): void {
-  // Horizontal layout flows in columns where vertical clamping makes no
-  // sense — keep the CSS default there.
   const editor = viewDom.closest<HTMLElement>(`.${PM_EDITOR_CLASS}`);
-  if (!editor || editor.dataset.pageLayout === 'horizontal') {
+  if (!editor) {
     return;
   }
 
