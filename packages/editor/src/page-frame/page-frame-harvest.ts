@@ -403,16 +403,24 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
     const r = el.getBoundingClientRect();
     const localX = r.left - h.originX;
     const localY = r.top - h.originY;
-    const bg = parseCssColor(getComputedStyle(el).backgroundColor);
-    if (el.classList.contains('pm-callout') && bg.opacity > 0.02) {
+    const isCallout = el.classList.contains('pm-callout');
+    // Callouts paint fill and rule as background-image gradients, so backgroundColor is transparent.
+    const style = getComputedStyle(el);
+    const rule = isCallout
+      ? parseCssColor(style.getPropertyValue('--pm-blockquote-rule-color'))
+      : { rgb: RULE_GRAY, opacity: 0.5 };
+    if (isCallout) {
+      const fill = parseCssColor(
+        style.getPropertyValue('--pm-callout-fill-color'),
+      );
       pushAt(h, localX, localY, (x, y) => ({
         t: 'rect',
         x,
         y,
         w: pxToPt(r.width),
         h: pxToPt(r.height),
-        fill: bg.rgb,
-        opacity: bg.opacity,
+        fill: fill.rgb,
+        opacity: fill.opacity,
       }));
     }
     pushAt(h, localX, localY, (x, y) => ({
@@ -421,8 +429,8 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
       y,
       w: pxToPt(2),
       h: pxToPt(r.height),
-      fill: RULE_GRAY,
-      opacity: 0.5,
+      fill: rule.rgb,
+      opacity: rule.opacity,
     }));
   }
 
