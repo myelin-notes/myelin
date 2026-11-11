@@ -27,4 +27,11 @@ describe('wrapTextLines', () => {
   it('never loses text when one character is wider than the box', () => {
     expect(wrapTextLines('ab', 0, measure).join('')).toBe('ab');
   });
+
+  it('never starts a line with punctuation that closes the word before it', () => {
+    expect(wrapTextLines('aaaa bbbb, cc', 9, measure)).toEqual([
+      'aaaa',
+      'bbbb, cc',
+    ]);
+  });
 });

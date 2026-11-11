@@ -58,8 +58,28 @@ export function wrapTextLines(
         line = piece;
       }
     };
-    for (const { segment } of wordSegmenter.segment(paragraph)) {
-      place(segment, graphemeSegmenter);
+    // Word segments split punctuation off its word, but a line can't start with "," or end with
+    // "(". Only whitespace or a boundary between two words (as in CJK) is a break opportunity.
+    const pieces: string[] = [];
+    let previousIsWord = false;
+    for (const { segment, isWordLike = false } of wordSegmenter.segment(
+      paragraph,
+    )) {
+      const last = pieces.length - 1;
+      if (
+        last >= 0 &&
+        segment.trim() &&
+        pieces[last].trim() &&
+        !(isWordLike && previousIsWord)
+      ) {
+        pieces[last] += segment;
+      } else {
+        pieces.push(segment);
+      }
+      previousIsWord = isWordLike;
+    }
+    for (const piece of pieces) {
+      place(piece, graphemeSegmenter);
     }
     lines.push(line.trimEnd());
   }
