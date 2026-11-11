@@ -481,7 +481,13 @@ async function harvestRasterizedBlocks(
     let dataUrl: string;
     try {
       dataUrl = await withTimeout(
-        toPng(cloneEl, { pixelRatio: 2, fontEmbedCSS }),
+        // html-to-image sizes from clientWidth/Height, which are 0 for inline math.
+        toPng(cloneEl, {
+          pixelRatio: 2,
+          fontEmbedCSS,
+          width: cloneRect.width,
+          height: cloneRect.height,
+        }),
         RASTERIZE_TIMEOUT_MS,
       );
     } catch (error) {

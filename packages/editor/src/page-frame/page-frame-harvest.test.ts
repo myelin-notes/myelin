@@ -79,13 +79,19 @@ describe('page-frame PDF rasterized blocks', () => {
 
   it('draws math as an image instead of harvesting its glyphs as text', async () => {
     toPng.mockResolvedValueOnce('data:image/png;base64,AAAA');
-    const { clone, accepts } = stubHarvestDom([rasterTarget(5)], {
+    const target = rasterTarget(5);
+    const { clone, accepts } = stubHarvestDom([target], {
       closest: (selector) => selector.includes('.pm-math-inline'),
     });
 
     const { request, warnings } = await harvestPageFramePdf(source(clone));
 
     expect(accepts()).toBe(false);
+    // Inline math is `display: inline`, whose clientWidth html-to-image would read as 0.
+    expect(toPng).toHaveBeenCalledWith(
+      target,
+      expect.objectContaining({ width: 40, height: 20 }),
+    );
     expect(request.imagesB64).toEqual(['AAAA']);
     expect(request.pages[0].items).toMatchObject([{ t: 'image', imageRef: 0 }]);
     expect(warnings).toEqual([]);
