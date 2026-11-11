@@ -27,7 +27,6 @@ use tauri_plugin_http::reqwest::Method;
 struct Snapshot {
     manifest: Value,
     records: HashMap<String, Vec<u8>>,
-    legacy: Option<Vec<u8>>,
     corrupt: Vec<String>,
     marker: bool,
     files: HashMap<String, SnapshotFile>,
@@ -119,18 +118,12 @@ impl Snapshot {
             files.insert(id.clone(), file);
             revisions.insert(id.clone(), revision);
         }
-        let sidecars = loaded.legacy.is_none();
         let drive_head = drive
-            .get(if sidecars {
-                metadata::SETTINGS
-            } else {
-                "manifest.json"
-            })
+            .get(metadata::SETTINGS)
             .and_then(|entry| entry.head_revision_id.clone());
         Ok(Self {
             manifest,
             records: loaded.records,
-            legacy: loaded.legacy,
             corrupt: loaded.corrupt,
             marker: std::fs::read(root.join("manifest.json"))
                 .is_ok_and(|bytes| metadata::is_marker(&bytes)),
@@ -142,7 +135,7 @@ impl Snapshot {
                 basis_id: None,
                 file_ids,
                 document_generations: HashMap::new(),
-                sidecars,
+                sidecars: true,
                 metadata_entries: drive
                     .into_iter()
                     .filter_map(|(name, entry)| {
@@ -331,7 +324,6 @@ impl Snapshot {
         Ok(Some(Self {
             manifest,
             records: loaded.records,
-            legacy: loaded.legacy,
             corrupt: loaded.corrupt,
             marker: true,
             files,
@@ -389,7 +381,6 @@ fn capture(store: &mut Store) -> Result<Captured, String> {
         snapshot: Snapshot {
             manifest: store.manifest.clone(),
             records: store.metadata_records(),
-            legacy: None,
             corrupt: Vec::new(),
             marker: true,
             files,
@@ -497,20 +488,6 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
         &captured.snapshot.manifest,
         &captured.operations,
     )?;
-    if remote.legacy.is_some() {
-        for path in remote.sync.metadata_entries.keys() {
-            if let Some(id) = path
-                .strip_prefix("files/")
-                .and_then(|name| name.strip_suffix(metadata::SUFFIX))
-            {
-                if remote.manifest["nodes"][id].is_null()
-                    && remote.manifest["deletedNodes"][id].is_null()
-                {
-                    remote.manifest["deletedNodes"][id] = json!(uuid::Uuid::new_v4().to_string());
-                }
-            }
-        }
-    }
     let mut additions = HashMap::new();
     for op in &captured.operations {
         if op["kind"] != "push-note" {
@@ -657,30 +634,21 @@ fn plan(captured: &Captured, mut remote: Snapshot) -> Result<Plan, String> {
             remote.files.remove(id);
         }
     }
-    let mut records = if remote.legacy.is_some() {
-        metadata::records(&remote.manifest)?
-    } else {
-        let mut records = previous_records.clone();
-        for id in metadata::changed_nodes(&previous, &remote.manifest) {
-            records.insert(
-                format!("files/{id}{}", metadata::SUFFIX),
-                metadata::node_record(&remote.manifest, &id)?,
-            );
-        }
+    let mut records = previous_records.clone();
+    for id in metadata::changed_nodes(&previous, &remote.manifest) {
         records.insert(
-            metadata::SETTINGS.into(),
-            metadata::settings(&remote.manifest)?,
+            format!("files/{id}{}", metadata::SUFFIX),
+            metadata::node_record(&remote.manifest, &id)?,
         );
-        records
-    };
+    }
+    records.insert(
+        metadata::SETTINGS.into(),
+        metadata::settings(&remote.manifest)?,
+    );
     for (path, bytes) in &records {
         if previous_records.get(path) != Some(bytes) {
             additions.insert(path.clone(), bytes.clone());
         }
-    }
-    if let Some(legacy) = remote.legacy.take() {
-        additions.insert(metadata::BACKUP.into(), legacy);
-        additions.insert("manifest.json".into(), metadata::MARKER.to_vec());
     }
     if !remote.marker {
         additions.insert("manifest.json".into(), metadata::MARKER.to_vec());
@@ -1902,14 +1870,6 @@ async fn drive_push(
     }
     if find_drive(client, endpoints, folder, head_name, false).await? != head {
         return Err("Google Drive metadata changed during sync; retrying".into());
-    }
-    if let Some(bytes) = plan.additions.get(metadata::BACKUP) {
-        if find_drive(client, endpoints, folder, metadata::BACKUP, false)
-            .await?
-            .is_none()
-        {
-            drive_metadata_write(client, endpoints, folder, metadata::BACKUP, None, bytes).await?;
-        }
     }
     let mut metadata_paths: Vec<_> = plan
         .additions

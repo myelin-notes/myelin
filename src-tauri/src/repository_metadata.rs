@@ -7,8 +7,8 @@ use std::{
 };
 
 pub(crate) const SETTINGS: &str = "repository.json";
-pub(crate) mod legacy;
-pub(crate) use legacy::{BACKUP, MARKER};
+// Omitting nodes makes older clients reject sidecar repositories before writing.
+pub(crate) const MARKER: &[u8] = br#"{"version":4}"#;
 pub(crate) const SUFFIX: &str = ".meta.json";
 
 pub(crate) fn empty_manifest() -> Value {
@@ -206,37 +206,23 @@ pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Value, Stri
 pub(crate) struct Loaded {
     pub manifest: Value,
     pub records: HashMap<String, Vec<u8>>,
-    pub legacy: Option<Vec<u8>>,
     pub corrupt: Vec<String>,
 }
 
 pub(crate) fn load(root: &Path) -> Result<Loaded, String> {
     reject_symlink(&root.join("manifest.json"))?;
-    let legacy = match fs::read(root.join("manifest.json")) {
+    let marker = match fs::read(root.join("manifest.json")) {
         Ok(bytes) => Some(bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => return Err(error.to_string()),
     };
-    if let Some(bytes) = &legacy {
+    if let Some(bytes) = &marker {
         if let Ok(value) = serde_json::from_slice::<Value>(bytes) {
             if value["version"].as_u64().is_some_and(|version| version > 4) {
                 return Err(
                     "Unsupported repository storage version; update Myelin before opening".into(),
                 );
             }
-        }
-    }
-    if let Some(bytes) = legacy.as_ref().filter(|bytes| !is_marker(bytes)) {
-        // The old manifest remains authoritative until the final migration marker is written.
-        if let Ok(mut manifest) = legacy::parse_manifest(bytes) {
-            legacy::migrate(&mut manifest);
-            records(&manifest)?;
-            return Ok(Loaded {
-                manifest,
-                records: HashMap::new(),
-                legacy,
-                corrupt: Vec::new(),
-            });
         }
     }
     let mut records = HashMap::new();
@@ -271,15 +257,9 @@ pub(crate) fn load(root: &Path) -> Result<Loaded, String> {
             }
         }
     }
-    if legacy.as_ref().is_some_and(|bytes| !is_marker(bytes))
-        && records.is_empty()
-        && corrupt.is_empty()
-    {
-        return Err("Unreadable repository manifest; migration requires recovery".into());
-    }
     if !records.contains_key(SETTINGS)
         && !corrupt.iter().any(|path| path == SETTINGS)
-        && (legacy.as_ref().is_some_and(|bytes| is_marker(bytes)) || !records.is_empty())
+        && (marker.as_ref().is_some_and(|bytes| is_marker(bytes)) || !records.is_empty())
     {
         corrupt.push(SETTINGS.into());
     }
@@ -287,7 +267,6 @@ pub(crate) fn load(root: &Path) -> Result<Loaded, String> {
     Ok(Loaded {
         manifest,
         records,
-        legacy: None,
         corrupt,
     })
 }

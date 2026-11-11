@@ -940,8 +940,6 @@ fn archive(entries: HashMap<String, Vec<u8>>) -> Vec<u8> {
 
 struct GitHubFixture {
     manifest: Value,
-    sidecars: bool,
-    backup: Option<Vec<u8>>,
     files: HashMap<String, Vec<u8>>,
     head: String,
     counter: u64,
@@ -956,8 +954,6 @@ impl GitHubFixture {
     fn new(manifest: Value, files: HashMap<String, Vec<u8>>) -> Self {
         Self {
             manifest,
-            sidecars: false,
-            backup: None,
             files,
             head: "a".repeat(40),
             counter: 1,
@@ -970,22 +966,11 @@ impl GitHubFixture {
         }
     }
     fn repository_files(&self) -> HashMap<String, Vec<u8>> {
-        let mut entries = if self.sidecars {
-            crate::repository_metadata::records(&self.manifest).unwrap()
-        } else {
-            HashMap::new()
-        };
+        let mut entries = crate::repository_metadata::records(&self.manifest).unwrap();
         entries.insert(
             "manifest.json".into(),
-            if self.sidecars {
-                crate::repository_metadata::MARKER.to_vec()
-            } else {
-                serde_json::to_vec(&self.manifest).unwrap()
-            },
+            crate::repository_metadata::MARKER.to_vec(),
         );
-        if let Some(backup) = &self.backup {
-            entries.insert(crate::repository_metadata::BACKUP.into(), backup.clone());
-        }
         for (id, bytes) in &self.files {
             if self.manifest["nodes"][id]["type"] == "file" {
                 entries.insert(
@@ -1061,21 +1046,14 @@ impl GitHubFixture {
             return reply(json!({"sha": format!("{:040x}", self.counter)}));
         }
         if request.method == "PATCH" && request.path.contains("/git/refs/heads/") {
-            let mut records = if self.sidecars {
-                crate::repository_metadata::records(&self.manifest).unwrap()
-            } else {
-                HashMap::new()
-            };
+            let mut records = crate::repository_metadata::records(&self.manifest).unwrap();
             for item in &self.tree {
                 let path = item["path"].as_str().unwrap();
                 let bytes = item["sha"].as_str().map(|sha| self.blobs[sha].clone());
                 if path == "manifest.json" {
-                    self.sidecars = crate::repository_metadata::is_marker(bytes.as_ref().unwrap());
-                    if !self.sidecars {
-                        self.manifest = serde_json::from_slice(bytes.as_ref().unwrap()).unwrap();
-                    }
-                } else if path == crate::repository_metadata::BACKUP {
-                    self.backup = bytes;
+                    assert!(crate::repository_metadata::is_marker(
+                        bytes.as_ref().unwrap()
+                    ));
                 } else if path == crate::repository_metadata::SETTINGS
                     || crate::repository_metadata::is_metadata_path(path)
                 {
@@ -1094,9 +1072,7 @@ impl GitHubFixture {
                     }
                 }
             }
-            if self.sidecars {
-                self.manifest = crate::repository_metadata::assemble(&records).unwrap();
-            }
+            self.manifest = crate::repository_metadata::assemble(&records).unwrap();
             self.head = body["sha"].as_str().unwrap().into();
             if self.fail_ref_response {
                 self.fail_ref_response = false;
@@ -1212,7 +1188,30 @@ impl DriveFixture {
                     name: "manifest.json".into(),
                     revision: "manifest-r1".into(),
                     app_properties: HashMap::new(),
-                    bytes: serde_json::to_vec(&manifest_with("canvas", "mcanvas")).unwrap(),
+                    bytes: crate::repository_metadata::MARKER.to_vec(),
+                },
+                DriveFile {
+                    id: "settings-entry".into(),
+                    parent: "folder-1".into(),
+                    name: "repository.json".into(),
+                    revision: "settings-r1".into(),
+                    app_properties: HashMap::new(),
+                    bytes: crate::repository_metadata::settings(&manifest_with(
+                        "canvas", "mcanvas",
+                    ))
+                    .unwrap(),
+                },
+                DriveFile {
+                    id: "meta-canvas".into(),
+                    parent: "files-folder".into(),
+                    name: "canvas.meta.json".into(),
+                    revision: "meta-canvas-r1".into(),
+                    app_properties: HashMap::new(),
+                    bytes: crate::repository_metadata::node_record(
+                        &manifest_with("canvas", "mcanvas"),
+                        "canvas",
+                    )
+                    .unwrap(),
                 },
                 DriveFile {
                     id: "files-folder".into(),
@@ -1235,16 +1234,36 @@ impl DriveFixture {
             fail_upload: false,
         }
     }
-    fn manifest(&self) -> Value {
-        let marker = &self
-            .files
-            .iter()
-            .find(|file| file.name == "manifest.json")
-            .unwrap()
-            .bytes;
-        if !crate::repository_metadata::is_marker(marker) {
-            return serde_json::from_slice(marker).unwrap();
+    fn set_manifest(&mut self, manifest: &Value) {
+        self.files.retain(|file| {
+            file.name != crate::repository_metadata::SETTINGS
+                && !file.name.ends_with(crate::repository_metadata::SUFFIX)
+        });
+        for (path, bytes) in crate::repository_metadata::records(manifest).unwrap() {
+            let (parent, id, name) = match path.strip_prefix("files/") {
+                Some(name) => (
+                    "files-folder",
+                    format!(
+                        "meta-{}",
+                        name.strip_suffix(crate::repository_metadata::SUFFIX)
+                            .unwrap()
+                    ),
+                    name.to_owned(),
+                ),
+                None => ("folder-1", "settings-entry".into(), path),
+            };
+            self.counter += 1;
+            self.files.push(DriveFile {
+                id,
+                parent: parent.into(),
+                revision: format!("seed-r{}", self.counter),
+                name,
+                app_properties: HashMap::new(),
+                bytes,
+            });
         }
+    }
+    fn manifest(&self) -> Value {
         let records = self
             .files
             .iter()
@@ -1327,7 +1346,6 @@ impl DriveFixture {
             let name = info["name"].as_str().unwrap();
             let id = match name {
                 "repository.json" => "settings-entry".into(),
-                "manifest.legacy.json" => "backup-entry".into(),
                 "manifest.json" => "manifest-entry".into(),
                 _ => format!("meta-{}", name.strip_suffix(".meta.json").unwrap()),
             };
@@ -1652,7 +1670,7 @@ async fn native_incremental_drive_pull_reuses_media_only_with_matching_id_and_re
         let mut remote = state.lock().unwrap();
         let mut manifest = manifest_with("canvas", "mcanvas");
         manifest["nodes"]["picture"] = node("picture", "png");
-        remote.files[0].bytes = serde_json::to_vec(&manifest).unwrap();
+        remote.set_manifest(&manifest);
         remote.files.push(DriveFile {
             id: "picture-entry".into(),
             parent: "files-folder".into(),
@@ -2005,7 +2023,10 @@ async fn github_commit_unknown_to_remote_is_a_failed_push_not_a_failed_verificat
     .await;
     seed(&engine, "picture", "png", b"local".to_vec()).await;
     let error = engine.cycle(github_source(), &server.endpoints).await.err();
-    assert_eq!(error.as_deref(), Some("GitHub branch update failed (422): Reference update failed"));
+    assert_eq!(
+        error.as_deref(),
+        Some("GitHub branch update failed (422): Reference update failed")
+    );
 }
 
 #[tokio::test]
@@ -2923,12 +2944,7 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
         let state = Arc::new(Mutex::new(DriveFixture::new()));
         if !failure.starts_with("delete-restored-yjs") {
             let mut remote = state.lock().unwrap();
-            remote
-                .files
-                .iter_mut()
-                .find(|file| file.id == "manifest-entry")
-                .unwrap()
-                .bytes = serde_json::to_vec(&manifest_with("canvas", "png")).unwrap();
+            remote.set_manifest(&manifest_with("canvas", "png"));
             let file = remote
                 .files
                 .iter_mut()
@@ -3255,7 +3271,7 @@ async fn initial_sync_installs_files_before_a_metadata_only_recovery_journal() {
         .is_empty());
     assert!(!root.join(".native-journal.json").exists());
     fs::remove_dir(blocked_file).unwrap();
-    let blocked = root.join(".repository.json.native.tmp");
+    let blocked = root.join("files/.picture.meta.json.native.tmp");
     fs::create_dir(&blocked).unwrap();
     assert!(engine
         .cycle(github_source(), &server.endpoints)
