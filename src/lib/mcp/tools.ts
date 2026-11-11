@@ -43,6 +43,7 @@ import {
 import {
   buildMcpNoteReadModel,
   findElementMap,
+  getMcpElementBounds,
   loadMcpNote,
   readMcpCanvasText,
   readMcpImage,
@@ -74,7 +75,7 @@ type ToolHandler = (args: unknown) => Promise<unknown>;
 type CanvasNoteSearchResult = NodeSearchResult & { node: VFSFileNode };
 
 const DEFAULT_NOTE_LIMIT = 50;
-const CREATE_FRAME_OFFSET_STEP = 48;
+const CREATE_FRAME_GAP = 48;
 const DEFAULT_STROKE_LIMIT = 200;
 const MAX_STROKE_LIMIT = 2000;
 
@@ -933,16 +934,19 @@ function isCanvasNote(node: VFSFileNode): boolean {
   return node.fileType === 'mcanvas' && !node.system;
 }
 
-function findPageFrameCount(session: NoteSession): number {
-  let count = 0;
-  for (let index = 0; index < session.ydoc.elements.length; index++) {
-    if (
-      session.ydoc.elements.get(index).get('type') === ElementType.PAGE_FRAME
-    ) {
-      count += 1;
-    }
+// Right of everything on the canvas, top-aligned with it, so the new frame overlaps nothing.
+function findFreeFramePosition(ydoc: YDocManager): { x: number; y: number } {
+  if (ydoc.elements.length === 0) {
+    return DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET;
   }
-  return count;
+  let right = -Infinity;
+  let top = Infinity;
+  for (let index = 0; index < ydoc.elements.length; index++) {
+    const bounds = getMcpElementBounds(ydoc.elements.get(index));
+    right = Math.max(right, bounds.x + bounds.width);
+    top = Math.min(top, bounds.y);
+  }
+  return { x: Math.ceil(right) + CREATE_FRAME_GAP, y: Math.floor(top) };
 }
 
 async function noteListItem(
@@ -1763,15 +1767,9 @@ export class McpToolService {
 
     try {
       session = await this.options.repository.openSession(noteId);
-      const existingFrameCount = findPageFrameCount(session);
-      const offsetX =
-        optionalNumber(input, 'x') ??
-        DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.x +
-          existingFrameCount * CREATE_FRAME_OFFSET_STEP;
-      const offsetY =
-        optionalNumber(input, 'y') ??
-        DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET.y +
-          existingFrameCount * CREATE_FRAME_OFFSET_STEP;
+      const auto = findFreeFramePosition(session.ydoc);
+      const offsetX = optionalNumber(input, 'x') ?? auto.x;
+      const offsetY = optionalNumber(input, 'y') ?? auto.y;
       const pageFrameId = await addMarkdownPageFrameToYDoc(
         session.ydoc,
         markdown,
