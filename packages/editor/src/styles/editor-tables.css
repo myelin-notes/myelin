@@ -267,6 +267,18 @@
   cursor: col-resize;
   touch-action: none;
   pointer-events: auto;
+  /* Leaves a hole over the 22px add-column button centered on the same boundary, which the resizer
+     would otherwise cover and steal clicks from. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(50% - 13px),
+    0 calc(50% - 13px),
+    0 calc(50% + 13px),
+    100% calc(50% + 13px),
+    100% 100%,
+    0 100%
+  );
 }
 
 .pm-editor .ProseMirror:not([contenteditable="true"]) .pm-table-node__column-resizer {
