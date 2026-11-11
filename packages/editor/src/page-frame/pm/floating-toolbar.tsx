@@ -101,8 +101,9 @@ function setAttributedMark(
 function selectionScreenRect(
   view: EditorView,
 ): { centerX: number; top: number; bottom: number } | null {
-  const { from, to, empty } = view.state.selection;
-  if (empty) {
+  const { from, to, empty, $from, $to } = view.state.selection;
+  // Code blocks allow no marks, so every toolbar action would be a no-op.
+  if (empty || ($from.sameParent($to) && $from.parent.type.spec.code)) {
     return null;
   }
   const start = getPageFramePmScreenRectForPos(view, from);
