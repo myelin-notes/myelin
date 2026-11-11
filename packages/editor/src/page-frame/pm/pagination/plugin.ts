@@ -84,9 +84,15 @@ export function paginationPlugin(
           return prev;
         }
 
+        const decos = prev.decos.map(tr.mapping, tr.doc);
         const mappedBreaks: Break[] = [];
         for (const b of prev.breaks) {
           const mapped = tr.mapping.map(b.pos);
+          // Layout ignores spacers, so a break kept without its widget would compare equal to the
+          // next pass and the spacer would never be redrawn.
+          if (decos.find(mapped, mapped).length === 0) {
+            continue;
+          }
           if (b.kind === 'block') {
             if (tr.doc.nodeAt(mapped)) {
               mappedBreaks.push({ ...b, pos: mapped });
@@ -115,7 +121,7 @@ export function paginationPlugin(
           }
         }
         return {
-          decos: prev.decos.map(tr.mapping, tr.doc),
+          decos,
           breaks: mappedBreaks,
           pageCount: prev.pageCount,
         };
