@@ -43,7 +43,9 @@ export class PageFrameTableNodeView implements NodeView {
   private pendingRenderFrame = 0;
   private hoveredRowIndex: number | null = null;
   private hoveredColumnIndex: number | null = null;
-  private resizing = false;
+  // Live ratios while a column drag is in progress; `TableView.update` resets the colgroup, so
+  // updates mid-drag (e.g. pagination reacting to reflow) must reapply these, not the stored ones.
+  private dragRatios: number[] | null = null;
 
   constructor(
     private node: PMNode,
@@ -81,9 +83,7 @@ export class PageFrameTableNodeView implements NodeView {
     }
 
     this.node = node;
-    if (!this.resizing) {
-      this.applyColumnRatios(this.storedColumnRatios());
-    }
+    this.applyColumnRatios(this.dragRatios ?? this.storedColumnRatios());
     this.scheduleHandleRender();
     return true;
   }
@@ -180,16 +180,17 @@ export class PageFrameTableNodeView implements NodeView {
     const ratiosAt = (clientX: number) =>
       resizeColumnRatios(start, index, (clientX - startX) / tableWidth);
 
-    this.resizing = true;
+    this.dragRatios = start;
     resizer.setPointerCapture(event.pointerId);
     const onMove = (move: PointerEvent) => {
-      this.applyColumnRatios(ratiosAt(move.clientX));
+      this.dragRatios = ratiosAt(move.clientX);
+      this.applyColumnRatios(this.dragRatios);
     };
     const finish = (end: PointerEvent) => {
       resizer.removeEventListener('pointermove', onMove);
       resizer.removeEventListener('pointerup', finish);
       resizer.removeEventListener('pointercancel', finish);
-      this.resizing = false;
+      this.dragRatios = null;
       if (end.type !== 'pointerup') {
         this.applyColumnRatios(this.storedColumnRatios() ?? start);
         return;
@@ -253,7 +254,7 @@ export class PageFrameTableNodeView implements NodeView {
 
   private renderHandles(): void {
     // Replacing the resizer mid-drag would drop its pointer capture.
-    if (this.resizing) {
+    if (this.dragRatios) {
       return;
     }
     this.handleLayer.replaceChildren();
