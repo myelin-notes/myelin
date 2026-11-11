@@ -5,7 +5,7 @@
  * can't be harvested reliably).
  */
 
-import { toPng } from 'html-to-image';
+import { getFontEmbedCSS, toPng } from 'html-to-image';
 import { Logger } from '@myelin/shared/logger';
 import { PAGE_GAP } from '../elements/page-frame-constants';
 import {
@@ -26,6 +26,7 @@ import {
 } from '../pdf-export/coords';
 import { resolveFont } from '../pdf-export/fonts';
 import { createFontTable, type PdfHarvestContext } from '../pdf-export/harvest';
+import { withTimeout } from '../utils/with-timeout';
 import { MERMAID_DIAGRAM_SELECTOR } from './pm/mermaid/node-view';
 
 const logger = new Logger('PageFramePdfExport');
@@ -46,6 +47,17 @@ export interface PageFramePdfSource {
 }
 
 const CODE_BLOCK_SELECTOR = '.pm-code-block';
+// KaTeX draws fraction bars with CSS borders and roots with SVG, and media and diagrams have no text
+// form, so none of these survive as harvested text runs.
+const RASTERIZED_SELECTOR = [
+  CODE_BLOCK_SELECTOR,
+  '.pm-math-inline',
+  '.pm-math-block-render',
+  '.pm-embed-host',
+  MERMAID_DIAGRAM_SELECTOR,
+].join(', ');
+// html-to-image never settles if `img.decode()` rejects.
+const RASTERIZE_TIMEOUT_MS = 5_000;
 const ASCENT_RATIO = 0.8;
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
 const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
@@ -62,7 +74,7 @@ interface Harvester {
 
 export interface PageFrameHarvestResult {
   request: PdfExportRequest;
-  /** Non-fatal warnings (e.g. code blocks that failed to rasterize). */
+  /** Non-fatal warnings (e.g. blocks that failed to rasterize). */
   warnings: string[];
 }
 
@@ -98,14 +110,14 @@ export async function harvestPageFramePdf(
 
     harvestDecorations(h, clone);
     harvestText(h, clone);
-    const failedBlocks = await harvestCodeBlocks(h, clone);
+    const failedBlocks = await harvestRasterizedBlocks(h, clone);
     harvestOverlays(h, source);
 
     const warnings: string[] = [];
     if (failedBlocks > 0) {
       const plural = failedBlocks === 1 ? '' : 's';
       warnings.push(
-        `${failedBlocks} code block${plural} couldn't be rendered and ${failedBlocks === 1 ? 'was' : 'were'} omitted.`,
+        `${failedBlocks} block${plural} (code, math, images or diagrams) couldn't be rendered and ${failedBlocks === 1 ? 'was' : 'were'} omitted.`,
       );
     }
 
@@ -193,8 +205,7 @@ function harvestText(h: Harvester, root: HTMLElement): void {
       if (!parent || !node.textContent?.trim()) {
         return NodeFilter.FILTER_REJECT;
       }
-      // Code blocks are rasterized separately.
-      if (parent.closest(CODE_BLOCK_SELECTOR)) {
+      if (parent.closest(RASTERIZED_SELECTOR)) {
         return NodeFilter.FILTER_REJECT;
       }
       return NodeFilter.FILTER_ACCEPT;
@@ -439,11 +450,16 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
   }
 }
 
-async function harvestCodeBlocks(
+async function harvestRasterizedBlocks(
   h: Harvester,
   clone: HTMLElement,
 ): Promise<number> {
-  const cloneBlocks = clone.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
+  const cloneBlocks = clone.querySelectorAll<HTMLElement>(RASTERIZED_SELECTOR);
+  if (cloneBlocks.length === 0) {
+    return 0;
+  }
+  // Embedding web fonts per element re-downloads them, and a report can hold hundreds of formulas.
+  const fontEmbedCSS = await getFontEmbedCSS(clone).catch(() => undefined);
   let failed = 0;
 
   for (let i = 0; i < cloneBlocks.length; i++) {
@@ -456,10 +472,13 @@ async function harvestCodeBlocks(
 
     let dataUrl: string;
     try {
-      dataUrl = await toPng(cloneEl, { pixelRatio: 2 });
+      dataUrl = await withTimeout(
+        toPng(cloneEl, { pixelRatio: 2, fontEmbedCSS }),
+        RASTERIZE_TIMEOUT_MS,
+      );
     } catch (error) {
       failed++;
-      logger.warn('Failed to rasterize code block for PDF export', {
+      logger.warn('Failed to rasterize block for PDF export', {
         error,
         index: i,
       });

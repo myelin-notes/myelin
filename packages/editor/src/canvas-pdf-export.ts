@@ -1,7 +1,10 @@
 import type { DrawableCanvas } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
 import { PAGE_GAP } from './elements/page-frame-constants';
-import { getCanvasPdfExportData } from './elements/pdf-exportable-element';
+import {
+  getCanvasPdfExportData,
+  loadContentForPdf,
+} from './elements/pdf-exportable-element';
 import type { ExportResult, ExportTarget } from './export/export-controller';
 import {
   harvestPageFramePdf,
@@ -73,6 +76,18 @@ export async function harvestCanvasPdf(
   elements: readonly DrawableElement[],
 ): Promise<CanvasPdfHarvestResult> {
   const visible = elements.filter((element) => !element.hidden);
+  // First, since loading media can add pages and so change the export bounds.
+  const releaseContent = await loadContentForPdf(visible);
+  try {
+    return await harvestLoadedCanvasPdf(visible);
+  } finally {
+    releaseContent();
+  }
+}
+
+async function harvestLoadedCanvasPdf(
+  visible: readonly DrawableElement[],
+): Promise<CanvasPdfHarvestResult> {
   const bounds = getCanvasPdfExportBounds(visible);
   if (!bounds) {
     throw new Error('Canvas has no visible content to export.');

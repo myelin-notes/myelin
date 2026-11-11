@@ -23,7 +23,10 @@ import {
   type PageFramePdfSource,
 } from '../page-frame/page-frame-harvest';
 import { PageFrameEditorState } from '../page-frame/pm/editor-state';
-import type { ResolveMediaSrc } from '../page-frame/pm/embed/renderer';
+import {
+  pinEmbedHosts,
+  type ResolveMediaSrc,
+} from '../page-frame/pm/embed/renderer';
 import type { ResolveNoteLink as NoteLinkResolver } from '../page-frame/pm/markdown/note-links';
 import { schema } from '../page-frame/pm/schema';
 import { renderPageFrameThumbnail } from '../page-frame/thumbnail/render';
@@ -567,20 +570,34 @@ export class PageFrameElement
         const overlays = includeAnnotations
           ? (this._exportElementsProvider?.() ?? [])
           : [];
-        const source = this.getPdfExportSource(overlays);
-        if (!source) {
-          return null;
+        const releaseContent = await this.loadContentForPdf();
+        try {
+          const source = this.getPdfExportSource(overlays);
+          if (!source) {
+            return null;
+          }
+          await prepareExportOverlays(overlays);
+          const harvest = await harvestPageFramePdf(source);
+          warnings = harvest.warnings;
+          return harvest.request;
+        } finally {
+          releaseContent();
         }
-        await prepareExportOverlays(overlays);
-        const harvest = await harvestPageFramePdf(source);
-        warnings = harvest.warnings;
-        return harvest.request;
       },
     });
     if (outcome.cancelled) {
       return { cancelled: true };
     }
     return { warnings };
+  }
+
+  public async loadContentForPdf(): Promise<() => void> {
+    const release = this.contentDiv
+      ? await pinEmbedHosts(this.contentDiv)
+      : () => undefined;
+    // Newly loaded media changes block heights; repaginate before page count is read.
+    this.pmEditor?.flushLayout();
+    return release;
   }
 
   public getPdfExportSource(

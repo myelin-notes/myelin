@@ -109,6 +109,28 @@ describe('harvestCanvasPdf', () => {
     ]);
   });
 
+  it('loads lazy content before reading export bounds, and releases it after', async () => {
+    const order: string[] = [];
+    const element = Object.assign(
+      drawableElement({
+        boundingBox: rect(10, 20, 30, 40),
+        drawToPdf: () => {
+          order.push('draw');
+        },
+      }),
+      {
+        loadContentForPdf: async () => {
+          order.push('load');
+          return () => order.push('release');
+        },
+      },
+    );
+
+    await harvestCanvasPdf([element]);
+
+    expect(order).toEqual(['load', 'draw', 'release']);
+  });
+
   it('places imported PDF pages by reference instead of rasterizing them', async () => {
     const source: PdfElementExportSource = {
       uuid: 'pdf',
