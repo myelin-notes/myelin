@@ -63,8 +63,8 @@ class PlayBillingPlugin(private val activity: Activity) : Plugin(activity) {
       .build()
     client.queryProductDetailsAsync(params) { result, details ->
       val product = details.productDetailsList.firstOrNull()
-      val offer = product?.oneTimePurchaseOfferDetailsList?.firstOrNull()
-      if (result.responseCode != BillingResponseCode.OK || product == null || offer == null) {
+      val offerToken = product?.oneTimePurchaseOfferDetailsList?.firstOrNull()?.offerToken
+      if (result.responseCode != BillingResponseCode.OK || product == null || offerToken == null) {
         invoke.reject("Pro is not available in Google Play right now.")
         return@queryProductDetailsAsync
       }
@@ -73,7 +73,7 @@ class PlayBillingPlugin(private val activity: Activity) : Plugin(activity) {
           listOf(
             BillingFlowParams.ProductDetailsParams.newBuilder()
               .setProductDetails(product)
-              .setOfferToken(offer.offerToken)
+              .setOfferToken(offerToken)
               .build()
           )
         )
