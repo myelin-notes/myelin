@@ -57,6 +57,7 @@ function stubHarvestDom(
 
 function rasterTarget(top: number): HTMLElement {
   return {
+    style: {},
     getBoundingClientRect: () => new DOMRect(10, top, 40, 20),
     querySelector: () => null,
   } as unknown as HTMLElement;

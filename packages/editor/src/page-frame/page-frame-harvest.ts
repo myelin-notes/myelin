@@ -178,6 +178,11 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     height: 'auto',
     overflow: 'visible',
   });
+  // An inline box's rect omits the KaTeX struts that hang past it (limits, denominators), so the
+  // raster would clip them. inline-block keeps the same line metrics but grows to contain them.
+  clone.querySelectorAll<HTMLElement>('.pm-math-inline').forEach((el) => {
+    el.style.display = 'inline-block';
+  });
   container.appendChild(clone);
   return { clone, container };
 }
@@ -471,7 +476,11 @@ async function harvestRasterizedBlocks(
   let failed = 0;
 
   for (let i = 0; i < cloneBlocks.length; i++) {
-    const cloneEl = cloneBlocks[i];
+    // .katex-display's 1em margin collapses through its wrapper, so it's outside the wrapper's rect
+    // but would still push the formula down inside html-to-image's foreignObject and clip its bottom.
+    const cloneEl =
+      cloneBlocks[i].querySelector<HTMLElement>(':scope > .katex-display') ??
+      cloneBlocks[i];
     const cloneRect = cloneEl.getBoundingClientRect();
     if (cloneRect.width <= 0 || cloneRect.height <= 0) {
       continue;
@@ -487,6 +496,7 @@ async function harvestRasterizedBlocks(
           fontEmbedCSS,
           width: cloneRect.width,
           height: cloneRect.height,
+          style: { margin: '0' },
         }),
         RASTERIZE_TIMEOUT_MS,
       );
