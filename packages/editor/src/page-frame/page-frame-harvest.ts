@@ -65,7 +65,6 @@ const ASCENT_RATIO = 0.8;
 const PAGE_NUMBER_SIZE_PX = 12;
 const PAGE_NUMBER_GRAY: [number, number, number] = [90, 94, 98];
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
-const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
 
 interface Harvester {
   pages: ExportPage[];
@@ -182,6 +181,10 @@ function buildOffscreenClone(source: PageFramePdfSource): {
   // raster would clip them. inline-block keeps the same line metrics but grows to contain them.
   clone.querySelectorAll<HTMLElement>('.pm-math-inline').forEach((el) => {
     el.style.display = 'inline-block';
+  });
+  // Table +/- handles are editing chrome whose glyphs would otherwise harvest as text.
+  clone.querySelectorAll('.pm-table-node__handles').forEach((el) => {
+    el.remove();
   });
   container.appendChild(clone);
   return { clone, container };
@@ -451,23 +454,57 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
     }));
   }
 
-  // Table cell borders.
+  // Table cells: fill + each side's own border, so header shading and the divider color match the
+  // screen. Page-break spacer cells compute to transparent with 0 borders and draw nothing.
   for (const cell of root.querySelectorAll<HTMLElement>('td, th')) {
     const r = cell.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) {
       continue;
     }
+    const style = getComputedStyle(cell);
     const localX = r.left - h.originX;
     const localY = r.top - h.originY;
-    pushAt(h, localX, localY, (x, y) => ({
-      t: 'rect',
-      x,
-      y,
-      w: pxToPt(r.width),
-      h: pxToPt(r.height),
-      stroke: TABLE_BORDER_GRAY,
-      lineWidth: 1,
-    }));
+    const bg = parseCssColor(style.backgroundColor);
+    if (bg.opacity > 0) {
+      pushAt(h, localX, localY, (x, y) => ({
+        t: 'rect',
+        x,
+        y,
+        w: pxToPt(r.width),
+        h: pxToPt(r.height),
+        fill: bg.rgb,
+        opacity: bg.opacity,
+      }));
+    }
+    const { width: cw, height: ch } = r;
+    // Each side's centerline, inset half a border width so the stroke stays inside the cell box.
+    const sides = [
+      ['top', (i: number) => [0, i, cw, i]],
+      ['bottom', (i: number) => [0, ch - i, cw, ch - i]],
+      ['left', (i: number) => [i, 0, i, ch]],
+      ['right', (i: number) => [cw - i, 0, cw - i, ch]],
+    ] as const;
+    for (const [side, centerline] of sides) {
+      const width = Number.parseFloat(
+        style.getPropertyValue(`border-${side}-width`),
+      );
+      const color = parseCssColor(
+        style.getPropertyValue(`border-${side}-color`),
+      );
+      if (!(width > 0) || color.opacity <= 0) {
+        continue;
+      }
+      const [x1, y1, x2, y2] = centerline(width / 2);
+      pushAt(h, localX, localY, (x, y) => ({
+        t: 'line',
+        x1: x + pxToPt(x1),
+        y1: y + pxToPt(y1),
+        x2: x + pxToPt(x2),
+        y2: y + pxToPt(y2),
+        color: color.rgb,
+        width: pxToPt(width),
+      }));
+    }
   }
 }
 
