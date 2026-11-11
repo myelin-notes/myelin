@@ -412,6 +412,19 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
           : b,
       );
 
+    // A block taller than a page can end short of the page it spilled onto; what follows it would
+    // otherwise sit in the gap between sheets. 0.5px absorbs float noise from earlier spacers.
+    const shortOfPage = pageStart - (block.measuredTop + cumulativeShift);
+    if (shortOfPage > 0.5) {
+      newBreaks.push({
+        pos: block.pos,
+        spacer: shortOfPage + marginGap,
+        kind: 'block',
+        ...(block.isEmbed && { beforeEmbeds: true }),
+      });
+      cumulativeShift += shortOfPage;
+    }
+
     const startsMidPage = () => {
       const top = block.measuredTop + cumulativeShift;
       return top > pageStart && top < pageBoundary;

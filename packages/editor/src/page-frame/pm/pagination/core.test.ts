@@ -290,6 +290,23 @@ describe('calculateBreakLayout document structure', () => {
     expect(result.breaks).toEqual([{ pos: 10, spacer: 180, kind: 'block' }]);
   });
 
+  it('starts the block after a slightly oversized one on the next page, not in the gap', () => {
+    // A full-width portrait figure: 784px of image plus a caption runs 16px past one page.
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 0, height: 800 }),
+        block({ pos: 10, measuredTop: 818, height: 20 }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    // The next page starts at 784 + 136 = 920; the 18px margin gap no longer renders.
+    expect(result).toEqual({
+      breaks: [{ pos: 10, spacer: 920 - 818 + 18, kind: 'block' }],
+      pageCount: 2,
+    });
+  });
+
   it('starts a new page after a manual page break even when content fits', () => {
     const result = calculateBreakLayout({
       blocks: [
