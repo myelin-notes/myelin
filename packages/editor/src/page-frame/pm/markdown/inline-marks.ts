@@ -4,7 +4,11 @@ import type { Plugin } from 'prosemirror-state';
 import type { Transform } from 'prosemirror-transform';
 import { parseInlineMarkdown } from './parse-inline';
 import { buildTextOffsetMap } from './text-offset-map';
-import type { InlinePreviewKind, InlinePreviewRange } from './types';
+import {
+  type InlinePreviewKind,
+  type InlinePreviewRange,
+  MARKDOWN_ATOM_CHAR,
+} from './types';
 
 const MARK_BY_KIND: Partial<Record<InlinePreviewKind, string>> = {
   bold: 'bold',
@@ -18,6 +22,21 @@ function markTypeFor(
 ): MarkType | null {
   const name = MARK_BY_KIND[range.kind];
   return name ? schema.marks[name] : null;
+}
+
+// Inline code is literal: its `*` and backticks must not pair with delimiters outside it. Text and
+// inline atoms are one character per position, so `text` indices are content offsets.
+function maskInlineCode(node: PMNode, text: string, schema: Schema): string {
+  let masked = text;
+  node.forEach((child, offset) => {
+    if (child.isText && schema.marks.code.isInSet(child.marks)) {
+      masked =
+        masked.slice(0, offset) +
+        MARKDOWN_ATOM_CHAR.repeat(child.nodeSize) +
+        masked.slice(offset + child.nodeSize);
+    }
+  });
+  return masked;
 }
 
 function hasOpenMath(textBefore: string): boolean {
@@ -34,10 +53,12 @@ export function inlineMarkInputRules(schema: Schema): Plugin {
           return null;
         }
         const $start = state.doc.resolve(start);
-        const { text, posAt } = buildTextOffsetMap(
-          $start.parent,
-          $start.before(),
-        );
+        if (schema.marks.code.isInSet(state.storedMarks ?? $start.marks())) {
+          return null;
+        }
+        const map = buildTextOffsetMap($start.parent, $start.before());
+        const text = maskInlineCode($start.parent, map.text, schema);
+        const { posAt } = map;
         const caret = posAt.indexOf(start);
         const candidate = text.slice(0, caret) + match[0];
         const range = parseInlineMarkdown(candidate).ranges.find(
@@ -72,7 +93,9 @@ export function convertInlineMarkdownInBlock(
   pos: number,
   schema: Schema,
 ): void {
-  const { text, posAt } = buildTextOffsetMap(node, pos);
+  const map = buildTextOffsetMap(node, pos);
+  const text = maskInlineCode(node, map.text, schema);
+  const { posAt } = map;
   if (!/[*`]/.test(text)) {
     return;
   }

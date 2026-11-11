@@ -1,3 +1,4 @@
+import type { Node as PMNode } from 'prosemirror-model';
 import { EditorState, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 import { describe, expect, it } from 'vitest';
@@ -5,17 +6,18 @@ import { serializeDocToMarkdown } from '../../markdown/serializer';
 import { schema } from '../schema';
 import { inlineMarkInputRules } from './inline-marks';
 
-function typeAtEnd(text: string, typed: string): EditorState {
+function typeAtEnd(text: string | PMNode[], typed: string): EditorState {
   const plugin = inlineMarkInputRules(schema);
+  const content = typeof text === 'string' ? schema.text(text) : text;
   const base = EditorState.create({
     schema,
     plugins: [plugin],
     doc: schema.nodes.doc.create(
       null,
-      schema.nodes.paragraph.create(null, schema.text(text)),
+      schema.nodes.paragraph.create(null, content),
     ),
   });
-  const caret = 1 + text.length;
+  const caret = base.doc.content.size - 1;
   let state = base.apply(
     base.tr.setSelection(TextSelection.create(base.doc, caret)),
   );
@@ -67,5 +69,18 @@ describe('inlineMarkInputRules', () => {
 
     expect(state.doc.textContent).toBe('code');
     expect(state.storedMarks ?? []).toEqual([]);
+  });
+
+  it('treats inline code as literal text', () => {
+    const code = [schema.marks.code.create()];
+
+    const typedInside = typeAtEnd([schema.text('a*b', code)], '*');
+    const pairedAcross = typeAtEnd(
+      [schema.text('x*y', code), schema.text(' z')],
+      '*',
+    );
+
+    expect(typedInside.doc.textContent).toBe('a*b*');
+    expect(pairedAcross.doc.textContent).toBe('x*y z*');
   });
 });

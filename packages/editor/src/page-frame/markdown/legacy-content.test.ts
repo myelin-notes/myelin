@@ -69,4 +69,27 @@ describe('migrateLegacyPageFrameContent', () => {
     expect(markdown).toBe('a **b** c\n');
     expect(yMap.has(CONTENT_FORMAT_KEY)).toBe(false);
   });
+
+  it('keeps asterisks inside inline code', () => {
+    const ydoc = new Y.Doc();
+    const fragment = ydoc.getXmlFragment('frame');
+    const yMap = ydoc.getMap<unknown>('props');
+    const code = [schema.marks.code.create()];
+    prosemirrorToYXmlFragment(
+      schema.nodes.doc.create(
+        null,
+        schema.nodes.paragraph.create(null, [
+          schema.text('**kwargs', code),
+          schema.text(' and '),
+          schema.text('**opts', code),
+        ]),
+      ),
+      fragment,
+    );
+
+    migrateLegacyPageFrameContent(yMap, fragment);
+
+    const doc = yXmlFragmentToProseMirrorRootNode(fragment, schema);
+    expect(doc.textContent).toBe('**kwargs and **opts');
+  });
 });
