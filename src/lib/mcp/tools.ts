@@ -5,6 +5,7 @@ import {
   DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET,
   writeMarkdownToPageFrameFragment,
 } from '@myelin/editor/page-frame/markdown/import';
+import { migrateLegacyPageFrameContent } from '@myelin/editor/page-frame/markdown/legacy-content';
 import { getPdfPageSizes, type PdfPageSize } from '@myelin/editor/pdf-renderer';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -1803,11 +1804,11 @@ export class McpToolService {
       if (yMap.get('type') !== ElementType.PAGE_FRAME) {
         throw new Error(`Element is not a page frame: ${pageFrameId}`);
       }
-      await writeMarkdownToPageFrameFragment(
-        markdown,
-        session.ydoc.getXmlFragment(pageFrameId),
-        { repository: this.options.repository },
-      );
+      const fragment = session.ydoc.getXmlFragment(pageFrameId);
+      migrateLegacyPageFrameContent(yMap, fragment);
+      await writeMarkdownToPageFrameFragment(markdown, fragment, {
+        repository: this.options.repository,
+      });
       await session.save();
       return readMcpPageFrame(this.options.repository, noteId, pageFrameId);
     } finally {

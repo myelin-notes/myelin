@@ -81,15 +81,6 @@
   color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 
-.pm-editor .ProseMirror .pm-md-bold {
-  color: var(--text-primary);
-  font-weight: 650;
-}
-
-.pm-editor .ProseMirror .pm-md-italic {
-  font-style: italic;
-}
-
 /* A second font on a line rounds half-leading differently per engine: a line with inline code was 27px
    in WebKit and 26px in Chromium. A zero line-height keeps these spans from growing the line box. */
 .pm-editor .ProseMirror code,

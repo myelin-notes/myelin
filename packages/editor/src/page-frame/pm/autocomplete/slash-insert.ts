@@ -60,6 +60,10 @@ type SlashInsertAction =
     }
   | {
       kind: 'pageBreak';
+    }
+  | {
+      kind: 'mark';
+      mark: 'bold' | 'italic' | 'code';
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -254,9 +258,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '**',
     keywords: ['bold', 'strong', '**'],
     slashAction: {
-      kind: 'inline',
-      open: '**',
-      close: '**',
+      kind: 'mark',
+      mark: 'bold',
     },
   },
   {
@@ -265,9 +268,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '*',
     keywords: ['italic', 'emphasis', 'em', '*'],
     slashAction: {
-      kind: 'inline',
-      open: '*',
-      close: '*',
+      kind: 'mark',
+      mark: 'italic',
     },
   },
   {
@@ -298,9 +300,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '`',
     keywords: ['code', 'inline', '`'],
     slashAction: {
-      kind: 'inline',
-      open: '`',
-      close: '`',
+      kind: 'mark',
+      mark: 'code',
     },
   },
   {
@@ -552,6 +553,13 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     );
 
     return setSelectionInsideTableCell(tr, blockPos, 0, 0);
+  }
+
+  if (slashAction.kind === 'mark') {
+    const { from, to } = activeRequest.replaceRange;
+    return state.tr
+      .delete(from, to)
+      .addStoredMark(schema.marks[slashAction.mark].create());
   }
 
   if (slashAction.kind === 'pageBreak') {

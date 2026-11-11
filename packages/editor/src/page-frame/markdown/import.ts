@@ -19,6 +19,10 @@ import {
   type ResolveNoteLink,
 } from '../pm/markdown/note-links';
 import { schema } from '../pm/schema';
+import {
+  CONTENT_FORMAT_KEY,
+  PAGE_FRAME_CONTENT_FORMAT,
+} from './legacy-content';
 import { parseMarkdownToDoc } from './parser';
 
 export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
@@ -106,6 +110,7 @@ export async function addMarkdownPageFrameToYDoc(
     pageWidth: PAGE_WIDTH,
     pageHeight: PAGE_HEIGHT,
     pageLayout: options.pageLayout ?? 'vertical',
+    [CONTENT_FORMAT_KEY]: PAGE_FRAME_CONTENT_FORMAT,
   });
 
   const fragment = ydoc.getXmlFragment(uuid);

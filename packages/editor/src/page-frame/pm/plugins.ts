@@ -13,6 +13,7 @@ import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
 } from './markdown/fence-commands';
+import { inlineMarkInputRules } from './markdown/inline-marks';
 import { linkMarkdownPlugin } from './markdown/links';
 import {
   noteLinkMarkdownPlugin,
@@ -92,6 +93,7 @@ export function buildPlugins(
     ySyncPlugin(yXmlFragment),
     yUndoPlugin(),
     prefixMarkdownInputRules(schema),
+    inlineMarkInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
     mathBlockInputRules(schema),

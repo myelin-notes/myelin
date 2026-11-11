@@ -6,10 +6,8 @@ import { parseInlineMarkdown } from './parse-inline';
 import { buildTextOffsetMap } from './text-offset-map';
 import type { InlinePreviewKind } from './types';
 
-const INLINE_CLASS_BY_KIND: Record<InlinePreviewKind, string> = {
-  bold: 'pm-md-bold',
-  italic: 'pm-md-italic',
-  inlineCode: 'pm-md-inline-code',
+// Bold, italic and inline code are real marks; only source-backed syntax gets decorated.
+const INLINE_CLASS_BY_KIND: Partial<Record<InlinePreviewKind, string>> = {
   noteLink: 'pm-md-note-link',
   math: 'pm-md-math',
 };
@@ -20,17 +18,16 @@ function addInlineDecorations(
   decorations: Decoration[],
 ): void {
   const { text, posAt } = buildTextOffsetMap(node, pos);
-  if (
-    !text.includes('`') &&
-    !text.includes('*') &&
-    !text.includes('[') &&
-    !text.includes('$')
-  ) {
+  if (!text.includes('[') && !text.includes('$')) {
     return;
   }
 
   const parsed = parseInlineMarkdown(text);
   for (const range of parsed.ranges) {
+    const contentClass = INLINE_CLASS_BY_KIND[range.kind];
+    if (!contentClass) {
+      continue;
+    }
     decorations.push(
       Decoration.inline(posAt[range.open.from], posAt[range.open.to], {
         class: 'pm-md-delim',
@@ -44,7 +41,7 @@ function addInlineDecorations(
     if (range.contentFrom < range.contentTo) {
       decorations.push(
         Decoration.inline(posAt[range.contentFrom], posAt[range.contentTo], {
-          class: INLINE_CLASS_BY_KIND[range.kind],
+          class: contentClass,
         }),
       );
     }

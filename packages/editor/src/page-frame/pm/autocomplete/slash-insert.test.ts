@@ -207,7 +207,7 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     expect(selectedState.selection.to).toBe(9);
   });
 
-  it('inserts paired markdown delimiters and places the caret inside them', () => {
+  it('turns on a real mark for the text about to be typed', () => {
     const markdown = '/italic';
     const head = 1 + markdown.length;
     const state = createState(markdown, head);
@@ -226,17 +226,10 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
 
     const selectedState = state.apply(tr!);
 
-    expect(selectedState.doc.toJSON()).toEqual({
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: '**' }],
-        },
-      ],
-    });
-    expect(selectedState.selection.from).toBe(2);
-    expect(selectedState.selection.to).toBe(2);
+    expect(selectedState.doc.textContent).toBe('');
+    expect(selectedState.storedMarks?.map((mark) => mark.type.name)).toEqual([
+      'italic',
+    ]);
   });
 
   it('inserts link markdown and places the caret between the brackets', () => {

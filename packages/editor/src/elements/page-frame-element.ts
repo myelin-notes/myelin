@@ -21,6 +21,11 @@ import type {
   ExportTarget,
 } from '../export/export-controller';
 import { getMessages } from '../i18n';
+import {
+  CONTENT_FORMAT_KEY,
+  migrateLegacyPageFrameContent,
+  PAGE_FRAME_CONTENT_FORMAT,
+} from '../page-frame/markdown/legacy-content';
 import { serializeDocToMarkdownChunked } from '../page-frame/markdown/serializer';
 import {
   harvestPageFramePdf,
@@ -241,6 +246,7 @@ export class PageFrameElement
       pagePreset: this._pagePreset,
       showPageNumbers: this._showPageNumbers,
       bodyFontPt: this._bodyFontPt,
+      [CONTENT_FORMAT_KEY]: PAGE_FRAME_CONTENT_FORMAT,
     };
   }
 
@@ -459,7 +465,11 @@ export class PageFrameElement
   }
 
   public override bindSharedYState(ydoc: YDocManager): void {
-    this.bindYProseMirror(ydoc.getXmlFragment(this.uuid));
+    const fragment = ydoc.getXmlFragment(this.uuid);
+    if (this._yMap) {
+      migrateLegacyPageFrameContent(this._yMap, fragment);
+    }
+    this.bindYProseMirror(fragment);
   }
 
   public override enterEditMode(
