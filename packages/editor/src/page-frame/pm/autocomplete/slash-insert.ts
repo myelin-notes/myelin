@@ -427,7 +427,8 @@ export function searchSlashInsertAutocompleteItems(
       (item.slashAction.kind === 'block' ||
         item.slashAction.kind === 'fencedBlock' ||
         item.slashAction.kind === 'table' ||
-        item.slashAction.kind === 'callout')
+        item.slashAction.kind === 'callout' ||
+        item.slashAction.kind === 'pageBreak')
     ) {
       return false;
     }

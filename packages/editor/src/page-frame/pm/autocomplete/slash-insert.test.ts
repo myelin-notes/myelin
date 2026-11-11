@@ -126,6 +126,8 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(ids).not.toContain('slash-paragraph');
     expect(ids).not.toContain('slash-code-block');
     expect(ids).not.toContain('slash-math-block');
+    // It replaces the whole block, which mid-paragraph would delete the text before the slash.
+    expect(ids).not.toContain('slash-page-break');
     expect(ids).toContain('slash-link');
     expect(ids).toContain('slash-date-today');
   });
