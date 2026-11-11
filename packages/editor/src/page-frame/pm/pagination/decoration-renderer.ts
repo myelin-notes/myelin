@@ -4,7 +4,6 @@ import { type Break, PAGE_GAP, type PageGeometry } from './core';
 
 function createStandardBreakWidget(spacer: number, kind: Break['kind']): Node {
   const div = document.createElement('div');
-  div.style.display = 'block';
   div.style.height = `${spacer}px`;
   div.style.userSelect = 'none';
   div.style.pointerEvents = 'none';

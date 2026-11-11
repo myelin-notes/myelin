@@ -27,6 +27,8 @@
   margin-bottom: 0;
 }
 
+/* An inline `display` on a spacer widget beats this rule, measures the spacer into the layout,
+   and makes pagination alternate between two layouts forever. */
 .pm-editor[data-page-measuring] .ProseMirror [data-page-break] {
   display: none;
 }
