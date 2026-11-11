@@ -384,7 +384,13 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
     ) {
       return false;
     }
-    return firstPieceBottom(follower) + cumulativeShift > pageBoundary;
+    const followerBottom = firstPieceBottom(follower);
+    // Moving the run is pointless when it can't share a page with the follower anyway, e.g. a
+    // page-tall code block; it would only leave the run alone on a page of its own.
+    if (followerBottom - blocks[index].measuredTop > contentHeight) {
+      return false;
+    }
+    return followerBottom + cumulativeShift > pageBoundary;
   };
 
   for (let index = 0; index < blocks.length; index++) {

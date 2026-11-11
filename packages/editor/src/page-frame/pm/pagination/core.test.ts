@@ -351,6 +351,24 @@ describe('calculateBreakLayout document structure', () => {
     expect(result.pageCount).toBe(2);
   });
 
+  it('keeps a heading in place when the block after it fills a whole page', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 700, height: 30, keepWithNext: true }),
+        block({
+          pos: 10,
+          measuredTop: 750,
+          height: 1500,
+          isPageHeightConstrained: true,
+        }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    expect(result.breaks).toEqual([{ pos: 10, spacer: 190, kind: 'block' }]);
+    expect(result.pageCount).toBe(2);
+  });
+
   it('keeps a heading in place when the first line of its paragraph fits', () => {
     const result = calculateBreakLayout({
       blocks: [
