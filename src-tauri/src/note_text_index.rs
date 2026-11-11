@@ -52,19 +52,28 @@ fn cache_path(app: &AppHandle, repo_id: &str, node_id: &str) -> Result<PathBuf, 
         .join(format!("{node_id}.json")))
 }
 
-fn source_stamp(path: &Path) -> Result<(u64, u64), String> {
-    let metadata = std::fs::metadata(path).map_err(|error| error.to_string())?;
+// Stamp and bytes come from one handle: saves replace notes by rename, so an open handle stays a
+// consistent snapshot even if a save lands mid-read.
+fn open_source(path: &Path) -> Result<(std::fs::File, (u64, u64)), String> {
+    let file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+    let metadata = file.metadata().map_err(|error| error.to_string())?;
     let modified_ns = metadata
         .modified()
         .map_err(|error| error.to_string())?
         .duration_since(UNIX_EPOCH)
         .map_err(|error| error.to_string())?
         .as_nanos() as u64;
-    Ok((metadata.len(), modified_ns))
+    Ok((file, (metadata.len(), modified_ns)))
+}
+
+fn read_all(mut file: std::fs::File) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(&mut file, &mut bytes).map_err(|error| error.to_string())?;
+    Ok(bytes)
 }
 
 fn index_file_at(cache_file: &Path, source: &Path, force: bool) -> Result<String, String> {
-    let stamp = source_stamp(source)?;
+    let (file, stamp) = open_source(source)?;
     let old = std::fs::read(&cache_file)
         .ok()
         .and_then(|bytes| serde_json::from_slice::<TextRecord>(&bytes).ok())
@@ -77,11 +86,7 @@ fn index_file_at(cache_file: &Path, source: &Path, force: bool) -> Result<String
         }
     }
 
-    let bytes = std::fs::read(source).map_err(|error| error.to_string())?;
-    let text = extract_text(&bytes)?;
-    if source_stamp(source)? != stamp {
-        return Err("note changed while indexing".into());
-    }
+    let text = extract_text(&read_all(file)?)?;
     if old.as_ref().is_some_and(|record| {
         record.text == text && (record.source_size, record.source_modified_ns) == stamp
     }) {
@@ -122,7 +127,7 @@ fn flags_at(
     cache_file: Option<&Path>,
     source: &Path,
 ) -> Result<Vec<(String, String, String)>, String> {
-    let stamp = source_stamp(source)?;
+    let (file, stamp) = open_source(source)?;
     if let Some(record) = cache_file
         .and_then(|path| std::fs::read(path).ok())
         .and_then(|bytes| serde_json::from_slice::<FlagRecord>(&bytes).ok())
@@ -133,7 +138,7 @@ fn flags_at(
     {
         return Ok(record.flags);
     }
-    let flags = extract_flags(&std::fs::read(source).map_err(|error| error.to_string())?)?;
+    let flags = extract_flags(&read_all(file)?)?;
     if let Some(cache_file) = cache_file {
         let record = FlagRecord {
             schema_version: SCHEMA_VERSION,
@@ -528,6 +533,26 @@ mod tests {
         std::fs::write(&source, bytes).unwrap();
         assert_eq!(index_file_at(&cache, &source, true).unwrap(), "new fox");
         assert_ne!(std::fs::read(&cache).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn stamp_matches_bytes_when_a_save_replaces_the_note_mid_read() {
+        let dir = std::env::temp_dir().join(format!(
+            "myelin-note-index-race-test-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("note.mcanvas");
+        std::fs::write(&source, b"old").unwrap();
+
+        let (file, stamp) = open_source(&source).unwrap();
+        let replacement = dir.join("note.tmp");
+        std::fs::write(&replacement, b"newer bytes").unwrap();
+        std::fs::rename(&replacement, &source).unwrap();
+
+        assert_eq!(read_all(file).unwrap(), b"old");
+        assert_eq!(stamp.0, 3);
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
