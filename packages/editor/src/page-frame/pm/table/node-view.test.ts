@@ -3,7 +3,7 @@ import type { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { schema } from '../schema';
 import { createTableNode } from './commands';
-import { PageFrameTableNodeView } from './node-view';
+import { PageFrameTableNodeView, resizeColumnRatios } from './node-view';
 
 class MockElement extends EventTarget {
   public className = '';
@@ -197,5 +197,22 @@ describe('table node view handles', () => {
 
     const nextState = state.apply(transaction!);
     expect(nextState.doc.firstChild?.childCount).toBe(1);
+  });
+});
+
+describe('resizeColumnRatios', () => {
+  it('moves one boundary and leaves the table total and other columns alone', () => {
+    const next = resizeColumnRatios([0.25, 0.25, 0.5], 0, 0.1);
+
+    expect(next[0]).toBeCloseTo(0.35);
+    expect(next[1]).toBeCloseTo(0.15);
+    expect(next[2]).toBe(0.5);
+  });
+
+  it('stops before a column collapses', () => {
+    const next = resizeColumnRatios([0.5, 0.5], 0, 0.9);
+
+    expect(next[1]).toBeGreaterThan(0.05);
+    expect(next[0] + next[1]).toBeCloseTo(1);
   });
 });

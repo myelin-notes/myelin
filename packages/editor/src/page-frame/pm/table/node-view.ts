@@ -14,6 +14,24 @@ import {
 
 const DEFAULT_CELL_MIN_WIDTH = 120;
 const HANDLE_HOVER_STRIP_THICKNESS = 14;
+const MIN_COLUMN_RATIO = 0.06;
+
+/** Moves the boundary after column `index` by `delta` of the table width, within the pair's room. */
+export function resizeColumnRatios(
+  ratios: readonly number[],
+  index: number,
+  delta: number,
+): number[] {
+  const pair = ratios[index] + ratios[index + 1];
+  const left = Math.max(
+    MIN_COLUMN_RATIO,
+    Math.min(pair - MIN_COLUMN_RATIO, ratios[index] + delta),
+  );
+  const next = [...ratios];
+  next[index] = left;
+  next[index + 1] = pair - left;
+  return next;
+}
 
 export class PageFrameTableNodeView implements NodeView {
   public readonly dom: HTMLDivElement;
@@ -25,9 +43,10 @@ export class PageFrameTableNodeView implements NodeView {
   private pendingRenderFrame = 0;
   private hoveredRowIndex: number | null = null;
   private hoveredColumnIndex: number | null = null;
+  private resizing = false;
 
   constructor(
-    node: PMNode,
+    private node: PMNode,
     private readonly view: EditorView,
     private readonly getPos: () => number,
   ) {
@@ -52,6 +71,7 @@ export class PageFrameTableNodeView implements NodeView {
       this.resizeObserver = null;
     }
 
+    this.applyColumnRatios(this.storedColumnRatios());
     this.scheduleHandleRender();
   }
 
@@ -60,6 +80,10 @@ export class PageFrameTableNodeView implements NodeView {
       return false;
     }
 
+    this.node = node;
+    if (!this.resizing) {
+      this.applyColumnRatios(this.storedColumnRatios());
+    }
     this.scheduleHandleRender();
     return true;
   }
@@ -88,6 +112,100 @@ export class PageFrameTableNodeView implements NodeView {
     this.dom.removeEventListener('pointermove', this.handlePointerMove);
     this.dom.removeEventListener('pointerleave', this.handlePointerLeave);
     this.resizeObserver?.disconnect();
+  }
+
+  // `null` when unset or stale: adding or deleting a column falls back to even columns.
+  private storedColumnRatios(): number[] | null {
+    const ratios = this.node.attrs.colRatios as number[] | null;
+    return ratios?.length === this.tableView.colgroup.children.length
+      ? ratios
+      : null;
+  }
+
+  private applyColumnRatios(ratios: readonly number[] | null): void {
+    if (!ratios) {
+      return;
+    }
+    const { colgroup, table } = this.tableView;
+    table.style.width = '100%';
+    table.style.minWidth = '';
+    Array.from(colgroup.children).forEach((col, index) => {
+      const { style } = col as HTMLElement;
+      style.width = `${ratios[index] * 100}%`;
+      style.minWidth = '';
+    });
+  }
+
+  private measureColumnRatios(row: HTMLTableRowElement): number[] {
+    const total = this.tableView.table.getBoundingClientRect().width;
+    return Array.from(row.cells).flatMap((cell) => {
+      const ratio = cell.getBoundingClientRect().width / total / cell.colSpan;
+      return Array.from({ length: cell.colSpan }, () => ratio);
+    });
+  }
+
+  private createColumnResizer(
+    index: number,
+    left: number,
+    top: number,
+    height: number,
+    row: HTMLTableRowElement,
+  ): HTMLDivElement {
+    const resizer = document.createElement('div');
+    resizer.className = 'pm-table-node__column-resizer';
+    resizer.style.left = `${left}px`;
+    resizer.style.top = `${top}px`;
+    resizer.style.height = `${height}px`;
+    resizer.addEventListener('pointerdown', (event) => {
+      this.beginColumnResize(event, resizer, index, row);
+    });
+    return resizer;
+  }
+
+  private beginColumnResize(
+    event: PointerEvent,
+    resizer: HTMLDivElement,
+    index: number,
+    row: HTMLTableRowElement,
+  ): void {
+    if (!this.view.editable) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const start = this.storedColumnRatios() ?? this.measureColumnRatios(row);
+    // Screen px over screen px, so the delta is independent of canvas zoom.
+    const tableWidth = this.tableView.table.getBoundingClientRect().width;
+    const startX = event.clientX;
+    const ratiosAt = (clientX: number) =>
+      resizeColumnRatios(start, index, (clientX - startX) / tableWidth);
+
+    this.resizing = true;
+    resizer.setPointerCapture(event.pointerId);
+    const onMove = (move: PointerEvent) => {
+      this.applyColumnRatios(ratiosAt(move.clientX));
+    };
+    const finish = (end: PointerEvent) => {
+      resizer.removeEventListener('pointermove', onMove);
+      resizer.removeEventListener('pointerup', finish);
+      resizer.removeEventListener('pointercancel', finish);
+      this.resizing = false;
+      if (end.type !== 'pointerup') {
+        this.applyColumnRatios(this.storedColumnRatios() ?? start);
+        return;
+      }
+      this.view.dispatch(
+        this.view.state.tr.setNodeMarkup(this.readTablePos(), undefined, {
+          ...this.node.attrs,
+          colRatios: ratiosAt(end.clientX).map(
+            (ratio) => Math.round(ratio * 10_000) / 10_000,
+          ),
+        }),
+      );
+    };
+    resizer.addEventListener('pointermove', onMove);
+    resizer.addEventListener('pointerup', finish);
+    resizer.addEventListener('pointercancel', finish);
   }
 
   private readTablePos(): number {
@@ -134,6 +252,10 @@ export class PageFrameTableNodeView implements NodeView {
   };
 
   private renderHandles(): void {
+    // Replacing the resizer mid-drag would drop its pointer capture.
+    if (this.resizing) {
+      return;
+    }
     this.handleLayer.replaceChildren();
 
     const rows = Array.from(this.contentDOM.rows).filter(
@@ -231,6 +353,18 @@ export class PageFrameTableNodeView implements NodeView {
           buttonLeft: columnHandle.width / 2,
           buttonTop: HANDLE_HOVER_STRIP_THICKNESS / 2,
         }),
+      );
+    }
+
+    for (const columnHandle of columnHandles.slice(0, -1)) {
+      this.handleLayer.appendChild(
+        this.createColumnResizer(
+          columnHandle.index,
+          columnHandle.boundaryLeft,
+          tableTop,
+          tableHeight,
+          rows[0],
+        ),
       );
     }
 
