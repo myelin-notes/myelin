@@ -6,6 +6,7 @@
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
 import { parseCalloutMarker } from '../callouts';
+import { parseFigureSource } from '../pm/figure/parse';
 import { OPENING_FENCE_TOKEN_RE } from '../pm/markdown/parse-fences';
 import { parseInlineMarkdown } from '../pm/markdown/parse-inline';
 import {
@@ -43,7 +44,11 @@ type BlockToken = BaseToken &
     | { type: 'mathBlock' }
     | { type: 'table' }
     | { type: 'hr' }
+    | { type: 'pageBreak' }
+    | { type: 'figure'; src: string; alt: string | null; caption: string }
   );
+
+export const PAGE_BREAK_MARKDOWN = '<!-- pagebreak -->';
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const CHECK_RE = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
@@ -164,6 +169,19 @@ function parseBlocks(md: string): BlockToken[] {
     const trimmed = line.trim();
 
     if (trimmed === '') {
+      i++;
+      continue;
+    }
+
+    if (trimmed === PAGE_BREAK_MARKDOWN) {
+      out.push({ type: 'pageBreak' });
+      i++;
+      continue;
+    }
+
+    const figure = parseFigureSource(trimmed);
+    if (figure) {
+      out.push({ type: 'figure', ...figure });
       i++;
       continue;
     }
@@ -642,6 +660,13 @@ function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
     }
     case 'hr':
       return schema.nodes.horizontalRule.create();
+    case 'pageBreak':
+      return schema.nodes.pageBreak.create();
+    case 'figure':
+      return schema.nodes.figure.create(
+        { src: block.src, alt: block.alt },
+        parseInline(block.caption, schema),
+      );
     default:
       return null;
   }

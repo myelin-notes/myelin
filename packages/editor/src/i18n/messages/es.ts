@@ -775,6 +775,7 @@ const es: typeof en = {
       pages: 'Páginas',
       continuous: 'Continuo',
       columns: 'Columnas',
+      figureCaptionPlaceholder: 'Añadir una leyenda',
       export: 'Exportar',
     },
     export: {
@@ -798,6 +799,10 @@ const es: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Salto de página',
+        subtitle: 'Empieza una página nueva',
+      },
       heading1: {
         title: 'Encabezado 1',
         subtitle: 'Convierte este bloque en un encabezado de nivel superior',

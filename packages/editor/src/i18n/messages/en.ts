@@ -766,6 +766,7 @@ const en = {
       pages: 'Pages',
       continuous: 'Continuous',
       columns: 'Columns',
+      figureCaptionPlaceholder: 'Add a caption',
       export: 'Export',
     },
     export: {
@@ -789,6 +790,10 @@ const en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Page break',
+        subtitle: 'Start a new page',
+      },
       heading1: {
         title: 'Heading 1',
         subtitle: 'Turn this block into a top-level heading',

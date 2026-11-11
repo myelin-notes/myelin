@@ -784,6 +784,7 @@ const fr: typeof en = {
       pages: 'Pages',
       continuous: 'Continu',
       columns: 'Colonnes',
+      figureCaptionPlaceholder: 'Ajouter une légende',
       export: 'Exporter',
     },
     export: {
@@ -807,6 +808,10 @@ const fr: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Saut de page',
+        subtitle: 'Commencer une nouvelle page',
+      },
       heading1: {
         title: 'Titre 1',
         subtitle: 'Transformer ce bloc en titre principal',

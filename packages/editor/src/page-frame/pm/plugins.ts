@@ -6,6 +6,7 @@ import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { anchorGapsPlugin } from './anchoring';
 import type { ResolveMediaSrc } from './embed/renderer';
+import { figureMarkdownPlugin } from './figure/plugin';
 import { buildKeymap, calloutCaretAnchorCleanupPlugin } from './keymap';
 import { embedPreviewPlugin } from './markdown/embeds';
 import {
@@ -96,6 +97,7 @@ export function buildPlugins(
     mathBlockInputRules(schema),
     mathBlockNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLink),
+    figureMarkdownPlugin(schema),
     embedPreviewPlugin(resolveMedia),
     linkMarkdownPlugin(schema),
     markdownPastePlugin(),

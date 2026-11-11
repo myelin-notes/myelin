@@ -85,7 +85,7 @@ export class PageFrameEditorState {
     this._view = new EditorView(mount, {
       state,
       editable: (_state) => editable(),
-      nodeViews: buildNodeViews(this._ensureCodeOutputCard),
+      nodeViews: buildNodeViews(this._ensureCodeOutputCard, this._resolveMedia),
       // Page frames never scroll internally — the canvas follow-cursor pan keeps the caret on screen.
       // PM's default ancestor scroll-walk would scroll the frame's clip boxes and desync the DOM from
       // the canvas-drawn chrome. Nested CodeMirror editors manage their own caret visibility.

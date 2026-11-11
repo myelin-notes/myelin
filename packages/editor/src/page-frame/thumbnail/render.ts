@@ -120,6 +120,19 @@ function drawBlock(
       drawPlaceholderRect(ctx, cursor, width, tableHeight(block));
       return;
     }
+    case 'pageBreak':
+      return;
+    case 'figure': {
+      const aspect = block.attrs.aspect as number | null;
+      const figureWidth = width * (block.attrs.width as number);
+      drawPlaceholderRect(
+        ctx,
+        cursor,
+        figureWidth,
+        aspect ? figureWidth / aspect : BODY_LINE_HEIGHT * 6,
+      );
+      return;
+    }
     default: {
       // Unknown block: render its text if any, otherwise a thin placeholder.
       const text = block.textContent;

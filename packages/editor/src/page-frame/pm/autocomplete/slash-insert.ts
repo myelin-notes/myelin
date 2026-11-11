@@ -57,6 +57,9 @@ type SlashInsertAction =
   | {
       kind: 'callout';
       type: 'note';
+    }
+  | {
+      kind: 'pageBreak';
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -210,6 +213,15 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
       kind: 'table',
       rows: 2,
       columns: 2,
+    },
+  },
+  {
+    id: 'slash-page-break',
+    labelKey: 'pageBreak',
+    detail: '',
+    keywords: ['page break', 'new page', 'break'],
+    slashAction: {
+      kind: 'pageBreak',
     },
   },
   {
@@ -540,6 +552,21 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     );
 
     return setSelectionInsideTableCell(tr, blockPos, 0, 0);
+  }
+
+  if (slashAction.kind === 'pageBreak') {
+    const { $from } = state.selection;
+    // Only the document root can hold one; table cells take textblocks only.
+    if ($from.depth !== 1) {
+      return null;
+    }
+    const blockPos = $from.before();
+    const tr = state.tr.replaceWith(blockPos, $from.after(), [
+      schema.nodes.pageBreak.create(),
+      schema.nodes.paragraph.create(),
+    ]);
+    tr.setSelection(TextSelection.create(tr.doc, blockPos + 2));
+    return tr;
   }
 
   if (slashAction.kind === 'fencedBlock') {

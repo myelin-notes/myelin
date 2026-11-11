@@ -7,6 +7,7 @@
 import type { Mark, Node as PMNode } from 'prosemirror-model';
 import { parseCalloutMarker } from '../callouts';
 import { parseInlineMarkdown } from '../pm/markdown/parse-inline';
+import { PAGE_BREAK_MARKDOWN } from './parser';
 
 export function serializeDocToMarkdown(doc: PMNode): string {
   const parts: string[] = [];
@@ -99,9 +100,19 @@ function serializeBlock(node: PMNode): string | null {
       return serializeTable(node);
     case 'horizontalRule':
       return '---';
+    case 'figure':
+      return serializeFigure(node);
+    case 'pageBreak':
+      return PAGE_BREAK_MARKDOWN;
     default:
       return serializeInline(node);
   }
+}
+
+function serializeFigure(node: PMNode): string {
+  const caption = serializeInline(node).replace(/"/g, '\\"');
+  const title = caption ? ` "${caption}"` : '';
+  return `![${node.attrs.alt ?? ''}](${node.attrs.src}${title})`;
 }
 
 function serializeBlockquote(node: PMNode): string {

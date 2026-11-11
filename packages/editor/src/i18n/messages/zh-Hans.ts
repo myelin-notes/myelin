@@ -740,6 +740,7 @@ const zhHans: typeof en = {
       pages: '页面',
       continuous: '连续',
       columns: '分栏',
+      figureCaptionPlaceholder: '添加图注',
       export: '导出',
     },
     export: {
@@ -763,6 +764,10 @@ const zhHans: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: '分页符',
+        subtitle: '开始新的一页',
+      },
       heading1: {
         title: '一级标题',
         subtitle: '将此块转换为顶级标题',
