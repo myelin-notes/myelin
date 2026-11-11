@@ -50,7 +50,8 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     }
     if (
       a[i].kind !== b[i].kind ||
-      a[i].afterAnchorGap !== b[i].afterAnchorGap
+      a[i].afterAnchorGap !== b[i].afterAnchorGap ||
+      a[i].beforeEmbeds !== b[i].beforeEmbeds
     ) {
       return false;
     }
