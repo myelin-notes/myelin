@@ -5,6 +5,7 @@ import { ColorSwatch } from '@myelin/editor/components/color-swatch';
 import { resolveFlagType } from '@myelin/editor/elements/flag-element';
 import { FLAG_COLORS, useFlagTypes } from '@myelin/editor/flag-types';
 import { useMessages } from '@myelin/editor/i18n';
+import { PLAN_LIMITS, planLimit, promptUpgrade } from '@myelin/editor/plan';
 import type { FlagType } from '@myelin/editor/sync/repo/types';
 import type { ToolOption } from '@myelin/editor/tools/tool';
 import { cn } from '@myelin/editor/utils';
@@ -24,7 +25,6 @@ import { useRepository } from '@/lib/sync';
 import type { NoteFlag } from '@/lib/sync/repo/types';
 
 const logger = new Logger('FlagTypeOptions');
-const MAX_FLAG_TYPES = 8;
 
 // No hover tint: it would stack on the row's own hover tint.
 const rowButtonClass =
@@ -148,10 +148,14 @@ export function FlagTypeOptions({
           ),
         )}
       </div>
-      {types.length < MAX_FLAG_TYPES && (
+      {types.length < PLAN_LIMITS.pro.flagTypes && (
         <button
           type="button"
           onClick={() => {
+            if (types.length >= planLimit('flagTypes')) {
+              promptUpgrade('limits');
+              return;
+            }
             const used = new Set(types.map((type) => type.color));
             const color =
               FLAG_COLORS.find((candidate) => !used.has(candidate)) ??

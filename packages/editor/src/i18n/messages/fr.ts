@@ -12,6 +12,36 @@ const fr: typeof en = {
     never: 'Jamais',
     or: 'ou',
   },
+  plan: {
+    title: 'Passez à Myelin Notes Pro',
+    description:
+      'Un achat unique : soutenez le développement et débloquez des fonctionnalités sympas !',
+    haveLicense: 'J’ai une licence',
+    features: {
+      agents: {
+        title: 'Agents IA via MCP',
+        description:
+          'L’app d’IA que vous utilisez déjà lit vos notes et, si vous l’autorisez, y écrit.',
+      },
+      code: {
+        title: 'Exécutez les blocs de code',
+        description:
+          'Exécutez le code d’une page et voyez le résultat juste à côté.',
+      },
+      canvasImage: {
+        title: 'Votre propre fond de canevas',
+        description:
+          'Utilisez n’importe quelle image comme fond sous vos notes.',
+      },
+      limits: {
+        title: 'Des limites plus hautes',
+        description:
+          'Jusqu’à 8 types de drapeaux, des drapeaux illimités par note et 16 préréglages de stylo.',
+      },
+    },
+    upgrade: 'Passer à Pro',
+    purchaseFailed: 'L’achat n’a pas pu aboutir.',
+  },
   tabBar: {
     library: 'Bibliothèque',
     home: 'Accueil',
@@ -763,6 +793,65 @@ const fr: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Passer à Pro',
+      active: 'Actif',
+      thanks: {
+        label: 'Pro est activé',
+        description: 'Merci de soutenir Myelin. Bonne utilisation !',
+      },
+      key: {
+        label: 'Clé de licence',
+        description:
+          'Collez la clé reçue par e-mail après l’achat. Une clé fonctionne sur 3 appareils maximum.',
+        descriptionAndroid:
+          'Vous avez déjà une clé de licence ? Saisissez-la ici.',
+        action: 'Activer',
+      },
+      buy: {
+        label: 'Acheter Pro',
+        description: 'Un achat unique sur le site de Myelin.',
+        descriptionIos:
+          'Un achat unique qui débloque Pro sur vos appareils Apple.',
+        descriptionAndroid: 'Un achat unique via Google Play.',
+        action: 'Acheter Pro',
+      },
+      restore: {
+        label: 'Restaurer les achats',
+        description: 'Débloquez le Pro déjà acheté avec cet identifiant Apple.',
+        action: 'Restaurer',
+        none: 'Aucun achat App Store trouvé pour cet identifiant Apple.',
+      },
+      email: {
+        label: 'Vous avez déjà Pro ?',
+        description:
+          'Saisissez l’adresse e-mail utilisée pour l’achat et nous vous enverrons un code.',
+        codeSent: 'Saisissez le code à 8 chiffres reçu par e-mail.',
+        codeLabel: 'Code',
+        send: 'Envoyer le code',
+        verify: 'Vérifier',
+      },
+      desktop: {
+        label: 'Utilisez Pro sur votre ordinateur',
+        description:
+          'Saisissez votre adresse e-mail et nous vous enverrons une clé de licence pour Mac, Windows ou Linux. Elle fonctionne sur 1 ordinateur.',
+        send: 'Envoyer la clé',
+        sent: 'Consultez votre boîte de réception pour votre clé de licence.',
+      },
+      deactivate: {
+        label: 'Cet appareil',
+        description:
+          'Retirez Pro de cet appareil pour libérer une place pour un autre.',
+        action: 'Désactiver',
+      },
+      errors: {
+        invalid: 'Cette clé ou ce code n’est pas valide.',
+        limit:
+          'Cette clé est déjà active sur tous les appareils autorisés. Désactivez-la d’abord sur l’un d’eux.',
+        failed: 'Impossible de joindre le serveur de licences. Réessayez.',
+      },
+    },
     about: {
       title: 'À propos',
       eyebrow: 'Application',
@@ -915,7 +1004,6 @@ const fr: typeof en = {
     flagTypes: {
       todo: 'À faire',
       review: 'À revoir',
-      examinable: 'À l’examen',
       newFlag: 'Nouveau drapeau',
       edit: 'Modifier le drapeau',
       remove: 'Supprimer le drapeau',

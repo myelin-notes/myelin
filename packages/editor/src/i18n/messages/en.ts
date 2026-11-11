@@ -10,6 +10,35 @@ const en = {
     never: 'Never',
     or: 'or',
   },
+  plan: {
+    title: 'Upgrade to Myelin Notes Pro',
+    description:
+      'A one-time purchase, support the development and unlock some cool features!',
+    haveLicense: 'I have a license',
+    features: {
+      agents: {
+        title: 'AI agents over MCP',
+        description:
+          'Let the AI app you already use read your notes and, when you allow it, write to them.',
+      },
+      code: {
+        title: 'Run code blocks',
+        description:
+          'Run the code in a page and see its output right beside it.',
+      },
+      canvasImage: {
+        title: 'Your own canvas background',
+        description: 'Use any image as the background behind your notes.',
+      },
+      limits: {
+        title: 'Higher limits',
+        description:
+          'Up to 8 flag types, unlimited flags per note, and 16 pen presets.',
+      },
+    },
+    upgrade: 'Upgrade',
+    purchaseFailed: 'The purchase could not be completed.',
+  },
   tabBar: {
     library: 'Library',
     home: 'Home',
@@ -745,6 +774,64 @@ const en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Upgrade',
+      active: 'Active',
+      thanks: {
+        label: 'Pro is active',
+        description: 'Thanks for supporting Myelin. Enjoy!',
+      },
+      key: {
+        label: 'License key',
+        description:
+          'Paste the key from your purchase email. One key works on up to 3 devices.',
+        descriptionAndroid: 'Already have a license key? Enter it here.',
+        action: 'Activate',
+      },
+      buy: {
+        label: 'Buy Pro',
+        description: 'A one-time purchase from the Myelin website.',
+        descriptionIos:
+          'A one-time purchase that unlocks Pro on your Apple devices.',
+        descriptionAndroid: 'A one-time purchase through Google Play.',
+        action: 'Buy Pro',
+      },
+      restore: {
+        label: 'Restore purchases',
+        description: 'Unlock Pro you already bought with this Apple ID.',
+        action: 'Restore',
+        none: 'No App Store purchase was found for this Apple ID.',
+      },
+      email: {
+        label: 'Already have Pro?',
+        description:
+          'Enter the email address you bought it with and we will send you a code.',
+        codeSent: 'Enter the 8-digit code we emailed you.',
+        codeLabel: 'Code',
+        send: 'Send code',
+        verify: 'Verify',
+      },
+      desktop: {
+        label: 'Use Pro on your computer',
+        description:
+          'Enter your email and we will send you a license key for Mac, Windows, or Linux. It works on 1 computer.',
+        send: 'Send key',
+        sent: 'Check your inbox for your license key.',
+      },
+      deactivate: {
+        label: 'This device',
+        description:
+          'Remove Pro from this device to free a slot for another one.',
+        action: 'Deactivate',
+      },
+      errors: {
+        invalid: 'That key or code is not valid.',
+        limit:
+          'This key is already active on as many devices as it allows. Deactivate it on one of them first.',
+        failed: 'Could not reach the license server. Please try again.',
+      },
+    },
     about: {
       title: 'About',
       eyebrow: 'Application',
@@ -895,7 +982,6 @@ const en = {
     flagTypes: {
       todo: 'To-do',
       review: 'Review',
-      examinable: 'Examinable',
       newFlag: 'New flag',
       edit: 'Edit flag',
       remove: 'Delete flag',

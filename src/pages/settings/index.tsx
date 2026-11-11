@@ -10,6 +10,7 @@ import { InputSection } from './sections/input-section';
 import { LanguageSection } from './sections/language-section';
 import { McpSection } from './sections/mcp-section';
 import { PrivacySection } from './sections/privacy-section';
+import { ProSection } from './sections/pro-section';
 import { SyncSection } from './sections/sync-section';
 import { SettingsRail } from './settings-rail';
 import { SETTINGS_SECTIONS, type SettingsSectionId } from './settings-sections';
@@ -73,6 +74,7 @@ export function SettingsPage() {
               <PrivacySection />
               {!IS_MOBILE_BUILD && <McpSection />}
               {!IS_MOBILE_BUILD && <KeybindsSection />}
+              <ProSection />
               <AboutSection />
             </div>
           </div>

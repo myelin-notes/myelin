@@ -12,6 +12,32 @@ const zhHans: typeof en = {
     never: '从不',
     or: '或',
   },
+  plan: {
+    title: '升级到 Myelin Notes Pro',
+    description: '一次性购买，支持开发并解锁一些超酷的功能！',
+    haveLicense: '我有许可证',
+    features: {
+      agents: {
+        title: '通过 MCP 使用 AI 代理',
+        description: '让你已在使用的 AI 应用读取你的笔记，并在你允许时写入。',
+      },
+      code: {
+        title: '运行代码块',
+        description: '运行页面中的代码，并在旁边查看输出。',
+      },
+      canvasImage: {
+        title: '自定义画布背景',
+        description: '将任意图片用作笔记背后的背景。',
+      },
+      limits: {
+        title: '更高的上限',
+        description:
+          '最多 8 种旗标类型、每篇笔记不限旗标数量，以及 16 个笔预设。',
+      },
+    },
+    upgrade: '升级',
+    purchaseFailed: '无法完成购买。',
+  },
   tabBar: {
     library: '资料库',
     home: '主页',
@@ -719,6 +745,59 @@ const zhHans: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: '升级',
+      active: '已激活',
+      thanks: {
+        label: 'Pro 已激活',
+        description: '感谢你支持 Myelin，祝使用愉快！',
+      },
+      key: {
+        label: '许可证密钥',
+        description: '粘贴购买邮件中的密钥。一个密钥最多可用于 3 台设备。',
+        descriptionAndroid: '已有许可证密钥？请在此输入。',
+        action: '激活',
+      },
+      buy: {
+        label: '购买 Pro',
+        description: '在 Myelin 网站一次性购买。',
+        descriptionIos: '一次性购买，在你的 Apple 设备上解锁 Pro。',
+        descriptionAndroid: '通过 Google Play 一次性购买。',
+        action: '购买 Pro',
+      },
+      restore: {
+        label: '恢复购买',
+        description: '解锁你已用此 Apple ID 购买的 Pro。',
+        action: '恢复',
+        none: '未找到此 Apple ID 的 App Store 购买记录。',
+      },
+      email: {
+        label: '已经拥有 Pro？',
+        description: '输入购买时使用的邮箱地址，我们会给你发送验证码。',
+        codeSent: '输入我们通过邮件发送的 8 位验证码。',
+        codeLabel: '验证码',
+        send: '发送验证码',
+        verify: '验证',
+      },
+      desktop: {
+        label: '在电脑上使用 Pro',
+        description:
+          '输入你的邮箱，我们会发送适用于 Mac、Windows 或 Linux 的许可证密钥。可用于 1 台电脑。',
+        send: '发送密钥',
+        sent: '请查看收件箱中的许可证密钥。',
+      },
+      deactivate: {
+        label: '此设备',
+        description: '从此设备移除 Pro，为其他设备腾出名额。',
+        action: '停用',
+      },
+      errors: {
+        invalid: '该密钥或验证码无效。',
+        limit: '此密钥已在允许的所有设备上激活。请先在其中一台上停用。',
+        failed: '无法连接许可证服务器，请重试。',
+      },
+    },
     about: {
       title: '关于',
       eyebrow: '应用程序',
@@ -870,7 +949,6 @@ const zhHans: typeof en = {
     flagTypes: {
       todo: '待办',
       review: '待复查',
-      examinable: '考试范围',
       newFlag: '新建旗标',
       edit: '编辑旗标',
       remove: '删除旗标',

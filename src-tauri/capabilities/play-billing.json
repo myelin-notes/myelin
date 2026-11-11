@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "play-billing",
+  "description": "Google Play purchase APIs on Android",
+  "platforms": ["android"],
+  "windows": ["*"],
+  "permissions": ["play-billing:default"]
+}

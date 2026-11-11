@@ -6,6 +6,7 @@ import type {
   RunPollResponse,
 } from '../../../code-runner/contract';
 import type { EnsureCodeOutputCard } from '../../../elements/code-output/bridge';
+import { isPro, promptUpgrade } from '../../../plan';
 import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
@@ -107,6 +108,10 @@ export class CodeBlockRunView {
   private async run(): Promise<void> {
     const codeRunner = getPlatform().codeRunner;
     if (!codeRunner) {
+      return;
+    }
+    if (!isPro()) {
+      promptUpgrade('code');
       return;
     }
     const payload = this.options.collectSource();

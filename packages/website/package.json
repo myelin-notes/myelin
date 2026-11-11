@@ -16,6 +16,7 @@
     "@base-ui/react": "^1.3.0",
     "@myelin/editor": "*",
     "@myelin/ui": "*",
+    "@polar-sh/checkout": "^0.6.0",
     "@tailwindcss/vite": "^4.2.2",
     "astro": "^7.4.3",
     "clsx": "^2.1.1",

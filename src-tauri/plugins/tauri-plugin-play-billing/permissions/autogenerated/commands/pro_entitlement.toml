@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-pro-entitlement"
+description = "Enables the pro_entitlement command without any pre-configured scope."
+commands.allow = ["pro_entitlement"]
+
+[[permission]]
+identifier = "deny-pro-entitlement"
+description = "Denies the pro_entitlement command without any pre-configured scope."
+commands.deny = ["pro_entitlement"]

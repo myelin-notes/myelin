@@ -6,6 +6,7 @@ import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { type Messages, useMessages } from '@myelin/editor/i18n';
 import { getPenPresetLabel, usePenPresets } from '@myelin/editor/pen-presets';
+import { planLimit, promptUpgrade } from '@myelin/editor/plan';
 import {
   MAX_CUSTOM_COLORS,
   MAX_PEN_PRESETS,
@@ -439,6 +440,10 @@ export function useToolState(
   const saveCurrentAsPreset = useCallback(() => {
     const settings = readPenSettings(canvasTools[selectedToolIndex]);
     if (!activePenTool || !settings || !canAddPreset) {
+      return;
+    }
+    if (presets.length >= planLimit('penPresets')) {
+      promptUpgrade('limits');
       return;
     }
     // An exact duplicate is a no-op in the repository, so this can't stack.

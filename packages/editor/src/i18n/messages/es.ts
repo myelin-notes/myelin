@@ -12,6 +12,35 @@ const es: typeof en = {
     never: 'Nunca',
     or: 'o',
   },
+  plan: {
+    title: 'Mejora a Myelin Notes Pro',
+    description:
+      'Un pago único: apoya el desarrollo y desbloquea funciones geniales.',
+    haveLicense: 'Tengo una licencia',
+    features: {
+      agents: {
+        title: 'Agentes de IA por MCP',
+        description:
+          'Deja que la app de IA que ya usas lea tus notas y, si lo permites, escriba en ellas.',
+      },
+      code: {
+        title: 'Ejecuta bloques de código',
+        description:
+          'Ejecuta el código de una página y ve el resultado justo al lado.',
+      },
+      canvasImage: {
+        title: 'Tu propio fondo de lienzo',
+        description: 'Usa cualquier imagen como fondo detrás de tus notas.',
+      },
+      limits: {
+        title: 'Límites más altos',
+        description:
+          'Hasta 8 tipos de bandera, banderas ilimitadas por nota y 16 ajustes de lápiz.',
+      },
+    },
+    upgrade: 'Mejorar',
+    purchaseFailed: 'No se pudo completar la compra.',
+  },
   tabBar: {
     library: 'Biblioteca',
     home: 'Inicio',
@@ -754,6 +783,66 @@ const es: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Mejorar',
+      active: 'Activo',
+      thanks: {
+        label: 'Pro está activo',
+        description: 'Gracias por apoyar a Myelin. ¡Que lo disfrutes!',
+      },
+      key: {
+        label: 'Clave de licencia',
+        description:
+          'Pega la clave del correo de tu compra. Una clave sirve en hasta 3 dispositivos.',
+        descriptionAndroid:
+          '¿Ya tienes una clave de licencia? Introdúcela aquí.',
+        action: 'Activar',
+      },
+      buy: {
+        label: 'Comprar Pro',
+        description: 'Un pago único en el sitio web de Myelin.',
+        descriptionIos:
+          'Un pago único que desbloquea Pro en tus dispositivos Apple.',
+        descriptionAndroid: 'Una compra única a través de Google Play.',
+        action: 'Comprar Pro',
+      },
+      restore: {
+        label: 'Restaurar compras',
+        description: 'Desbloquea el Pro que ya compraste con este Apple ID.',
+        action: 'Restaurar',
+        none: 'No se encontró ninguna compra en la App Store para este Apple ID.',
+      },
+      email: {
+        label: '¿Ya tienes Pro?',
+        description:
+          'Escribe el correo con el que lo compraste y te enviaremos un código.',
+        codeSent: 'Escribe el código de 8 dígitos que te enviamos.',
+        codeLabel: 'Código',
+        send: 'Enviar código',
+        verify: 'Verificar',
+      },
+      desktop: {
+        label: 'Usa Pro en tu ordenador',
+        description:
+          'Escribe tu correo y te enviaremos una clave de licencia para Mac, Windows o Linux. Sirve en 1 ordenador.',
+        send: 'Enviar clave',
+        sent: 'Revisa tu bandeja de entrada para ver tu clave de licencia.',
+      },
+      deactivate: {
+        label: 'Este dispositivo',
+        description:
+          'Quita Pro de este dispositivo para liberar un lugar para otro.',
+        action: 'Desactivar',
+      },
+      errors: {
+        invalid: 'Esa clave o código no es válido.',
+        limit:
+          'Esta clave ya está activa en todos los dispositivos que permite. Desactívala primero en uno de ellos.',
+        failed:
+          'No se pudo conectar con el servidor de licencias. Inténtalo de nuevo.',
+      },
+    },
     about: {
       title: 'Acerca de',
       eyebrow: 'Aplicación',
@@ -905,7 +994,6 @@ const es: typeof en = {
     flagTypes: {
       todo: 'Pendiente',
       review: 'Revisar',
-      examinable: 'Evaluable',
       newFlag: 'Nueva bandera',
       edit: 'Editar bandera',
       remove: 'Eliminar bandera',
