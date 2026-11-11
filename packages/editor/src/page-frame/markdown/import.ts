@@ -90,20 +90,96 @@ export function preserveUnchangedBlocks(current: PMNode, next: PMNode): PMNode {
   return next.copy(Fragment.fromArray(blocks));
 }
 
-// Updates in place rather than clearing first: y-prosemirror diffs against the fragment, so
-// unchanged blocks keep their Yjs identity and any ink anchored to them stays attached.
+// Positions in `current` and `merged` holding the same reused node, in order: the blocks the
+// rewrite leaves alone.
+function keptBlockPairs(current: PMNode, merged: PMNode): [number, number][] {
+  const a = current.content.content;
+  const b = merged.content.content;
+  // Common ends first, so a typical one-region edit never builds the O(n·m) table.
+  let start = 0;
+  while (start < a.length && start < b.length && a[start] === b[start]) {
+    start++;
+  }
+  let end = 0;
+  while (
+    end < a.length - start &&
+    end < b.length - start &&
+    a[a.length - 1 - end] === b[b.length - 1 - end]
+  ) {
+    end++;
+  }
+  const n = a.length - start - end;
+  const m = b.length - start - end;
+  const lengths = new Uint32Array((n + 1) * (m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      lengths[i * (m + 1) + j] =
+        a[start + i] === b[start + j]
+          ? lengths[(i + 1) * (m + 1) + j + 1] + 1
+          : Math.max(
+              lengths[(i + 1) * (m + 1) + j],
+              lengths[i * (m + 1) + j + 1],
+            );
+    }
+  }
+  const pairs: [number, number][] = [];
+  for (let i = 0; i < start; i++) {
+    pairs.push([i, i]);
+  }
+  for (let i = 0, j = 0; i < n && j < m; ) {
+    if (a[start + i] === b[start + j]) {
+      pairs.push([start + i, start + j]);
+      i++;
+      j++;
+    } else if (lengths[(i + 1) * (m + 1) + j] >= lengths[i * (m + 1) + j + 1]) {
+      i++;
+    } else {
+      j++;
+    }
+  }
+  for (let k = end; k > 0; k--) {
+    pairs.push([a.length - k, b.length - k]);
+  }
+  return pairs;
+}
+
+// y-prosemirror only keeps the unchanged runs at the two ends of a document; blocks between two
+// edited regions are overwritten in place, which moves any ink anchored to them onto other text.
+// Applying one region at a time keeps every unchanged block inside one of those end runs.
 function replacePageFrameFragmentDoc(
   fragment: Y.XmlFragment,
   doc: PMNode,
 ): void {
-  const merged =
-    fragment.length > 0
-      ? preserveUnchangedBlocks(
-          yXmlFragmentToProseMirrorRootNode(fragment, schema),
-          doc,
-        )
-      : doc;
-  prosemirrorToYXmlFragment(merged, fragment);
+  if (fragment.length === 0) {
+    prosemirrorToYXmlFragment(doc, fragment);
+    return;
+  }
+  const current = yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  const merged = preserveUnchangedBlocks(current, doc);
+  const working = [...current.content.content];
+  let shift = 0;
+  let oldStart = 0;
+  let newStart = 0;
+  const regionEnds: [number, number][] = [
+    ...keptBlockPairs(current, merged),
+    [current.childCount, merged.childCount],
+  ];
+  for (const [oldEnd, newEnd] of regionEnds) {
+    if (oldEnd > oldStart || newEnd > newStart) {
+      working.splice(
+        oldStart + shift,
+        oldEnd - oldStart,
+        ...merged.content.content.slice(newStart, newEnd),
+      );
+      shift += newEnd - newStart - (oldEnd - oldStart);
+      prosemirrorToYXmlFragment(
+        merged.copy(Fragment.fromArray(working)),
+        fragment,
+      );
+    }
+    oldStart = oldEnd + 1;
+    newStart = newEnd + 1;
+  }
 }
 
 export async function writeMarkdownToPageFrameFragment(

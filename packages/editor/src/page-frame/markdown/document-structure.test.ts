@@ -82,6 +82,43 @@ describe('writeMarkdownToPageFrameFragment over existing content', () => {
     expect(doc.child(2).textContent).toBe('fixed typo');
   });
 
+  it.each([
+    [
+      'an insertion above and an edit below',
+      'first\n\nnew\n\nkept one\n\nlast edited\n',
+    ],
+    ['a deletion above and an edit below', 'kept one\n\nlast edited\n'],
+    [
+      'insertions on both sides',
+      'first\n\nnew\n\nkept one\n\nnew too\n\nlast\n',
+    ],
+  ])('keeps ink anchored to an unchanged block between %s', async (_, markdown) => {
+    const ydoc = new Y.Doc();
+    const fragment = ydoc.getXmlFragment('frame');
+    prosemirrorToYXmlFragment(
+      schema.nodes.doc.create(
+        null,
+        ['first', 'kept one', 'last'].map((text) =>
+          schema.nodes.paragraph.create(null, schema.text(text)),
+        ),
+      ),
+      fragment,
+    );
+    // Ink anchors are Yjs relative positions like this one, inside "kept one".
+    const keptText = (fragment.get(1) as Y.XmlElement).get(0) as Y.XmlText;
+    const anchor = Y.createRelativePositionFromTypeIndex(keptText, 2);
+
+    await writeMarkdownToPageFrameFragment(markdown, fragment);
+
+    const resolved = Y.createAbsolutePositionFromRelativePosition(anchor, ydoc);
+    expect(resolved?.type.toString()).toBe('kept one');
+    expect(
+      serializeDocToMarkdown(
+        yXmlFragmentToProseMirrorRootNode(fragment, schema),
+      ),
+    ).toBe(markdown);
+  });
+
   it('removes blocks the markdown dropped', async () => {
     const fragment = styledFrame();
 
