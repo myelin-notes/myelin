@@ -133,22 +133,31 @@ function serializeBlockquote(node: PMNode): string {
 function serializeInline(node: PMNode): string {
   let out = '';
   const activeMarks: Mark[] = [];
+  let codeDelims = { open: '`', close: '`' };
 
   const closeMarks = (marks: readonly Mark[]) => {
     // Close marks in reverse order of opening.
     for (let i = activeMarks.length - 1; i >= 0; i--) {
       const m = activeMarks[i];
       if (!marks.some((n) => n.eq(m))) {
-        out += markClose(m, textTail(out));
+        out +=
+          m.type.name === 'code'
+            ? codeDelims.close
+            : markClose(m, textTail(out));
         activeMarks.splice(i, 1);
       }
     }
   };
 
-  const openMarks = (marks: readonly Mark[]) => {
+  const openMarks = (marks: readonly Mark[], text: string) => {
     for (const m of marks) {
       if (!activeMarks.some((a) => a.eq(m))) {
-        out += markOpen(m);
+        if (m.type.name === 'code') {
+          codeDelims = codeSpanDelimiters(text);
+          out += codeDelims.open;
+        } else {
+          out += markOpen(m);
+        }
         activeMarks.push(m);
       }
     }
@@ -157,8 +166,11 @@ function serializeInline(node: PMNode): string {
   node.forEach((child) => {
     if (child.isText) {
       closeMarks(child.marks);
-      openMarks(child.marks);
-      out += child.marks.some((mark) => mark.type.name === 'noteLink')
+      openMarks(child.marks, child.text ?? '');
+      // Backslashes are literal inside code spans, so escaping there would grow on every round-trip.
+      out += child.marks.some(
+        (mark) => mark.type.name === 'noteLink' || mark.type.name === 'code',
+      )
         ? (child.text ?? '')
         : escapeMarkdownPreservingMath(child.text ?? '');
     } else {
@@ -169,6 +181,17 @@ function serializeInline(node: PMNode): string {
 
   closeMarks([]);
   return out;
+}
+
+// CommonMark: the fence must outrun any backtick run inside; one space each side is stripped on read.
+function codeSpanDelimiters(text: string): { open: string; close: string } {
+  const longestRun = Math.max(
+    0,
+    ...(text.match(/`+/g) ?? []).map((r) => r.length),
+  );
+  const fence = '`'.repeat(longestRun + 1);
+  const pad = /^`|`$|^ .*[^ ].* $/s.test(text) ? ' ' : '';
+  return { open: fence + pad, close: pad + fence };
 }
 
 function renderInlineAtom(node: PMNode): string {
@@ -259,8 +282,6 @@ function markOpen(mark: Mark): string {
       return '<u>';
     case 'strikethrough':
       return '~~';
-    case 'code':
-      return '`';
     case 'link':
       return '[';
     default:
@@ -278,8 +299,6 @@ function markClose(mark: Mark, _preceding: string): string {
       return '</u>';
     case 'strikethrough':
       return '~~';
-    case 'code':
-      return '`';
     case 'link': {
       const href = (mark.attrs.href as string | null) ?? '';
       return `](${href})`;

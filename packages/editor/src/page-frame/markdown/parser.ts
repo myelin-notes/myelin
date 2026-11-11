@@ -451,20 +451,29 @@ function scanInline(
       }
     }
 
-    // Inline code: `...`
+    // Inline code: a run of N backticks closes at the next run of exactly N (CommonMark).
     if (ch === '`') {
-      const end = text.indexOf('`', i + 1);
+      const fence = text.slice(i).match(/^`+/)![0];
+      const close = new RegExp(`(?<!\`)${fence}(?!\`)`, 'g');
+      close.lastIndex = i + fence.length;
+      const end = close.exec(text)?.index ?? -1;
       if (end !== -1) {
         pushText();
-        const codeText = text.slice(i + 1, end);
+        let codeText = text.slice(i + fence.length, end);
+        if (/^ .*[^ ].* $/s.test(codeText)) {
+          codeText = codeText.slice(1, -1);
+        }
         if (codeText.length > 0) {
           nodes.push(
             schema.text(codeText, [...baseMarks, schema.marks.code.create()]),
           );
         }
-        i = end + 1;
+        i = end + fence.length;
         continue;
       }
+      buf += fence;
+      i += fence.length;
+      continue;
     }
 
     // Inline math stays literal text, backslashes intact — the math preview plugin renders it.
