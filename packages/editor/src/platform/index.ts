@@ -20,3 +20,8 @@ export function getPlatform(): Platform {
   }
   return platform;
 }
+
+/** Whether {@link setPlatform} has run. */
+export function isPlatformSet(): boolean {
+  return platform !== null;
+}
