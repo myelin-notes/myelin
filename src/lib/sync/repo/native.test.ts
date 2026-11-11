@@ -6,6 +6,7 @@ import { ElementType } from '@myelin/editor/elements/element-type';
 import en from '@myelin/editor/i18n/messages/en';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
+import { setLogErrorReporter } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { trackEvent } from '@/lib/analytics';
 import { createCanvasFile } from '@/pages/library/import/canvas-file';
@@ -1013,7 +1014,14 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
   vi.mocked(invoke).mockImplementation(async (command, args) => {
     if (command === 'scan_onenote') {
       expect(args).toEqual({ path: '/picked/Notebook.onepkg' });
-      return { pages: 2, sections: 1 };
+      return {
+        pages: 2,
+        sections: 1,
+        failedSections: [
+          'Unexpected end of file',
+          'Not a section file: <section>',
+        ],
+      };
     }
     const op = (args as { operation?: Record<string, unknown> })?.operation;
     if (command === 'repository_operation' && op?.kind === 'import-one-note') {
@@ -1035,12 +1043,29 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     parentId: null,
     strings: en,
   });
+  const reportError = vi.fn();
+  setLogErrorReporter(reportError);
   const preview = await job.scan();
+  setLogErrorReporter(null);
+  // One fixed exception message so PostHog groups every failure as one issue.
+  expect(reportError.mock.calls).toEqual([
+    [
+      new Error('OneNote section import failed'),
+      { subsystem: 'OneNoteImport', reason: 'Unexpected end of file' },
+    ],
+    [
+      new Error('OneNote section import failed'),
+      { subsystem: 'OneNoteImport', reason: 'Not a section file: <section>' },
+    ],
+  ]);
   expect(preview.name).toBe('Notebook');
   expect(preview.lines.map((line) => line.text)).toEqual([
     en.library.importSources.onenote.pages(2),
     en.library.importSources.onenote.sections(1),
   ]);
+  expect(preview.skippedText).toBe(
+    en.library.importSources.onenote.skippedSections(2),
+  );
   const onProgress = vi.fn();
   const summary = await job.run({ conflictResolution: 'rename', onProgress });
   expect(imported).toMatchObject({
@@ -1056,6 +1081,9 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     fileName: 'Page',
   });
   expect(summary.focusNodeId).toBe(result.rootFolderId);
+  expect(summary.skippedText).toBe(
+    en.library.importSources.onenote.skippedSections(2),
+  );
   expect(summary.stats).toEqual({ count: 2, skipped: 0 });
   expect(native.operations.map((op) => op.kind)).toEqual(['manifest']);
   await repository.dispose();

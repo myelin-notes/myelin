@@ -5,9 +5,7 @@
   border-radius: 18px;
   background: var(--bg-code);
   color: var(--text-primary);
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -92,10 +90,18 @@
   font-style: italic;
 }
 
+/* A second font on a line rounds half-leading differently per engine: a line with inline code was 27px
+   in WebKit and 26px in Chromium. A zero line-height keeps these spans from growing the line box. */
+.pm-editor .ProseMirror code,
+.pm-editor .ProseMirror .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-md-math,
+.pm-editor .ProseMirror span[style*="font-family"] {
+  line-height: 0;
+}
+
 .pm-editor .ProseMirror .pm-md-inline-code {
   position: relative;
   z-index: 0;
-  line-height: inherit;
   vertical-align: baseline;
 }
 
@@ -115,9 +121,7 @@
 
 .pm-editor .ProseMirror .pm-md-inline-code {
   border-radius: 0.35rem;
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code::before {
@@ -126,9 +130,7 @@
 }
 
 .pm-editor .ProseMirror .pm-md-math {
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
 }
 
@@ -139,6 +141,7 @@
    resolve to bogus screen rects that fling the viewport. */
 .pm-editor .ProseMirror .pm-math-source-hidden {
   font-size: 0;
+  line-height: 0;
   letter-spacing: 0;
 }
 

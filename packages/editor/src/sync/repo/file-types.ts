@@ -158,7 +158,6 @@ export const FileTypes: readonly FileType[] = FileTypeDescriptors.map(
 );
 export const ImageFileTypes = fileTypesForCategory('image');
 export const VideoFileTypes = fileTypesForCategory('video');
-export const DataFileTypes = fileTypesForCategory('data');
 export const ImportableFileTypes = FileTypes.filter(isImportableFileType);
 
 const FILE_TYPE_SET = new Set<string>(FileTypes);

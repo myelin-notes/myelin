@@ -182,6 +182,7 @@ const zhHans: typeof en = {
         sections: (count: number) => `${count} 个分区`,
         summary: (count: number) => `已导入 ${count} 个页面`,
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
+        skippedSections: (count: number) => `有 ${count} 个分区无法读取`,
       },
       obsidian_vault: {
         label: '从 Obsidian 导入',
@@ -214,6 +215,7 @@ const zhHans: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `正在导入 ${current}/${total}…`,
+        preparing: '正在准备导入…',
         cancelling: '正在取消…',
       },
       summary: {
@@ -1291,6 +1293,17 @@ const zhHans: typeof en = {
         toolbarHint: '其他内容都可以通过工具栏顶部的 + 按钮添加。',
       },
     },
+  },
+  mediaMigration: {
+    title: '正在优化存储',
+    description:
+      '请在完成前保持 Myelin 打开。同时请更新其他设备上的 Myelin，否则图片、PDF 和音频可能显示为空白。',
+    preparing: '正在准备…',
+    progress: (completed: number, total: number) =>
+      `第 ${completed} 个，共 ${total} 个文档`,
+    finishing: '正在完成上传…',
+    unreachable: '当前无法连接到你的仓库。恢复连接后将自动完成。',
+    continueWithoutWaiting: '继续，不再等待',
   },
   shutdown: {
     title: '正在保存更改…',

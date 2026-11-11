@@ -31,6 +31,9 @@ vi.mock('./analytics', () => ({
 vi.mock('./shutdown-gate', () => ({
   RepositoryShutdownGate: () => null,
 }));
+vi.mock('./media-migration-gate', () => ({
+  RepositoryMediaMigrationGate: () => null,
+}));
 
 it('loads the saved repository after Strict Mode replay and releases it on switch and unmount', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -83,6 +86,7 @@ it('loads the saved repository after Strict Mode replay and releases it on switc
           lastRemoteSyncAt: 1,
           lastError: null,
           syncing: false,
+          mediaMigration: null,
           dataVersion: 0,
         },
       };
@@ -207,6 +211,7 @@ it('discards preference loads from a repository replaced while opening and repor
           lastRemoteSyncAt: null,
           lastError: null,
           syncing: false,
+          mediaMigration: null,
           dataVersion: 0,
         },
       };

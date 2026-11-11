@@ -48,6 +48,8 @@ impl Default for RemoteEndpoints {
     }
 }
 
+const STALL_TIMEOUT: Duration = Duration::from_secs(if cfg!(test) { 5 } else { 120 });
+
 pub(crate) struct RemoteClient {
     pub(crate) client: Client,
     pub(crate) token: String,
@@ -79,9 +81,12 @@ fn copy_durable(source: &Path, destination: &Path) -> std::io::Result<()> {
 
 impl RemoteClient {
     pub(crate) fn new(token: String, github: bool) -> Result<Self, String> {
+        // Bounds stalls, not transfers: a total limit failed a 1 GB tarball that took just over 120s.
+        // shortcut: closing the app waits out an in-flight download, cancel on release if noticed.
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(30))
+            .read_timeout(STALL_TIMEOUT)
             .build()
             .map_err(|_| "Repository download client unavailable")?;
         Ok(Self {
@@ -148,7 +153,7 @@ impl RemoteClient {
             {
                 return Ok(response);
             }
-            return Err(format!("{label} ({status})"));
+            return Err(status_error(response, label).await);
         }
         Err(format!("{label}: exhausted retries"))
     }
@@ -160,7 +165,8 @@ impl RemoteClient {
         url: Url,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let response = require_success(self.request(label, method, url, body).await?, label)?;
+        let response =
+            require_success(self.request(label, method, url, body).await?, label).await?;
         let bytes = response
             .bytes()
             .await
@@ -194,11 +200,30 @@ fn retry_delay(response: &Response, attempt: usize, github: bool) -> Option<Dura
     ))
 }
 
-pub(crate) fn require_success(response: Response, label: &str) -> Result<Response, String> {
+pub(crate) async fn require_success(response: Response, label: &str) -> Result<Response, String> {
     if response.status().is_success() {
         Ok(response)
     } else {
-        Err(format!("{label} ({})", response.status().as_u16()))
+        Err(status_error(response, label).await)
+    }
+}
+
+// GitHub puts the reason in `message`, Drive in `error.message`; the status alone can't tell a
+// missing repository from a rule violation or an oversized file.
+async fn status_error(response: Response, label: &str) -> String {
+    let status = response.status().as_u16();
+    let body = response
+        .bytes()
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .unwrap_or_default();
+    match body["message"]
+        .as_str()
+        .or(body["error"]["message"].as_str())
+    {
+        Some(message) => format!("{label} ({status}): {message}"),
+        None => format!("{label} ({status})"),
     }
 }
 
@@ -242,6 +267,7 @@ pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+#[cfg(test)]
 pub(crate) async fn download_repository(
     stage: &Path,
     source: RepositorySource,
@@ -390,7 +416,7 @@ async fn download_github(
     }
     let archive = stage.join(".archive.tar.gz");
     save_response(
-        require_success(response, "GitHub tarball request failed")?,
+        require_success(response, "GitHub tarball request failed").await?,
         &archive,
         "GitHub tarball download failed",
     )
@@ -890,7 +916,8 @@ async fn download_drive_entry(
             .request("Google Drive download failed", Method::GET, url, None)
             .await?,
         "Google Drive download failed",
-    )?;
+    )
+    .await?;
     save_response(response, destination, "Google Drive download failed").await
 }
 

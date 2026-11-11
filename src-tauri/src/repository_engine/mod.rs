@@ -1,5 +1,7 @@
 mod document;
 mod flags;
+mod media;
+mod media_cleanup;
 mod onenote;
 mod references;
 mod remote;
@@ -56,6 +58,9 @@ pub(crate) struct RepositoryEngine {
     // Millis of the last sync that confirmed the remote, including no-op checks; 0 = none yet.
     last_checked_at: AtomicU64,
     error: Mutex<Option<String>>,
+    media_migration: Mutex<Option<MediaMigration>>,
+    // Last error reported per background task, so a retry loop reports each failure once.
+    reported_errors: Mutex<HashMap<&'static str, String>>,
     cache_dir: PathBuf,
 }
 
@@ -91,6 +96,20 @@ pub struct OpenRepositoryRequest {
     source: Option<RepositorySource>,
 }
 
+// How much one sync may have to hold in memory while existing documents migrate.
+const MEDIA_BATCH_BYTES: usize = if cfg!(test) {
+    8 * 1024
+} else {
+    64 * 1024 * 1024
+};
+
+// A `total` of 0 means the documents to migrate are still being counted.
+#[derive(Clone, Serialize)]
+struct MediaMigration {
+    completed: usize,
+    total: usize,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct NativeStatus {
@@ -101,6 +120,7 @@ struct NativeStatus {
     last_error: Option<String>,
     data_version: u64,
     syncing: bool,
+    media_migration: Option<MediaMigration>,
 }
 
 #[derive(Deserialize)]
@@ -339,6 +359,7 @@ impl RepositoryEngine {
             last_error: recovery.or_else(|| self.error.lock().unwrap().clone()),
             data_version: version,
             syncing: self.syncing.load(Ordering::Relaxed),
+            media_migration: self.media_migration.lock().unwrap().clone(),
         }
     }
 
@@ -401,6 +422,137 @@ impl RepositoryEngine {
         }
     }
 
+    fn report_background_error<T, R: tauri::Runtime>(
+        &self,
+        app: &AppHandle<R>,
+        message: &'static str,
+        result: &Result<T, String>,
+    ) {
+        let mut reported = self.reported_errors.lock().unwrap();
+        match result {
+            Err(error) if reported.get(message) != Some(error) => {
+                crate::error_report::report_error(app, "RepositoryEngine", message, error);
+                reported.insert(message, error.clone());
+            }
+            Err(_) => {}
+            Ok(_) => {
+                reported.remove(message);
+            }
+        }
+    }
+
+    async fn set_media_migration(&self, app: Option<&AppHandle>, progress: Option<MediaMigration>) {
+        *self.media_migration.lock().unwrap() = progress;
+        if let Some(app) = app {
+            let _ = app.emit("repository-status", self.status().await);
+        }
+    }
+
+    // Documents written before media storage keep their bytes until something rewrites them. A sync
+    // holds every queued document in memory with its media restored, so this uploads what it has
+    // rewritten before rewriting more. That also keeps a device that cannot sync from queueing the
+    // whole repository. Taking the store once per document keeps it available in between.
+    async fn migrate_media(
+        engine: std::sync::Weak<Self>,
+        app: Option<AppHandle>,
+    ) -> Result<(), String> {
+        let result = Self::migrate_media_documents(&engine, app.as_ref()).await;
+        if let Some(owner) = engine.upgrade() {
+            owner.set_media_migration(app.as_ref(), None).await;
+        }
+        result
+    }
+
+    async fn migrate_media_documents(
+        engine: &std::sync::Weak<Self>,
+        app: Option<&AppHandle>,
+    ) -> Result<(), String> {
+        let Some(owner) = engine.upgrade() else {
+            return Ok(());
+        };
+        let candidates = owner
+            .with_store(|state| state.documents_large_enough_for_media())
+            .await?;
+        drop(owner);
+        let mut documents = Vec::new();
+        for (id, path) in candidates {
+            let holds_media = tauri::async_runtime::spawn_blocking(move || {
+                std::fs::read(path).is_ok_and(|stored| media::has_inline_media(&stored))
+            })
+            .await
+            .map_err(|error| error.to_string())?;
+            if !holds_media {
+                continue;
+            }
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            // Shown as soon as there is work, before the total is known.
+            if documents.is_empty() {
+                let progress = MediaMigration {
+                    completed: 0,
+                    total: 0,
+                };
+                owner.set_media_migration(app, Some(progress)).await;
+            }
+            documents.push(id);
+        }
+        if documents.is_empty() {
+            return Ok(());
+        }
+        let total = documents.len();
+        let mut queued = 0;
+        for (index, id) in documents.into_iter().enumerate() {
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            let progress = MediaMigration {
+                completed: index,
+                total,
+            };
+            owner.set_media_migration(app, Some(progress)).await;
+            queued += owner
+                .with_store(move |state| state.extract_document_media(&id))
+                .await?;
+            drop(owner);
+            if queued >= MEDIA_BATCH_BYTES {
+                Self::wait_for_upload(engine).await?;
+                queued = 0;
+            }
+        }
+        if let Some(owner) = engine.upgrade() {
+            let progress = MediaMigration {
+                completed: total,
+                total,
+            };
+            owner.set_media_migration(app, Some(progress)).await;
+        }
+        Self::wait_for_upload(engine).await
+    }
+
+    // Retries are the scheduler's: it syncs every 30 seconds whatever this is waiting for.
+    async fn wait_for_upload(engine: &std::sync::Weak<Self>) -> Result<(), String> {
+        let mut woken = false;
+        loop {
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            if owner.references.load(Ordering::SeqCst) == 0
+                || owner
+                    .with_store(|state| Ok(state.outbox.is_empty()))
+                    .await?
+            {
+                return Ok(());
+            }
+            if !woken {
+                owner.wake.notify_one();
+                woken = true;
+            }
+            drop(owner);
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        }
+    }
+
     fn schedule(engine: &Arc<Self>, app: &AppHandle) {
         let weak = Arc::downgrade(engine);
         let app = app.clone();
@@ -421,6 +573,11 @@ impl RepositoryEngine {
                         return;
                     }
                     let checkpoint = engine.checkpoint_pending().await;
+                    engine.report_background_error(
+                        &checkpoint_app,
+                        "Checkpointing pending documents failed",
+                        &checkpoint,
+                    );
                     if let Ok(changes) = checkpoint {
                         if !changes.changed.is_empty() {
                             engine.emit_changes(&checkpoint_app, changes).await;
@@ -449,7 +606,8 @@ impl RepositoryEngine {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {}
                 }
                 if engine.references.load(Ordering::SeqCst) != 0 {
-                    let _ = engine.synchronize(&app, true).await;
+                    let result = engine.synchronize(&app, true).await;
+                    engine.report_background_error(&app, "Background sync failed", &result);
                 }
             }
         });
@@ -727,7 +885,9 @@ impl RepositoryOperation {
                         generation
                     }
                 };
-                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": revision(&document::bytes(state.doc(&node_id)?)), "generation": generation})
+                // Not a content hash: hashing the full encode cost a second whole-document encode
+                // per open, even for the state-vector pull whose diff is a few bytes.
+                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": format!("native:{}", state.data_version), "generation": generation})
             }
             Self::CheckpointDocument { node_id } => {
                 if state.delta_counts.contains_key(&node_id) {
@@ -932,6 +1092,8 @@ pub async fn repository_open(
             syncing: AtomicBool::new(false),
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
+            media_migration: Mutex::new(None),
+            reported_errors: Mutex::new(HashMap::new()),
             cache_dir: app
                 .path()
                 .app_cache_dir()
@@ -941,7 +1103,7 @@ pub async fn repository_open(
         engines.insert(id, engine.clone());
         engine
     };
-    engine.references.fetch_add(1, Ordering::SeqCst);
+    let first_handle = engine.references.fetch_add(1, Ordering::SeqCst) == 0;
     drop(engines);
     let handle_id = uuid::Uuid::new_v4().to_string();
     manager.handles.lock().await.insert(
@@ -964,11 +1126,26 @@ pub async fn repository_open(
         })
         .await?;
     if !has_local_state {
-        let _ = engine.synchronize(&app, false).await;
+        let result = engine.synchronize(&app, false).await;
+        engine.report_background_error(&app, "Background sync failed", &result);
     }
     RepositoryEngine::schedule(&engine, &app);
     if has_local_state {
         engine.wake.notify_one();
+    }
+    if first_handle {
+        let weak = Arc::downgrade(&engine);
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = RepositoryEngine::migrate_media(weak, Some(app.clone())).await {
+                crate::error_report::report_error(
+                    &app,
+                    "RepositoryEngine",
+                    "Media migration failed",
+                    error,
+                );
+            }
+        });
     }
     Ok(json!({"handle": handle_id, "status": engine.status().await}))
 }

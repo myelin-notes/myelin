@@ -503,6 +503,8 @@ export function SidebarTree({
     <div
       className={cn(
         'flex min-h-full flex-col gap-0.5 rounded-md transition-colors duration-150',
+        // Other rows ignore clicks while one is renaming; see ExplorerTree.
+        '[&:has(input)_button:not(:has(input))]:pointer-events-none',
         !isFlat && rootDragOver && 'bg-accent/10 ring-1 ring-accent/30',
       )}
       {...(isFlat ? {} : rootDropProps)}

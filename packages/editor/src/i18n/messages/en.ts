@@ -192,6 +192,8 @@ const en = {
           `Imported ${count} page${count === 1 ? '' : 's'}`,
         skipped: (count: number) =>
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
+        skippedSections: (count: number) =>
+          `${count} section${count === 1 ? '' : 's'} could not be read`,
       },
       obsidian_vault: {
         label: 'Import from Obsidian',
@@ -225,6 +227,7 @@ const en = {
       progress: {
         importing: (current: number, total: number) =>
           `Importing ${current} of ${total}...`,
+        preparing: 'Preparing import...',
         cancelling: 'Cancelling...',
       },
       summary: {
@@ -1339,6 +1342,18 @@ const en = {
           'Use the + button at the top of the toolbar to add anything else.',
       },
     },
+  },
+  mediaMigration: {
+    title: 'Optimizing storage',
+    description:
+      'Please keep Myelin open until this finishes. Also update Myelin on your other devices, or images, PDFs and audio may appear blank there.',
+    preparing: 'Preparing…',
+    progress: (completed: number, total: number) =>
+      `${completed} of ${total} documents`,
+    finishing: 'Finishing upload…',
+    unreachable:
+      'Your repository can’t be reached right now. This will finish by itself once it’s back.',
+    continueWithoutWaiting: 'Continue without waiting',
   },
   shutdown: {
     title: 'Saving changes…',

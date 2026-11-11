@@ -24,6 +24,7 @@ import {
 } from '../../pdf-element-export';
 import { bytesToBase64 } from '../../pdf-export/contract';
 import {
+  cleanupPdfPage,
   getPdfDocumentPageSizes,
   getPdfPageTexts,
   getPdfRenderScale,
@@ -90,6 +91,11 @@ const logger = new Logger('PdfElement');
 // Long enough to outlast the pan to the page and its text layer rendering.
 const QUOTE_FLASH_MS = 4000;
 
+interface PdfThumbnailPage {
+  canvas: HTMLCanvasElement;
+  page: PdfElementExportPdfPage;
+}
+
 export class PdfElement
   extends DrawableElement
   implements PdfExportableElement, SearchableElement
@@ -104,10 +110,7 @@ export class PdfElement
   private _exportElementsProvider: (() => readonly DrawableElement[]) | null =
     null;
   private _uiServices?: CanvasUiServices;
-  private _thumbnailPages: {
-    canvas: HTMLCanvasElement;
-    page: PdfElementExportPdfPage;
-  }[] = [];
+  private _thumbnailPages: PdfThumbnailPage[] = [];
   private _pdfLoadPromise: Promise<void> | null = null;
   // Indexed by original page; persisted as `pdfText` so library search can read it without pdf.js.
   private _pageTexts: string[] = [];
@@ -506,13 +509,15 @@ export class PdfElement
     region: DOMRect,
   ): Promise<void> {
     const generation = this._loadGeneration;
-    this._thumbnailPages = [];
+    this.releaseThumbnailPages();
     await this._pdfLoadPromise;
     if (generation !== this._loadGeneration || !this._pdfDocument) {
       return;
     }
     const scaleX = getPositiveScale(this._scale.x);
     const scaleY = getPositiveScale(this._scale.y);
+    // Not shared on the element: a timed-out render can overlap the next one, and drawing consumes.
+    const pages: PdfThumbnailPage[] = [];
     for (const page of this.model.layout.pages) {
       if (
         page.kind !== 'pdf' ||
@@ -559,8 +564,10 @@ export class PdfElement
       if (generation !== this._loadGeneration) {
         return;
       }
-      this._thumbnailPages.push({ canvas, page });
+      pages.push({ canvas, page });
     }
+    this.releaseThumbnailPages();
+    this._thumbnailPages = pages;
   }
 
   public override drawThumbnail(
@@ -575,7 +582,20 @@ export class PdfElement
         page.size.w,
         page.size.h,
       );
+      if (this._pdfDocument && !this.pageView.isPageLive(page.originalIndex)) {
+        cleanupPdfPage(this._pdfDocument, page.originalIndex);
+      }
     }
+    this.releaseThumbnailPages();
+  }
+
+  // Sized down rather than just dropped: WebKit caps total canvas memory, and GC is late.
+  private releaseThumbnailPages(): void {
+    for (const { canvas } of this._thumbnailPages) {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+    this._thumbnailPages = [];
   }
 
   public getPdfExportSource(): PdfElementExportSource | null {
@@ -727,7 +747,7 @@ export class PdfElement
     this._loadGeneration++;
     this.pageView.dispose(this._pdfDocument);
     this._pdfDocument = null;
-    this._thumbnailPages = [];
+    this.releaseThumbnailPages();
     this.chromeController.clear();
     this._contentRoot = null;
     this._chrome?.dispose();
@@ -850,7 +870,7 @@ export class PdfElement
     forceMetadata: boolean,
   ): Promise<void> {
     const generation = ++this._loadGeneration;
-    this._thumbnailPages = [];
+    this.releaseThumbnailPages();
     this.pageView.invalidate();
     void this._pdfDocument?.loadingTask.destroy();
     this._pdfDocument = null;

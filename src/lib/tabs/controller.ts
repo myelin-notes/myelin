@@ -183,13 +183,6 @@ function findPane(node: LayoutNode, paneId: PaneId): PaneNode | null {
   return null;
 }
 
-export function findPaneInLayout(
-  node: LayoutNode,
-  paneId: PaneId,
-): PaneNode | null {
-  return findPane(node, paneId);
-}
-
 function findPaneForTab(node: LayoutNode, tabId: TabId): PaneNode | null {
   if (node.type === 'pane') {
     return node.tabs.some((tab) => tab.id === tabId) ? node : null;

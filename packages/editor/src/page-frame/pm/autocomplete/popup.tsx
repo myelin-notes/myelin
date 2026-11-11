@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { cn } from '../../../utils';
 import type {
   NoteLinkPreview,
@@ -215,17 +216,19 @@ export function PageFrameAutocompletePopup({
     const width = root.offsetWidth;
     const height = root.offsetHeight;
 
+    const visible = getVisibleViewportBounds();
     let left = rect.left;
     left = Math.max(
-      EDGE_MARGIN,
-      Math.min(left, window.innerWidth - width - EDGE_MARGIN),
+      visible.left + EDGE_MARGIN,
+      Math.min(left, visible.right - width - EDGE_MARGIN),
     );
 
     const below = rect.bottom + ANCHOR_GAP;
     const above = rect.top - height - ANCHOR_GAP;
     const top =
-      below + height <= window.innerHeight - EDGE_MARGIN || above < EDGE_MARGIN
-        ? Math.min(below, window.innerHeight - height - EDGE_MARGIN)
+      below + height <= visible.bottom - EDGE_MARGIN ||
+      above < visible.top + EDGE_MARGIN
+        ? Math.min(below, visible.bottom - height - EDGE_MARGIN)
         : above;
 
     setStyle((current) => {
@@ -342,7 +345,7 @@ export function PageFrameAutocompletePopup({
         ref={listRef}
         role="listbox"
         aria-label="Autocomplete suggestions"
-        className="flex max-h-[280px] w-[320px] flex-col gap-1 overflow-y-auto p-1.5"
+        className="flex max-h-[280px] w-[320px] max-w-[calc(100vw-1.5rem)] flex-col gap-1 overflow-y-auto p-1.5"
       >
         {state.status === 'loading' && (
           <AutocompleteStatusRow

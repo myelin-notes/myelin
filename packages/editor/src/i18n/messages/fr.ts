@@ -199,6 +199,8 @@ const fr: typeof en = {
           `${count} page${count > 1 ? 's' : ''} importée${count > 1 ? 's' : ''}`,
         skipped: (count: number) =>
           `${count} page${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être importée${count > 1 ? 's' : ''}`,
+        skippedSections: (count: number) =>
+          `${count} section${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être lue${count > 1 ? 's' : ''}`,
       },
       obsidian_vault: {
         label: 'Importer depuis Obsidian',
@@ -234,6 +236,7 @@ const fr: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `Import de ${current} sur ${total}...`,
+        preparing: "Préparation de l'importation...",
         cancelling: 'Annulation...',
       },
       summary: {
@@ -1364,6 +1367,18 @@ const fr: typeof en = {
           'Utilisez le bouton + en haut de la barre d’outils pour ajouter tout le reste.',
       },
     },
+  },
+  mediaMigration: {
+    title: 'Optimisation du stockage',
+    description:
+      'Gardez Myelin ouvert jusqu’à la fin. Mettez aussi à jour Myelin sur vos autres appareils, sinon les images, les PDF et l’audio risquent d’y apparaître vides.',
+    preparing: 'Préparation…',
+    progress: (completed: number, total: number) =>
+      `${completed} documents sur ${total}`,
+    finishing: 'Fin de l’envoi…',
+    unreachable:
+      'Votre dépôt est inaccessible pour le moment. L’opération se terminera d’elle-même dès qu’il sera de nouveau disponible.',
+    continueWithoutWaiting: 'Continuer sans attendre',
   },
   shutdown: {
     title: 'Enregistrement des modifications…',

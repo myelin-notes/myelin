@@ -76,6 +76,8 @@ webview2-com = "0.38"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
+libgit2-sys = "0.18"
+openssl-sys = "0.9"
 
 [features]
 # Opt-in GPU acceleration via whisper.cpp's Vulkan backend. Kept off by default
@@ -107,9 +109,22 @@ objc2-ui-kit = { version = "0.3", default-features = false, features = ["std", "
 [profile.dev.package.scrypt]
 opt-level = 3
 
+# Unoptimized, OneNote imports take several times longer than in release.
+[profile.dev.package.lzxd]
+opt-level = 3
+
+[profile.dev.package.onenote_parser]
+opt-level = 3
+
+[profile.dev.package.yrs]
+opt-level = 3
+
 # Fork carrying the Windows MSVC compilation fix (whisper logging hooks) plus
 # Opts.abort_signal for cancelling in-flight whisper runs. Pinned to a branch so
 # a clean checkout (CI) resolves it without any local patch step.
 [patch.crates-io]
 tauri-plugin-scoped-storage = { git = "https://github.com/myelin-notes/tauri-plugin-scoped-storage.git", rev = "02572c6891221b311091e69963bda7565a6d8c11" }
 scribble = { git = "https://github.com/myelin-notes/scribble", branch = "feat/abort-signal-upstream" }
+# Fork that stops a node-list fragment at its ChunkTerminatorFND; upstream reads the
+# padding after it as a node, so large sections fail and are skipped on import.
+onenote_parser = { git = "https://github.com/myelin-notes/onenote.rs", branch = "fix/chunk-terminator-padding" }

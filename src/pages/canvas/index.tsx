@@ -56,13 +56,13 @@ import {
 } from '@/components/ui/tooltip';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_DEV } from '@/lib/env';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import type { TabId } from '@/lib/tabs/types';
 import { useCanvasStyle } from '@/lib/use-canvas-style';
-import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { RenameReferencesDialog } from '@/pages/library/explorer/rename-references-dialog';
 import { BacklinksChip } from './components/backlinks-chip';
 import { CameraCapture } from './components/camera-capture';
@@ -70,6 +70,7 @@ import { CanvasSearch } from './components/canvas-search';
 import { CanvasStyleButton } from './components/canvas-style-button';
 import { CanvasToolbar } from './components/canvas-toolbar';
 import { ChromeMenu } from './components/chrome-menu';
+import { ContextInsertAnchor } from './components/context-insert-anchor';
 import { EmbedComposer } from './components/embed-composer';
 import { ExportDialog } from './components/export-dialog';
 import { FlagsChip } from './components/flags-chip';
@@ -85,6 +86,7 @@ import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
+import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -92,6 +94,8 @@ const logger = new Logger('CanvasView');
 // The wheel's rings sit at fixed offsets outside this radius, so the default 100 spans 478px —
 // wider than any phone. 52 brings the outer ring to 382px, clearing a 390px portrait screen.
 const COMPACT_WHEEL_RADIUS = 52;
+// Not just phones: a tablet in split screen or a small desktop window can't fit the full wheel either.
+const COMPACT_WHEEL_QUERY = '(max-width: 519px), (max-height: 519px)';
 
 interface CanvasViewProps {
   id: VFSNodeId;
@@ -133,14 +137,17 @@ function CanvasViewInner({
   const repository = useRepository();
   const strings = useMessages();
   const { types: flagTypes } = useFlagTypes();
+  const canvasRootRef = useRef<HTMLDivElement>(null);
   const thumbnailRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const bgHostRef = useRef<HTMLDivElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const wheelRef = useRef<WheelPickerHandle>(null);
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
+  useVisibleCanvasSize(canvasRootRef);
+  const compactWheel = useMediaQuery(COMPACT_WHEEL_QUERY);
   const toolState = useToolState(drawableCanvasRef);
   usePencilGestures({
     drawableCanvasRef,
@@ -202,7 +209,7 @@ function CanvasViewInner({
     recordingOwnerId,
     thumbnailRootRef,
     canvasRef,
-    bgHostRef,
+    bgCanvasRef,
     overlayCanvasRef,
     domOverlayRef,
     wheelRef,
@@ -632,6 +639,7 @@ function CanvasViewInner({
   // caret-reveal for offscreen page-frame carets can scroll them and desync the DOM from the canvas.
   return (
     <div
+      ref={canvasRootRef}
       data-canvas-root
       className="relative h-full w-full overflow-clip bg-page"
       style={surfaceStyle}
@@ -658,13 +666,11 @@ function CanvasViewInner({
         className="absolute inset-0 isolate overflow-clip bg-page"
         style={surfaceStyle}
       >
-        {/* Background layer: dot grid, as a repeating CSS background rather
-            than a canvas — panning it is a compositor translate that
-            rasterizes nothing. Position and size are written by CanvasRenderer,
-            which owns the overdraw the pan translate depends on. */}
-        <div
-          ref={bgHostRef}
+        {/* Background pattern, below the DOM layers. */}
+        <canvas
+          ref={bgCanvasRef}
           data-thumbnail-exclude="true"
+          className="pointer-events-none absolute inset-0 block h-full w-full"
           style={{ zIndex: 0 }}
         />
 
@@ -771,12 +777,9 @@ function CanvasViewInner({
       />
 
       {inserts.contextInsert && (
-        <div
-          className="pointer-events-auto absolute z-20"
-          style={{
-            left: inserts.contextInsert.screenX,
-            top: inserts.contextInsert.screenY,
-          }}
+        <ContextInsertAnchor
+          screenX={inserts.contextInsert.screenX}
+          screenY={inserts.contextInsert.screenY}
         >
           <InsertPopover
             onPaste={() => {
@@ -790,7 +793,7 @@ function CanvasViewInner({
             onTakePhoto={inserts.onContextTakePhoto}
             onClose={inserts.closeContextInsert}
           />
-        </div>
+        </ContextInsertAnchor>
       )}
 
       <div
@@ -799,7 +802,7 @@ function CanvasViewInner({
       >
         <WheelPicker
           ref={wheelRef}
-          radius={IS_PHONE_BUILD ? COMPACT_WHEEL_RADIUS : 100}
+          radius={compactWheel ? COMPACT_WHEEL_RADIUS : 100}
           items={toolState.wheelItems}
         >
           {wheelCenterIcon}

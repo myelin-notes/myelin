@@ -271,7 +271,7 @@ export default function CanvasEditor({ locale }: { locale: Locale }) {
 }
 
 function CanvasEditorInner() {
-  const bgRef = useRef<HTMLDivElement>(null);
+  const bgRef = useRef<HTMLCanvasElement>(null);
   const fgRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const domHostRef = useRef<HTMLDivElement>(null);
@@ -305,7 +305,7 @@ function CanvasEditorInner() {
     const stopPersisting = persistTryCanvas(ydoc.doc);
     const canvas = new DrawableCanvas(fg, ydoc, canvasTools);
     const stopPersistingView = persistTryCanvasView(canvas.viewport);
-    canvas.setBackgroundHost(bg);
+    canvas.setBackgroundCanvas(bg);
     canvas.setOverlayCanvas(overlay);
     canvas.setDomOverlayHost(domHost);
     canvas.setOnToolSwitched(setSelectedToolIndex);
@@ -372,7 +372,11 @@ function CanvasEditorInner() {
           scroll. Isolated so the element-order z-indexes stay below the
           selection overlay and chrome controls. */}
       <div className="absolute inset-0 isolate">
-        <div ref={bgRef} style={{ zIndex: 0 }} />
+        <canvas
+          ref={bgRef}
+          className={`${layerClass} pointer-events-none`}
+          style={{ zIndex: 0 }}
+        />
 
         {/* Page-frame chrome + ProseMirror editors (self-positioned). */}
         {canvas && (

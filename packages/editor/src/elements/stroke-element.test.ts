@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
 import {
@@ -503,5 +503,241 @@ describe('StrokeElement turning tip', () => {
 
     // With the pointer held fixed in the comparison, the contour must not jump farther than a sample.
     expect(largestDisplacement).toBeLessThanOrEqual(step);
+  });
+});
+
+describe('StrokeElement outline simplification', () => {
+  // Flattens what actually gets filled, so these assert the painted shape, not the simplifier.
+  class RecordingPath {
+    public readonly points: number[][] = [];
+    public segments = 0;
+
+    public moveTo(x: number, y: number): void {
+      this.points.push([x, y]);
+    }
+
+    public lineTo(x: number, y: number): void {
+      this.points.push([x, y]);
+      this.segments += 1;
+    }
+
+    public quadraticCurveTo(cx: number, cy: number, x: number, y: number) {
+      const [startX, startY] = this.points[this.points.length - 1];
+      for (let step = 1; step <= 8; step++) {
+        const t = step / 8;
+        const u = 1 - t;
+        this.points.push([
+          u * u * startX + 2 * u * t * cx + t * t * x,
+          u * u * startY + 2 * u * t * cy + t * t * y,
+        ]);
+      }
+      this.segments += 1;
+    }
+
+    public closePath(): void {
+      this.points.push(this.points[0]);
+    }
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('Path2D', RecordingPath);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function paintedPath(stroke: StrokeElement): RecordingPath {
+    let path: RecordingPath | null = null;
+    stroke.draw(
+      {
+        save() {},
+        restore() {},
+        translate() {},
+        rotate() {},
+        scale() {},
+        fill(painted: RecordingPath) {
+          path = painted;
+        },
+      } as unknown as CanvasRenderingContext2D,
+      0,
+    );
+    return path!;
+  }
+
+  function fullOutlineWorld(stroke: StrokeElement): number[][] {
+    const outline: number[][] = [];
+    stroke.drawToPdf({
+      worldToPagePt: (x, y) => ({ x, y }),
+      ptPerWorldY: 1,
+      push: (item) => {
+        if (item.t === 'path') {
+          for (let i = 0; i < item.pts.length; i += 2) {
+            outline.push([item.pts[i], item.pts[i + 1]]);
+          }
+        }
+      },
+      addImageBase64: () => 0,
+      addFontBase64: () => 0,
+    });
+    return outline;
+  }
+
+  // The dense, near-straight handwriting that imported ink is made of.
+  const densePoints = Array.from({ length: 300 }, (_, i) => [
+    i * 0.2,
+    Math.sin(i / 30) * 6,
+    0.5,
+  ]).flat();
+
+  function distanceToPolyline(
+    x: number,
+    y: number,
+    line: { x: number; y: number }[],
+  ): number {
+    let nearest = Number.POSITIVE_INFINITY;
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1];
+      const dx = line[i].x - a.x;
+      const dy = line[i].y - a.y;
+      const along = Math.min(
+        1,
+        Math.max(0, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy)),
+      );
+      nearest = Math.min(
+        nearest,
+        Math.hypot(x - a.x - along * dx, y - a.y - along * dy),
+      );
+    }
+    return nearest;
+  }
+
+  it.each([
+    1, 20,
+  ])('does not move the painted ink at element scale %s', (scale) => {
+    const stroke = new StrokeElement('dense', densePoints, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    stroke.setScale(scale, scale);
+
+    const unsimplified = new RecordingPath();
+    appendStrokeOutline(unsimplified, fullOutlineWorld(stroke));
+    const painted = paintedPath(stroke).points.map(([x, y]) =>
+      stroke.localToWorld(x, y),
+    );
+
+    for (const [x, y] of unsimplified.points) {
+      // Half a device pixel at 400% on a 2x display, whatever the element's own scale.
+      expect(distanceToPolyline(x, y, painted)).toBeLessThan(0.0625);
+    }
+  });
+
+  it('traces far fewer segments than a dense outline has points', () => {
+    const stroke = new StrokeElement('dense', densePoints, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+
+    stroke.updateBounds();
+
+    expect(paintedPath(stroke).segments).toBeLessThan(
+      fullOutlineWorld(stroke).length / 2,
+    );
+  });
+
+  it('keeps every outline point while the stroke is being drawn', () => {
+    const stroke = new StrokeElement('live', [], false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    for (let i = 0; i < densePoints.length; i += 3) {
+      stroke.addPoint(densePoints[i], densePoints[i + 1], densePoints[i + 2]);
+    }
+
+    const live = paintedPath(stroke).segments;
+    expect(live).toBeGreaterThanOrEqual(fullOutlineWorld(stroke).length - 2);
+
+    stroke.updateBounds();
+    expect(paintedPath(stroke).segments).toBeLessThan(live / 2);
+  });
+
+  it('paints a stroke longer than the buffers start out, to its very end', () => {
+    const points = Array.from({ length: 6000 }, (_, i) => [
+      i * 0.2,
+      Math.sin(i / 3) * 4,
+      0.5,
+    ]).flat();
+    const stroke = new StrokeElement('long', points, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    stroke.updateBounds();
+    expect(fullOutlineWorld(stroke).length).toBeGreaterThan(4096);
+
+    const painted = paintedPath(stroke).points;
+    const box = stroke.localBoundingBox;
+    expect(painted.flat().every(Number.isFinite)).toBe(true);
+    expect(Math.max(...painted.map(([x]) => x))).toBeCloseTo(box.right, 0);
+    expect(Math.min(...painted.map(([x]) => x))).toBeCloseTo(box.left, 0);
+  });
+
+  it('paints a stroke the same after a longer one has used the buffers', () => {
+    const make = (uuid: string) => {
+      const stroke = new StrokeElement(uuid, densePoints, false, {
+        color: '#ff0000',
+        size: 1.3,
+      });
+      stroke.updateBounds();
+      return paintedPath(stroke).points;
+    };
+    const before = make('first');
+
+    const longer = new StrokeElement(
+      'longer',
+      Array.from({ length: 3000 }, (_, i) => [i, (i % 7) * 3, 0.5]).flat(),
+      false,
+      { color: '#ff0000', size: 1.3 },
+    );
+    longer.updateBounds();
+
+    expect(make('second')).toEqual(before);
+  });
+
+  it('paints nothing for a stroke with no outline, not the stroke before it', () => {
+    const previous = new StrokeElement('previous', densePoints, false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    previous.updateBounds();
+
+    const empty = new StrokeElement('empty', densePoints, false, {
+      color: '#ff0000',
+      size: 0,
+    });
+    empty.updateBounds();
+
+    expect(paintedPath(empty).segments).toBe(0);
+  });
+
+  it('keeps a tap shrunk below the tolerance from vanishing', () => {
+    const stroke = new StrokeElement('tiny', [5, 5, 0.5], false, {
+      color: '#ff0000',
+      size: 0.5,
+    });
+    stroke.setScale(0.05, 0.05);
+
+    // Fewer than two segments enclose nothing to fill.
+    expect(paintedPath(stroke).segments).toBeGreaterThanOrEqual(2);
+  });
+
+  it('still paints a tap', () => {
+    const stroke = new StrokeElement('tap', [5, 5, 0.5], false, {
+      color: '#ff0000',
+      size: 1.3,
+    });
+    stroke.updateBounds();
+
+    expect(paintedPath(stroke).segments).toBeGreaterThan(0);
   });
 });

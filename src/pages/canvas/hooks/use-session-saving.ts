@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
+  ensureThumbnail,
   regenerateThumbnailNow,
   requestThumbnailRegeneration,
 } from '@myelin/editor/thumbnails';
@@ -21,6 +22,8 @@ const AUTO_SAVE_INTERVAL_MS = 10_000;
  * autosave interval below still bounds what an unclean exit can lose.
  */
 const SAVE_DEBOUNCE_MS = 1_000;
+// Lets the opening viewport animation settle; closing sooner still flushes a render.
+const MISSING_THUMBNAIL_DELAY_MS = 3_000;
 const logger = new Logger('CanvasSessionSaveScheduler');
 
 interface UseSessionSavingArgs {
@@ -177,6 +180,16 @@ export function useCanvasSessionSaving({
     const cleanupNoteId = noteId;
     const cleanupRepository = repository;
     const cleanupSession = noteSession;
+    // Empty notes keep the library's placeholder rather than a blank image.
+    if (noteSession.ydoc.elements.length > 0) {
+      void ensureThumbnail(noteSession.id, {
+        delayMs: MISSING_THUMBNAIL_DELAY_MS,
+      }).catch((error) => {
+        logger.error('Failed to check for a missing thumbnail', error, {
+          id: noteSession.id,
+        });
+      });
+    }
     const unsubscribeLocalChanges = noteSession.subscribeLocalChanges(() => {
       if (noteIdRef.current !== undefined) {
         requestThumbnailRegeneration(noteIdRef.current);

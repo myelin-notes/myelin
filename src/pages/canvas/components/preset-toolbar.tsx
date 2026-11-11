@@ -13,6 +13,7 @@ import {
   type PresetToolbarPosition,
   UserPrefs,
 } from '@myelin/editor/user-prefs';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import {
   Tooltip,
   TooltipContent,
@@ -171,25 +172,32 @@ export const PresetToolbar = memo(function PresetToolbar({
     if (!bar) {
       return { left: 0, top: 0 };
     }
+    const visible = getVisibleViewportBounds();
     if (vertical) {
       return {
         left:
-          bar.left + bar.width / 2 < window.innerWidth / 2
+          bar.left + bar.width / 2 < (visible.left + visible.right) / 2
             ? bar.right + DELETE_ZONE_GAP
             : bar.left - DELETE_ZONE_GAP - DELETE_ZONE_WIDTH,
         top: Math.min(
-          Math.max(pointerY - DELETE_ZONE_HEIGHT / 2, VIEWPORT_MARGIN),
-          window.innerHeight - DELETE_ZONE_HEIGHT - VIEWPORT_MARGIN,
+          Math.max(
+            pointerY - DELETE_ZONE_HEIGHT / 2,
+            visible.top + VIEWPORT_MARGIN,
+          ),
+          visible.bottom - DELETE_ZONE_HEIGHT - VIEWPORT_MARGIN,
         ),
       };
     }
     return {
       left: Math.min(
-        Math.max(pointerX - DELETE_ZONE_WIDTH / 2, VIEWPORT_MARGIN),
-        window.innerWidth - DELETE_ZONE_WIDTH - VIEWPORT_MARGIN,
+        Math.max(
+          pointerX - DELETE_ZONE_WIDTH / 2,
+          visible.left + VIEWPORT_MARGIN,
+        ),
+        visible.right - DELETE_ZONE_WIDTH - VIEWPORT_MARGIN,
       ),
       top:
-        bar.top + bar.height / 2 < window.innerHeight / 2
+        bar.top + bar.height / 2 < (visible.top + visible.bottom) / 2
           ? bar.bottom + DELETE_ZONE_GAP
           : bar.top - DELETE_ZONE_GAP - DELETE_ZONE_HEIGHT,
     };

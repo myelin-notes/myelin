@@ -111,6 +111,48 @@ pub(crate) fn lock_git() -> Result<MutexGuard<'static, ()>, String> {
     GIT_LOCK.lock().map_err(|_| "Git lock unavailable".into())
 }
 
+// openssl-src builds Android with `no-stdio`, so OpenSSL cannot read a CA file from disk and
+// `git2::opts::set_ssl_cert_file` always fails there.
+#[cfg(target_os = "android")]
+fn trust_bundled_certificates() -> Result<(), String> {
+    static TRUSTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    let trusted = TRUSTED.get_or_init(|| unsafe {
+        libgit2_sys::init();
+        let bundle = include_bytes!("../resources/cacert.pem");
+        let bio = openssl_sys::BIO_new_mem_buf(bundle.as_ptr().cast(), bundle.len() as libc::c_int);
+        if bio.is_null() {
+            return false;
+        }
+        let mut all_added = true;
+        let mut count = 0;
+        loop {
+            let certificate = openssl_sys::PEM_read_bio_X509(
+                bio,
+                std::ptr::null_mut(),
+                None,
+                std::ptr::null_mut(),
+            );
+            if certificate.is_null() {
+                break;
+            }
+            all_added &= libgit2_sys::git_libgit2_opts(
+                libgit2_sys::GIT_OPT_ADD_SSL_X509_CERT as libc::c_int,
+                certificate,
+            ) == 0;
+            openssl_sys::X509_free(certificate);
+            count += 1;
+        }
+        openssl_sys::BIO_free_all(bio);
+        // The end of the bundle reads as an error; left queued, SSL_get_error would misreport the
+        // next TLS call on this thread.
+        openssl_sys::ERR_clear_error();
+        all_added && count > 0
+    });
+    trusted
+        .then_some(())
+        .ok_or_else(|| "Git TLS certificates unavailable".into())
+}
+
 /// Fetches `branch` into the bare cache at `repo_path`, cloning on first use, and returns its
 /// head. The caller must hold [`lock_git`]; `scratch` must be an existing, empty directory.
 pub(crate) fn fetch_head(
@@ -121,17 +163,8 @@ pub(crate) fn fetch_head(
     token: &str,
 ) -> Result<(Repository, Oid), String> {
     let trace = crate::repository_engine::telemetry::current();
-    #[cfg(any(target_os = "android", test))]
-    {
-        let cert_path = scratch.with_file_name("cacert.pem");
-        std::fs::write(&cert_path, include_bytes!("../resources/cacert.pem"))
-            .map_err(|_| "Git CA bundle unavailable")?;
-        if cfg!(target_os = "android") {
-            // All Git network operations in this app hold GIT_LOCK.
-            unsafe { git2::opts::set_ssl_cert_file(cert_path.as_path()) }
-                .map_err(|_| "Git TLS certificates unavailable")?;
-        }
-    }
+    #[cfg(target_os = "android")]
+    trust_bundled_certificates()?;
     // Same bound as the REST client; a stalled fetch could otherwise hold the sync locks.
     unsafe {
         git2::opts::set_server_connect_timeout_in_milliseconds(30_000)
@@ -146,7 +179,8 @@ pub(crate) fn fetch_head(
         true
     });
     let mut fetch_options = FetchOptions::new();
-    if url.starts_with("https://") {
+    // libgit2's local transport can't serve shallow fetches.
+    if url.contains("://") {
         fetch_options.depth(1);
     }
     fetch_options
@@ -184,7 +218,9 @@ pub(crate) fn fetch_head(
         std::fs::create_dir_all(repo_path.parent().ok_or("Git cache path unavailable")?)
             .map_err(|_| "Git cache unavailable")?;
         std::fs::rename(scratch.join("repo"), repo_path).map_err(|_| "Git cache unavailable")?;
-        Repository::open_bare(repo_path).map_err(|_| "Git cache unavailable")?
+        // Not open_bare: it leaves the shallow boundary unloaded until a fetch, so a push from this
+        // clone walks to parents it doesn't have and fails with Odb/GenericError.
+        Repository::open(repo_path).map_err(|_| "Git cache unavailable")?
     };
     drop(fetching);
     trace.add("git_received_bytes", received.get() as u64);
@@ -196,6 +232,10 @@ pub(crate) fn fetch_head(
 // costs one download of the current tree, so wait until stale versions outweigh it about twice;
 // the 64 MiB floor keeps small repositories from re-cloning on most syncs.
 fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
+    let size = directory_size(repo_path);
+    if size <= 64 * 1024 * 1024 {
+        return false;
+    }
     let Some(tree) = find_parent(repo, branch, true)
         .or_else(|_| find_parent(repo, branch, false))
         .ok()
@@ -215,7 +255,7 @@ fn outgrown(repo: &Repository, repo_path: &Path, branch: &str) -> bool {
         }
         TreeWalkResult::Ok
     });
-    walked.is_ok() && directory_size(repo_path) > current * 3 + 64 * 1024 * 1024
+    walked.is_ok() && size > current * 3 + 64 * 1024 * 1024
 }
 
 fn directory_size(path: &Path) -> u64 {
@@ -458,10 +498,6 @@ mod tests {
         )
         .expect("push succeeds");
         assert_eq!(result.status, "pushed");
-        assert_eq!(
-            fs::read(root.join("cacert.pem")).expect("Git CA bundle"),
-            include_bytes!("../resources/cacert.pem")
-        );
         let pushed = git2::Repository::open_bare(&bare_path).expect("pushed repository");
         let pushed_head = pushed
             .find_reference("refs/heads/main")
@@ -558,6 +594,122 @@ mod tests {
         drop(root_tree);
         drop(files);
         drop(seed);
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn pushes_from_a_fresh_shallow_clone() {
+        struct Daemon(std::process::Child);
+        impl Drop for Daemon {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+
+        let root = std::env::temp_dir().join(format!(
+            "myelin-git-shallow-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let remote = Repository::init_bare(root.join("notes.git")).expect("remote repository");
+        let tree_id = remote
+            .treebuilder(None)
+            .expect("tree")
+            .write()
+            .expect("tree id");
+        let tree = remote.find_tree(tree_id).expect("tree");
+        let signature = Signature::now("Test", "test@example.invalid").expect("identity");
+        let first = remote
+            .commit(None, &signature, &signature, "first", &tree, &[])
+            .expect("first commit");
+        let first = remote.find_commit(first).expect("first commit");
+        let head = remote
+            .commit(
+                Some("refs/heads/main"),
+                &signature,
+                &signature,
+                "second",
+                &tree,
+                &[&first],
+            )
+            .expect("second commit");
+
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .expect("free port")
+            .port();
+        let exec_path = std::process::Command::new("git")
+            .arg("--exec-path")
+            .output()
+            .expect("git exec path")
+            .stdout;
+        // Not `git daemon`: killing that wrapper orphans the real server.
+        let daemon = Daemon(
+            std::process::Command::new(
+                Path::new(String::from_utf8_lossy(&exec_path).trim()).join("git-daemon"),
+            )
+            .args([
+                "--reuseaddr",
+                "--export-all",
+                "--enable=receive-pack",
+                "--listen=127.0.0.1",
+            ])
+            .arg(format!("--port={port}"))
+            .arg(format!("--base-path={}", root.display()))
+            .spawn()
+            .expect("git daemon"),
+        );
+        for _ in 0..100 {
+            if std::net::TcpStream::connect(("127.0.0.1", port)).is_ok() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+
+        let stage = root.join("stage");
+        fs::create_dir_all(&stage).expect("stage directory");
+        fs::write(stage.join("0"), b"note").expect("note file");
+        let cache_path = root.join("cache.git");
+        let response = push_batch_to_url(
+            &stage,
+            &cache_path,
+            &format!("git://127.0.0.1:{port}/notes.git"),
+            GitPushRequest {
+                owner: "example".into(),
+                repo: "notes".into(),
+                branch: "main".into(),
+                token: String::new(),
+                expected_head_oid: head.to_string(),
+                message: "Sync notes".into(),
+                staging_id: "00000000-0000-0000-0000-000000000005".into(),
+                additions: vec![GitPushFile {
+                    path: "files/note.myelin".into(),
+                    index: 0,
+                }],
+                deletions: vec![],
+            },
+        )
+        .expect("push response");
+        assert!(Repository::open_bare(&cache_path)
+            .expect("cache")
+            .is_shallow());
+        assert_eq!(response.failure_reason, None);
+        assert_eq!(
+            response.commit_oid,
+            Some(
+                remote
+                    .refname_to_id("refs/heads/main")
+                    .expect("pushed head")
+                    .to_string()
+            )
+        );
+        drop(daemon);
+        drop(first);
+        drop(tree);
+        drop(remote);
         fs::remove_dir_all(root).expect("remove test directory");
     }
 

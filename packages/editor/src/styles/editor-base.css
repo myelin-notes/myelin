@@ -32,23 +32,44 @@
   margin: 0 0 0.9em;
 }
 
+/* WebKit floors line-height to whole px and Chromium keeps the fraction, so 1.65 is 26 vs 26.4px: the
+   same document runs ~12px a page taller on Chromium and can paginate differently. Inherits as a
+   length, so inline children that change font must set their own (see .pm-md-inline-code). */
+.pm-editor .ProseMirror p,
+.pm-editor .ProseMirror blockquote,
+.pm-editor .ProseMirror .pm-math-block,
 .pm-editor .ProseMirror .bullet-list-item,
 .pm-editor .ProseMirror .ordered-list-item,
 .pm-editor .ProseMirror .check-list-item {
-  padding-left: 1.5em;
-  position: relative;
+  line-height: 26px;
+}
+
+.pm-editor .ProseMirror .bullet-list-item,
+.pm-editor .ProseMirror .ordered-list-item,
+.pm-editor .ProseMirror .check-list-item {
+  /* Grid, not an inline-block marker: an atomic inline adds a wrap opportunity, so a first word or formula
+     wider than the line would drop below a marker left alone on line one. The wrapper around the content
+     keeps inline children from becoming grid items. */
+  align-items: baseline;
+  display: grid;
+  grid-template-columns: 1.5em minmax(0, 1fr);
+}
+
+/* Pinned, not auto-placed, so the PDF harvest's stand-in can share the cell (see measureListMarker). */
+.pm-editor .ProseMirror .bullet-list-item::before,
+.pm-editor .ProseMirror .ordered-list-item::before {
+  grid-area: 1 / 1;
+  justify-self: start;
 }
 
 .pm-editor .ProseMirror .bullet-list-item::before {
   content: '\2022';
-  position: absolute;
-  left: 0.35em;
+  margin-left: 0.35em;
 }
 
 .pm-editor .ProseMirror .ordered-list-item::before {
   content: attr(data-order) '.';
-  position: absolute;
-  left: 0.1em;
+  margin-left: 0.1em;
 }
 
 .pm-editor .ProseMirror .bullet-list-item.pm-list-marker-selected::before,
@@ -66,10 +87,10 @@
 .pm-editor .ProseMirror .check-list-item > input[type="checkbox"] {
   accent-color: var(--accent-dark);
   height: 1em;
-  left: 0;
   margin: 0;
-  position: absolute;
-  top: calc((1.65em - 1em) / 2);
+  position: relative;
+  /* Both engines rest a checkbox's bottom edge on the baseline, which reads high beside the text. */
+  top: 0.2em;
   width: 1em;
 }
 
@@ -85,20 +106,22 @@
   color: var(--text-primary);
   font-family: var(--font-heading);
   font-weight: 560;
-  line-height: 1.12;
   letter-spacing: -0.025em;
 }
 
 .pm-editor .ProseMirror h1 {
   font-size: 2.35rem;
+  line-height: 42px;
 }
 
 .pm-editor .ProseMirror h2 {
   font-size: 1.8rem;
+  line-height: 32px;
 }
 
 .pm-editor .ProseMirror h3 {
   font-size: 1.4rem;
+  line-height: 25px;
 }
 
 .pm-editor .ProseMirror blockquote {

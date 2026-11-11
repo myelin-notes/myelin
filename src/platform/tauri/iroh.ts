@@ -39,6 +39,9 @@ export class IrohTransport implements Transport {
   private _connected = false;
   private repositoryHandle: string | null = null;
   private unlisteners: UnlistenFn[] = [];
+  // Leave must run after an in-flight host/join attaches, or the late attach replaces the topic
+  // of the transport that superseded this one.
+  private attaching: Promise<unknown> = Promise.resolve();
   // biome-ignore lint/suspicious/noExplicitAny: generic event emitter
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
@@ -75,23 +78,27 @@ export class IrohTransport implements Transport {
 
   async host(): Promise<string> {
     await this.setupTauriListeners();
-    const ticket = await invoke<string>('iroh_host', {
+    const hosting = invoke<string>('iroh_host', {
       noteId: this.noteId,
       transportId: this.transportId,
       repositoryHandle: this.repositoryHandle,
     });
+    this.attaching = hosting.catch(() => {});
+    const ticket = await hosting;
     logger.debug('Hosting note transport', { noteId: this.noteId });
     return ticket;
   }
 
   async join(ticket: string): Promise<void> {
     await this.setupTauriListeners();
-    await invoke('iroh_join', {
+    const joining = invoke('iroh_join', {
       noteId: this.noteId,
       transportId: this.transportId,
       repositoryHandle: this.repositoryHandle,
       ticket,
     });
+    this.attaching = joining.catch(() => {});
+    await joining;
     logger.debug('Joining note transport', { noteId: this.noteId });
   }
 
@@ -101,6 +108,7 @@ export class IrohTransport implements Transport {
     }
     this.unlisteners = [];
     this._connected = false;
+    await this.attaching;
     await invoke('iroh_leave', {
       noteId: this.noteId,
       transportId: this.transportId,

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type * as Y from 'yjs';
+import { Logger } from '@myelin/shared/logger';
 import { CanvasDocumentBinding } from './canvas-document-binding';
 import { ElementType } from './elements/element-type';
 import { PageFrameElement } from './elements/page-frame-element';
@@ -61,6 +62,25 @@ describe('CanvasDocumentBinding', () => {
     expect(binding.elements).toEqual([]);
     expect(removed).toHaveBeenCalledWith(element);
     binding.destroy();
+  });
+
+  it('disposes every element on destroy even if one fails', () => {
+    const logged = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
+    const { binding, removed } = createBinding(new YDocManager());
+    const first = binding.addElement(createStroke, undefined);
+    const second = binding.addElement(createStroke, undefined);
+    removed.mockImplementationOnce(() => {
+      throw new Error('dispose failed');
+    });
+
+    binding.destroy();
+
+    expect(removed).toHaveBeenCalledWith(first);
+    expect(removed).toHaveBeenCalledWith(second);
+    expect(binding.elements).toEqual([]);
+    logged.mockRestore();
   });
 });
 

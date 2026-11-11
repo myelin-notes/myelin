@@ -25,9 +25,10 @@ export function useCanvasThumbnailProducer({
       return;
     }
 
-    return registerThumbnailProducer(id, {
+    let closed = false;
+    const unregister = registerThumbnailProducer(id, {
       async render(maxSize) {
-        const canvas = drawableCanvasRef.current;
+        const canvas = closed ? null : drawableCanvasRef.current;
         if (canvas === null) {
           return null;
         }
@@ -38,6 +39,12 @@ export function useCanvasThumbnailProducer({
         );
       },
     });
+    return () => {
+      // After unregister, which can flush while the ref is still this note's: the ref moves on to
+      // the next note's canvas, so a later render would save that note's image as this one's.
+      unregister();
+      closed = true;
+    };
   }, [drawableCanvasRef, id]);
 
   useEffect(() => {
