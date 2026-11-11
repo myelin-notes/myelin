@@ -121,6 +121,15 @@ export class FigureNodeView implements NodeView {
 
   private readonly handleMediaLoad = (event: Event): void => {
     const target = event.target;
+    // A link card's favicon and thumbnail load here too, and say nothing about the figure's shape.
+    if (
+      !(
+        target instanceof Element &&
+        target.matches('.pm-embed-image, .pm-embed-video')
+      )
+    ) {
+      return;
+    }
     const [width, height] =
       target instanceof HTMLImageElement
         ? [target.naturalWidth, target.naturalHeight]
