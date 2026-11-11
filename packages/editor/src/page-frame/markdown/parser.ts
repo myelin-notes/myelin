@@ -573,6 +573,21 @@ function scanInline(
       }
     }
 
+    if (text.startsWith('<u>', i)) {
+      const end = text.indexOf('</u>', i + 3);
+      if (end !== -1) {
+        pushText();
+        for (const child of scanInline(text.slice(i + 3, end), schema, [
+          ...baseMarks,
+          schema.marks.underline.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = end + 4;
+        continue;
+      }
+    }
+
     buf += ch;
     i++;
   }

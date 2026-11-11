@@ -313,7 +313,10 @@ function textTail(s: string): string {
 }
 
 function escapeMarkdown(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/([*`[\]~])/g, '\\$1');
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/([*`[\]~])/g, '\\$1')
+    .replace(/<(\/?u>)/g, '\\<$1');
 }
 
 // Inline-math spans are emitted verbatim — LaTeX backslashes must not be doubled.

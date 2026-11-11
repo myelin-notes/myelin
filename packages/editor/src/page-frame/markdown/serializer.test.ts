@@ -13,4 +13,15 @@ describe('inline code serialization', () => {
       expect(parseMarkdownToDoc(md, schema).textContent).toBe(text);
     }
   });
+
+  it('reads <u> as an underline mark and keeps literal tags literal', () => {
+    const doc = parseMarkdownToDoc('<u>under</u> and \\<u>tag\\</u>', schema);
+    expect(doc.firstChild?.toJSON().content).toEqual([
+      { type: 'text', text: 'under', marks: [{ type: 'underline' }] },
+      { type: 'text', text: ' and <u>tag</u>' },
+    ]);
+    expect(
+      parseMarkdownToDoc(serializeDocToMarkdown(doc), schema).eq(doc),
+    ).toBe(true);
+  });
 });
