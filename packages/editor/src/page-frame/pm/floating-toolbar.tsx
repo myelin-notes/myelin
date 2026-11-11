@@ -169,10 +169,14 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     null,
   );
   const [fontSizePt, setFontSizePt] = useState(12);
+  // Selection range the toolbar was last placed for. Restyling text (size, bold, font) shifts the
+  // selection's rect; re-placing on that would move the button out from under repeated clicks.
+  const placedForRef = useRef<string | null>(null);
 
   const sync = useEffectEvent(() => {
     const rect = selectionScreenRect(view);
     if (!rect) {
+      placedForRef.current = null;
       setVisible(false);
       setOpenMenu(null);
       return;
@@ -219,7 +223,15 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
           : 12),
     );
 
+    setVisible(true);
     const toolbar = ref.current;
+    const { from, to } = view.state.selection;
+    const placementKey = `${from}:${to}`;
+    if (toolbar && placedForRef.current === placementKey) {
+      return;
+    }
+    // Only lock once placed with the real toolbar size, not the fallback below.
+    placedForRef.current = toolbar ? placementKey : null;
     const width = toolbar?.offsetWidth ?? 260;
     const height = toolbar?.offsetHeight ?? 40;
 
@@ -241,7 +253,6 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     setStyle((current) =>
       styleEqual(current, nextStyle) ? current : nextStyle,
     );
-    setVisible(true);
   });
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
     if (pickerOpen || swatchMenuOpen) {
@@ -257,6 +268,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     if (view.dom.contains(target)) {
       return;
     }
+    placedForRef.current = null;
     setOpenMenu(null);
     setVisible(false);
   });
