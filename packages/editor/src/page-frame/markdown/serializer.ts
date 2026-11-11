@@ -110,7 +110,10 @@ export function serializeBlock(node: PMNode): string | null {
 }
 
 function serializeFigure(node: PMNode): string {
-  const caption = serializeInline(node).replace(/"/g, '\\"');
+  // The title is one line; a pasted line break would stop the figure parsing back as one.
+  const caption = serializeInline(node)
+    .replace(/\n/g, ' ')
+    .replace(/"/g, '\\"');
   const title = caption ? ` "${caption}"` : '';
   return `![${node.attrs.alt ?? ''}](${node.attrs.src}${title})`;
 }

@@ -22,6 +22,21 @@ describe('document structure markdown', () => {
     expect(serializeDocToMarkdown(doc)).toBe(markdown);
   });
 
+  it('keeps a figure whose caption holds a line break', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('figure', { src: '/a.png' }, [
+        schema.text('Line one'),
+        schema.node('hardBreak'),
+        schema.text('line two'),
+      ]),
+    ]);
+
+    const reparsed = parseMarkdownToDoc(serializeDocToMarkdown(doc), schema);
+
+    expect(reparsed.childCount).toBe(1);
+    expect(reparsed.child(0).type.name).toBe('figure');
+  });
+
   it('round-trips a manual page break', () => {
     const markdown = 'Title\n\n<!-- pagebreak -->\n\nBody\n';
 
