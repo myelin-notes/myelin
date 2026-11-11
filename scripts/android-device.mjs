@@ -95,6 +95,10 @@ try {
         BINDGEN_EXTRA_CLANG_ARGS: `--sysroot=${process.env.NDK_HOME}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot`,
         CARGO_PROFILE_DEV_DEBUG: '0',
         CARGO_PROFILE_DEV_OPT_LEVEL: '2',
+        // libsodium's ./configure finds no `aarch64-linux-android-ar` and falls back to macOS ar,
+        // which silently writes empty archives for ELF objects; the app then crashes on launch.
+        AR: `${process.env.NDK_HOME}/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ar`,
+        RANLIB: `${process.env.NDK_HOME}/toolchains/llvm/prebuilt/darwin-x86_64/bin/llvm-ranlib`,
       },
     },
   );
@@ -103,7 +107,7 @@ try {
     throw new Error(`Could not find ${apkPath}.`);
   }
 
-  run('adb', ['-s', serial, 'install', '-r', apkPath]);
+  run('adb', ['-s', serial, 'install', '-r', '--user', 'current', apkPath]);
   run('adb', [
     '-s',
     serial,
