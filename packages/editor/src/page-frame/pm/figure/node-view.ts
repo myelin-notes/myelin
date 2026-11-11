@@ -88,6 +88,13 @@ export class FigureNodeView implements NodeView {
   }
 
   destroy(): void {
+    // Media still loading would otherwise call getPos on a destroyed view and throw.
+    this.media.removeEventListener('load', this.handleMediaLoad, true);
+    this.media.removeEventListener(
+      'loadedmetadata',
+      this.handleMediaLoad,
+      true,
+    );
     this.embed.destroy();
   }
 
