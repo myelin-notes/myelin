@@ -483,7 +483,8 @@ export function findActiveSlashInsertAutocomplete(
           to: posAt[cursorOffset],
         },
     anchorPosition: state.selection.head,
-    allowBlockActions: atBlockStart,
+    // Block actions retype or replace the parent, which for a caption would drop the figure.
+    allowBlockActions: atBlockStart && parent.type.name !== 'figure',
   };
 }
 

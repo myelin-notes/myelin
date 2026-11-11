@@ -75,6 +75,21 @@ describe('findActiveSlashInsertAutocomplete', () => {
     );
   });
 
+  it('disallows block actions in a figure caption, which would replace the figure', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('figure', { src: '/a.png' }, schema.text('/head')),
+    ]);
+    const state = EditorState.create({
+      schema,
+      doc,
+      selection: TextSelection.create(doc, 6),
+    });
+
+    expect(findActiveSlashInsertAutocomplete(state)?.allowBlockActions).toBe(
+      false,
+    );
+  });
+
   it('does not trigger when the slash is mid-word with no preceding space', () => {
     const markdown = 'and/or';
     const head = 1 + markdown.length;
