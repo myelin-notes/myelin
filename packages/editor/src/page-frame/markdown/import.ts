@@ -1,5 +1,8 @@
-import type { Node as PMNode } from 'prosemirror-model';
-import { prosemirrorToYXmlFragment } from 'y-prosemirror';
+import { Fragment, type Node as PMNode } from 'prosemirror-model';
+import {
+  prosemirrorToYXmlFragment,
+  yXmlFragmentToProseMirrorRootNode,
+} from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { ElementType } from '../../elements/element-type';
 import {
@@ -24,6 +27,7 @@ import {
   PAGE_FRAME_CONTENT_FORMAT,
 } from './legacy-content';
 import { parseMarkdownToDoc } from './parser';
+import { serializeBlock } from './serializer';
 
 export const DEFAULT_MARKDOWN_IMPORT_FRAME_OFFSET = {
   x: 160,
@@ -68,14 +72,38 @@ function pickResolveNoteLink(
   return undefined;
 }
 
+// Markdown can't express color, fonts, figure widths or column sizes. A block whose markdown didn't
+// change keeps its existing node, so rewriting a document only loses styling on blocks actually edited.
+export function preserveUnchangedBlocks(current: PMNode, next: PMNode): PMNode {
+  const existing = new Map<string, PMNode[]>();
+  current.forEach((node) => {
+    const key = serializeBlock(node);
+    if (key !== null) {
+      existing.set(key, [...(existing.get(key) ?? []), node]);
+    }
+  });
+  const blocks: PMNode[] = [];
+  next.forEach((node) => {
+    const key = serializeBlock(node);
+    blocks.push((key !== null && existing.get(key)?.shift()) || node);
+  });
+  return next.copy(Fragment.fromArray(blocks));
+}
+
+// Updates in place rather than clearing first: y-prosemirror diffs against the fragment, so
+// unchanged blocks keep their Yjs identity and any ink anchored to them stays attached.
 function replacePageFrameFragmentDoc(
   fragment: Y.XmlFragment,
   doc: PMNode,
 ): void {
-  if (fragment.length > 0) {
-    fragment.delete(0, fragment.length);
-  }
-  prosemirrorToYXmlFragment(doc, fragment);
+  const merged =
+    fragment.length > 0
+      ? preserveUnchangedBlocks(
+          yXmlFragmentToProseMirrorRootNode(fragment, schema),
+          doc,
+        )
+      : doc;
+  prosemirrorToYXmlFragment(merged, fragment);
 }
 
 export async function writeMarkdownToPageFrameFragment(

@@ -64,7 +64,7 @@ function yieldToEventLoop(): Promise<void> {
   });
 }
 
-function serializeBlock(node: PMNode): string | null {
+export function serializeBlock(node: PMNode): string | null {
   switch (node.type.name) {
     case 'paragraph':
       return serializeInline(node);
