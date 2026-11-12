@@ -1107,8 +1107,6 @@ const en = {
       livePaused: 'Live sync paused',
       peerModes: {
         'owner-device': 'Owner device',
-        'guest-editor': 'Guest editor',
-        'guest-viewer': 'Guest viewer',
       },
       repositoryStatus: {
         localOnly: 'Local only',

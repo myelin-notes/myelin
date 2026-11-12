@@ -1080,8 +1080,6 @@ const zhHans: typeof en = {
       livePaused: '实时同步已暂停',
       peerModes: {
         'owner-device': '所有者设备',
-        'guest-editor': '访客编辑',
-        'guest-viewer': '访客查看',
       },
       repositoryStatus: {
         localOnly: '仅本地',
