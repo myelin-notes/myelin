@@ -1,4 +1,5 @@
 import { AllSelection, EditorState, TextSelection } from 'prosemirror-state';
+import { CellSelection } from 'prosemirror-tables';
 import { DecorationSet } from 'prosemirror-view';
 import { describe, expect, it } from 'vitest';
 import { schema } from './schema';
@@ -64,5 +65,38 @@ describe('list marker selection highlights', () => {
 
     expect(markerRanges(state)).toEqual([[0, 6]]);
     expect(markerRanges(next)).toEqual([]);
+  });
+});
+
+describe('cell selection highlights', () => {
+  it('highlights only the selected column, not the cells between', () => {
+    const { table, table_row, table_cell, paragraph } = schema.nodes;
+    const cell = (text: string) =>
+      table_cell.create(null, paragraph.create(null, schema.text(text)));
+    const doc = schema.nodes.doc.create(null, [
+      table.create(null, [
+        table_row.create(null, [cell('A1'), cell('B1')]),
+        table_row.create(null, [cell('A2'), cell('B2')]),
+      ]),
+    ]);
+    const cellPos = (text: string) => {
+      let found = -1;
+      doc.descendants((node, pos) => {
+        if (node.type === table_cell && node.textContent === text) {
+          found = pos;
+        }
+      });
+      return doc.resolve(found);
+    };
+    const state = EditorState.create({
+      doc,
+      selection: new CellSelection(cellPos('A1'), cellPos('A2')),
+    });
+
+    const decorations = plugin.props.decorations?.call(plugin, state);
+    const highlighted = (decorations as DecorationSet)
+      .find()
+      .map(({ from, to }) => doc.textBetween(from, to));
+    expect(highlighted).toEqual(['A1', 'A2']);
   });
 });

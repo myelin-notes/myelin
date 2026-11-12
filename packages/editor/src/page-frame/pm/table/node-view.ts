@@ -12,7 +12,6 @@ import {
   buildDeleteTableRowTransaction,
 } from './commands';
 
-const DEFAULT_CELL_MIN_WIDTH = 120;
 const HANDLE_HOVER_STRIP_THICKNESS = 14;
 const MIN_COLUMN_RATIO = 0.06;
 
@@ -52,7 +51,9 @@ export class PageFrameTableNodeView implements NodeView {
     private readonly view: EditorView,
     private readonly getPos: () => number,
   ) {
-    this.tableView = new TableView(node, DEFAULT_CELL_MIN_WIDTH);
+    // prosemirror-tables sets the table's min-width to columns × this, overflowing the frame; columns
+    // instead share 100% of the width, floored by MIN_COLUMN_RATIO on resize.
+    this.tableView = new TableView(node, 0);
     this.dom = this.tableView.dom;
     this.contentDOM = this.tableView.contentDOM;
     this.dom.classList.add('pm-table-node');

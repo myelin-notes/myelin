@@ -84,13 +84,16 @@ function setAttributedMark(
   markType: MarkType,
   attrs: Record<string, unknown> | null,
 ): void {
-  const { from, to } = view.state.selection;
-  if (from === to) {
+  const { selection, tr } = view.state;
+  if (selection.empty) {
     return;
   }
-  let tr = view.state.tr.removeMark(from, to, markType);
-  if (attrs) {
-    tr = tr.addMark(from, to, markType.create(attrs));
+  // A CellSelection holds one range per cell; from..to covers only the first.
+  for (const { $from, $to } of selection.ranges) {
+    tr.removeMark($from.pos, $to.pos, markType);
+    if (attrs) {
+      tr.addMark($from.pos, $to.pos, markType.create(attrs));
+    }
   }
   view.dispatch(tr);
   view.focus();
