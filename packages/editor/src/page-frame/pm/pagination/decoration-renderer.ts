@@ -13,10 +13,6 @@ function createStandardBreakWidget(spacer: number, kind: Break['kind']): Node {
 }
 
 function syncTableCellInlineBreakGeometry(div: HTMLElement): void {
-  if (!div.isConnected) {
-    return;
-  }
-
   const row = div.closest('tr');
   const table = div.closest('table');
   if (!(row instanceof HTMLTableRowElement && table instanceof HTMLElement)) {
@@ -62,17 +58,30 @@ function createTableCellInlineBreakWidget(
   const div = createStandardBreakWidget(spacer, 'inline') as HTMLElement;
   div.classList.add('pm-table-node__cell-page-break');
 
+  // The mask starts at the page boundary, not the widget top: above it, other cells in the row
+  // still have content on this page.
+  const maskTop = Math.max(0, spacer - breakGap);
   const margin = (breakGap - PAGE_GAP) / 2;
-  const gapStart = Math.max(0, spacer - breakGap + margin);
-  const gapEnd = Math.min(spacer, gapStart + PAGE_GAP);
+  const gapStart = Math.max(0, spacer - breakGap + margin) - maskTop;
+  const gapEnd = Math.min(spacer - maskTop, gapStart + PAGE_GAP);
+  div.style.setProperty('--pm-table-cell-break-top', `${maskTop}px`);
   div.style.setProperty('--pm-table-cell-break-gap-start', `${gapStart}px`);
   div.style.setProperty('--pm-table-cell-break-gap-end', `${gapEnd}px`);
-  div.style.setProperty('--pm-table-cell-break-height', `${spacer}px`);
-
-  requestAnimationFrame(() => {
-    syncTableCellInlineBreakGeometry(div);
-  });
+  div.style.setProperty(
+    '--pm-table-cell-break-height',
+    `${spacer - maskTop}px`,
+  );
   return div;
+}
+
+// Must run synchronously after each DOM update: until synced the mask spans only its own cell, and a
+// rAF scheduled from pagination's own rAF lands a frame late, showing that for one paint.
+export function syncTableCellBreakGeometry(view: EditorView): void {
+  for (const div of view.dom.querySelectorAll<HTMLElement>(
+    '.pm-table-node__cell-page-break',
+  )) {
+    syncTableCellInlineBreakGeometry(div);
+  }
 }
 
 function isPositionInsideTable(view: EditorView, pos: number): boolean {

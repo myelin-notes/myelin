@@ -105,6 +105,7 @@
   --pm-table-cell-break-mask-width: 100%;
   --pm-table-cell-break-border-left: 0px;
   --pm-table-cell-break-border-width: 100%;
+  --pm-table-cell-break-top: 0px;
   --pm-table-cell-break-gap-start: 0px;
   --pm-table-cell-break-gap-end: 0px;
   --pm-table-cell-break-border: var(--border-subtle);
@@ -117,7 +118,7 @@
 .pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
   content: "";
   position: absolute;
-  top: 0;
+  top: var(--pm-table-cell-break-top);
   height: var(--pm-table-cell-break-height);
   pointer-events: none;
 }

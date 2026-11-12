@@ -21,14 +21,14 @@ function tableRow(
   naturalTop: number,
   naturalBottom: number,
   getPos: () => number | null = () => null,
-  options: { isHeaderRow?: boolean; splitLines?: ParagraphLine[] } = {},
+  options: { isHeaderRow?: boolean; cellLines?: ParagraphLine[][] } = {},
 ): TableRowLine {
   return {
     naturalTop,
     naturalBottom,
     getPos,
     isHeaderRow: options.isHeaderRow,
-    splitLines: options.splitLines,
+    cellLines: options.cellLines,
   };
 }
 
@@ -467,10 +467,12 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(720, 860, () => 21, {
-          splitLines: [
-            line(720, 744, () => 101),
-            line(760, 784, () => 201),
-            line(800, 824, () => 301),
+          cellLines: [
+            [
+              line(720, 744, () => 101),
+              line(760, 784, () => 201),
+              line(800, 824, () => 301),
+            ],
           ],
         }),
       ],
@@ -489,7 +491,7 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(776, 860, () => 21, {
-          splitLines: [line(790, 814, () => 101), line(820, 844, () => 201)],
+          cellLines: [[line(790, 814, () => 101), line(820, 844, () => 201)]],
         }),
       ],
       20,
@@ -509,10 +511,12 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(0, 1000, () => 21, {
-          splitLines: [
-            line(0, 24, () => 101),
-            line(720, 744, () => 201),
-            line(780, 804, () => 301),
+          cellLines: [
+            [
+              line(0, 24, () => 101),
+              line(720, 744, () => 201),
+              line(780, 804, () => 301),
+            ],
           ],
         }),
       ],
@@ -527,14 +531,67 @@ describe('paginateTableRows', () => {
     expect(result.pageAdvances).toBe(1);
   });
 
+  it('breaks every cell of a split row so none straddles the page gap', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(700, 900, () => 21, {
+          cellLines: [
+            [line(700, 744, () => 101), line(760, 800, () => 102)],
+            [line(700, 724, () => 201), line(740, 764, () => 202)],
+            [line(700, 724, () => 301), line(770, 810, () => 302)],
+          ],
+        }),
+        tableRow(900, 940, () => 41),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    // Cell 2 fits, cells 1 and 3 each break at their own line; the next row shifts by the most any
+    // cell's content grew.
+    expect(result.breaks).toEqual([
+      { pos: 102, spacer: 160, kind: 'inline' },
+      { pos: 302, spacer: 150, kind: 'inline' },
+    ]);
+    expect(result.cumulativeShift).toBe(150);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('moves a multi-cell row when any cell has no line before the boundary', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(740, 900, () => 21, {
+          cellLines: [
+            [line(740, 764, () => 101), line(780, 804, () => 102)],
+            [line(770, 810, () => 201)],
+          ],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 21, spacer: 180, kind: 'table-row' },
+    ]);
+  });
+
   it('continues splitting an oversized single-cell row across later pages', () => {
     const result = paginateTableRows(
       [
         tableRow(0, 1800, () => 21, {
-          splitLines: [
-            line(720, 744, () => 101),
-            line(780, 804, () => 201),
-            line(1540, 1580, () => 301),
+          cellLines: [
+            [
+              line(720, 744, () => 101),
+              line(780, 804, () => 201),
+              line(1540, 1580, () => 301),
+            ],
           ],
         }),
       ],

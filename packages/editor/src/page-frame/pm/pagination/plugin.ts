@@ -6,6 +6,7 @@ import { type Break, DEFAULT_PAGE_GEOMETRY, type PageGeometry } from './core';
 import {
   buildPaginationDecorations,
   syncBlockquoteRuleStyles,
+  syncTableCellBreakGeometry,
 } from './decoration-renderer';
 import { observePaginationInvalidations } from './invalidation-controller';
 import { calculatePaginationLayout } from './layout-calculator';
@@ -297,6 +298,14 @@ export function paginationPlugin(
 
       return {
         update(view, prevState) {
+          // Widgets are rebuilt both by pagination and when an edit redraws the cell they sit in.
+          if (
+            view.state.doc !== prevState.doc ||
+            paginationKey.getState(view.state) !==
+              paginationKey.getState(prevState)
+          ) {
+            syncTableCellBreakGeometry(view);
+          }
           // Skip selection-only state changes — they don't affect layout
           // and the previous pagination is still valid.
           if (

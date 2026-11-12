@@ -13,67 +13,70 @@ function isTableRowBreakElement(element: Element): boolean {
   );
 }
 
-function collectTableRowTextBlocks(
-  rowNode: PMNode,
-  rowPos: number,
+function collectCellTextBlocks(
+  cell: PMNode,
+  cellPos: number,
   view: EditorView,
 ): PaginationBlockInfo[] {
   const blocks: PaginationBlockInfo[] = [];
 
-  rowNode.forEach((cell, cellOffset) => {
-    const cellPos = rowPos + 1 + cellOffset;
-    cell.forEach((child, childOffset) => {
-      if (!child.isTextblock || child.type.name === 'codeBlock') {
-        return;
-      }
+  cell.forEach((child, childOffset) => {
+    if (!child.isTextblock || child.type.name === 'codeBlock') {
+      return;
+    }
 
-      const blockPos = cellPos + 1 + childOffset;
-      const dom = view.nodeDOM(blockPos);
-      if (!(dom instanceof HTMLElement) || dom.offsetHeight <= 0) {
-        return;
-      }
+    const blockPos = cellPos + 1 + childOffset;
+    const dom = view.nodeDOM(blockPos);
+    if (!(dom instanceof HTMLElement) || dom.offsetHeight <= 0) {
+      return;
+    }
 
-      blocks.push({
-        pos: blockPos,
-        dom,
-        height: dom.offsetHeight,
-        measuredTop: 0,
-        nodeSize: child.nodeSize,
-        isBreakableTextBlock: true,
-        isBreakableTableBlock: false,
-        isPageHeightConstrained: false,
-      });
+    blocks.push({
+      pos: blockPos,
+      dom,
+      height: dom.offsetHeight,
+      measuredTop: 0,
+      nodeSize: child.nodeSize,
+      isBreakableTextBlock: true,
+      isBreakableTableBlock: false,
+      isPageHeightConstrained: false,
     });
   });
 
   return blocks;
 }
 
-function measureTableRowSplitLines(
+function measureTableRowCellLines(
   rowNode: PMNode,
   rowPos: number,
   view: EditorView,
   editorScreenTop: number,
   invScale: number,
   lineMeasurer: ParagraphLineMeasurer,
-): ParagraphLine[] {
-  const lines: ParagraphLine[] = [];
+): ParagraphLine[][] {
+  const cells: ParagraphLine[][] = [];
 
-  for (const block of collectTableRowTextBlocks(rowNode, rowPos, view)) {
-    lines.push(
-      ...lineMeasurer.measure({
-        block,
-        view,
-        editorScreenTop,
-        invScale,
-        metrics: null,
-      }),
-    );
-  }
+  rowNode.forEach((cell, cellOffset) => {
+    const lines: ParagraphLine[] = [];
+    for (const block of collectCellTextBlocks(
+      cell,
+      rowPos + 1 + cellOffset,
+      view,
+    )) {
+      lines.push(
+        ...lineMeasurer.measure({
+          block,
+          view,
+          editorScreenTop,
+          invScale,
+          metrics: null,
+        }),
+      );
+    }
+    cells.push(lines);
+  });
 
-  return lines.sort(
-    (a, b) => a.naturalTop - b.naturalTop || a.naturalBottom - b.naturalBottom,
-  );
+  return cells;
 }
 
 export function measureTableRows(
@@ -135,8 +138,8 @@ export function measureTableRows(
       naturalBottom: (rect.bottom - editorScreenTop) * invScale,
       getPos: () => info.pos,
       isHeaderRow: info.isHeaderRow,
-      measureSplitLines: () =>
-        measureTableRowSplitLines(
+      measureCellLines: () =>
+        measureTableRowCellLines(
           info.node,
           info.pos,
           view,

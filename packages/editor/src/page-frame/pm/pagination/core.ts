@@ -50,8 +50,9 @@ export interface ParagraphLine {
 
 export interface TableRowLine extends ParagraphLine {
   isHeaderRow?: boolean;
-  splitLines?: ParagraphLine[];
-  measureSplitLines?: () => ParagraphLine[];
+  /** Text lines of each cell, top to bottom. */
+  cellLines?: ParagraphLine[][];
+  measureCellLines?: () => ParagraphLine[][];
 }
 
 export interface PaginationBlock {
@@ -170,7 +171,7 @@ export function paginateTableRows(
   let pageAdvances = 0;
   let segmentStartRowIndex = 0;
   let headerRowCount = 0;
-  const splitLineCache = new Map<TableRowLine, ParagraphLine[]>();
+  const cellLineCache = new Map<TableRowLine, ParagraphLine[][]>();
 
   while (
     headerRowCount < rows.length &&
@@ -188,67 +189,104 @@ export function paginateTableRows(
     pageAdvances++;
   };
 
-  const getSplitLines = (row: TableRowLine): ParagraphLine[] => {
-    const cached = splitLineCache.get(row);
+  const getCellLines = (row: TableRowLine): ParagraphLine[][] => {
+    const cached = cellLineCache.get(row);
     if (cached) {
       return cached;
     }
 
-    const splitLines = row.splitLines ?? row.measureSplitLines?.() ?? [];
-    splitLineCache.set(row, splitLines);
-    return splitLines;
+    const cellLines = row.cellLines ?? row.measureCellLines?.() ?? [];
+    cellLineCache.set(row, cellLines);
+    return cellLines;
   };
 
+  // Every cell breaks at its own first overflowing line, so all cells resume at the next page top.
+  // A spacer in one cell alone would leave the others' lines straddling the gap.
   const splitInsideRow = (row: TableRowLine): boolean => {
-    const splitLines = getSplitLines(row);
-    if (splitLines.length === 0) {
+    const cells = getCellLines(row).filter((lines) => lines.length > 0);
+    if (cells.length === 0) {
       return false;
     }
 
-    let didSplit = false;
-    let segmentHasFittingLine = false;
+    const rowShift = cumulativeShift;
+    const cellShifts = cells.map(() => 0);
+    const cursors = cells.map(() => 0);
+    const hasFittingLine = cells.map(() => false);
+    const cellBreaks: Break[] = [];
+    let isFirstBoundary = true;
 
-    for (const line of splitLines) {
-      const lineEffectiveTop = line.naturalTop + cumulativeShift;
-      const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
-
-      if (lineEffectiveBottom <= pageBoundary) {
-        if (lineEffectiveBottom > pageStart) {
-          segmentHasFittingLine = true;
-        }
-        continue;
-      }
-
-      let appliedSpacer = 0;
-      if (lineEffectiveTop > pageStart && segmentHasFittingLine) {
-        const spacer = pageBoundary + breakGap - lineEffectiveTop;
-        if (spacer > 0) {
-          const pos = line.getPos();
-          if (pos !== null) {
-            const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
-            breaks.push({ pos: clamped, spacer, kind: 'inline' });
-            cumulativeShift += spacer;
-            appliedSpacer = spacer;
-            didSplit = true;
+    for (;;) {
+      const crossings: Array<{ cell: number; index: number }> = [];
+      for (let cell = 0; cell < cells.length; cell++) {
+        const lines = cells[cell];
+        while (cursors[cell] < lines.length) {
+          const line = lines[cursors[cell]];
+          const bottom = line.naturalBottom + rowShift + cellShifts[cell];
+          if (bottom > pageBoundary) {
+            crossings.push({ cell, index: cursors[cell] });
+            break;
           }
+          if (bottom > pageStart) {
+            hasFittingLine[cell] = true;
+          }
+          cursors[cell]++;
         }
       }
+      if (crossings.length === 0) {
+        break;
+      }
 
-      if (!didSplit) {
+      let maxCrossingBottom = 0;
+      for (const { cell, index } of crossings) {
+        const line = cells[cell][index];
+        const top = line.naturalTop + rowShift + cellShifts[cell];
+        if (top > pageStart && !hasFittingLine[cell] && isFirstBoundary) {
+          return false;
+        }
+        const spacer = pageBoundary + breakGap - top;
+        const pos =
+          top > pageStart && hasFittingLine[cell] && spacer > 0
+            ? line.getPos()
+            : null;
+        if (pos !== null) {
+          const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
+          cellBreaks.push({ pos: clamped, spacer, kind: 'inline' });
+          cellShifts[cell] += spacer;
+        }
+        maxCrossingBottom = Math.max(
+          maxCrossingBottom,
+          line.naturalBottom + rowShift + cellShifts[cell],
+        );
+        cursors[cell] = index + 1;
+      }
+
+      if (isFirstBoundary && cellBreaks.length === 0) {
         return false;
       }
+      isFirstBoundary = false;
 
-      const shiftedLineBottom = lineEffectiveBottom + appliedSpacer;
       do {
         advancePage();
-      } while (shiftedLineBottom > pageBoundary);
-
-      segmentHasFittingLine = shiftedLineBottom > pageStart;
+      } while (maxCrossingBottom > pageBoundary);
+      for (const { cell, index } of crossings) {
+        hasFittingLine[cell] =
+          cells[cell][index].naturalBottom + rowShift + cellShifts[cell] >
+          pageStart;
+      }
     }
 
-    if (!didSplit) {
-      return false;
+    breaks.push(...cellBreaks.sort((a, b) => a.pos - b.pos));
+    let naturalContentBottom = Number.NEGATIVE_INFINITY;
+    let shiftedContentBottom = Number.NEGATIVE_INFINITY;
+    for (let cell = 0; cell < cells.length; cell++) {
+      const bottom = cells[cell][cells[cell].length - 1].naturalBottom;
+      naturalContentBottom = Math.max(naturalContentBottom, bottom);
+      shiftedContentBottom = Math.max(
+        shiftedContentBottom,
+        bottom + cellShifts[cell],
+      );
     }
+    cumulativeShift += shiftedContentBottom - naturalContentBottom;
 
     const shiftedRowBottom = row.naturalBottom + cumulativeShift;
     while (shiftedRowBottom > pageBoundary) {
@@ -269,7 +307,7 @@ export function paginateTableRows(
 
     const rowHeight = row.naturalBottom - row.naturalTop;
     const canSplitInsideRow =
-      row.splitLines !== undefined || row.measureSplitLines !== undefined;
+      row.cellLines !== undefined || row.measureCellLines !== undefined;
     if (
       canSplitInsideRow &&
       (rowHeight > contentHeight || rowEffectiveTop < pageBoundary) &&
