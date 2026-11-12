@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import { UserPrefs } from '@myelin/editor/user-prefs';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useMediaQuery } from '@myelin/ui';
 import { IS_MOBILE_BUILD } from '@/lib/env';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 

@@ -45,7 +45,10 @@ export class IrohTransport implements Transport {
   // biome-ignore lint/suspicious/noExplicitAny: generic event emitter
   private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
-  constructor(private readonly noteId: VFSNodeId) {}
+  constructor(
+    private readonly noteId: VFSNodeId,
+    private readonly liveSecret: string,
+  ) {}
 
   bindRepository(handle: string): void {
     this.repositoryHandle = handle;
@@ -80,6 +83,7 @@ export class IrohTransport implements Transport {
     await this.setupTauriListeners();
     const hosting = invoke<string>('iroh_host', {
       noteId: this.noteId,
+      liveSecret: this.liveSecret,
       transportId: this.transportId,
       repositoryHandle: this.repositoryHandle,
     });
@@ -93,6 +97,7 @@ export class IrohTransport implements Transport {
     await this.setupTauriListeners();
     const joining = invoke('iroh_join', {
       noteId: this.noteId,
+      liveSecret: this.liveSecret,
       transportId: this.transportId,
       repositoryHandle: this.repositoryHandle,
       ticket,

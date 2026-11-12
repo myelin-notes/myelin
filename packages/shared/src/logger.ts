@@ -301,6 +301,12 @@ export function setLogErrorReporter(reporter: LogErrorReporter | null): void {
   errorReporter = reporter;
 }
 
+function clean(meta: unknown): Record<string, unknown> {
+  return isPlainObject(meta)
+    ? (sanitizeValue(meta) as Record<string, unknown>)
+    : {};
+}
+
 function reportError(
   subsystem: string,
   message: string,
@@ -316,7 +322,7 @@ function reportError(
       errorReporter(errorOrMeta, {
         subsystem,
         message,
-        ...(maybeMeta ?? {}),
+        ...clean(maybeMeta),
       });
       return;
     }
@@ -324,8 +330,8 @@ function reportError(
     if (isPlainObject(errorOrMeta) || errorOrMeta === undefined) {
       errorReporter(new Error(message), {
         subsystem,
-        ...(errorOrMeta ?? {}),
-        ...(maybeMeta ?? {}),
+        ...clean(errorOrMeta),
+        ...clean(maybeMeta),
       });
       return;
     }
@@ -334,7 +340,7 @@ function reportError(
     errorReporter(new Error(String(errorOrMeta)), {
       subsystem,
       message,
-      ...(maybeMeta ?? {}),
+      ...clean(maybeMeta),
     });
   } catch {
     // Swallow reporter failures. Logging must not break app code.

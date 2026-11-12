@@ -9,8 +9,8 @@ import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { useMessages } from '@myelin/editor/i18n';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
+import { Switch } from '@myelin/ui';
 import { FlagTypeOptions } from '@/components/flag-type-options';
-import { Switch } from '@/components/ui/switch';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 
 interface ToolOptionsPanelProps {

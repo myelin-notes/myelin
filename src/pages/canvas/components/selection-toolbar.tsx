@@ -47,7 +47,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@myelin/ui';
 import {
   findCurrentPdfPage,
   getPdfPageJumpOffset,

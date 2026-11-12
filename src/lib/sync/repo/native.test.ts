@@ -30,7 +30,7 @@ import { NativeRepository } from './native';
 import type { MetadataPatch } from './native-operations';
 import { renameNoteReferences } from './rename-note-references';
 import { renamePageFrameReferences } from './rename-page-frame-references';
-import { createRepositoryFromConfig } from './repository-backends';
+import { createRepository } from './repository-backends';
 import { createEmptyManifest } from './shared';
 
 const { listeners } = vi.hoisted(() => ({
@@ -255,7 +255,7 @@ function nativeBoundary() {
 
 it('uses native factories, imports bytes before publishing a batch, and replays metadata conflicts', async () => {
   const native = nativeBoundary();
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   expect(repository).toBeInstanceOf(NativeRepository);
   await repository.initialize();
   let fileId = '';
@@ -337,7 +337,7 @@ it('reports diagnostics from a sync that finishes while the repository is being 
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   await repository.initialize();
   vi.mocked(trackEvent).mockClear();
 
@@ -363,7 +363,7 @@ it('forwards GitHub refresh requests and turns a final 401 into a sign-in prompt
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({
+  const repository = createRepository({
     kind: 'github',
     owner: 'me',
     repo: 'notes',
@@ -424,7 +424,7 @@ it('refreshes Drive authentication only for its repository and credential', asyn
   token
     .mockResolvedValueOnce('initial-token')
     .mockResolvedValueOnce('refreshed-token');
-  const repository = createRepositoryFromConfig({
+  const repository = createRepository({
     kind: 'google-drive',
     folderName: 'Notes',
     folderId: 'drive-folder',
@@ -507,7 +507,7 @@ it('keeps snapshot and restore content in Rust while ordinary writes check confl
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   await repository.initialize();
   const id = await repository.createFile(
     'Image',
@@ -553,7 +553,7 @@ it('does not publish a new file while its native byte write is still in flight',
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const creating = repository.createFile(
     'Large import',
     'png',
@@ -608,7 +608,7 @@ it.each([
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const create = (name: string) =>
     kind === 'create'
       ? repository.createFile(name, 'png', null, new Uint8Array([7, 8, 9]))
@@ -661,7 +661,7 @@ it('keeps session subscriptions distinct and delivers metadata-only replacement 
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const editor = vi.fn((_change: NativeDocumentChange) => {});
   const mcp = vi.fn((_change: NativeDocumentChange) => {});
   const closeEditor = await repository.subscribeDocument(
@@ -754,7 +754,7 @@ it.each([
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const job = filesProvider.createJob({
     selection: { kind: 'native-files', paths: [path] },
     repository,
@@ -814,7 +814,7 @@ it.each([
           },
         ];
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const folder = {
     kind: 'scoped' as const,
     handle: { id: 'picked-folder', name: 'Imported' },
@@ -862,7 +862,7 @@ it('leaves a revoked scoped-folder import unpublished', async () => {
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   await expect(
     repository.importFile('photo.png', 'png', null, {
       kind: 'scoped',
@@ -889,7 +889,7 @@ it('routes note and frame renames to Rust without fetching or replacing file con
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const backlinks = ['owner', 'source', 'source'].map((sourceId) => ({
     sourceId,
     sourceName: sourceId,
@@ -930,7 +930,7 @@ it('routes note and frame renames to Rust without fetching or replacing file con
 it('paces large JS file writes in bounded chunks and never publishes partial bytes', async () => {
   const native = nativeBoundary();
   const bytes = Uint8Array.from({ length: 8192 * 2 + 1 }, (_, i) => i % 251);
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const id = await repository.createFile('Large', 'png', null, bytes);
   expect(native.files.get(id)).toEqual(bytes);
   const chunks = native.operations.filter((op) => op.kind === 'stage-bytes');
@@ -957,7 +957,7 @@ it('cancels a failed JS transfer without publishing a new file', async () => {
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   await expect(
     repository.createFile('Failed', 'png', null, new Uint8Array(8193)),
   ).rejects.toThrow('Transfer interrupted');
@@ -969,7 +969,7 @@ it('cancels a failed JS transfer without publishing a new file', async () => {
 
 it('saves a JS-generated canvas import through bounded native byte transfers', async () => {
   const native = nativeBoundary();
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const bytes = Uint8Array.from({ length: 20000 }, (_, i) => i % 251);
   const id = await createCanvasFile({
     repository,
@@ -1036,7 +1036,7 @@ it('imports OneNote entirely through Rust while keeping preview and progress in 
     }
     return implementation(command, args);
   });
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const job = onenoteProvider.createJob({
     selection: { kind: 'file', path: '/picked/Notebook.onepkg' },
     repository,
@@ -1097,7 +1097,7 @@ it('imports Obsidian notes and PDFs before publishing their manifest', async () 
       : 'Beta body',
   );
   vi.mocked(scoped.readFile).mockResolvedValueOnce(new Uint8Array([1, 2, 3]));
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const result = await importObsidianVault({
     repository,
     parentId: null,
@@ -1159,7 +1159,7 @@ it('imports Obsidian notes and PDFs before publishing their manifest', async () 
 
 it('imports a Goodnotes ZIP canvas while its manifest is unpublished', async () => {
   const native = nativeBoundary();
-  const repository = createRepositoryFromConfig({ kind: 'local' });
+  const repository = createRepository({ kind: 'local' });
   const result = await importGoodnotesZip({
     scanned: {
       pdfEntries: [
@@ -1191,7 +1191,7 @@ it('imports a Goodnotes ZIP canvas while its manifest is unpublished', async () 
 it('reports sync diagnostics only for the active repository and releases the listener', async () => {
   nativeBoundary();
   vi.mocked(trackEvent).mockClear();
-  const repository = await createRepositoryFromConfig({ kind: 'local' });
+  const repository = await createRepository({ kind: 'local' });
   await repository.initialize();
   const report = listeners.get('repository-sync-diagnostics')!;
   const properties = {

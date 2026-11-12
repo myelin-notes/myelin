@@ -1,7 +1,8 @@
 use crate::repository_bootstrap::{reject_symlink, valid_component};
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Map, Number, Value};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::Path,
 };
@@ -11,8 +12,157 @@ pub(crate) const SETTINGS: &str = "repository.json";
 pub(crate) const MARKER: &[u8] = br#"{"version":4}"#;
 pub(crate) const SUFFIX: &str = ".meta.json";
 
-pub(crate) fn empty_manifest() -> Value {
-    json!({ "version": 3, "nodes": {}, "linksBySource": {}, "colors": { "pen": [], "highlighter": [], "text": [], "folder": [] }, "tagRegistry": [], "penPresets": [], "flagTypes": [] })
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum NodeKind {
+    File,
+    Folder,
+}
+
+// Persisted through `json!`, whose map sorts keys, so field order here never reaches disk.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Node {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "type")]
+    pub kind: NodeKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_type: Option<String>,
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    pub tags: Vec<String>,
+    pub created_at: Number,
+    pub modified_at: Number,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Node {
+    pub fn is_file(&self) -> bool {
+        self.kind == NodeKind::File
+    }
+
+    pub fn is_folder(&self) -> bool {
+        self.kind == NodeKind::Folder
+    }
+
+    pub fn system_kind(&self) -> Option<&str> {
+        self.system.as_ref()?["kind"].as_str()
+    }
+
+    pub fn is_media(&self) -> bool {
+        self.system_kind() == Some("media")
+    }
+
+    pub fn is_canvas(&self) -> bool {
+        self.file_type.as_deref() == Some("mcanvas")
+    }
+
+    pub fn validate(&self, id: &str) -> Result<(), String> {
+        let valid_file_type = match (self.kind, self.file_type.as_deref()) {
+            (NodeKind::File, Some(kind)) => valid_component(kind) && kind != "meta.json",
+            (NodeKind::File, None) => false,
+            (NodeKind::Folder, _) => true,
+        };
+        if !valid_component(id)
+            || self.id != id
+            || !valid_file_type
+            || !self
+                .parent_id
+                .as_deref()
+                .is_none_or(|parent| valid_component(parent))
+        {
+            return Err(format!("Invalid metadata for node {id}"));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn parse_node(id: &str, value: Value) -> Result<Node, String> {
+    let node: Node =
+        serde_json::from_value(value).map_err(|_| format!("Invalid metadata for node {id}"))?;
+    node.validate(id)?;
+    Ok(node)
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Manifest {
+    pub version: u64,
+    #[serde(default)]
+    pub nodes: BTreeMap<String, Node>,
+    #[serde(default)]
+    pub links_by_source: BTreeMap<String, Vec<Value>>,
+    #[serde(default)]
+    pub deleted_nodes: BTreeMap<String, String>,
+    #[serde(default)]
+    pub restored_nodes: BTreeMap<String, String>,
+    #[serde(default)]
+    pub colors: Value,
+    #[serde(default)]
+    pub tag_registry: Value,
+    #[serde(default)]
+    pub pen_presets: Value,
+    #[serde(default)]
+    pub flag_types: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub live_secret: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generation: Option<Value>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Manifest {
+    pub fn node(&self, id: &str) -> Option<&Node> {
+        self.nodes.get(id)
+    }
+
+    pub fn node_mut(&mut self, id: &str) -> Option<&mut Node> {
+        self.nodes.get_mut(id)
+    }
+
+    pub fn file(&self, id: &str) -> Option<&Node> {
+        self.nodes.get(id).filter(|node| node.is_file())
+    }
+
+    pub fn is_deleted(&self, id: &str) -> bool {
+        self.deleted_nodes.contains_key(id)
+    }
+
+    /// Reinstates `id` from the tombstone it was deleted under, so other devices accept it.
+    pub fn restore(&mut self, id: &str, node: Node) {
+        if let Some(deletion) = self.deleted_nodes.remove(id) {
+            self.restored_nodes.insert(id.into(), deletion);
+        }
+        self.nodes.insert(id.into(), node);
+    }
+
+    pub fn remove_links(&mut self, id: &str) {
+        self.links_by_source.remove(id);
+    }
+}
+
+pub(crate) fn empty_manifest() -> Manifest {
+    Manifest {
+        version: 3,
+        nodes: BTreeMap::new(),
+        links_by_source: BTreeMap::new(),
+        deleted_nodes: BTreeMap::new(),
+        restored_nodes: BTreeMap::new(),
+        colors: json!({ "pen": [], "highlighter": [], "text": [], "folder": [] }),
+        tag_registry: json!([]),
+        pen_presets: json!([]),
+        flag_types: json!([]),
+        live_secret: None,
+        generation: None,
+        extra: Map::new(),
+    }
 }
 
 pub(crate) fn is_marker(bytes: &[u8]) -> bool {
@@ -25,110 +175,75 @@ pub(crate) fn is_metadata_path(path: &str) -> bool {
         .is_some_and(valid_component)
 }
 
-pub(crate) fn settings(manifest: &Value) -> Result<Vec<u8>, String> {
-    let object = manifest.as_object().ok_or("Invalid repository metadata")?;
-    let mut settings = Value::Object(
-        object
-            .iter()
-            .filter(|(key, _)| {
-                !matches!(
-                    key.as_str(),
-                    "nodes" | "linksBySource" | "deletedNodes" | "restoredNodes"
-                )
-            })
-            .map(|(key, value)| (key.clone(), value.clone()))
-            .collect(),
-    );
+pub(crate) fn settings(manifest: &Manifest) -> Result<Vec<u8>, String> {
+    let mut settings = serde_json::to_value(manifest).map_err(|e| e.to_string())?;
+    let object = settings
+        .as_object_mut()
+        .ok_or("Invalid repository metadata")?;
+    for key in ["nodes", "linksBySource", "deletedNodes", "restoredNodes"] {
+        object.remove(key);
+    }
     settings["version"] = json!(1);
     serde_json::to_vec(&settings).map_err(|e| e.to_string())
 }
 
-pub(crate) fn node_record(manifest: &Value, id: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn node_record(manifest: &Manifest, id: &str) -> Result<Vec<u8>, String> {
     if !valid_component(id) {
         return Err("Invalid repository node ID".into());
     }
-    let node = &manifest["nodes"][id];
-    let record = if node.is_null() {
-        let deletion = &manifest["deletedNodes"][id];
-        if !deletion.is_string() {
-            return Err("Invalid deletion revision".into());
+    let record = match manifest.nodes.get(id) {
+        None => {
+            let deletion = manifest
+                .deleted_nodes
+                .get(id)
+                .ok_or("Invalid deletion revision")?;
+            json!({"version":1,"id":id,"deleted":true,"deletionId":deletion})
         }
-        json!({"version":1,"id":id,"deleted":true,"deletionId":deletion})
-    } else {
-        validate_node(id, node)?;
-        let links = manifest["linksBySource"][id]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        json!({"version":1,"node":node,"links":links,"restoredFrom":manifest["restoredNodes"][id]})
+        Some(node) => {
+            node.validate(id)?;
+            let links = manifest
+                .links_by_source
+                .get(id)
+                .cloned()
+                .unwrap_or_default();
+            json!({"version":1,"node":node,"links":links,"restoredFrom":manifest.restored_nodes.get(id)})
+        }
     };
     serde_json::to_vec(&record).map_err(|e| e.to_string())
 }
 
-pub(crate) fn changed_nodes(previous: &Value, next: &Value) -> HashSet<String> {
-    let mut changed = HashSet::new();
-    for key in ["nodes", "linksBySource", "deletedNodes", "restoredNodes"] {
-        for id in previous[key]
-            .as_object()
-            .into_iter()
-            .flat_map(|nodes| nodes.keys())
-            .chain(
-                next[key]
-                    .as_object()
-                    .into_iter()
-                    .flat_map(|nodes| nodes.keys()),
-            )
-        {
-            if previous[key][id] != next[key][id] {
-                changed.insert(id.clone());
-            }
-        }
+pub(crate) fn changed_nodes(previous: &Manifest, next: &Manifest) -> HashSet<String> {
+    fn differing<'a, T: PartialEq>(
+        previous: &'a BTreeMap<String, T>,
+        next: &'a BTreeMap<String, T>,
+    ) -> impl Iterator<Item = &'a String> {
+        previous
+            .keys()
+            .chain(next.keys())
+            .filter(move |id| previous.get(*id) != next.get(*id))
     }
-    changed
+    differing(&previous.nodes, &next.nodes)
+        .chain(differing(&previous.links_by_source, &next.links_by_source))
+        .chain(differing(&previous.deleted_nodes, &next.deleted_nodes))
+        .chain(differing(&previous.restored_nodes, &next.restored_nodes))
+        .cloned()
+        .collect()
 }
 
-pub(crate) fn records(manifest: &Value) -> Result<HashMap<String, Vec<u8>>, String> {
+pub(crate) fn records(manifest: &Manifest) -> Result<HashMap<String, Vec<u8>>, String> {
     let mut records = HashMap::from([(SETTINGS.into(), settings(manifest)?)]);
-    let nodes = manifest["nodes"]
-        .as_object()
-        .ok_or("Invalid repository nodes")?;
-    let ids: HashSet<_> = nodes
+    for id in manifest
+        .nodes
         .keys()
-        .chain(
-            manifest["deletedNodes"]
-                .as_object()
-                .into_iter()
-                .flat_map(|nodes| nodes.keys()),
-        )
-        .collect();
-    for id in ids {
+        .chain(manifest.deleted_nodes.keys())
+        .collect::<HashSet<_>>()
+    {
         records.insert(format!("files/{id}{SUFFIX}"), node_record(manifest, id)?);
     }
     Ok(records)
 }
 
-pub(crate) fn validate_node(id: &str, node: &Value) -> Result<(), String> {
-    if !valid_component(id)
-        || node["id"] != id
-        || !matches!(node["type"].as_str(), Some("file" | "folder"))
-        || !node["name"].is_string()
-        || !node["tags"]
-            .as_array()
-            .is_some_and(|tags| tags.iter().all(Value::is_string))
-        || !node["createdAt"].is_number()
-        || !node["modifiedAt"].is_number()
-        || !(node["parentId"].is_null() || node["parentId"].as_str().is_some_and(valid_component))
-        || (node["type"] == "file"
-            && !node["fileType"]
-                .as_str()
-                .is_some_and(|kind| valid_component(kind) && kind != "meta.json"))
-    {
-        return Err(format!("Invalid metadata for node {id}"));
-    }
-    Ok(())
-}
-
-pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Value, String> {
+pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Manifest, String> {
     let mut manifest = match records.get(SETTINGS) {
         Some(bytes) => {
             let settings: Value =
@@ -136,18 +251,16 @@ pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Value, Stri
             if settings["version"] != 1 {
                 return Err("Unsupported repository settings version".into());
             }
-            settings
+            serde_json::from_value::<Manifest>(settings)
+                .map_err(|_| "Invalid repository settings")?
         }
         None => empty_manifest(),
     };
-    if !manifest.is_object() {
-        return Err("Invalid repository settings".into());
-    }
-    manifest["version"] = json!(3);
-    manifest["nodes"] = json!({});
-    manifest["linksBySource"] = json!({});
-    manifest["deletedNodes"] = json!({});
-    manifest["restoredNodes"] = json!({});
+    manifest.version = 3;
+    manifest.nodes.clear();
+    manifest.links_by_source.clear();
+    manifest.deleted_nodes.clear();
+    manifest.restored_nodes.clear();
     for (path, bytes) in records {
         if path == SETTINGS {
             continue;
@@ -157,7 +270,7 @@ pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Value, Stri
             .and_then(|name| name.strip_suffix(SUFFIX))
             .filter(|id| valid_component(id))
             .ok_or("Invalid metadata path")?;
-        let record: Value = serde_json::from_slice(bytes)
+        let mut record: Value = serde_json::from_slice(bytes)
             .map_err(|_| format!("Unreadable metadata for node {id}"))?;
         if record["version"] != 1 {
             return Err(format!("Unsupported metadata version for node {id}"));
@@ -166,45 +279,53 @@ pub(crate) fn assemble(records: &HashMap<String, Vec<u8>>) -> Result<Value, Stri
             if record["id"] != id {
                 return Err("Invalid deleted node ID".into());
             }
-            if !record["deletionId"].is_string() {
-                return Err("Invalid deletion revision".into());
-            }
-            manifest["deletedNodes"][id] = record["deletionId"].clone();
+            let deletion = record["deletionId"]
+                .as_str()
+                .ok_or("Invalid deletion revision")?;
+            manifest.deleted_nodes.insert(id.into(), deletion.into());
         } else {
-            validate_node(id, &record["node"])?;
-            if !record["links"].is_array() {
-                return Err("Invalid stored note links".into());
+            let node = parse_node(id, record["node"].take())?;
+            let links = match record["links"].take() {
+                Value::Array(links) => links,
+                _ => return Err("Invalid stored note links".into()),
+            };
+            manifest.nodes.insert(id.into(), node);
+            match record["restoredFrom"].take() {
+                Value::Null => {}
+                Value::String(revision) => {
+                    manifest.restored_nodes.insert(id.into(), revision);
+                }
+                _ => return Err(format!("Invalid restore revision for node {id}")),
             }
-            manifest["nodes"][id] = record["node"].clone();
-            if !record["restoredFrom"].is_null() {
-                manifest["restoredNodes"][id] = record["restoredFrom"].clone();
-            }
-            if !record["links"].as_array().unwrap().is_empty() {
-                manifest["linksBySource"][id] = record["links"].clone();
+            if !links.is_empty() {
+                manifest.links_by_source.insert(id.into(), links);
             }
         }
     }
     normalize(&mut manifest);
     let mut detached = Vec::new();
-    for id in manifest["nodes"].as_object().unwrap().keys() {
+    for (id, mut node) in &manifest.nodes {
         let mut visited = HashSet::from([id.as_str()]);
-        let mut node = &manifest["nodes"][id];
-        while let Some(parent) = node["parentId"].as_str() {
-            node = &manifest["nodes"][parent];
-            if node["type"] != "folder" || !visited.insert(parent) {
-                detached.push(id.clone());
-                break;
+        while let Some(parent) = node.parent_id.as_deref() {
+            match manifest.nodes.get(parent) {
+                Some(candidate) if candidate.is_folder() && visited.insert(parent) => {
+                    node = candidate;
+                }
+                _ => {
+                    detached.push(id.clone());
+                    break;
+                }
             }
         }
     }
     for id in detached {
-        manifest["nodes"][id]["parentId"] = Value::Null;
+        manifest.nodes.get_mut(&id).unwrap().parent_id = None;
     }
     Ok(manifest)
 }
 
 pub(crate) struct Loaded {
-    pub manifest: Value,
+    pub manifest: Manifest,
     pub records: HashMap<String, Vec<u8>>,
     pub corrupt: Vec<String>,
 }
@@ -271,34 +392,74 @@ pub(crate) fn load(root: &Path) -> Result<Loaded, String> {
     })
 }
 
-pub(crate) fn normalize(manifest: &mut Value) {
-    manifest["version"] = json!(3);
-    for key in ["linksBySource", "colors"] {
-        if !manifest[key].is_object() {
-            manifest[key] = json!({});
-        }
+pub(crate) fn normalize(manifest: &mut Manifest) {
+    manifest.version = 3;
+    if !manifest.colors.is_object() {
+        manifest.colors = json!({});
     }
     for key in ["pen", "highlighter", "text", "folder"] {
-        if !manifest["colors"][key].is_array() {
-            manifest["colors"][key] = json!([]);
+        if !manifest.colors[key].is_array() {
+            manifest.colors[key] = json!([]);
         }
     }
-    if !manifest["tagRegistry"].is_array() {
-        manifest["tagRegistry"] = json!([]);
+    if !manifest.tag_registry.is_array() {
+        manifest.tag_registry = json!([]);
     }
-    let presets = manifest["penPresets"].as_array().map(|entries| entries.iter().filter_map(|entry| {
+    let presets = manifest.pen_presets.as_array().map(|entries| entries.iter().filter_map(|entry| {
         let (min, max) = match entry["tool"].as_str()? { "pen" => (1.0, 40.0), "highlighter" => (12.0, 60.0), _ => return None };
         let color = entry["color"].as_str()?.trim();
         let color = color.strip_prefix('#').unwrap_or(color);
         if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() { return None; }
         Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max)}))
     }).take(12).collect::<Vec<_>>()).unwrap_or_default();
-    manifest["penPresets"] = json!(presets);
-    let flag_types = manifest["flagTypes"].as_array().map(|entries| entries.iter().filter_map(|entry| {
+    manifest.pen_presets = json!(presets);
+    let flag_types = manifest.flag_types.as_array().map(|entries| entries.iter().filter_map(|entry| {
         let color = entry["color"].as_str()?.trim();
         let color = color.strip_prefix('#').unwrap_or(color);
         if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() || !entry["name"].is_string() { return None; }
         Some(json!({"id": entry["id"], "name": entry["name"], "color": format!("#{}", color.to_lowercase())}))
     }).collect::<Vec<_>>()).unwrap_or_default();
-    manifest["flagTypes"] = json!(flag_types);
+    manifest.flag_types = json!(flag_types);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nodes_round_trip_byte_for_byte() {
+        // The order the TS client writes, plus an unknown field it may add later.
+        let file = r#"{"id":"a","name":"A","type":"file","fileType":"mcanvas","parentId":null,"tags":["x"],"createdAt":1700000000000,"modifiedAt":1700000000001,"system":{"kind":"media","byteLength":3},"future":true}"#;
+        let folder = r##"{"id":"b","name":"B","type":"folder","parentId":"a","tags":[],"createdAt":1,"modifiedAt":1,"color":"#ff0000"}"##;
+        for json in [file, folder] {
+            let value: Value = serde_json::from_str(json).unwrap();
+            let node: Node = serde_json::from_value(value.clone()).unwrap();
+            // Sidecars go through `json!`, so key order follows serde_json's map, as it always has.
+            assert_eq!(
+                serde_json::to_string(&json!(node)).unwrap(),
+                serde_json::to_string(&value).unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_nodes_are_rejected() {
+        let base = json!({"id":"a","name":"A","type":"file","parentId":null,"tags":[],"createdAt":1,"modifiedAt":1});
+        assert!(
+            parse_node("a", base.clone()).is_err(),
+            "file without fileType"
+        );
+        let mut mismatched = base.clone();
+        mismatched["fileType"] = json!("png");
+        assert!(
+            parse_node("other", mismatched).is_err(),
+            "id must match the record"
+        );
+        let mut traversal = base;
+        traversal["fileType"] = json!("../png");
+        assert!(
+            parse_node("a", traversal).is_err(),
+            "fileType must be a path component"
+        );
+    }
 }

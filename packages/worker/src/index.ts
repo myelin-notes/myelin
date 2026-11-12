@@ -3,6 +3,7 @@ const MAX_RECORD_TTL_MS = 30 * 60 * 1000;
 const MAX_RECORDS_PER_ROOM = 16;
 const MAX_REQUEST_BYTES = 16 * 1024;
 const RECORD_PREFIX = 'record:';
+const TOKEN_HEADER = 'X-Record-Token';
 const textDecoder = new TextDecoder();
 
 type DurableObjectId = object;
@@ -40,6 +41,10 @@ interface DiscoveryRecord {
   expiresAt: number;
 }
 
+interface StoredRecord extends DiscoveryRecord {
+  token: string;
+}
+
 interface DiscoveryRecordInput {
   recordId?: unknown;
   peerId?: unknown;
@@ -62,7 +67,7 @@ function corsHeaders(): HeadersInit {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Accept',
+    'Access-Control-Allow-Headers': 'Content-Type,Accept,X-Record-Token',
     'Access-Control-Max-Age': '86400',
   };
 }
@@ -82,7 +87,13 @@ function isSafeId(value: string): boolean {
   return /^[a-zA-Z0-9._-]{1,128}$/.test(value);
 }
 
-function isDiscoveryRecord(value: unknown): value is DiscoveryRecord {
+function isDiscoveryRecord(value: unknown): value is StoredRecord {
+  return (
+    isRecord(value) && typeof value.token === 'string' && isPublicRecord(value)
+  );
+}
+
+function isPublicRecord(value: unknown): value is DiscoveryRecord {
   if (!isRecord(value)) {
     return false;
   }
@@ -219,7 +230,7 @@ export class LiveDiscoveryRoom {
         case 'POST':
           return await this.publish(request);
         case 'DELETE':
-          return await this.remove(parsedPath.recordId);
+          return await this.remove(request, parsedPath.recordId);
         default:
           return json({ error: 'Method not allowed.' }, { status: 405 });
       }
@@ -239,13 +250,44 @@ export class LiveDiscoveryRoom {
 
     const now = Date.now();
     const record = createRecord(input, now);
-    await this.state.storage.put(storageKey(record.recordId), record);
-    return json({ records: await this.listFreshRecords(now) });
+    const existing = await this.state.storage.get<unknown>(
+      storageKey(record.recordId),
+    );
+    // Refreshing a live record needs its token, so listed record ids can't be hijacked.
+    if (
+      isDiscoveryRecord(existing) &&
+      existing.expiresAt > now &&
+      existing.token !== request.headers.get(TOKEN_HEADER)
+    ) {
+      return json({ error: 'Invalid record token.' }, { status: 403 });
+    }
+
+    const token = isDiscoveryRecord(existing)
+      ? existing.token
+      : crypto.randomUUID();
+    await this.state.storage.put(storageKey(record.recordId), {
+      ...record,
+      token,
+    });
+    return json({ records: await this.listFreshRecords(now), token });
   }
 
-  private async remove(recordId: string | null): Promise<Response> {
+  private async remove(
+    request: Request,
+    recordId: string | null,
+  ): Promise<Response> {
     if (!recordId) {
       return json({ error: 'Record id is required.' }, { status: 404 });
+    }
+
+    const existing = await this.state.storage.get<unknown>(
+      storageKey(recordId),
+    );
+    if (!isDiscoveryRecord(existing)) {
+      return empty(204);
+    }
+    if (existing.token !== request.headers.get(TOKEN_HEADER)) {
+      return json({ error: 'Invalid record token.' }, { status: 403 });
     }
 
     await this.state.storage.delete(storageKey(recordId));
@@ -256,7 +298,7 @@ export class LiveDiscoveryRoom {
     const entries = await this.state.storage.list<unknown>({
       prefix: RECORD_PREFIX,
     });
-    const records: DiscoveryRecord[] = [];
+    const records: StoredRecord[] = [];
 
     await Promise.all(
       Array.from(entries, async ([key, value]) => {
@@ -277,7 +319,9 @@ export class LiveDiscoveryRoom {
       ),
     );
 
-    return records.slice(0, MAX_RECORDS_PER_ROOM);
+    return records
+      .slice(0, MAX_RECORDS_PER_ROOM)
+      .map(({ token: _token, ...record }) => record);
   }
 }
 

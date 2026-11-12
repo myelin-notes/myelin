@@ -1130,8 +1130,6 @@ const fr: typeof en = {
       livePaused: 'Synchronisation en direct en pause',
       peerModes: {
         'owner-device': 'Appareil propriétaire',
-        'guest-editor': 'Invité éditeur',
-        'guest-viewer': 'Invité lecteur',
       },
       repositoryStatus: {
         localOnly: 'Local uniquement',

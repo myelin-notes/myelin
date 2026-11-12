@@ -12,7 +12,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@myelin/ui';
 import { useMessages } from '@/lib/i18n';
 
 interface SelectionToolbarProps {

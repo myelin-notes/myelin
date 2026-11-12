@@ -26,6 +26,7 @@
     "tauri:mac-deep-links:clear": "node scripts/tauri-deep-links.mjs clear",
     "website:dev": "yarn workspace @myelin/website dev",
     "website:build": "yarn workspace @myelin/website build",
+    "worker:deploy": "npx wrangler deploy --config packages/worker/wrangler.toml",
     "prepare": "husky"
   },
   "resolutions": {

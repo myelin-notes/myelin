@@ -1,4 +1,5 @@
 use super::{document, store::Store, Changes, DocumentNotification};
+use crate::repository_metadata::Node;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
@@ -216,7 +217,7 @@ pub(super) fn rename(
     let mut seen = HashSet::new();
     let mut updates = Vec::new();
     for id in sources {
-        if !seen.insert(id.clone()) || state.manifest["nodes"][&id]["fileType"] != "mcanvas" {
+        if !seen.insert(id.clone()) || !state.manifest.node(&id).is_some_and(Node::is_canvas) {
             continue;
         }
         let before = document::vector(state.doc(&id)?);

@@ -1,5 +1,6 @@
 use super::{document, store, Changes, Store};
 use crate::onenote_import::{ImportedElement, ImportedNotebook, ImportedPage};
+use crate::repository_metadata::{Node, NodeKind};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use tauri::ipc::Channel;
@@ -137,12 +138,24 @@ fn add_node(
 ) -> String {
     let id = uuid::Uuid::new_v4().to_string();
     let now = store::now();
-    let mut node = json!({"id": id, "name": name, "parentId": parent_id,
-        "type": if file { "file" } else { "folder" }, "tags": [], "createdAt": now, "modifiedAt": now});
-    if file {
-        node["fileType"] = json!("mcanvas");
-    }
-    state.manifest["nodes"][&id] = node;
+    let node = Node {
+        id: id.clone(),
+        name,
+        kind: if file {
+            NodeKind::File
+        } else {
+            NodeKind::Folder
+        },
+        file_type: file.then(|| "mcanvas".into()),
+        parent_id,
+        tags: Vec::new(),
+        created_at: now.into(),
+        modified_at: now.into(),
+        system: None,
+        color: None,
+        extra: Default::default(),
+    };
+    state.manifest.nodes.insert(id.clone(), node);
     state.queue("upsert-manifest-node", Some(&id), json!({}));
     if file {
         state.queue("push-note", Some(&id), json!({"baseFileRevision": null}));
@@ -161,7 +174,7 @@ pub(super) fn import(
 ) -> Result<(Value, Changes), String> {
     if parent_id
         .as_ref()
-        .is_some_and(|id| state.manifest["nodes"][id]["type"] != "folder")
+        .is_some_and(|id| !state.manifest.node(id).is_some_and(Node::is_folder))
     {
         return Err("Import destination is not a folder".into());
     }
@@ -218,14 +231,11 @@ pub(super) fn import(
                 .unwrap_or_else(|| format!("{fallback_title} {}", index + 1));
             let mut name = title.clone();
             let mut suffix = 1;
-            while state.manifest["nodes"]
-                .as_object()
-                .unwrap()
-                .values()
-                .any(|node| {
-                    node["parentId"] == parent && node["name"] == name && node["system"].is_null()
-                })
-            {
+            while state.manifest.nodes.values().any(|node| {
+                node.parent_id.as_deref() == Some(parent.as_str())
+                    && node.name == name
+                    && node.system.is_none()
+            }) {
                 name = format!("{title} {suffix}");
                 suffix += 1;
             }
@@ -237,7 +247,7 @@ pub(super) fn import(
             let path = state
                 .root
                 .join("files")
-                .join(store::file_name(&state.manifest["nodes"][&id])?);
+                .join(store::file_name(&state.manifest.nodes[&id])?);
             if let Err(error) = store::atomic_write(&path, &document::bytes(&doc)) {
                 for path in written {
                     let _ = std::fs::remove_file(path);

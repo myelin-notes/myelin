@@ -6,6 +6,7 @@ import {
 import type { PageFrameElement } from '@myelin/editor/elements/page-frame-element';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
+import { Switch } from '@myelin/ui';
 import { Button } from '@myelin/ui/button';
 import {
   Dialog,
@@ -15,7 +16,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
 
 interface PageSetupDialogProps {
   frame: PageFrameElement | null;

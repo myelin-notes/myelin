@@ -136,15 +136,8 @@ export interface SearchNodesOptions {
   limit?: number;
 }
 
-export interface RepositoryCapabilities {
-  polling: boolean;
-  liveSync: boolean;
-  batchedCommit: boolean;
-}
-
 export interface Repository {
   readonly kind: string;
-  readonly capabilities: RepositoryCapabilities;
 
   getNode(nodeId: VFSNodeId): Promise<VFSNode | null>;
   listDirectory(
@@ -204,7 +197,6 @@ export interface Repository {
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   /** `null` clears back to the default color. */
   setFolderColor(nodeId: VFSNodeId, color: string | null): Promise<void>;
-  getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 

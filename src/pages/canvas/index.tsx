@@ -46,17 +46,17 @@ import { getPlatform } from '@myelin/editor/platform';
 import { regenerateThumbnailNow } from '@myelin/editor/thumbnails';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Logger } from '@myelin/shared/logger';
-import { usePresence } from '@myelin/ui';
-import { Button } from '@myelin/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+  useMediaQuery,
+  usePresence,
+} from '@myelin/ui';
+import { Button } from '@myelin/ui/button';
 import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
-import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { IS_DEV } from '@/lib/env';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
 import { useRepository, type VFSNodeId } from '@/lib/sync';

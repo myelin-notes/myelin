@@ -3,14 +3,14 @@ import { Plus as PlusIcon } from 'lucide-react';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { ITool, ToolOption } from '@myelin/editor/tools/tool';
 import { getToolHotkey } from '@myelin/editor/tools/tool-keybinds';
-import { usePresence } from '@myelin/ui';
-import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+  usePresence,
+} from '@myelin/ui';
+import { ToolOptionsPanel } from '@/components/tool-options-panel';
 import { useMessages } from '@/lib/i18n';
 
 interface CanvasToolbarProps {

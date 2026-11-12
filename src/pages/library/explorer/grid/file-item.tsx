@@ -168,7 +168,7 @@ export function GridFileItem({
           onReveal={
             IS_DEV
               ? async () => {
-                  const path = await repository.getRevealPath(file.id);
+                  const path = await repository.getStoredAbsolutePath(file.id);
                   if (path) {
                     await revealItemInDir(path);
                   }

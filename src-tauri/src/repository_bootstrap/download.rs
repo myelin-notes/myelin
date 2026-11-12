@@ -232,28 +232,23 @@ pub(crate) fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
     Ok(url)
 }
 
-pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
+pub(crate) fn manifest_files(manifest: &metadata::Manifest) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
-    for (key, node) in manifest["nodes"]
-        .as_object()
-        .ok_or("Invalid repository manifest")?
-    {
-        if node["type"] == "folder" {
+    for (key, node) in &manifest.nodes {
+        if node.is_folder() {
             continue;
         }
-        if node["type"] != "file" {
-            return Err("Invalid repository manifest node".into());
+        if !valid_component(&node.id) || node.id != *key {
+            return Err("Invalid repository file ID".into());
         }
-        let id = node["id"]
-            .as_str()
-            .filter(|id| valid_component(id) && *id == key)
-            .ok_or("Invalid repository file ID")?;
-        let file_type = node["fileType"]
-            .as_str()
+        let file_type = node
+            .file_type
+            .as_deref()
             .filter(|value| valid_component(value))
             .ok_or("Invalid repository file type")?;
         files.push(format!(
-            "{id}.{}",
+            "{}.{}",
+            node.id,
             if file_type == "mcanvas" {
                 "myelin"
             } else {
