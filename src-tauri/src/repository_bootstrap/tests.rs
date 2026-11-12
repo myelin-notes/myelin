@@ -151,10 +151,11 @@ fn github_source() -> RepositorySource {
 
 // `manifest()` as the upgrade marker plus its sidecars, followed by `files`.
 fn with_metadata(files: Vec<(&str, Vec<u8>)>) -> Vec<(String, Vec<u8>)> {
-    let mut entries: Vec<_> = crate::repository_metadata::records(&manifest())
-        .unwrap()
-        .into_iter()
-        .collect();
+    let mut entries: Vec<_> =
+        crate::repository_metadata::records(&serde_json::from_value(manifest()).unwrap())
+            .unwrap()
+            .into_iter()
+            .collect();
     entries.push((
         "manifest.json".into(),
         crate::repository_metadata::MARKER.to_vec(),
@@ -299,7 +300,7 @@ async fn github_downloads_one_revision_without_changing_existing_cache() {
     assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
     assert_eq!(
         crate::repository_metadata::load(&stage).unwrap().records,
-        crate::repository_metadata::records(&manifest()).unwrap()
+        crate::repository_metadata::records(&serde_json::from_value(manifest()).unwrap()).unwrap()
     );
 
     assert!(!stage.join("files/old.myelin").exists());
@@ -351,7 +352,9 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
         let directory = TestDirectory::new();
         let stage = directory.0.join("download");
         fs::create_dir_all(stage.join("files")).unwrap();
-        let records = crate::repository_metadata::records(&manifest()).unwrap();
+        let records =
+            crate::repository_metadata::records(&serde_json::from_value(manifest()).unwrap())
+                .unwrap();
         let lookups = AtomicU64::new(0);
         let server = TestServer::new(move |path| {
             if path.starts_with("/drive/files?") {
@@ -431,7 +434,7 @@ async fn prepares_empty_github_repositories_without_creating_a_legacy_manifest()
         assert_eq!((prepared.0, prepared.1), (0, 0));
         let loaded = crate::repository_metadata::load(&stage).unwrap();
         assert!(loaded.corrupt.is_empty());
-        assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
+        assert!(loaded.manifest.nodes.is_empty());
         assert!(stage.join("repository.json").exists());
         assert!(server
             .messages
@@ -474,7 +477,7 @@ async fn prepares_empty_drive_repositories_without_creating_a_legacy_manifest() 
 
         let loaded = crate::repository_metadata::load(&stage).unwrap();
         assert!(loaded.corrupt.is_empty());
-        assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
+        assert!(loaded.manifest.nodes.is_empty());
         assert!(stage.join("repository.json").exists());
         assert!(server
             .messages

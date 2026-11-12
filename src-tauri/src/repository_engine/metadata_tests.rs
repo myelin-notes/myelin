@@ -76,7 +76,7 @@ async fn corruption_is_isolated_and_a_lost_marker_does_not_lose_the_library() {
     fs::write(root.join("repository.json"), b"corrupt settings").unwrap();
     let reopened = directory.engine(true);
     assert_eq!(read(&reopened, "picture").await, b"image");
-    assert!(reopened.store.lock().unwrap().manifest["nodes"]["canvas"].is_null());
+    assert!(untyped(&reopened.store.lock().unwrap().manifest)["nodes"]["canvas"].is_null());
     assert!(reopened.store.lock().unwrap().recovery_error.is_some());
     assert!(root.join("files/canvas.myelin").exists());
     let quarantined: Vec<_> = fs::read_dir(&root)
@@ -129,7 +129,7 @@ async fn stale_offline_edits_keep_a_recovery_copy_without_resurrecting_a_deleted
         .unwrap();
     second
         .operate(RepositoryOperation::WriteFile {
-            node: node("picture", "png"),
+            node: file("picture", "png"),
             bytes_base64: STANDARD.encode(b"offline edit"),
             replace: true,
             overwrite_remote: false,
@@ -145,7 +145,7 @@ async fn stale_offline_edits_keep_a_recovery_copy_without_resurrecting_a_deleted
         .unwrap();
     second
         .operate(RepositoryOperation::WriteFile {
-            node: node("picture", "png"),
+            node: file("picture", "png"),
             bytes_base64: STANDARD.encode(b"newer offline edit"),
             replace: true,
             overwrite_remote: false,
@@ -154,7 +154,7 @@ async fn stale_offline_edits_keep_a_recovery_copy_without_resurrecting_a_deleted
         .unwrap();
     server.resume.notify_one();
     task.await.unwrap().unwrap();
-    let recovery_id = second.store.lock().unwrap().manifest["nodes"]
+    let recovery_id = untyped(&second.store.lock().unwrap().manifest)["nodes"]
         .as_object()
         .unwrap()
         .keys()
@@ -298,7 +298,7 @@ async fn cloud_upgrade_markers_are_rebuilt_from_sidecars_when_missing_or_corrupt
             .await
             .unwrap();
         assert_eq!(
-            fresh.store.lock().unwrap().manifest["nodes"]["canvas"]["name"],
+            untyped(&fresh.store.lock().unwrap().manifest)["nodes"]["canvas"]["name"],
             "canvas.mcanvas"
         );
         assert!(fresh.store.lock().unwrap().recovery_error.is_none());
@@ -351,7 +351,7 @@ async fn fresh_cloud_repositories_publish_sidecars_without_a_legacy_manifest() {
     let engine = directory.engine(true);
     seed(&engine, "image", "png", b"image".to_vec()).await;
     let state = Arc::new(Mutex::new(GitHubFixture::new(
-        metadata::empty_manifest(),
+        untyped(&metadata::empty_manifest()),
         HashMap::new(),
     )));
     let remote = state.clone();

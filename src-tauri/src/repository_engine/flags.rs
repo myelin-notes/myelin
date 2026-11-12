@@ -3,6 +3,7 @@ use super::{
     store::{file_name, FileWrite, Store},
     Changes, DocumentNotification,
 };
+use crate::repository_metadata::Node;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
 use serde_json::Value;
@@ -60,7 +61,7 @@ pub(super) fn edit(
     let mut changes = Changes::default();
     let mut files = Vec::new();
     for (id, ids) in flag_ids {
-        if state.manifest["nodes"][&id]["fileType"] != "mcanvas" {
+        if !state.manifest.node(&id).is_some_and(Node::is_canvas) {
             continue;
         }
         let before = document::vector(state.doc(&id)?);
@@ -78,7 +79,7 @@ pub(super) fn edit(
         state.touch_document(&id, true)?;
         // A full write rather than a journal delta: flag listings read the saved file directly.
         files.push(FileWrite {
-            name: file_name(&state.manifest["nodes"][&id])?,
+            name: file_name(&state.manifest.nodes[&id])?,
             bytes: Some(STANDARD.encode(document::bytes(state.doc(&id)?))),
         });
         changes.changed.push(id.clone());

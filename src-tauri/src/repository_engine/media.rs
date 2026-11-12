@@ -1,4 +1,5 @@
-use serde_json::{json, Value};
+use crate::repository_metadata::{Node, NodeKind};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use yrs::{
@@ -81,12 +82,20 @@ pub(super) fn has_inline_media(update: &[u8]) -> bool {
 
 /// A hidden node for a media file. Its fixed timestamps keep the sidecar identical on every device,
 /// so two devices adding the same bytes never conflict.
-pub(super) fn node(hash: &str, byte_length: usize) -> Value {
-    json!({
-        "id": hash, "type": "file", "name": hash, "fileType": FILE_TYPE, "parentId": null,
-        "tags": [], "createdAt": 0, "modifiedAt": 0,
-        "system": { "kind": "media", "byteLength": byte_length }
-    })
+pub(super) fn node(hash: &str, byte_length: usize) -> Node {
+    Node {
+        id: hash.into(),
+        name: hash.into(),
+        kind: NodeKind::File,
+        file_type: Some(FILE_TYPE.into()),
+        parent_id: None,
+        tags: Vec::new(),
+        created_at: 0.into(),
+        modified_at: 0.into(),
+        system: Some(json!({ "kind": "media", "byteLength": byte_length })),
+        color: None,
+        extra: Default::default(),
+    }
 }
 
 fn hash(bytes: &[u8]) -> String {
@@ -218,6 +227,7 @@ mod tests {
     use super::*;
     use crate::repository_engine::document;
     use base64::{engine::general_purpose::STANDARD, Engine};
+    use serde_json::Value;
     use std::collections::HashMap;
     use yrs::{Array, Doc, Map, MapPrelim, Out, Transact};
 

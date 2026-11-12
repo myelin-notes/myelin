@@ -1,5 +1,6 @@
 use super::*;
 use crate::repository_bootstrap::download::RemoteEndpoints;
+use crate::repository_metadata::Manifest;
 use std::{fs, sync::atomic::AtomicU64};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use yrs::{Any, Array, GetString, Map, Out, ReadTxn, Text, Transact};
@@ -55,6 +56,15 @@ fn fixture_bytes(key: &str) -> Vec<u8> {
 fn node(id: &str, kind: &str) -> Value {
     json!({"id": id, "type": "file", "fileType": kind, "name": format!("{id}.{kind}"), "parentId": null, "tags": [], "createdAt": 1, "modifiedAt": 1})
 }
+fn file(id: &str, kind: &str) -> Node {
+    serde_json::from_value(node(id, kind)).unwrap()
+}
+fn typed(manifest: &Value) -> Manifest {
+    serde_json::from_value(manifest.clone()).unwrap()
+}
+fn untyped(manifest: &Manifest) -> Value {
+    serde_json::to_value(manifest).unwrap()
+}
 
 fn metadata_patch(previous: &Value, next: &Value) -> MetadataPatch {
     serde_json::from_value(json!({
@@ -83,7 +93,7 @@ async fn seed(engine: &RepositoryEngine, id: &str, kind: &str, bytes: Vec<u8>) {
     save_manifest(engine, manifest).await;
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: file,
+            node: serde_json::from_value(file).unwrap(),
             bytes_base64: STANDARD.encode(bytes),
             replace: true,
             overwrite_remote: false,
@@ -195,7 +205,14 @@ async fn native_versions_check_cadence_before_reading_and_deduplicate_existing_c
     fs::write(&source, b"changed").unwrap();
     {
         let mut store = engine.store.lock().unwrap();
-        store.manifest["nodes"][version["id"].as_str().unwrap()]["system"]["capturedAt"] = json!(1);
+        store
+            .manifest
+            .nodes
+            .get_mut(version["id"].as_str().unwrap())
+            .unwrap()
+            .system
+            .as_mut()
+            .unwrap()["capturedAt"] = json!(1);
     }
     let changed = capture_version(&engine, "picture", false).await;
     assert_eq!(
@@ -220,7 +237,7 @@ async fn native_restore_preserves_metadata_saves_current_bytes_and_rejects_missi
     let version_id = version["id"].as_str().unwrap();
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: node("picture", "png"),
+            node: file("picture", "png"),
             bytes_base64: STANDARD.encode(b"current"),
             replace: true,
             overwrite_remote: false,
@@ -229,9 +246,10 @@ async fn native_restore_preserves_metadata_saves_current_bytes_and_rejects_missi
         .unwrap();
     let before = {
         let mut store = engine.store.lock().unwrap();
-        store.manifest["nodes"]["picture"]["name"] = json!("Renamed.png");
-        store.manifest["nodes"]["picture"]["tags"] = json!(["keep"]);
-        store.manifest["nodes"]["picture"].clone()
+        let picture = store.manifest.nodes.get_mut("picture").unwrap();
+        picture.name = "Renamed.png".into();
+        picture.tags = vec!["keep".into()];
+        json!(picture)
     };
     assert!(engine
         .operate(RepositoryOperation::RestoreFileVersion {
@@ -252,13 +270,16 @@ async fn native_restore_preserves_metadata_saves_current_bytes_and_rejects_missi
         let store = engine.store.lock().unwrap();
         assert_eq!(store.data_version, before_version + 1);
         for key in ["name", "parentId", "tags", "createdAt"] {
-            assert_eq!(store.manifest["nodes"]["picture"][key], before[key]);
+            assert_eq!(
+                untyped(&store.manifest)["nodes"]["picture"][key],
+                before[key]
+            );
         }
         assert!(store
             .outbox
             .iter()
             .any(|op| op["nodeId"] == "picture" && op["replaceFile"] == true));
-        store.manifest["nodes"]
+        untyped(&store.manifest)["nodes"]
             .as_object()
             .unwrap()
             .values()
@@ -291,7 +312,7 @@ async fn native_restore_preserves_metadata_saves_current_bytes_and_rejects_missi
         .unwrap();
     assert_eq!(read(&engine, "picture").await, b"current");
     assert_eq!(
-        engine.store.lock().unwrap().manifest["nodes"]
+        untyped(&engine.store.lock().unwrap().manifest)["nodes"]
             .as_object()
             .unwrap()
             .values()
@@ -323,7 +344,7 @@ async fn native_restore_can_prune_the_selected_version_without_losing_its_bytes(
     for index in 0..32 {
         engine
             .operate(RepositoryOperation::WriteFile {
-                node: node("picture", "png"),
+                node: file("picture", "png"),
                 bytes_base64: STANDARD.encode([index]),
                 replace: true,
                 overwrite_remote: false,
@@ -335,12 +356,21 @@ async fn native_restore_can_prune_the_selected_version_without_losing_its_bytes(
         if index == 0 {
             oldest_id = id.into();
         }
-        engine.store.lock().unwrap().manifest["nodes"][id]["system"]["capturedAt"] =
-            json!(index + 1);
+        engine
+            .store
+            .lock()
+            .unwrap()
+            .manifest
+            .nodes
+            .get_mut(id)
+            .unwrap()
+            .system
+            .as_mut()
+            .unwrap()["capturedAt"] = json!(index + 1);
     }
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: node("picture", "png"),
+            node: file("picture", "png"),
             bytes_base64: STANDARD.encode([99]),
             replace: true,
             overwrite_remote: false,
@@ -362,7 +392,8 @@ async fn native_restore_can_prune_the_selected_version_without_losing_its_bytes(
         .exists());
     let backup_id = {
         let store = engine.store.lock().unwrap();
-        let versions = store.manifest["nodes"]
+        let manifest = untyped(&store.manifest);
+        let versions = manifest["nodes"]
             .as_object()
             .unwrap()
             .values()
@@ -415,19 +446,20 @@ async fn native_canvas_restore_captures_uncheckpointed_edits_and_replaces_the_ge
     );
     let backup_id = {
         let store = engine.store.lock().unwrap();
-        let backup = store.manifest["nodes"]
+        let manifest = untyped(&store.manifest);
+        let backup = manifest["nodes"]
             .as_object()
             .unwrap()
             .values()
             .find(|node| node["system"]["kind"] == "file-version" && node["id"] != version_id)
             .unwrap();
-        assert!(store.manifest["linksBySource"][backup["id"].as_str().unwrap()].is_null());
+        assert!(manifest["linksBySource"][backup["id"].as_str().unwrap()].is_null());
         assert!(store
             .outbox
             .iter()
             .any(|op| op["nodeId"] == "canvas" && op["replaceFile"] == true));
         assert_eq!(
-            store.manifest["linksBySource"]["canvas"],
+            untyped(&store.manifest)["linksBySource"]["canvas"],
             json!(document::links(
                 &document::decode(&fixture_bytes("baseUpdate")).unwrap()
             ))
@@ -625,7 +657,7 @@ async fn document_events_skip_the_source_session_and_replacements_omit_bytes() {
         .all(|(_, payload)| payload["origin"] == "peer"));
     let (_, replacement) = engine
         .operate(RepositoryOperation::WriteFile {
-            node: node("canvas", "mcanvas"),
+            node: file("canvas", "mcanvas"),
             bytes_base64: fixture()["baseUpdate"].as_str().unwrap().into(),
             replace: true,
             overwrite_remote: true,
@@ -654,14 +686,14 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     let (before_import, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: file.clone(),
+            node: serde_json::from_value(file.clone()).unwrap(),
             bytes_base64: links["update"].as_str().unwrap().into(),
             replace: true,
             overwrite_remote: false,
         })
         .await
         .unwrap();
-    let mut manifest = crate::repository_metadata::empty_manifest();
+    let mut manifest = untyped(&crate::repository_metadata::empty_manifest());
     manifest["nodes"]["canvas"] = file.clone();
     engine
         .operate(RepositoryOperation::SaveMetadata {
@@ -678,7 +710,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     assert!(engine.store.lock().unwrap().outbox.is_empty());
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: file.clone(),
+            node: serde_json::from_value(file.clone()).unwrap(),
             bytes_base64: fixture()["baseUpdate"].as_str().unwrap().into(),
             replace: true,
             overwrite_remote: false,
@@ -701,7 +733,7 @@ async fn checkpoint_materializes_index_bytes_and_imported_links_and_rejects_stal
     assert_document(&stored_document(&directory));
     let (_, replacement) = engine
         .operate(RepositoryOperation::WriteFile {
-            node: file,
+            node: serde_json::from_value(file).unwrap(),
             bytes_base64: fixture()["baseUpdate"].as_str().unwrap().into(),
             replace: true,
             overwrite_remote: true,
@@ -788,7 +820,7 @@ async fn flag_types_persist_normalized_and_stay_queued_across_reopen() {
     save_manifest(&engine, manifest).await;
     let reopened = Store::open(directory.0.join("data"), true).unwrap();
     assert_eq!(
-        reopened.manifest["flagTypes"],
+        untyped(&reopened.manifest)["flagTypes"],
         json!([{"id": "todo", "name": "To-do", "color": "#ef4444"}])
     );
     assert!(reopened
@@ -817,7 +849,7 @@ async fn corrupt_outbox_is_quarantined_and_pauses_cloud_without_losing_local_fil
         .contains("requires recovery"));
     assert!(!reopened.status().await.online);
     update(&reopened, "localUpdate", "local").await;
-    assert!(reopened.store.lock().unwrap().manifest["nodes"]["canvas"].is_object());
+    assert!(untyped(&reopened.store.lock().unwrap().manifest)["nodes"]["canvas"].is_object());
     assert!(fs::read_dir(directory.0.join("data"))
         .unwrap()
         .any(|entry| entry
@@ -966,7 +998,7 @@ impl GitHubFixture {
         }
     }
     fn repository_files(&self) -> HashMap<String, Vec<u8>> {
-        let mut entries = crate::repository_metadata::records(&self.manifest).unwrap();
+        let mut entries = crate::repository_metadata::records(&typed(&self.manifest)).unwrap();
         entries.insert(
             "manifest.json".into(),
             crate::repository_metadata::MARKER.to_vec(),
@@ -974,7 +1006,13 @@ impl GitHubFixture {
         for (id, bytes) in &self.files {
             if self.manifest["nodes"][id]["type"] == "file" {
                 entries.insert(
-                    format!("files/{}", file_name(&self.manifest["nodes"][id]).unwrap()),
+                    format!(
+                        "files/{}",
+                        file_name(
+                            &serde_json::from_value(self.manifest["nodes"][id].clone()).unwrap()
+                        )
+                        .unwrap()
+                    ),
                     bytes.clone(),
                 );
             }
@@ -1046,7 +1084,7 @@ impl GitHubFixture {
             return reply(json!({"sha": format!("{:040x}", self.counter)}));
         }
         if request.method == "PATCH" && request.path.contains("/git/refs/heads/") {
-            let mut records = crate::repository_metadata::records(&self.manifest).unwrap();
+            let mut records = crate::repository_metadata::records(&typed(&self.manifest)).unwrap();
             for item in &self.tree {
                 let path = item["path"].as_str().unwrap();
                 let bytes = item["sha"].as_str().map(|sha| self.blobs[sha].clone());
@@ -1072,7 +1110,7 @@ impl GitHubFixture {
                     }
                 }
             }
-            self.manifest = crate::repository_metadata::assemble(&records).unwrap();
+            self.manifest = untyped(&crate::repository_metadata::assemble(&records).unwrap());
             self.head = body["sha"].as_str().unwrap().into();
             if self.fail_ref_response {
                 self.fail_ref_response = false;
@@ -1135,7 +1173,7 @@ async fn native_metadata_deletes_and_head_conflict_retry_preserve_remote_nodes_a
         .await
         .unwrap();
     assert_eq!(
-        engine.store.lock().unwrap().manifest["nodes"]["remote-image"]["name"],
+        untyped(&engine.store.lock().unwrap().manifest)["nodes"]["remote-image"]["name"],
         "remote-image.png"
     );
     assert_eq!(
@@ -1196,9 +1234,9 @@ impl DriveFixture {
                     name: "repository.json".into(),
                     revision: "settings-r1".into(),
                     app_properties: HashMap::new(),
-                    bytes: crate::repository_metadata::settings(&manifest_with(
+                    bytes: crate::repository_metadata::settings(&typed(&manifest_with(
                         "canvas", "mcanvas",
-                    ))
+                    )))
                     .unwrap(),
                 },
                 DriveFile {
@@ -1208,7 +1246,7 @@ impl DriveFixture {
                     revision: "meta-canvas-r1".into(),
                     app_properties: HashMap::new(),
                     bytes: crate::repository_metadata::node_record(
-                        &manifest_with("canvas", "mcanvas"),
+                        &typed(&manifest_with("canvas", "mcanvas")),
                         "canvas",
                     )
                     .unwrap(),
@@ -1239,7 +1277,7 @@ impl DriveFixture {
             file.name != crate::repository_metadata::SETTINGS
                 && !file.name.ends_with(crate::repository_metadata::SUFFIX)
         });
-        for (path, bytes) in crate::repository_metadata::records(manifest).unwrap() {
+        for (path, bytes) in crate::repository_metadata::records(&typed(manifest)).unwrap() {
             let (parent, id, name) = match path.strip_prefix("files/") {
                 Some(name) => (
                     "files-folder",
@@ -1278,7 +1316,7 @@ impl DriveFixture {
                 .then(|| (path, file.bytes.clone()))
             })
             .collect();
-        crate::repository_metadata::assemble(&records).unwrap()
+        untyped(&crate::repository_metadata::assemble(&records).unwrap())
     }
     fn metadata(file: &DriveFile) -> Value {
         json!({"id": file.id, "name": file.name, "headRevisionId": file.revision, "appProperties": file.app_properties})
@@ -1855,7 +1893,7 @@ fn github_source() -> RepositorySource {
     }
 }
 fn manifest_with(id: &str, kind: &str) -> Value {
-    let mut manifest = crate::repository_metadata::empty_manifest();
+    let mut manifest = untyped(&crate::repository_metadata::empty_manifest());
     manifest["nodes"][id] = node(id, kind);
     manifest
 }
@@ -1981,7 +2019,7 @@ async fn github_sync_initializes_an_empty_repository_branch() {
     let directory = TestDirectory::new();
     let engine = directory.engine(true);
     let state = Arc::new(Mutex::new(GitHubFixture::new(
-        crate::repository_metadata::empty_manifest(),
+        untyped(&crate::repository_metadata::empty_manifest()),
         HashMap::new(),
     )));
     state.lock().unwrap().empty = true;
@@ -2008,7 +2046,7 @@ async fn github_commit_unknown_to_remote_is_a_failed_push_not_a_failed_verificat
     let directory = TestDirectory::new();
     let engine = directory.engine(true);
     let state = Arc::new(Mutex::new(GitHubFixture::new(
-        crate::repository_metadata::empty_manifest(),
+        untyped(&crate::repository_metadata::empty_manifest()),
         HashMap::new(),
     )));
     let server = TestServer::new(move |request| {
@@ -2065,7 +2103,7 @@ async fn native_raw_sync_preserves_legacy_content_bases_and_makes_conflict_copie
     );
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: node("picture", "png"),
+            node: file("picture", "png"),
             bytes_base64: STANDARD.encode(b"new local bytes"),
             replace: true,
             overwrite_remote: false,
@@ -2103,7 +2141,7 @@ async fn native_imports_store_bytes_before_publishing() {
     let bytes: Vec<u8> = (0..20000).map(|i| (i % 251) as u8).collect();
     engine
         .operate(RepositoryOperation::ImportedFile {
-            node: node("import", "png"),
+            node: file("import", "png"),
             bytes: bytes.clone(),
         })
         .await
@@ -2112,8 +2150,8 @@ async fn native_imports_store_bytes_before_publishing() {
         fs::read(directory.0.join("data/files/import.png")).unwrap(),
         bytes
     );
-    assert!(engine.store.lock().unwrap().manifest["nodes"]["import"].is_null());
-    let mut manifest = engine.store.lock().unwrap().manifest.clone();
+    assert!(untyped(&engine.store.lock().unwrap().manifest)["nodes"]["import"].is_null());
+    let mut manifest = untyped(&engine.store.lock().unwrap().manifest);
     manifest["nodes"]["import"] = node("import", "png");
     save_manifest(&engine, manifest).await;
     assert_eq!(read(&engine, "import").await, bytes);
@@ -2260,7 +2298,7 @@ async fn native_reference_renames_update_text_marks_indexes_and_mergeable_deltas
     assert_eq!(links[0]["snippet"], "😀 before [[Folder/新\\#Name\\\\x#Draft]] between [[Folder/新\\#Name\\\\x#Draft]][[Folder/新\\#Name\\\\x#Draft]] after");
     assert_eq!(
         json!(links),
-        engine.store.lock().unwrap().manifest["linksBySource"]["source"]
+        untyped(&engine.store.lock().unwrap().manifest)["linksBySource"]["source"]
     );
     let (result, changes) = engine
         .operate(RepositoryOperation::RenameReferences {
@@ -2375,7 +2413,7 @@ async fn native_chunk_transfers_reject_bad_chunks_and_commit_only_complete_file_
         .resolve_transfer(RepositoryOperation::FinishTransfer {
             transfer_id: "file".into(),
             operation: Box::new(RepositoryOperation::WriteFile {
-                node: node("image", "png"),
+                node: file("image", "png"),
                 bytes_base64: String::new(),
                 replace: true,
                 overwrite_remote: false,
@@ -2440,7 +2478,7 @@ async fn native_chunk_transfers_reject_bad_chunks_and_commit_only_complete_file_
         .resolve_transfer(RepositoryOperation::FinishTransfer {
             transfer_id: "cancelled".into(),
             operation: Box::new(RepositoryOperation::WriteFile {
-                node: node("image", "png"),
+                node: file("image", "png"),
                 bytes_base64: String::new(),
                 replace: true,
                 overwrite_remote: false
@@ -2574,7 +2612,8 @@ async fn onenote_import_persists_canvas_content_and_unique_titles_without_js() {
     );
 
     let mut reopened = Store::open(directory.0.join("data"), true).unwrap();
-    let nodes = reopened.manifest["nodes"].as_object().unwrap();
+    let manifest = untyped(&reopened.manifest);
+    let nodes = manifest["nodes"].as_object().unwrap();
     let mut names = nodes
         .values()
         .filter(|node| node["type"] == "file")
@@ -2692,7 +2731,8 @@ async fn onenote_import_preserves_shared_section_groups_and_rejects_missing_dest
         .is_err());
     let (result, _) = engine.operate(operation(None)).await.unwrap();
     let reopened = Store::open(directory.0.join("data"), false).unwrap();
-    let nodes = reopened.manifest["nodes"].as_object().unwrap();
+    let manifest = untyped(&reopened.manifest);
+    let nodes = manifest["nodes"].as_object().unwrap();
     assert_eq!(nodes.len(), 7);
     let named = |name: &str| nodes.values().find(|node| node["name"] == name).unwrap();
     assert_eq!(named("Group")["parentId"], result["rootFolderId"]);
@@ -3005,7 +3045,7 @@ async fn native_drive_deletions_publish_first_and_finish_after_interruption_and_
         if failure == "manifest" {
             assert_eq!(read(&reader, "canvas").await, b"saved picture");
         } else {
-            assert!(reader.store.lock().unwrap().manifest["nodes"]["canvas"].is_null());
+            assert!(untyped(&reader.store.lock().unwrap().manifest)["nodes"]["canvas"].is_null());
         }
         if failure == "delete-changed" {
             let mut remote = state.lock().unwrap();
@@ -3265,7 +3305,7 @@ async fn initial_sync_installs_files_before_a_metadata_only_recovery_journal() {
         .cycle(github_source(), &server.endpoints)
         .await
         .is_err());
-    assert!(engine.store.lock().unwrap().manifest["nodes"]
+    assert!(untyped(&engine.store.lock().unwrap().manifest)["nodes"]
         .as_object()
         .unwrap()
         .is_empty());
@@ -3484,7 +3524,7 @@ async fn a_document_whose_media_is_missing_stays_usable_and_recovers_when_it_arr
 
     {
         let mut remote = state.lock().unwrap();
-        remote.manifest["nodes"][&hash] = media::node(&hash, bytes.len());
+        remote.manifest["nodes"][&hash] = json!(media::node(&hash, bytes.len()));
         remote.files.insert(hash.clone(), bytes.to_vec());
         remote.head = "f".repeat(40);
     }
@@ -3524,7 +3564,7 @@ async fn versions_and_documents_share_one_stored_copy_of_their_media() {
     assert_eq!(read(&reopened, "drawing").await, whole);
     assert_eq!(read(&reopened, version_id).await, whole);
 
-    let manifest = reopened.store.lock().unwrap().manifest.clone();
+    let manifest = untyped(&reopened.store.lock().unwrap().manifest);
     let node = manifest["nodes"]
         .as_object()
         .unwrap()
@@ -3893,7 +3933,7 @@ async fn removed_media_nothing_uses_is_deleted_from_the_device_that_applies_the_
         .await
         .unwrap();
     assert!(second.store.lock().unwrap().outbox.is_empty());
-    assert!(second.store.lock().unwrap().manifest["nodes"][&hash].is_null());
+    assert!(untyped(&second.store.lock().unwrap().manifest)["nodes"][&hash].is_null());
     assert!(!second_directory
         .0
         .join(format!("data/files/{hash}.media"))
@@ -3912,7 +3952,7 @@ async fn empty_media_document(engine: &RepositoryEngine) {
     let (saved, _) = engine.operate(RepositoryOperation::Manifest).await.unwrap();
     engine
         .operate(RepositoryOperation::WriteFile {
-            node: saved["manifest"]["nodes"]["drawing"].clone(),
+            node: serde_json::from_value(saved["manifest"]["nodes"]["drawing"].clone()).unwrap(),
             bytes_base64: STANDARD.encode(document::bytes(&yrs::Doc::new())),
             replace: true,
             overwrite_remote: true,

@@ -1,6 +1,6 @@
 use super::{document, media};
 use crate::repository_bootstrap::{reject_symlink, sync_directory, valid_component};
-use crate::repository_metadata as metadata;
+use crate::repository_metadata::{self as metadata, Manifest, Node};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -75,7 +75,7 @@ struct DeltaWrite {
 
 pub(super) struct Store {
     pub root: PathBuf,
-    pub manifest: Value,
+    pub manifest: Manifest,
     pub outbox: Vec<Value>,
     pub documents: HashMap<String, Doc>,
     pub sync: SyncState,
@@ -106,15 +106,17 @@ pub(super) fn revision(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
-pub(super) fn file_name(node: &Value) -> Result<String, String> {
-    let id = node["id"]
-        .as_str()
-        .filter(|id| valid_component(id))
-        .ok_or("Invalid repository node ID")?;
-    let kind = node["fileType"]
-        .as_str()
-        .filter(|kind| valid_component(kind) && *kind != "meta.json")
-        .ok_or("Invalid repository file type")?;
+pub(super) fn file_name(node: &Node) -> Result<String, String> {
+    file_name_for(&node.id, node.file_type.as_deref().unwrap_or_default())
+}
+
+pub(super) fn file_name_for(id: &str, kind: &str) -> Result<String, String> {
+    if !valid_component(id) {
+        return Err("Invalid repository node ID".into());
+    }
+    if !valid_component(kind) || kind == "meta.json" {
+        return Err("Invalid repository file type".into());
+    }
     Ok(format!(
         "{id}.{}",
         if kind == "mcanvas" { "myelin" } else { kind }
@@ -273,7 +275,11 @@ impl Store {
         }
         for entry in fs::read_dir(root.join("files")).map_err(io)? {
             let entry = entry.map_err(io)?;
-            if entry.file_name().to_string_lossy().ends_with(".journal.tmp") {
+            if entry
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".journal.tmp")
+            {
                 reject_symlink(&entry.path())?;
                 fs::remove_file(entry.path()).map_err(io)?;
             }
@@ -354,16 +360,10 @@ impl Store {
             .ok();
         }
         let mut store = Self {
-            dirty_nodes: manifest["nodes"]
-                .as_object()
-                .unwrap()
+            dirty_nodes: manifest
+                .nodes
                 .keys()
-                .chain(
-                    manifest["deletedNodes"]
-                        .as_object()
-                        .into_iter()
-                        .flat_map(|nodes| nodes.keys()),
-                )
+                .chain(manifest.deleted_nodes.keys())
                 .cloned()
                 .collect(),
             dirty_settings: true,
@@ -392,10 +392,10 @@ impl Store {
             for entry in fs::read_dir(&directory).map_err(io)? {
                 let entry = entry.map_err(io)?;
                 let id = entry.file_name().to_string_lossy().to_string();
-                if store.manifest["nodes"][&id]["fileType"] == "mcanvas" {
-                    let bytes = store.read_file(&store.manifest["nodes"][&id])?;
+                if let Some(node) = store.manifest.node(&id).filter(|node| node.is_canvas()) {
+                    let bytes = store.read_file(node)?;
                     files.push(FileWrite {
-                        name: file_name(&store.manifest["nodes"][&id])?,
+                        name: file_name(node)?,
                         bytes: Some(STANDARD.encode(bytes)),
                     });
                 }
@@ -416,7 +416,7 @@ impl Store {
         self.dirty_nodes.insert(id.to_owned());
     }
 
-    pub fn replace_metadata(&mut self, next: Value) {
+    pub fn replace_metadata(&mut self, next: Manifest) {
         self.dirty_nodes
             .extend(metadata::changed_nodes(&self.manifest, &next));
         self.dirty_settings = true;
@@ -427,9 +427,9 @@ impl Store {
         self.persisted_metadata.clone()
     }
 
-    pub fn read_file(&self, node: &Value) -> Result<Vec<u8>, String> {
-        if node["fileType"] == "mcanvas" {
-            if let Some(doc) = node["id"].as_str().and_then(|id| self.documents.get(id)) {
+    pub fn read_file(&self, node: &Node) -> Result<Vec<u8>, String> {
+        if node.is_canvas() {
+            if let Some(doc) = self.documents.get(&node.id) {
                 return Ok(document::bytes(doc));
             }
         }
@@ -440,12 +440,11 @@ impl Store {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
             Err(error) => return Err(io(error)),
         };
-        if node["fileType"] == "mcanvas" {
+        if node.is_canvas() {
             if let Cow::Owned(inlined) = media::inline(&bytes, |hash| self.read_media(hash)) {
                 bytes = inlined;
             }
-            let id = node["id"].as_str().ok_or("Invalid repository node ID")?;
-            let directory = self.root.join(".native-updates").join(id);
+            let directory = self.root.join(".native-updates").join(&node.id);
             reject_symlink(&self.root.join(".native-updates"))?;
             reject_symlink(&directory)?;
             if directory.exists() {
@@ -496,8 +495,8 @@ impl Store {
                 if !path.exists() {
                     atomic_write(&path, bytes)?;
                 }
-                if self.manifest["nodes"][hash].is_null() {
-                    self.manifest["nodes"][hash] = node;
+                if self.manifest.node(hash).is_none() {
+                    self.manifest.nodes.insert(hash.into(), node);
                     self.queue("upsert-manifest-node", Some(hash), json!({}));
                     self.queue("push-note", Some(hash), json!({"baseFileRevision": null}));
                 }
@@ -510,8 +509,8 @@ impl Store {
     /// Documents big enough to hold inline media, with where each is stored.
     pub fn documents_large_enough_for_media(&self) -> Result<Vec<(String, PathBuf)>, String> {
         let mut documents = Vec::new();
-        for (id, node) in self.manifest["nodes"].as_object().unwrap() {
-            if node["type"] == "file" && node["fileType"] == "mcanvas" {
+        for (id, node) in &self.manifest.nodes {
+            if node.is_file() && node.is_canvas() {
                 let path = self.root.join("files").join(file_name(node)?);
                 if fs::metadata(&path).is_ok_and(|file| file.len() as usize >= media::MIN_BYTES) {
                     documents.push((id.clone(), path));
@@ -524,10 +523,14 @@ impl Store {
     /// Rewrites a document stored with inline media and queues it for upload. Returns the size of the
     /// complete document, which is what a sync has to hold in memory to upload it.
     pub fn extract_document_media(&mut self, id: &str) -> Result<usize, String> {
-        let node = self.manifest["nodes"][id].clone();
-        if node["fileType"] != "mcanvas" {
+        let Some(node) = self
+            .manifest
+            .node(id)
+            .filter(|node| node.is_canvas())
+            .cloned()
+        else {
             return Ok(0);
-        }
+        };
         let name = file_name(&node)?;
         let path = self.root.join("files").join(&name);
         reject_symlink(&path)?;
@@ -545,10 +548,9 @@ impl Store {
 
     pub fn doc(&mut self, id: &str) -> Result<&Doc, String> {
         if !self.documents.contains_key(id) {
-            let node = &self.manifest["nodes"][id];
-            if node["type"] != "file" || node["fileType"] != "mcanvas" {
+            let Some(node) = self.manifest.file(id).filter(|node| node.is_canvas()) else {
                 return Err("Cannot open this file as a canvas document".into());
-            }
+            };
             self.documents
                 .insert(id.into(), document::decode(&self.read_file(node)?)?);
         }
@@ -595,17 +597,18 @@ impl Store {
 
     pub fn touch_document(&mut self, id: &str, enqueue: bool) -> Result<(), String> {
         let links = document::links(self.doc(id)?);
-        if self.manifest["nodes"][id]["system"].is_null() {
+        let node = self
+            .manifest
+            .node_mut(id)
+            .ok_or("Unknown repository node")?;
+        node.modified_at = now().into();
+        if node.system.is_none() {
             if links.is_empty() {
-                self.manifest["linksBySource"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove(id);
+                self.manifest.links_by_source.remove(id);
             } else {
-                self.manifest["linksBySource"][id] = json!(links);
+                self.manifest.links_by_source.insert(id.into(), links);
             }
         }
-        self.manifest["nodes"][id]["modifiedAt"] = json!(now());
         self.mark_node(id);
         if enqueue {
             self.queue("push-note", Some(id), json!({}));
@@ -635,8 +638,9 @@ impl Store {
             *count += 1;
             if *count >= 64 {
                 let bytes = document::bytes(self.doc(&id)?);
+                let node = self.manifest.node(&id).ok_or("Unknown repository node")?;
                 files.push(FileWrite {
-                    name: file_name(&self.manifest["nodes"][&id])?,
+                    name: file_name(node)?,
                     bytes: Some(STANDARD.encode(bytes)),
                 });
                 self.delta_counts.remove(&id);
@@ -661,27 +665,18 @@ impl Store {
         let dirty: Vec<_> = self.dirty_nodes.iter().cloned().collect();
         let mut records = HashMap::new();
         for id in &dirty {
-            if self.manifest["nodes"][id].is_null() {
-                if !self.manifest["deletedNodes"].is_object() {
-                    self.manifest["deletedNodes"] = json!({});
-                }
-                if self.manifest["deletedNodes"][id].is_null() {
-                    self.manifest["deletedNodes"][id] = self
+            if self.manifest.node(id).is_none() {
+                if !self.manifest.is_deleted(id) {
+                    let revision = self
                         .outbox
                         .iter()
                         .find(|op| op["kind"] == "delete-manifest-node" && op["nodeId"] == *id)
-                        .map(|op| op["queueRevision"].clone())
-                        .unwrap_or_else(|| json!(uuid::Uuid::new_v4().to_string()));
+                        .and_then(|op| op["queueRevision"].as_str().map(str::to_owned))
+                        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+                    self.manifest.deleted_nodes.insert(id.clone(), revision);
                 }
-            } else if !self.manifest["deletedNodes"][id].is_null() {
-                if !self.manifest["restoredNodes"].is_object() {
-                    self.manifest["restoredNodes"] = json!({});
-                }
-                self.manifest["restoredNodes"][id] = self.manifest["deletedNodes"][id].clone();
-                self.manifest["deletedNodes"]
-                    .as_object_mut()
-                    .unwrap()
-                    .remove(id);
+            } else if let Some(deletion) = self.manifest.deleted_nodes.remove(id) {
+                self.manifest.restored_nodes.insert(id.clone(), deletion);
             }
             records.insert(
                 format!("files/{id}{}", metadata::SUFFIX),
