@@ -45,7 +45,8 @@ function controller(elements: DrawableElement[]) {
 
 // Ten one-line paragraphs, 20px each from y = PAGE_PADDING (+ shift), with each anchor gap laid out
 // above its paragraph. Paragraph k starts at pos 4k; world, local, and screen px coincide.
-function laidOutFrame() {
+// `figureAt` swaps that paragraph for a figure captioned the same, so positions don't move.
+function laidOutFrame(figureAt?: number) {
   const doc = new Y.Doc();
   const fragment = doc.getXmlFragment('page');
   prosemirrorToYXmlFragment(
@@ -53,7 +54,9 @@ function laidOutFrame() {
       'doc',
       null,
       Array.from({ length: 10 }, (_, k) =>
-        schema.node('paragraph', null, schema.text(`p${k}`)),
+        k === figureAt
+          ? schema.node('figure', { src: '/a.png' }, schema.text(`p${k}`))
+          : schema.node('paragraph', null, schema.text(`p${k}`)),
       ),
     ),
     fragment,
@@ -164,10 +167,6 @@ describe('page frame anchoring', () => {
     ).toBe(false);
     expect(
       pageContainsPoint(frame, { x: 20, y: frame.pageHeight + PAGE_GAP + 20 }),
-    ).toBe(true);
-    frame.setPageLayout('horizontal');
-    expect(
-      pageContainsPoint(frame, { x: frame.pageWidth + PAGE_GAP + 20, y: 20 }),
     ).toBe(true);
     frame.setPageLayout('continuous');
     frame.setMeasuredContentHeight(2000);
@@ -286,6 +285,17 @@ describe('page frame anchoring', () => {
     expect(gaps()).toEqual([
       { pos: 3 * 4 + 1, height: image.boundingBox.height },
     ]);
+  });
+
+  it('reserves space above a figure, not between its image and caption', () => {
+    const { image, anchors, frame, gaps } = laidOutFrame(3);
+    const positions = () => gaps().map(({ pos }) => pos);
+
+    anchors.attachAtPosition(image, frame, 3 * 4, true);
+    expect(positions()).toEqual([3 * 4]);
+
+    anchors.attachAtPosition(image, frame, 3 * 4 + 2, true);
+    expect(positions()).toEqual([3 * 4]);
   });
 
   it('reflows text while dragging, keeps the element under the pointer, and rebinds it on drop', () => {

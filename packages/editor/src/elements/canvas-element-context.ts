@@ -5,10 +5,12 @@ import type { ResolveNoteLink } from '../page-frame/pm/markdown/note-links';
 import type { LivePeersSnapshot } from '../sync/live/peers';
 import type { EnsureCodeOutputCard } from './code-output/bridge';
 import type { DrawableElement } from './drawable-element';
+import type { PageFrameElement } from './page-frame-element';
 
 export interface CanvasUiServices {
   openChromeMenu: ChromeMenuOpener;
   openExportDialog: (target: ExportTarget) => void;
+  openPageSetupDialog: (frame: PageFrameElement) => void;
   ensureCodeOutputCard?: EnsureCodeOutputCard;
 }
 

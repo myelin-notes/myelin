@@ -5,7 +5,7 @@
  * can't be harvested reliably).
  */
 
-import { toPng } from 'html-to-image';
+import { getFontEmbedCSS, toPng } from 'html-to-image';
 import { Logger } from '@myelin/shared/logger';
 import { PAGE_GAP } from '../elements/page-frame-constants';
 import {
@@ -26,6 +26,7 @@ import {
 } from '../pdf-export/coords';
 import { resolveFont } from '../pdf-export/fonts';
 import { createFontTable, type PdfHarvestContext } from '../pdf-export/harvest';
+import { withTimeout } from '../utils/with-timeout';
 import { MERMAID_DIAGRAM_SELECTOR } from './pm/mermaid/node-view';
 
 const logger = new Logger('PageFramePdfExport');
@@ -36,7 +37,9 @@ export interface PageFramePdfSource {
   numPages: number;
   pageWidth: number;
   pageHeight: number;
-  pageLayout: 'vertical' | 'horizontal';
+  /** CSS px on every side. */
+  pageMargin: number;
+  showPageNumbers: boolean;
   scale?: { x: number; y: number };
   /** This frame's world offset (content top-left) — needed to place overlays. */
   offset: { x: number; y: number };
@@ -47,9 +50,21 @@ export interface PageFramePdfSource {
 }
 
 const CODE_BLOCK_SELECTOR = '.pm-code-block';
+// KaTeX draws fraction bars with CSS borders and roots with SVG, and media and diagrams have no text
+// form, so none of these survive as harvested text runs.
+const RASTERIZED_SELECTOR = [
+  CODE_BLOCK_SELECTOR,
+  '.pm-math-inline',
+  '.pm-math-block-render',
+  '.pm-embed-host',
+  MERMAID_DIAGRAM_SELECTOR,
+].join(', ');
+// html-to-image never settles if `img.decode()` rejects.
+const RASTERIZE_TIMEOUT_MS = 5_000;
 const ASCENT_RATIO = 0.8;
+const PAGE_NUMBER_SIZE_PX = 12;
+const PAGE_NUMBER_GRAY: [number, number, number] = [90, 94, 98];
 const RULE_GRAY: [number, number, number] = [195, 199, 202];
-const TABLE_BORDER_GRAY: [number, number, number] = [210, 214, 218];
 
 interface Harvester {
   pages: ExportPage[];
@@ -63,7 +78,7 @@ interface Harvester {
 
 export interface PageFrameHarvestResult {
   request: PdfExportRequest;
-  /** Non-fatal warnings (e.g. code blocks that failed to rasterize). */
+  /** Non-fatal warnings (e.g. blocks that failed to rasterize). */
   warnings: string[];
 }
 
@@ -92,7 +107,6 @@ export async function harvestPageFramePdf(
         pageWidth: source.pageWidth,
         pageHeight: source.pageHeight,
         pageGap: PAGE_GAP,
-        layout: source.pageLayout,
       },
       originX: cloneRect.left,
       originY: cloneRect.top,
@@ -100,14 +114,17 @@ export async function harvestPageFramePdf(
 
     harvestDecorations(h, clone);
     harvestText(h, clone);
-    const failedBlocks = await harvestCodeBlocks(h, clone);
+    const failedBlocks = await harvestRasterizedBlocks(h, clone);
     harvestOverlays(h, source);
+    if (source.showPageNumbers) {
+      harvestPageNumbers(h, source);
+    }
 
     const warnings: string[] = [];
     if (failedBlocks > 0) {
       const plural = failedBlocks === 1 ? '' : 's';
       warnings.push(
-        `${failedBlocks} code block${plural} couldn't be rendered and ${failedBlocks === 1 ? 'was' : 'were'} omitted.`,
+        `${failedBlocks} block${plural} (code, math, images or diagrams) couldn't be rendered and ${failedBlocks === 1 ? 'was' : 'were'} omitted.`,
       );
     }
 
@@ -129,13 +146,6 @@ function buildOffscreenClone(source: PageFramePdfSource): {
   clone: HTMLElement;
   container: HTMLElement;
 } {
-  const horizontal = source.pageLayout === 'horizontal';
-  // Vertical: a single page-wide column that grows downward. Horizontal: the full
-  // multi-column width; the inner editor's copied column styles flow the pages.
-  const cloneWidth = horizontal
-    ? source.numPages * (source.pageWidth + PAGE_GAP)
-    : source.pageWidth;
-
   const container = document.createElement('div');
   // PDFs always render on a white page, so force the light palette regardless of the live theme.
   // The class re-declares the light tokens on the container, so the subtree inherits them over
@@ -145,7 +155,7 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     position: 'fixed',
     left: '-100000px',
     top: '0px',
-    width: `${cloneWidth}px`,
+    width: `${source.pageWidth}px`,
     pointerEvents: 'none',
     background: '#ffffff',
   });
@@ -157,15 +167,24 @@ function buildOffscreenClone(source: PageFramePdfSource): {
     host.innerHTML = diagrams[i]?.shadowRoot?.innerHTML ?? '';
   });
   // Neutralize dom-layer's live transforms/zoom so the clone lays out at its natural scale-1 size;
-  // the pagination spacer widgets (and horizontal layout's column styles) are already baked in.
+  // the pagination spacer widgets are already baked in.
   Object.assign(clone.style, {
     position: 'static',
     inset: 'auto',
     transform: 'none',
     zoom: 'normal',
-    width: `${cloneWidth}px`,
-    height: horizontal ? `${source.pageHeight}px` : 'auto',
+    width: `${source.pageWidth}px`,
+    height: 'auto',
     overflow: 'visible',
+  });
+  // An inline box's rect omits the KaTeX struts that hang past it (limits, denominators), so the
+  // raster would clip them. inline-block keeps the same line metrics but grows to contain them.
+  clone.querySelectorAll<HTMLElement>('.pm-math-inline').forEach((el) => {
+    el.style.display = 'inline-block';
+  });
+  // Table +/- handles are editing chrome whose glyphs would otherwise harvest as text.
+  clone.querySelectorAll('.pm-table-node__handles').forEach((el) => {
+    el.remove();
   });
   container.appendChild(clone);
   return { clone, container };
@@ -202,8 +221,7 @@ function harvestText(h: Harvester, root: HTMLElement): void {
       if (!parent || !node.textContent?.trim()) {
         return NodeFilter.FILTER_REJECT;
       }
-      // Code blocks are rasterized separately.
-      if (parent.closest(CODE_BLOCK_SELECTOR)) {
+      if (parent.closest(RASTERIZED_SELECTOR)) {
         return NodeFilter.FILTER_REJECT;
       }
       return NodeFilter.FILTER_ACCEPT;
@@ -388,16 +406,24 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
     const r = el.getBoundingClientRect();
     const localX = r.left - h.originX;
     const localY = r.top - h.originY;
-    const bg = parseCssColor(getComputedStyle(el).backgroundColor);
-    if (el.classList.contains('pm-callout') && bg.opacity > 0.02) {
+    const isCallout = el.classList.contains('pm-callout');
+    // Callouts paint fill and rule as background-image gradients, so backgroundColor is transparent.
+    const style = getComputedStyle(el);
+    const rule = isCallout
+      ? parseCssColor(style.getPropertyValue('--pm-blockquote-rule-color'))
+      : { rgb: RULE_GRAY, opacity: 0.5 };
+    if (isCallout) {
+      const fill = parseCssColor(
+        style.getPropertyValue('--pm-callout-fill-color'),
+      );
       pushAt(h, localX, localY, (x, y) => ({
         t: 'rect',
         x,
         y,
         w: pxToPt(r.width),
         h: pxToPt(r.height),
-        fill: bg.rgb,
-        opacity: bg.opacity,
+        fill: fill.rgb,
+        opacity: fill.opacity,
       }));
     }
     pushAt(h, localX, localY, (x, y) => ({
@@ -406,8 +432,8 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
       y,
       w: pxToPt(2),
       h: pxToPt(r.height),
-      fill: RULE_GRAY,
-      opacity: 0.5,
+      fill: rule.rgb,
+      opacity: rule.opacity,
     }));
   }
 
@@ -428,35 +454,78 @@ function harvestDecorations(h: Harvester, root: HTMLElement): void {
     }));
   }
 
-  // Table cell borders.
+  // Table cells: fill + each side's own border, so header shading and the divider color match the
+  // screen. Page-break spacer cells compute to transparent with 0 borders and draw nothing.
   for (const cell of root.querySelectorAll<HTMLElement>('td, th')) {
     const r = cell.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) {
       continue;
     }
+    const style = getComputedStyle(cell);
     const localX = r.left - h.originX;
     const localY = r.top - h.originY;
-    pushAt(h, localX, localY, (x, y) => ({
-      t: 'rect',
-      x,
-      y,
-      w: pxToPt(r.width),
-      h: pxToPt(r.height),
-      stroke: TABLE_BORDER_GRAY,
-      lineWidth: 1,
-    }));
+    const bg = parseCssColor(style.backgroundColor);
+    if (bg.opacity > 0) {
+      pushAt(h, localX, localY, (x, y) => ({
+        t: 'rect',
+        x,
+        y,
+        w: pxToPt(r.width),
+        h: pxToPt(r.height),
+        fill: bg.rgb,
+        opacity: bg.opacity,
+      }));
+    }
+    const { width: cw, height: ch } = r;
+    // Each side's centerline, inset half a border width so the stroke stays inside the cell box.
+    const sides = [
+      ['top', (i: number) => [0, i, cw, i]],
+      ['bottom', (i: number) => [0, ch - i, cw, ch - i]],
+      ['left', (i: number) => [i, 0, i, ch]],
+      ['right', (i: number) => [cw - i, 0, cw - i, ch]],
+    ] as const;
+    for (const [side, centerline] of sides) {
+      const width = Number.parseFloat(
+        style.getPropertyValue(`border-${side}-width`),
+      );
+      const color = parseCssColor(
+        style.getPropertyValue(`border-${side}-color`),
+      );
+      if (!(width > 0) || color.opacity <= 0) {
+        continue;
+      }
+      const [x1, y1, x2, y2] = centerline(width / 2);
+      pushAt(h, localX, localY, (x, y) => ({
+        t: 'line',
+        x1: x + pxToPt(x1),
+        y1: y + pxToPt(y1),
+        x2: x + pxToPt(x2),
+        y2: y + pxToPt(y2),
+        color: color.rgb,
+        width: pxToPt(width),
+      }));
+    }
   }
 }
 
-async function harvestCodeBlocks(
+async function harvestRasterizedBlocks(
   h: Harvester,
   clone: HTMLElement,
 ): Promise<number> {
-  const cloneBlocks = clone.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR);
+  const cloneBlocks = clone.querySelectorAll<HTMLElement>(RASTERIZED_SELECTOR);
+  if (cloneBlocks.length === 0) {
+    return 0;
+  }
+  // Embedding web fonts per element re-downloads them, and a report can hold hundreds of formulas.
+  const fontEmbedCSS = await getFontEmbedCSS(clone).catch(() => undefined);
   let failed = 0;
 
   for (let i = 0; i < cloneBlocks.length; i++) {
-    const cloneEl = cloneBlocks[i];
+    // .katex-display's 1em margin collapses through its wrapper, so it's outside the wrapper's rect
+    // but would still push the formula down inside html-to-image's foreignObject and clip its bottom.
+    const cloneEl =
+      cloneBlocks[i].querySelector<HTMLElement>(':scope > .katex-display') ??
+      cloneBlocks[i];
     const cloneRect = cloneEl.getBoundingClientRect();
     if (cloneRect.width <= 0 || cloneRect.height <= 0) {
       continue;
@@ -465,10 +534,20 @@ async function harvestCodeBlocks(
 
     let dataUrl: string;
     try {
-      dataUrl = await toPng(cloneEl, { pixelRatio: 2 });
+      dataUrl = await withTimeout(
+        // html-to-image sizes from clientWidth/Height, which are 0 for inline math.
+        toPng(cloneEl, {
+          pixelRatio: 2,
+          fontEmbedCSS,
+          width: cloneRect.width,
+          height: cloneRect.height,
+          style: { margin: '0' },
+        }),
+        RASTERIZE_TIMEOUT_MS,
+      );
     } catch (error) {
       failed++;
-      logger.warn('Failed to rasterize code block for PDF export', {
+      logger.warn('Failed to rasterize block for PDF export', {
         error,
         index: i,
       });
@@ -524,17 +603,13 @@ function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
   if (!overlays || overlays.length === 0) {
     return;
   }
-  const horizontal = source.pageLayout === 'horizontal';
   const scaleX = Math.max(Math.abs(source.scale?.x ?? 1), 0.001);
   const scaleY = Math.max(Math.abs(source.scale?.y ?? 1), 0.001);
 
   for (let p = 0; p < h.pages.length; p++) {
-    const pageWorldX =
-      source.offset.x +
-      (horizontal ? p * (source.pageWidth + PAGE_GAP) : 0) * scaleX;
+    const pageWorldX = source.offset.x;
     const pageWorldY =
-      source.offset.y +
-      (horizontal ? 0 : p * (source.pageHeight + PAGE_GAP)) * scaleY;
+      source.offset.y + p * (source.pageHeight + PAGE_GAP) * scaleY;
     const pageBounds = new DOMRect(
       pageWorldX,
       pageWorldY,
@@ -562,6 +637,26 @@ function harvestOverlays(h: Harvester, source: PageFramePdfSource): void {
       }
     }
   }
+}
+
+function harvestPageNumbers(h: Harvester, source: PageFramePdfSource): void {
+  h.pages.forEach((page, index) => {
+    const text = `${index + 1}`;
+    page.items.push({
+      t: 'text',
+      // The renderer has no centering; digits in the bundled sans are about 0.55em wide.
+      x: pxToPt(
+        source.pageWidth / 2 - (text.length * PAGE_NUMBER_SIZE_PX * 0.55) / 2,
+      ),
+      baselineY: pxToPt(source.pageHeight - source.pageMargin / 2),
+      text,
+      font: 'sans',
+      weight: 400,
+      italic: false,
+      sizePt: pxToPt(PAGE_NUMBER_SIZE_PX),
+      color: PAGE_NUMBER_GRAY,
+    });
+  });
 }
 
 function circlePath(cx: number, cy: number, r: number): PageItem {

@@ -57,6 +57,13 @@ type SlashInsertAction =
   | {
       kind: 'callout';
       type: 'note';
+    }
+  | {
+      kind: 'pageBreak';
+    }
+  | {
+      kind: 'mark';
+      mark: 'bold' | 'italic' | 'code';
     };
 
 export interface SlashInsertAutocompleteItem extends PageFrameAutocompleteItem {
@@ -213,6 +220,15 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     },
   },
   {
+    id: 'slash-page-break',
+    labelKey: 'pageBreak',
+    detail: '',
+    keywords: ['page break', 'new page', 'break'],
+    slashAction: {
+      kind: 'pageBreak',
+    },
+  },
+  {
     id: 'slash-code-block',
     labelKey: 'codeBlock',
     detail: '```',
@@ -242,9 +258,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '**',
     keywords: ['bold', 'strong', '**'],
     slashAction: {
-      kind: 'inline',
-      open: '**',
-      close: '**',
+      kind: 'mark',
+      mark: 'bold',
     },
   },
   {
@@ -253,9 +268,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '*',
     keywords: ['italic', 'emphasis', 'em', '*'],
     slashAction: {
-      kind: 'inline',
-      open: '*',
-      close: '*',
+      kind: 'mark',
+      mark: 'italic',
     },
   },
   {
@@ -286,9 +300,8 @@ const SLASH_INSERT_DEFINITIONS: readonly SlashInsertItemDefinition[] = [
     detail: '`',
     keywords: ['code', 'inline', '`'],
     slashAction: {
-      kind: 'inline',
-      open: '`',
-      close: '`',
+      kind: 'mark',
+      mark: 'code',
     },
   },
   {
@@ -414,7 +427,8 @@ export function searchSlashInsertAutocompleteItems(
       (item.slashAction.kind === 'block' ||
         item.slashAction.kind === 'fencedBlock' ||
         item.slashAction.kind === 'table' ||
-        item.slashAction.kind === 'callout')
+        item.slashAction.kind === 'callout' ||
+        item.slashAction.kind === 'pageBreak')
     ) {
       return false;
     }
@@ -469,7 +483,8 @@ export function findActiveSlashInsertAutocomplete(
           to: posAt[cursorOffset],
         },
     anchorPosition: state.selection.head,
-    allowBlockActions: atBlockStart,
+    // Block actions retype or replace the parent, which for a caption would drop the figure.
+    allowBlockActions: atBlockStart && parent.type.name !== 'figure',
   };
 }
 
@@ -540,6 +555,28 @@ export function buildSelectSlashInsertAutocompleteTransaction(
     );
 
     return setSelectionInsideTableCell(tr, blockPos, 0, 0);
+  }
+
+  if (slashAction.kind === 'mark') {
+    const { from, to } = activeRequest.replaceRange;
+    return state.tr
+      .delete(from, to)
+      .addStoredMark(schema.marks[slashAction.mark].create());
+  }
+
+  if (slashAction.kind === 'pageBreak') {
+    const { $from } = state.selection;
+    // Only the document root can hold one; table cells take textblocks only.
+    if ($from.depth !== 1) {
+      return null;
+    }
+    const blockPos = $from.before();
+    const tr = state.tr.replaceWith(blockPos, $from.after(), [
+      schema.nodes.pageBreak.create(),
+      schema.nodes.paragraph.create(),
+    ]);
+    tr.setSelection(TextSelection.create(tr.doc, blockPos + 2));
+    return tr;
   }
 
   if (slashAction.kind === 'fencedBlock') {

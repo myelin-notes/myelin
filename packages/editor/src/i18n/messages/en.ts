@@ -2,6 +2,7 @@ const en = {
   common: {
     close: 'Close',
     cancel: 'Cancel',
+    done: 'Done',
     clear: 'Clear',
     copy: 'Copy',
     copied: 'Copied',
@@ -423,7 +424,7 @@ const en = {
       defaultPageLayout: {
         label: 'Default page layout',
         description:
-          'Choose how new page frames arrange content. PDFs use Pages or Columns only.',
+          'Choose how new documents arrange content. Columns applies to PDFs only, and Continuous to page frames only.',
         options: {
           vertical: 'Pages',
           horizontal: 'Columns',
@@ -766,6 +767,16 @@ const en = {
       pages: 'Pages',
       continuous: 'Continuous',
       columns: 'Columns',
+      figureCaptionPlaceholder: 'Add a caption',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      customSize: 'Custom',
+      customSizeHint: "Drag the page's side edges to set its width.",
+      pageNumbers: 'Page numbers',
+      pageSetup: 'Page setup',
+      pageSize: 'Size',
+      pageMargins: 'Margins',
+      inchesUnit: 'in',
       export: 'Export',
     },
     export: {
@@ -789,6 +800,10 @@ const en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Page break',
+        subtitle: 'Start a new page',
+      },
       heading1: {
         title: 'Heading 1',
         subtitle: 'Turn this block into a top-level heading',

@@ -40,8 +40,6 @@ pub(super) struct FileWrite {
 
 #[derive(Serialize, Deserialize)]
 struct Journal {
-    #[serde(flatten)]
-    legacy: metadata::legacy::Journal,
     #[serde(default)]
     metadata: Vec<FileWrite>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -204,13 +202,9 @@ fn apply_journal(root: &Path, journal: &Journal) -> Result<(), String> {
                 .map_err(|_| "Invalid native document journal update")?,
         )?;
     }
-    journal.legacy.replay(root)?;
     for write in &journal.metadata {
         if !metadata::is_metadata_path(&write.name)
-            && !matches!(
-                write.name.as_str(),
-                metadata::SETTINGS | metadata::BACKUP | "manifest.json"
-            )
+            && !matches!(write.name.as_str(), metadata::SETTINGS | "manifest.json")
         {
             return Err("Invalid repository metadata journal path".into());
         }
@@ -255,13 +249,6 @@ impl Store {
         }
         let loaded = metadata::load(&root)?;
         let manifest = loaded.manifest;
-        if let Some(legacy) = &loaded.legacy {
-            let backup = root.join(metadata::BACKUP);
-            reject_symlink(&backup)?;
-            if !backup.exists() {
-                atomic_write(&backup, legacy)?;
-            }
-        }
         let outbox_path = root.join("outbox.json");
         reject_symlink(&outbox_path)?;
         let mut recovery_error: Option<String> = None;
@@ -689,7 +676,6 @@ impl Store {
             });
         }
         let journal = Journal {
-            legacy: metadata::legacy::Journal::default(),
             metadata: writes,
             outbox: (self.persisted_outbox
                 != serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?)

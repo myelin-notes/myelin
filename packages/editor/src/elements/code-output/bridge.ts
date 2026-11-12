@@ -11,7 +11,6 @@ export interface EnsureCardRequest {
   blockId: string;
   /** The block's on-screen rect at run time (client px), for the initial spawn position. */
   blockScreenRect: PageFramePmScreenRect | null;
-  pageLayout: string;
 }
 
 export type EnsureCodeOutputCard = (request: EnsureCardRequest) => void;
@@ -36,13 +35,8 @@ export function ensureCodeOutputCard(
     clientY: rect.top,
   });
 
-  // Each layout leaves an empty canvas band opposite its stacking axis: vertical/continuous
-  // stack downward (room on the side), horizontal steps sideways (room below). Initial value
-  // only — an attached card re-derives this from the block's rect every frame.
-  const position =
-    req.pageLayout === 'horizontal'
-      ? { x: blockTopLeft.x, y: frameBox.bottom + SPAWN_GAP }
-      : { x: frameBox.right + SPAWN_GAP, y: blockTopLeft.y };
+  // Initial value only — an attached card re-derives this from the block's rect every frame.
+  const position = { x: frameBox.right + SPAWN_GAP, y: blockTopLeft.y };
 
   const card = canvas.addElement((uuid) => {
     const element = new CodeOutputElement(uuid, req.frameUuid, req.blockId);

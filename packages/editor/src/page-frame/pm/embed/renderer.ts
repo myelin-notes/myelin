@@ -38,6 +38,8 @@ function buildFavicon(url: string, className: string): HTMLImageElement | null {
   return fav;
 }
 
+const embedHostPins = new WeakMap<HTMLElement, () => Promise<() => void>>();
+
 function clear(el: HTMLElement): void {
   while (el.firstChild) {
     el.removeChild(el.firstChild);
@@ -314,14 +316,16 @@ function renderLibraryMedia(
   let state: 'idle' | 'loading' | 'loaded' | 'missing' = 'idle';
   let revoke: (() => void) | null = null;
   let visible = false;
+  let pinned = false;
   let destroyed = false;
+  let loading: Promise<void> = Promise.resolve();
 
   const load = (): void => {
     if (destroyed || state !== 'idle') {
       return;
     }
     state = 'loading';
-    resolveMedia(url)
+    loading = resolveMedia(url)
       .then((media) => {
         if (!media) {
           // Leave the skeleton showing the raw path so a broken/missing
@@ -329,7 +333,7 @@ function renderLibraryMedia(
           state = 'missing';
           return;
         }
-        if (destroyed || !visible) {
+        if (destroyed || !(visible || pinned)) {
           // Destroyed or scrolled away before the bytes arrived: drop them now
           // and let it reload if it comes back into view.
           media.revoke();
@@ -351,7 +355,7 @@ function renderLibraryMedia(
   };
 
   const unload = (): void => {
-    if (state !== 'loaded') {
+    if (state !== 'loaded' || pinned) {
       return;
     }
     revoke?.();
@@ -359,6 +363,19 @@ function renderLibraryMedia(
     state = 'idle';
     swap(buildSkeleton(url));
   };
+
+  embedHostPins.set(host, async () => {
+    pinned = true;
+    load();
+    await loading;
+    await decodeHostImages(host);
+    return () => {
+      pinned = false;
+      if (!visible) {
+        unload();
+      }
+    };
+  });
 
   // Without IntersectionObserver (e.g. a non-DOM test env) resolve eagerly so
   // behaviour is unchanged.
@@ -394,6 +411,40 @@ function renderLibraryMedia(
       observer.disconnect();
       revoke?.();
     },
+  };
+}
+
+async function decodeHostImages(host: HTMLElement): Promise<void> {
+  await Promise.all(
+    Array.from(host.querySelectorAll('img'), (img) => {
+      img.loading = 'eager';
+      return img.decode().catch(() => undefined);
+    }),
+  );
+}
+
+/**
+ * Loads every embed under `root`, including off-screen ones that are normally unloaded, and holds
+ * them loaded until the returned function is called. Export needs real media, not skeletons.
+ */
+export async function pinEmbedHosts(root: HTMLElement): Promise<() => void> {
+  const releases = await Promise.all(
+    Array.from(
+      root.querySelectorAll<HTMLElement>('.pm-embed-host'),
+      async (host) => {
+        const pin = embedHostPins.get(host);
+        if (pin) {
+          return pin();
+        }
+        await decodeHostImages(host);
+        return () => undefined;
+      },
+    ),
+  );
+  return () => {
+    for (const release of releases) {
+      release();
+    }
   };
 }
 

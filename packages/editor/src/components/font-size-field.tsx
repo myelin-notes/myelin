@@ -78,6 +78,8 @@ export function FontSizeField({
         onBlur={(e) => commit(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
+            // Committing can refocus the editor mid-keydown, which would then receive this Enter.
+            e.preventDefault();
             e.currentTarget.blur();
           } else if (e.key === 'Escape') {
             setDraft(null);

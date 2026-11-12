@@ -216,7 +216,11 @@ describe('CanvasSessionController', () => {
       drawableCanvasRef,
       { current: [] },
       '',
-      { openChromeMenu: vi.fn(), openExportDialog: vi.fn() },
+      {
+        openChromeMenu: vi.fn(),
+        openExportDialog: vi.fn(),
+        openPageSetupDialog: vi.fn(),
+      },
       selectedToolIndexRef,
     );
 
@@ -381,6 +385,7 @@ describe('CanvasSessionController', () => {
     const uiServices: CanvasUiServices = {
       openChromeMenu: vi.fn(),
       openExportDialog: vi.fn(),
+      openPageSetupDialog: vi.fn(),
     };
     const controller = new CanvasSessionController(
       repository as unknown as ControllerRepository,

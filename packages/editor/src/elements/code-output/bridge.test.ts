@@ -35,7 +35,6 @@ describe('ensureCodeOutputCard', () => {
         width: 3,
         height: 4,
       },
-      pageLayout: 'horizontal',
     });
 
     expect(firstCanvas.addElement).toHaveBeenCalledOnce();

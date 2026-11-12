@@ -59,22 +59,15 @@ describe('observePaginationInvalidations', () => {
     const stop = observePaginationInvalidations(
       { dom: editorDom } as unknown as EditorView,
       schedule,
-      () => false,
-      4,
     );
     await Promise.resolve();
 
-    expect(layoutHost.style.setProperty).toHaveBeenCalledWith(
-      '--pm-content-height',
-      '784px',
-    );
     FakeResizeObserver.latest?.notify();
     FakeMutationObserver.latest?.notify();
     fonts.dispatchEvent(new Event('loadingdone'));
     editorDom.dispatchEvent(new Event('focusin'));
 
     expect(schedule).toHaveBeenCalledTimes(5);
-    expect(schedule).toHaveBeenLastCalledWith(4);
 
     stop();
 

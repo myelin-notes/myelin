@@ -4,6 +4,7 @@ const zhHans: typeof en = {
   common: {
     close: '关闭',
     cancel: '取消',
+    done: '完成',
     clear: '清除',
     copy: '复制',
     copied: '已复制',
@@ -407,7 +408,8 @@ const zhHans: typeof en = {
       eyebrow: '文档视图',
       defaultPageLayout: {
         label: '默认页面布局',
-        description: '选择新页面框的内容排列方式。PDF 仅支持页面或分栏。',
+        description:
+          '选择新文档的内容排列方式。分栏仅适用于 PDF，连续仅适用于页面框。',
         options: {
           vertical: '页面',
           horizontal: '分栏',
@@ -740,6 +742,16 @@ const zhHans: typeof en = {
       pages: '页面',
       continuous: '连续',
       columns: '分栏',
+      figureCaptionPlaceholder: '添加图注',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      customSize: '自定义',
+      customSizeHint: '拖动页面左右边缘来调整宽度。',
+      pageNumbers: '页码',
+      pageSetup: '页面设置',
+      pageSize: '尺寸',
+      pageMargins: '页边距',
+      inchesUnit: '英寸',
       export: '导出',
     },
     export: {
@@ -763,6 +775,10 @@ const zhHans: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: '分页符',
+        subtitle: '开始新的一页',
+      },
       heading1: {
         title: '一级标题',
         subtitle: '将此块转换为顶级标题',

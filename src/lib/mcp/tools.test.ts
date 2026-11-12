@@ -304,6 +304,36 @@ describe('MCP tool service', () => {
     });
   });
 
+  it('auto-places created page frames clear of existing frames', async () => {
+    const { repository, noteId } = await createRepositoryWithNote();
+    const service = new McpToolService({
+      repository,
+      allowDirectWrites: () => true,
+    });
+
+    for (let i = 0; i < 3; i++) {
+      await service.callTool('create_page_frame', { noteId, markdown: 'Body' });
+    }
+
+    const note = (await service.callTool('read_note', {
+      noteId,
+    })) as McpNoteReadModel;
+    const frames = note.elements
+      .filter((element) => element.kind === 'page-frame')
+      .map((element) => element.bounds);
+    expect(frames).toHaveLength(5);
+    for (const [i, a] of frames.entries()) {
+      for (const b of frames.slice(i + 1)) {
+        const overlaps =
+          a.x < b.x + b.width &&
+          b.x < a.x + a.width &&
+          a.y < b.y + b.height &&
+          b.y < a.y + a.height;
+        expect(overlaps).toBe(false);
+      }
+    }
+  });
+
   it('creates page frames with the default page layout pref', async () => {
     const { repository, noteId } = await createRepositoryWithNote();
     const service = new McpToolService({

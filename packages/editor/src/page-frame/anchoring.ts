@@ -9,11 +9,7 @@ import type {
   SelectionToolbarItem,
 } from '../elements/drawable-element';
 import { FlagElement } from '../elements/flag-element';
-import {
-  PAGE_GAP,
-  PAGE_PADDING,
-  PageFrameElement,
-} from '../elements/page-frame-element';
+import { PAGE_GAP, PageFrameElement } from '../elements/page-frame-element';
 import { PdfElement } from '../elements/pdf';
 import type { StrokeElement } from '../elements/stroke-element';
 import type { Vector2 } from '../geometry';
@@ -43,10 +39,7 @@ function pageBounds(frame: PageFrameElement): DOMRect[] {
     { length: frame.pageLayout === 'continuous' ? 1 : frame.numPages },
     (_, page) =>
       new DOMRect(
-        frame.offset.x +
-          (frame.pageLayout === 'horizontal'
-            ? page * (frame.pageWidth + PAGE_GAP) * frame.scale.x
-            : 0),
+        frame.offset.x,
         frame.offset.y +
           (frame.pageLayout === 'vertical'
             ? page * (frame.pageHeight + PAGE_GAP) * frame.scale.y
@@ -182,14 +175,7 @@ export class PageFrameAnchoring {
     if (!local) {
       return null;
     }
-    return {
-      x:
-        frame.pageLayout === 'horizontal'
-          ? Math.max(0, Math.floor(local.x / (frame.pageWidth + PAGE_GAP))) *
-            (frame.pageWidth + PAGE_GAP)
-          : 0,
-      y: local.y,
-    };
+    return { x: 0, y: local.y };
   }
 
   public attach(
@@ -228,14 +214,8 @@ export class PageFrameAnchoring {
     }
     const scale = bounds.width / content.offsetWidth;
     const localX = (point.x - frame.offset.x) / frame.scale.x;
-    const column =
-      frame.pageLayout === 'horizontal'
-        ? Math.max(0, Math.floor(localX / (frame.pageWidth + PAGE_GAP)))
-        : 0;
-    const left =
-      bounds.left +
-      (column * (frame.pageWidth + PAGE_GAP) + PAGE_PADDING) * scale;
-    const right = left + (frame.pageWidth - PAGE_PADDING * 2) * scale - 1;
+    const left = bounds.left + frame.pageMargin * scale;
+    const right = left + (frame.pageWidth - frame.pageMargin * 2) * scale - 1;
     const coords = {
       left: element?.makesSpace
         ? left
@@ -278,8 +258,9 @@ export class PageFrameAnchoring {
     }
     let pos = position;
     const resolved = view.state.doc.resolve(pos);
+    // A figure is a textblock only for its caption; a gap there would split it from the image.
     const isSource = (name: string) =>
-      name === 'codeBlock' || name === 'mathBlock';
+      name === 'codeBlock' || name === 'mathBlock' || name === 'figure';
     // Gaps inside tables, lists, and source editors would reserve only a cell or nested block.
     if (
       element.makesSpace &&
@@ -310,7 +291,7 @@ export class PageFrameAnchoring {
     }
     if (placeAtCursor) {
       element.setOffset(
-        frame.offset.x + (origin.x + PAGE_PADDING) * frame.scale.x,
+        frame.offset.x + (origin.x + frame.pageMargin) * frame.scale.x,
         frame.offset.y + origin.y * frame.scale.y,
       );
     }

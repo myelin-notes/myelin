@@ -5,6 +5,7 @@ export interface ChromeMenuItem {
   label: string;
   icon?: LucideIcon;
   checked?: boolean;
+  separatorBefore?: boolean;
   onSelect: () => void;
   variant?: 'default' | 'danger';
 }

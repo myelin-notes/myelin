@@ -49,42 +49,6 @@ function delimRangesIn(decorations: Decoration[]): Array<[number, number]> {
 }
 
 describe('buildMarkdownDecorations inline delimiters', () => {
-  it('decorates an italic `*…*` span', () => {
-    //   *  h  i  *
-    //   1  2  3  4  5
-    const decorations = buildMarkdownDecorations(docFromText('*hi*'));
-
-    expect(toDecorationViews(decorations)).toEqual([
-      { from: 1, to: 2, class: 'pm-md-delim' },
-      { from: 2, to: 4, class: 'pm-md-italic' },
-      { from: 4, to: 5, class: 'pm-md-delim' },
-    ]);
-  });
-
-  it('decorates a bold `**…**` span', () => {
-    //   *  *  h  i  *  *
-    //   1  2  3  4  5  6  7
-    const decorations = buildMarkdownDecorations(docFromText('**hi**'));
-
-    expect(toDecorationViews(decorations)).toEqual([
-      { from: 1, to: 3, class: 'pm-md-delim' },
-      { from: 3, to: 5, class: 'pm-md-bold' },
-      { from: 5, to: 7, class: 'pm-md-delim' },
-    ]);
-  });
-
-  it('decorates an inline-code `` `…` `` span', () => {
-    //   `  h  i  `
-    //   1  2  3  4  5
-    const decorations = buildMarkdownDecorations(docFromText('`hi`'));
-
-    expect(toDecorationViews(decorations)).toEqual([
-      { from: 1, to: 2, class: 'pm-md-delim' },
-      { from: 2, to: 4, class: 'pm-md-inline-code' },
-      { from: 4, to: 5, class: 'pm-md-delim' },
-    ]);
-  });
-
   it('decorates a note-link `[[…]]` span', () => {
     //   [  [  h  i  ]  ]
     //   1  2  3  4  5  6  7
@@ -97,19 +61,10 @@ describe('buildMarkdownDecorations inline delimiters', () => {
     ]);
   });
 
-  it('decorates multiple ranges in one paragraph', () => {
-    //   *  a  *     *  *  b  *  *
-    //   1  2  3  4  5  6  7  8  9
+  it('leaves literal asterisks undecorated, since emphasis is stored as marks', () => {
     const decorations = buildMarkdownDecorations(docFromText('*a* **b**'));
 
-    expect(toDecorationViews(decorations)).toEqual([
-      { from: 1, to: 2, class: 'pm-md-delim' }, // *
-      { from: 2, to: 3, class: 'pm-md-italic' },
-      { from: 3, to: 4, class: 'pm-md-delim' }, // *
-      { from: 5, to: 7, class: 'pm-md-delim' }, // **
-      { from: 7, to: 8, class: 'pm-md-bold' },
-      { from: 8, to: 10, class: 'pm-md-delim' }, // **
-    ]);
+    expect(toDecorationViews(decorations)).toEqual([]);
   });
 
   it('produces no decorations for plain text', () => {
@@ -224,18 +179,6 @@ describe('buildMarkdownDecorations note-link escapes', () => {
     expect(delimRangesIn(decorations)).toEqual([
       [1, 3], // [[
       [6, 8], // ]]
-    ]);
-  });
-
-  it('does not decorate `\\` escapes inside an italic span', () => {
-    // Escape syntax is note-link-only — italic content is rendered as-is.
-    //   *  F  o  o  \  #  B  a  r  *
-    //   1  2  3  4  5  6  7  8  9 10 11
-    const decorations = buildMarkdownDecorations(docFromText('*Foo\\#Bar*'));
-
-    expect(delimRangesIn(decorations)).toEqual([
-      [1, 2], // opening *
-      [10, 11], // closing *
     ]);
   });
 });

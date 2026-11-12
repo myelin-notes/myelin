@@ -4,6 +4,7 @@ const es: typeof en = {
   common: {
     close: 'Cerrar',
     cancel: 'Cancelar',
+    done: 'Listo',
     clear: 'Limpiar',
     copy: 'Copiar',
     copied: 'Copiado',
@@ -431,7 +432,7 @@ const es: typeof en = {
       defaultPageLayout: {
         label: 'Diseño de página predeterminado',
         description:
-          'Elige cómo los nuevos marcos de página organizan su contenido. Los PDF solo usan Páginas o Columnas.',
+          'Elige cómo se organizan los documentos nuevos. Columnas solo se aplica a los PDF y Continuo solo a los marcos de página.',
         options: {
           vertical: 'Páginas',
           horizontal: 'Columnas',
@@ -775,6 +776,17 @@ const es: typeof en = {
       pages: 'Páginas',
       continuous: 'Continuo',
       columns: 'Columnas',
+      figureCaptionPlaceholder: 'Añadir una leyenda',
+      letterSize: 'Carta',
+      a4Size: 'A4',
+      customSize: 'Personalizado',
+      customSizeHint:
+        'Arrastra los bordes laterales de la página para ajustar su ancho.',
+      pageNumbers: 'Números de página',
+      pageSetup: 'Configurar página',
+      pageSize: 'Tamaño',
+      pageMargins: 'Márgenes',
+      inchesUnit: 'in',
       export: 'Exportar',
     },
     export: {
@@ -798,6 +810,10 @@ const es: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Salto de página',
+        subtitle: 'Empieza una página nueva',
+      },
       heading1: {
         title: 'Encabezado 1',
         subtitle: 'Convierte este bloque en un encabezado de nivel superior',

@@ -1,7 +1,10 @@
 import type { DrawableCanvas } from './drawable-canvas';
 import type { DrawableElement } from './elements/drawable-element';
 import { PAGE_GAP } from './elements/page-frame-constants';
-import { getCanvasPdfExportData } from './elements/pdf-exportable-element';
+import {
+  getCanvasPdfExportData,
+  loadContentForPdf,
+} from './elements/pdf-exportable-element';
 import type { ExportResult, ExportTarget } from './export/export-controller';
 import {
   harvestPageFramePdf,
@@ -73,6 +76,18 @@ export async function harvestCanvasPdf(
   elements: readonly DrawableElement[],
 ): Promise<CanvasPdfHarvestResult> {
   const visible = elements.filter((element) => !element.hidden);
+  // First, since loading media can add pages and so change the export bounds.
+  const releaseContent = await loadContentForPdf(visible);
+  try {
+    return await harvestLoadedCanvasPdf(visible);
+  } finally {
+    releaseContent();
+  }
+}
+
+async function harvestLoadedCanvasPdf(
+  visible: readonly DrawableElement[],
+): Promise<CanvasPdfHarvestResult> {
   const bounds = getCanvasPdfExportBounds(visible);
   if (!bounds) {
     throw new Error('Canvas has no visible content to export.');
@@ -190,15 +205,10 @@ function getPdfElementContentBounds(source: PdfElementExportSource): DOMRect {
 function getPageFrameContentBounds(source: PageFramePdfSource): DOMRect {
   const scaleX = getPositiveScale(source.scale?.x ?? 1);
   const scaleY = getPositiveScale(source.scale?.y ?? 1);
-  const horizontal = source.pageLayout === 'horizontal';
-  const width = horizontal
-    ? source.numPages * source.pageWidth +
-      Math.max(0, source.numPages - 1) * PAGE_GAP
-    : source.pageWidth;
-  const height = horizontal
-    ? source.pageHeight
-    : source.numPages * source.pageHeight +
-      Math.max(0, source.numPages - 1) * PAGE_GAP;
+  const width = source.pageWidth;
+  const height =
+    source.numPages * source.pageHeight +
+    Math.max(0, source.numPages - 1) * PAGE_GAP;
 
   return new DOMRect(
     source.offset.x,
@@ -241,13 +251,11 @@ function appendPageFrameHarvest(
 
   const scaleX = getPositiveScale(source.scale?.x ?? 1);
   const scaleY = getPositiveScale(source.scale?.y ?? 1);
-  const horizontal = source.pageLayout === 'horizontal';
 
   for (let pageIndex = 0; pageIndex < request.pages.length; pageIndex++) {
     const harvestedPage = request.pages[pageIndex];
-    const localX = horizontal ? pageIndex * (source.pageWidth + PAGE_GAP) : 0;
-    const localY = horizontal ? 0 : pageIndex * (source.pageHeight + PAGE_GAP);
-    const worldX = source.offset.x + localX * scaleX;
+    const localY = pageIndex * (source.pageHeight + PAGE_GAP);
+    const worldX = source.offset.x;
     const worldY = source.offset.y + localY * scaleY;
     const origin = {
       x: pxToPt(worldX - canvasBounds.x),

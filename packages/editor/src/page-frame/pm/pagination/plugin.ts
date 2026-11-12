@@ -1,23 +1,30 @@
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { DecorationSet, type EditorView } from 'prosemirror-view';
-import type { PageLayout } from '../../../elements/page-frame-constants';
 import { anchorGapsKey } from '../anchoring';
 import { PM_ADD_TO_HISTORY } from '../constants';
-import { type Break, PAGE_BREAK_GAP } from './core';
+import { type Break, DEFAULT_PAGE_GEOMETRY, type PageGeometry } from './core';
 import {
   buildPaginationDecorations,
   syncBlockquoteRuleStyles,
+  syncTableCellBreakGeometry,
 } from './decoration-renderer';
 import { observePaginationInvalidations } from './invalidation-controller';
 import { calculatePaginationLayout } from './layout-calculator';
 import {
-  BrowserParagraphLineMeasurer,
   collectPaginationBlocks,
   DomParagraphLineMeasurer,
 } from './line-measurer';
 import { paginationProfiler } from './profiler';
 
-const SETTLE_PASS_COUNT = 4;
+// Hides spacers (editor-base.css) so measurement sees the document as if unpaginated.
+const MEASURING_ATTRIBUTE = 'data-page-measuring';
+
+const paginationRunners = new WeakMap<EditorView, () => void>();
+
+/** Runs pagination synchronously, for callers that read page count right after changing content. */
+export function flushPagination(view: EditorView): void {
+  paginationRunners.get(view)?.();
+}
 
 interface PaginationState {
   decos: DecorationSet;
@@ -27,9 +34,8 @@ interface PaginationState {
 
 const paginationKey = new PluginKey<PaginationState>('pagination');
 
-// Spacer heights come from sub-pixel measurements and wobble between passes. Exact float
-// equality reads that noise as a layout change, so the settle loop never converges. Real layout
-// changes move spacers by at least a line height.
+// Spacer heights come from sub-pixel measurements scaled by canvas zoom, so they carry float noise.
+// Real layout changes move spacers by at least a line height.
 const SPACER_EPSILON = 0.5;
 
 function breaksEqual(a: Break[], b: Break[]): boolean {
@@ -45,7 +51,8 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
     }
     if (
       a[i].kind !== b[i].kind ||
-      a[i].afterAnchorGap !== b[i].afterAnchorGap
+      a[i].afterAnchorGap !== b[i].afterAnchorGap ||
+      a[i].beforeEmbeds !== b[i].beforeEmbeds
     ) {
       return false;
     }
@@ -53,43 +60,16 @@ function breaksEqual(a: Break[], b: Break[]): boolean {
   return true;
 }
 
-function getPageLayout(view: EditorView): PageLayout | null {
-  const value = view.dom
-    .closest('.pm-editor')
-    ?.getAttribute('data-page-layout');
-  return value === 'horizontal' ||
-    value === 'vertical' ||
-    value === 'continuous'
-    ? value
-    : null;
-}
-
-// scrollWidth exactly equal to N*stride - gap can drift up by ε, flipping ceil() from N to N+1.
-const PAGE_COUNT_STRIDE_EPSILON = 0.01;
-
-function getHorizontalPageCount(view: EditorView): number {
-  const columnWidth = view.dom.offsetWidth;
-  if (columnWidth <= 0) {
-    return 1;
-  }
-
-  const columnGap = Number.parseFloat(getComputedStyle(view.dom).columnGap);
-  const gap = Number.isFinite(columnGap) ? columnGap : PAGE_BREAK_GAP;
-  const stride = columnWidth + gap;
-  if (stride <= 0) {
-    return 1;
-  }
-
-  return Math.max(
-    1,
-    Math.ceil(
-      (view.dom.scrollWidth + gap) / stride - PAGE_COUNT_STRIDE_EPSILON,
-    ),
+function isContinuousLayout(view: EditorView): boolean {
+  return (
+    view.dom.closest('.pm-editor')?.getAttribute('data-page-layout') ===
+    'continuous'
   );
 }
 
 export function paginationPlugin(
   onLayout?: (pageCount: number, contentHeight: number | null) => void,
+  getGeometry: () => PageGeometry = () => DEFAULT_PAGE_GEOMETRY,
 ): Plugin {
   return new Plugin<PaginationState>({
     key: paginationKey,
@@ -106,9 +86,15 @@ export function paginationPlugin(
           return prev;
         }
 
+        const decos = prev.decos.map(tr.mapping, tr.doc);
         const mappedBreaks: Break[] = [];
         for (const b of prev.breaks) {
           const mapped = tr.mapping.map(b.pos);
+          // Layout ignores spacers, so a break kept without its widget would compare equal to the
+          // next pass and the spacer would never be redrawn.
+          if (decos.find(mapped, mapped).length === 0) {
+            continue;
+          }
           if (b.kind === 'block') {
             if (tr.doc.nodeAt(mapped)) {
               mappedBreaks.push({ ...b, pos: mapped });
@@ -137,7 +123,7 @@ export function paginationPlugin(
           }
         }
         return {
-          decos: prev.decos.map(tr.mapping, tr.doc),
+          decos,
           breaks: mappedBreaks,
           pageCount: prev.pageCount,
         };
@@ -149,17 +135,10 @@ export function paginationPlugin(
       },
     },
     view(editorView) {
-      const domLineMeasurer = new DomParagraphLineMeasurer();
-      const paragraphLineMeasurer = new BrowserParagraphLineMeasurer(
-        domLineMeasurer,
-      );
+      const lineMeasurer = new DomParagraphLineMeasurer();
       let rafId = 0;
       let destroyed = false;
-      let pendingFollowUpPasses = 0;
-      let suppressResizeInvalidation = false;
-      let clearSuppressResizeRafId = 0;
       let syncBlockquoteStylesRafId = 0;
-      let measurementCacheGeneration = 0;
 
       function scheduleBlockquoteRuleSync() {
         if (syncBlockquoteStylesRafId !== 0) {
@@ -177,9 +156,10 @@ export function paginationPlugin(
         if (destroyed) {
           return;
         }
-        rafId = 0;
-        const remainingFollowUpPasses = pendingFollowUpPasses;
-        pendingFollowUpPasses = 0;
+        if (rafId !== 0) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+        }
 
         const prev = paginationKey.getState(editorView.state);
         const prevBreaks = prev?.breaks ?? [];
@@ -187,13 +167,12 @@ export function paginationPlugin(
         const run = paginationProfiler.startRun(
           prevBreaks.length,
           prevPageCount,
-          remainingFollowUpPasses > 0,
+          false,
         );
         const metrics = run?.metrics ?? null;
 
         try {
-          const pageLayout = getPageLayout(editorView);
-          if (pageLayout === 'continuous') {
+          if (isContinuousLayout(editorView)) {
             // One uninterrupted strip: report the editor's natural height so the frame can size its single
             // sheet, and clear any breaks left from a previous paginated layout.
             const contentHeight = editorView.dom.offsetHeight;
@@ -210,78 +189,53 @@ export function paginationPlugin(
               editorView.dispatch(tr);
             }
             syncBlockquoteRuleStyles(editorView);
-
-            if (remainingFollowUpPasses > 0) {
-              schedule(remainingFollowUpPasses - 1);
-            }
             return;
           }
 
-          if (pageLayout === 'horizontal') {
-            const pageCount = getHorizontalPageCount(editorView);
-            const changed =
-              prevBreaks.length > 0 || pageCount !== prevPageCount;
-            if (!changed) {
-              syncBlockquoteRuleStyles(editorView);
+          const geometry = getGeometry();
+          const layoutHost = editorView.dom.closest('.pm-editor');
+          // Layout is a pure function of the spacer-free document. Hiding and restoring spacers in
+          // one synchronous step never paints, and a single pass is final.
+          layoutHost?.setAttribute(MEASURING_ATTRIBUTE, '');
+          let breaks: Break[];
+          let pageCount: number;
+          try {
+            const editorOffsetTop = editorView.dom.offsetTop;
+            const collectBlocksStartedAt = metrics ? performance.now() : 0;
+            const blocks = collectPaginationBlocks(editorView, editorOffsetTop);
+            if (metrics) {
+              metrics.collectBlocksMs =
+                performance.now() - collectBlocksStartedAt;
+              metrics.blocks = blocks.length;
+            }
+            if (blocks.length === 0) {
               return;
             }
 
-            if (pageCount !== prevPageCount) {
-              onLayout?.(pageCount, null);
+            // Ancestor `transform: scale(zoom)` makes getClientRects coords scaled; offsetWidth is unscaled
+            // CSS width. Width, not height, to avoid divide-by-zero on a 0-height empty doc.
+            const screenRect = editorView.dom.getBoundingClientRect();
+            const cssWidth = editorView.dom.offsetWidth;
+            const invScale = cssWidth > 0 ? cssWidth / screenRect.width : 1;
+
+            const calculateLayoutStartedAt = metrics ? performance.now() : 0;
+            ({ breaks, pageCount } = calculatePaginationLayout(
+              blocks,
+              editorView,
+              screenRect.top,
+              invScale,
+              geometry,
+              metrics,
+              lineMeasurer,
+            ));
+            if (metrics) {
+              metrics.calculateLayoutMs =
+                performance.now() - calculateLayoutStartedAt;
+              metrics.breakCount = breaks.length;
+              metrics.pageCount = pageCount;
             }
-
-            const tr = editorView.state.tr;
-            tr.setMeta(paginationKey, {
-              decos: DecorationSet.empty,
-              breaks: [],
-              pageCount,
-            });
-            tr.setMeta(PM_ADD_TO_HISTORY, false);
-            editorView.dispatch(tr);
-            syncBlockquoteRuleStyles(editorView);
-
-            if (remainingFollowUpPasses > 0) {
-              schedule(remainingFollowUpPasses - 1);
-            }
-            return;
-          }
-
-          const editorOffsetTop = editorView.dom.offsetTop;
-          const collectBlocksStartedAt = metrics ? performance.now() : 0;
-          const blocks = collectPaginationBlocks(editorView, editorOffsetTop);
-          if (metrics) {
-            metrics.collectBlocksMs =
-              performance.now() - collectBlocksStartedAt;
-            metrics.blocks = blocks.length;
-          }
-          if (blocks.length === 0) {
-            return;
-          }
-
-          // Ancestor `transform: scale(zoom)` makes getClientRects coords scaled; offsetWidth is unscaled
-          // CSS width. Width, not height, to avoid divide-by-zero on a 0-height empty doc.
-          const screenRect = editorView.dom.getBoundingClientRect();
-          const cssWidth = editorView.dom.offsetWidth;
-          const invScale = cssWidth > 0 ? cssWidth / screenRect.width : 1;
-          const editorScreenTop = screenRect.top;
-
-          const calculateLayoutStartedAt = metrics ? performance.now() : 0;
-          const { breaks, pageCount } = calculatePaginationLayout(
-            blocks,
-            editorView,
-            editorScreenTop,
-            invScale,
-            prevBreaks,
-            metrics,
-            measurementCacheGeneration,
-            paragraphLineMeasurer,
-            domLineMeasurer,
-          );
-          if (metrics) {
-            metrics.calculateLayoutMs =
-              performance.now() - calculateLayoutStartedAt;
-            metrics.breakCount = breaks.length;
-            metrics.pageCount = pageCount;
+          } finally {
+            layoutHost?.removeAttribute(MEASURING_ATTRIBUTE);
           }
 
           const changed =
@@ -299,7 +253,11 @@ export function paginationPlugin(
           }
 
           const buildDecorationsStartedAt = metrics ? performance.now() : 0;
-          const decos = buildPaginationDecorations(editorView, breaks);
+          const decos = buildPaginationDecorations(
+            editorView,
+            breaks,
+            geometry,
+          );
           if (metrics) {
             metrics.buildDecorationsMs =
               performance.now() - buildDecorationsStartedAt;
@@ -309,58 +267,45 @@ export function paginationPlugin(
           tr.setMeta(paginationKey, { decos, breaks, pageCount });
           tr.setMeta(PM_ADD_TO_HISTORY, false);
 
-          // Spacer widgets mutate the editor height and can trip the ResizeObserver. Ignore that
-          // self-induced resize for one frame and rely on the bounded settle loop below.
-          suppressResizeInvalidation = true;
-          if (clearSuppressResizeRafId !== 0) {
-            cancelAnimationFrame(clearSuppressResizeRafId);
-          }
-          clearSuppressResizeRafId = requestAnimationFrame(() => {
-            clearSuppressResizeRafId = 0;
-            suppressResizeInvalidation = false;
-          });
-
           const dispatchStartedAt = metrics ? performance.now() : 0;
           editorView.dispatch(tr);
           scheduleBlockquoteRuleSync();
           if (metrics) {
             metrics.dispatchMs = performance.now() - dispatchStartedAt;
           }
-
-          // The first pass often measures an unpaginated DOM and then mutates it. Run a bounded number of
-          // follow-up frames so reopen-time layout converges without waiting for a keystroke.
-          if (remainingFollowUpPasses > 0) {
-            schedule(remainingFollowUpPasses - 1);
-          }
         } finally {
           run?.finish();
         }
       }
 
-      function schedule(followUpPasses = 0) {
-        if (followUpPasses >= SETTLE_PASS_COUNT) {
-          measurementCacheGeneration++;
-        }
-        pendingFollowUpPasses = Math.max(pendingFollowUpPasses, followUpPasses);
+      function schedule() {
         if (!destroyed && rafId === 0) {
           rafId = requestAnimationFrame(paginate);
         }
       }
+
+      paginationRunners.set(editorView, paginate);
 
       // The doc can stay unchanged while the DOM settles underneath it (web fonts swap in, node views
       // resize). Repaginating only on PM transactions leaves those stale breaks until the next edit.
       const stopObservingLayout = observePaginationInvalidations(
         editorView,
         schedule,
-        () => suppressResizeInvalidation,
-        SETTLE_PASS_COUNT,
       );
 
       // Initial pagination after first paint.
-      schedule(SETTLE_PASS_COUNT);
+      schedule();
 
       return {
         update(view, prevState) {
+          // Widgets are rebuilt both by pagination and when an edit redraws the cell they sit in.
+          if (
+            view.state.doc !== prevState.doc ||
+            paginationKey.getState(view.state) !==
+              paginationKey.getState(prevState)
+          ) {
+            syncTableCellBreakGeometry(view);
+          }
           // Skip selection-only state changes — they don't affect layout
           // and the previous pagination is still valid.
           if (
@@ -368,7 +313,7 @@ export function paginationPlugin(
             anchorGapsKey.getState(view.state) !==
               anchorGapsKey.getState(prevState)
           ) {
-            schedule(SETTLE_PASS_COUNT);
+            schedule();
           }
         },
         destroy() {
@@ -379,9 +324,6 @@ export function paginationPlugin(
           }
           if (syncBlockquoteStylesRafId !== 0) {
             cancelAnimationFrame(syncBlockquoteStylesRafId);
-          }
-          if (clearSuppressResizeRafId !== 0) {
-            cancelAnimationFrame(clearSuppressResizeRafId);
           }
         },
       };

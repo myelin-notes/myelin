@@ -1,7 +1,6 @@
-import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import { ElementType } from '@myelin/editor/elements/element-type';
+import { readPageFrameDoc } from '@myelin/editor/page-frame/markdown/legacy-content';
 import { serializeDocToMarkdownChunked } from '@myelin/editor/page-frame/markdown/serializer';
-import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { Logger } from '@myelin/shared/logger';
 import type { PickedFolder } from '@/lib/folder-picker';
@@ -75,10 +74,7 @@ async function noteMarkdownBody(
     if (typeof uuid !== 'string') {
       continue;
     }
-    const doc = yXmlFragmentToProseMirrorRootNode(
-      ydoc.getXmlFragment(uuid),
-      schema,
-    );
+    const doc = readPageFrameDoc(yMap, ydoc.getXmlFragment(uuid));
     const markdown = (await serializeDocToMarkdownChunked(doc)).trim();
     if (markdown.length > 0) {
       frames.push(markdown);

@@ -1,6 +1,5 @@
 import { EditorState, TextSelection } from 'prosemirror-state';
 import { describe, expect, it } from 'vitest';
-import { parseMarkdownToDoc } from '../../markdown/parser';
 import { schema } from '../schema';
 import {
   buildSelectMediaPathAutocompleteTransaction,
@@ -10,7 +9,10 @@ import {
 function createState(markdown: string, head: number) {
   const state = EditorState.create({
     schema,
-    doc: parseMarkdownToDoc(markdown, schema),
+    doc: schema.nodes.doc.create(
+      null,
+      schema.nodes.paragraph.create(null, schema.text(markdown)),
+    ),
   });
 
   return state.apply(

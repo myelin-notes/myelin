@@ -149,7 +149,25 @@ fn github_source() -> RepositorySource {
     }
 }
 
-fn archive(entries: Vec<(&str, Vec<u8>)>) -> Vec<u8> {
+// `manifest()` as the upgrade marker plus its sidecars, followed by `files`.
+fn with_metadata(files: Vec<(&str, Vec<u8>)>) -> Vec<(String, Vec<u8>)> {
+    let mut entries: Vec<_> = crate::repository_metadata::records(&manifest())
+        .unwrap()
+        .into_iter()
+        .collect();
+    entries.push((
+        "manifest.json".into(),
+        crate::repository_metadata::MARKER.to_vec(),
+    ));
+    entries.extend(
+        files
+            .into_iter()
+            .map(|(path, bytes)| (path.to_owned(), bytes)),
+    );
+    entries
+}
+
+fn archive<P: AsRef<str>>(entries: Vec<(P, Vec<u8>)>) -> Vec<u8> {
     let gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
     let mut builder = tar::Builder::new(gzip);
     for (path, bytes) in entries {
@@ -160,7 +178,7 @@ fn archive(entries: Vec<(&str, Vec<u8>)>) -> Vec<u8> {
         builder
             .append_data(
                 &mut header,
-                format!("owner-repo-revision/{path}"),
+                format!("owner-repo-revision/{}", path.as_ref()),
                 bytes.as_slice(),
             )
             .unwrap();
@@ -185,11 +203,10 @@ async fn github_server(archive: Vec<u8>) -> TestServer {
 // Serves the branch, then the tarball in three parts with `pause` between them; `None` stalls after
 // the first part.
 async fn slow_github_endpoints(pause: Option<std::time::Duration>) -> download::RemoteEndpoints {
-    let tarball = archive(vec![
-        ("manifest.json", serde_json::to_vec(&manifest()).unwrap()),
+    let tarball = archive(with_metadata(vec![
         ("files/canvas.myelin", vec![7; 150_000]),
         ("files/version.pdf", b"pdf".to_vec()),
-    ]);
+    ]));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
     tokio::spawn(async move {
@@ -262,14 +279,12 @@ async fn github_downloads_one_revision_without_changing_existing_cache() {
     let stage = directory.0.join("download");
     fs::create_dir_all(stage.join("files")).unwrap();
     directory.seed_cache();
-    let manifest = manifest();
     let note = vec![7; 150_000];
-    let server = github_server(archive(vec![
-        ("manifest.json", serde_json::to_vec(&manifest).unwrap()),
+    let server = github_server(archive(with_metadata(vec![
         ("files/canvas.myelin", note.clone()),
         ("files/version.pdf", b"pdf".to_vec()),
         ("unrelated.txt", b"ignore".to_vec()),
-    ]))
+    ])))
     .await;
     let prepared = download_repository(&stage, github_source(), &server.endpoints())
         .await
@@ -283,11 +298,8 @@ async fn github_downloads_one_revision_without_changing_existing_cache() {
     assert_eq!(fs::read(stage.join("files/canvas.myelin")).unwrap(), note);
     assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
     assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(
-            &fs::read(stage.join("manifest.json")).unwrap()
-        )
-        .unwrap(),
-        manifest
+        crate::repository_metadata::load(&stage).unwrap().records,
+        crate::repository_metadata::records(&manifest()).unwrap()
     );
 
     assert!(!stage.join("files/old.myelin").exists());
@@ -303,11 +315,7 @@ async fn github_rejects_an_archive_missing_repository_files() {
     directory.seed_cache();
     let stage = directory.0.join("download");
     fs::create_dir_all(stage.join("files")).unwrap();
-    let server = github_server(archive(vec![(
-        "manifest.json",
-        serde_json::to_vec(&manifest()).unwrap(),
-    )]))
-    .await;
+    let server = github_server(archive(with_metadata(vec![]))).await;
     let error = download_repository(&stage, github_source(), &server.endpoints())
         .await
         .unwrap_err();
@@ -343,7 +351,7 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
         let directory = TestDirectory::new();
         let stage = directory.0.join("download");
         fs::create_dir_all(stage.join("files")).unwrap();
-        let body = serde_json::to_vec(&manifest()).unwrap();
+        let records = crate::repository_metadata::records(&manifest()).unwrap();
         let lookups = AtomicU64::new(0);
         let server = TestServer::new(move |path| {
             if path.starts_with("/drive/files?") {
@@ -352,15 +360,20 @@ async fn drive_downloads_pinned_revisions_and_refuses_a_manifest_change() {
                 let files = if query.contains("name = 'manifest.json'") {
                     let revision = if changed && lookups.fetch_add(1, Ordering::Relaxed) > 0 { "manifest-2" } else { "manifest-1" };
                     serde_json::json!([{ "id": "manifest", "name": "manifest.json", "headRevisionId": revision }])
+                } else if query.contains("name = 'repository.json'") {
+                    serde_json::json!([{ "id": "settings", "name": "repository.json", "headRevisionId": "settings-1" }])
                 } else if query.contains("name = 'files'") {
                     serde_json::json!([{ "id": "files-folder", "name": "files" }])
                 } else {
-                    serde_json::json!([{ "id": "note", "name": "canvas.myelin", "headRevisionId": "note-1" }, { "id": "snapshot", "name": "version.pdf", "headRevisionId": "snapshot-1" }])
+                    serde_json::json!([{ "id": "note", "name": "canvas.myelin", "headRevisionId": "note-1" }, { "id": "snapshot", "name": "version.pdf", "headRevisionId": "snapshot-1" }, { "id": "canvas-meta", "name": "canvas.meta.json", "headRevisionId": "canvas-meta-1" }, { "id": "version-meta", "name": "version.meta.json", "headRevisionId": "version-meta-1" }])
                 };
                 return (200, serde_json::to_vec(&serde_json::json!({"files": files})).unwrap());
             }
             match path {
-                "/drive/files/manifest/revisions/manifest-1?alt=media" => (200, body.clone()),
+                "/drive/files/manifest/revisions/manifest-1?alt=media" => (200, crate::repository_metadata::MARKER.to_vec()),
+                "/drive/files/settings/revisions/settings-1?alt=media" => (200, records["repository.json"].clone()),
+                "/drive/files/canvas-meta/revisions/canvas-meta-1?alt=media" => (200, records["files/canvas.meta.json"].clone()),
+                "/drive/files/version-meta/revisions/version-meta-1?alt=media" => (200, records["files/version.meta.json"].clone()),
                 "/drive/files/note/revisions/note-1?alt=media" => (200, b"canvas".to_vec()),
                 "/drive/files/snapshot/revisions/snapshot-1?alt=media" => (200, b"pdf".to_vec()),
                 _ => (404, vec![]),
@@ -417,7 +430,6 @@ async fn prepares_empty_github_repositories_without_creating_a_legacy_manifest()
             .unwrap();
         assert_eq!((prepared.0, prepared.1), (0, 0));
         let loaded = crate::repository_metadata::load(&stage).unwrap();
-        assert!(loaded.legacy.is_none());
         assert!(loaded.corrupt.is_empty());
         assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
         assert!(stage.join("repository.json").exists());
@@ -461,7 +473,6 @@ async fn prepares_empty_drive_repositories_without_creating_a_legacy_manifest() 
         assert_eq!(prepared.0, 0);
 
         let loaded = crate::repository_metadata::load(&stage).unwrap();
-        assert!(loaded.legacy.is_none());
         assert!(loaded.corrupt.is_empty());
         assert_eq!(loaded.manifest["nodes"], serde_json::json!({}));
         assert!(stage.join("repository.json").exists());
@@ -519,18 +530,23 @@ async fn github_git_pull_writes_the_snapshot_and_follows_new_commits() {
     let directory = TestDirectory::new();
     let remote_path = directory.0.join("remote.git");
     let remote = git2::Repository::init_bare(&remote_path).unwrap();
-    let manifest = serde_json::to_vec(&manifest()).unwrap();
     let note = vec![7; 150_000];
-    let first = commit_files(
-        &remote,
-        "feature/notes",
-        &[
-            ("manifest.json", &manifest),
-            ("files/canvas.myelin", &note),
-            ("files/version.pdf", b"pdf"),
-            ("unrelated.txt", b"ignore"),
-        ],
-    );
+    let snapshot = |files: Vec<(&str, Vec<u8>)>| {
+        let entries = with_metadata(files);
+        commit_files(
+            &remote,
+            "feature/notes",
+            &entries
+                .iter()
+                .map(|(path, bytes)| (path.as_str(), bytes.as_slice()))
+                .collect::<Vec<_>>(),
+        )
+    };
+    let first = snapshot(vec![
+        ("files/canvas.myelin", note.clone()),
+        ("files/version.pdf", b"pdf".to_vec()),
+        ("unrelated.txt", b"ignore".to_vec()),
+    ]);
     let url = remote_path.to_str().unwrap();
     let cache_dir = directory.0.join("app-cache");
     let pull = |stage: PathBuf| {
@@ -555,7 +571,10 @@ async fn github_git_pull_writes_the_snapshot_and_follows_new_commits() {
     assert_eq!(pull(stage.clone()).await.unwrap(), Some((2, 150_003)));
     assert_eq!(fs::read(stage.join("files/canvas.myelin")).unwrap(), note);
     assert_eq!(fs::read(stage.join("files/version.pdf")).unwrap(), b"pdf");
-    assert_eq!(fs::read(stage.join("manifest.json")).unwrap(), manifest);
+    assert_eq!(
+        fs::read(stage.join("manifest.json")).unwrap(),
+        crate::repository_metadata::MARKER
+    );
     assert_eq!(
         fs::read_to_string(stage.join(".remote-revision")).unwrap(),
         first.to_string()
@@ -563,15 +582,10 @@ async fn github_git_pull_writes_the_snapshot_and_follows_new_commits() {
     assert!(!stage.join("unrelated.txt").exists());
 
     // The second pull fetches into the cached clone, whose branch lives under refs/remotes.
-    let second = commit_files(
-        &remote,
-        "feature/notes",
-        &[
-            ("manifest.json", &manifest),
-            ("files/canvas.myelin", b"edited on the tablet"),
-            ("files/version.pdf", b"pdf"),
-        ],
-    );
+    let second = snapshot(vec![
+        ("files/canvas.myelin", b"edited on the tablet".to_vec()),
+        ("files/version.pdf", b"pdf".to_vec()),
+    ]);
     let stage = directory.0.join("second");
     assert_eq!(pull(stage.clone()).await.unwrap(), Some((2, 23)));
     assert_eq!(

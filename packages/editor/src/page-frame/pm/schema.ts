@@ -231,6 +231,55 @@ const horizontalRule: NodeSpec = {
   parseDOM: [{ tag: 'hr' }],
 };
 
+const figure: NodeSpec = {
+  content: 'inline*',
+  group: 'block',
+  defining: true,
+  isolating: true,
+  attrs: {
+    src: {},
+    alt: { default: null },
+    /** Fraction of the text column, so it adapts when the page size changes. */
+    width: { default: 1 },
+    /** Width over height, once the media has loaded. */
+    aspect: { default: null },
+  },
+  toDOM(node) {
+    return [
+      'figure',
+      {
+        class: 'pm-figure',
+        'data-src': node.attrs.src,
+        ...(node.attrs.alt ? { 'data-alt': node.attrs.alt } : {}),
+        'data-width': node.attrs.width,
+      },
+      ['figcaption', 0],
+    ];
+  },
+  parseDOM: [
+    {
+      tag: 'figure.pm-figure',
+      contentElement: 'figcaption',
+      getAttrs(dom) {
+        const el = dom as HTMLElement;
+        return {
+          src: el.getAttribute('data-src') ?? '',
+          alt: el.getAttribute('data-alt'),
+          width: Number(el.getAttribute('data-width')) || 1,
+        };
+      },
+    },
+  ],
+};
+
+const pageBreak: NodeSpec = {
+  group: 'block',
+  toDOM() {
+    return ['div', { class: 'pm-page-break' }];
+  },
+  parseDOM: [{ tag: 'div.pm-page-break' }],
+};
+
 const mention: NodeSpec = {
   inline: true,
   group: 'inline',
@@ -300,7 +349,7 @@ const strikethrough: MarkSpec = {
 const code: MarkSpec = {
   excludes: '_',
   toDOM() {
-    return ['code', 0];
+    return ['code', { class: 'pm-md-inline-code' }, 0];
   },
   parseDOM: [{ tag: 'code' }],
 };
@@ -318,6 +367,30 @@ const fontFamily: MarkSpec = {
           return false;
         }
         return { family: value };
+      },
+    },
+  ],
+};
+
+const fontSize: MarkSpec = {
+  attrs: { size: {} },
+  toDOM(mark) {
+    return [
+      'span',
+      {
+        'data-font-size': mark.attrs.size,
+        style: `font-size: ${mark.attrs.size}pt`,
+      },
+      0,
+    ];
+  },
+  // Matches our own output only, so pasted web text doesn't bring its px sizes along.
+  parseDOM: [
+    {
+      tag: 'span[data-font-size]',
+      getAttrs(dom) {
+        const size = Number((dom as HTMLElement).dataset.fontSize);
+        return size > 0 ? { size } : false;
       },
     },
   ],
@@ -417,6 +490,13 @@ const tableSpecs = tableNodes({
   cellAttributes: {},
 });
 
+const table: NodeSpec = {
+  ...tableSpecs.table,
+  // Fractions of the table width, one per column; `null` for even columns. Fractions rather than
+  // the cell `colwidth` px so a table still fits after the page size changes.
+  attrs: { colRatios: { default: null } },
+};
+
 export const schema = new Schema({
   nodes: {
     doc,
@@ -430,8 +510,11 @@ export const schema = new Schema({
     codeBlock,
     mathBlock,
     horizontalRule,
+    figure,
+    pageBreak,
     mention,
     ...tableSpecs,
+    table,
     text: { group: 'inline' },
   },
   marks: {
@@ -441,6 +524,7 @@ export const schema = new Schema({
     strikethrough,
     code,
     fontFamily,
+    fontSize,
     textColor,
     noteLink,
     link,

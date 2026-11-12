@@ -14,7 +14,6 @@ export interface PaginationRunMetrics {
   buildDecorationsMs: number;
   dispatchMs: number;
   domMeasurementMs: number;
-  pretextMeasurementMs: number;
   paragraphPaginationMs: number;
   blocks: number;
   breakCount: number;
@@ -33,8 +32,6 @@ export interface PaginationRunMetrics {
   domTextNodeCount: number;
   domFragmentCount: number;
   domBinarySearchStepCount: number;
-  pretextMeasurementAttemptCount: number;
-  pretextMeasurementSuccessCount: number;
 }
 
 interface PaginationProfileSnapshot {
@@ -50,7 +47,6 @@ interface PaginationProfileSnapshot {
     buildDecorationsMs: number;
     dispatchMs: number;
     domMeasurementMs: number;
-    pretextMeasurementMs: number;
     paragraphPaginationMs: number;
     blocks: number;
     breakCount: number;
@@ -66,8 +62,6 @@ interface PaginationProfileSnapshot {
     domTextNodeCount: number;
     domFragmentCount: number;
     domBinarySearchStepCount: number;
-    pretextMeasurementAttemptCount: number;
-    pretextMeasurementSuccessCount: number;
   };
   recentSamples: PaginationRunMetrics[];
 }
@@ -92,7 +86,6 @@ const zeroAverages = {
   buildDecorationsMs: 0,
   dispatchMs: 0,
   domMeasurementMs: 0,
-  pretextMeasurementMs: 0,
   paragraphPaginationMs: 0,
   blocks: 0,
   breakCount: 0,
@@ -109,8 +102,6 @@ const zeroTotals = {
   domTextNodeCount: 0,
   domFragmentCount: 0,
   domBinarySearchStepCount: 0,
-  pretextMeasurementAttemptCount: 0,
-  pretextMeasurementSuccessCount: 0,
 };
 
 function round2(value: number): number {
@@ -130,7 +121,6 @@ function createEmptyMetrics(
     buildDecorationsMs: 0,
     dispatchMs: 0,
     domMeasurementMs: 0,
-    pretextMeasurementMs: 0,
     paragraphPaginationMs: 0,
     blocks: 0,
     breakCount: 0,
@@ -149,8 +139,6 @@ function createEmptyMetrics(
     domTextNodeCount: 0,
     domFragmentCount: 0,
     domBinarySearchStepCount: 0,
-    pretextMeasurementAttemptCount: 0,
-    pretextMeasurementSuccessCount: 0,
   };
 }
 
@@ -224,7 +212,6 @@ class PaginationProfiler {
         collectBlocksMs: round2(sample.collectBlocksMs),
         calculateLayoutMs: round2(sample.calculateLayoutMs),
         domMeasurementMs: round2(sample.domMeasurementMs),
-        pretextMeasurementMs: round2(sample.pretextMeasurementMs),
         paragraphPaginationMs: round2(sample.paragraphPaginationMs),
         measuredLineCount: sample.measuredLineCount,
         domMeasurementAttemptCount: sample.domMeasurementAttemptCount,
@@ -267,7 +254,6 @@ class PaginationProfiler {
       sums.buildDecorationsMs += sample.buildDecorationsMs;
       sums.dispatchMs += sample.dispatchMs;
       sums.domMeasurementMs += sample.domMeasurementMs;
-      sums.pretextMeasurementMs += sample.pretextMeasurementMs;
       sums.paragraphPaginationMs += sample.paragraphPaginationMs;
       sums.blocks += sample.blocks;
       sums.breakCount += sample.breakCount;
@@ -282,10 +268,6 @@ class PaginationProfiler {
       totals.domTextNodeCount += sample.domTextNodeCount;
       totals.domFragmentCount += sample.domFragmentCount;
       totals.domBinarySearchStepCount += sample.domBinarySearchStepCount;
-      totals.pretextMeasurementAttemptCount +=
-        sample.pretextMeasurementAttemptCount;
-      totals.pretextMeasurementSuccessCount +=
-        sample.pretextMeasurementSuccessCount;
     }
 
     const divisor = this.recentSamples.length;
@@ -303,7 +285,6 @@ class PaginationProfiler {
         buildDecorationsMs: round2(sums.buildDecorationsMs / divisor),
         dispatchMs: round2(sums.dispatchMs / divisor),
         domMeasurementMs: round2(sums.domMeasurementMs / divisor),
-        pretextMeasurementMs: round2(sums.pretextMeasurementMs / divisor),
         paragraphPaginationMs: round2(sums.paragraphPaginationMs / divisor),
         blocks: round2(sums.blocks / divisor),
         breakCount: round2(sums.breakCount / divisor),
@@ -326,7 +307,6 @@ class PaginationProfiler {
         avgCollectBlocksMs: snapshot.averages.collectBlocksMs,
         avgCalculateLayoutMs: snapshot.averages.calculateLayoutMs,
         avgDomMeasurementMs: snapshot.averages.domMeasurementMs,
-        avgPretextMeasurementMs: snapshot.averages.pretextMeasurementMs,
         avgParagraphPaginationMs: snapshot.averages.paragraphPaginationMs,
         avgBlocks: snapshot.averages.blocks,
         avgBreaks: snapshot.averages.breakCount,
@@ -336,8 +316,6 @@ class PaginationProfiler {
         domTextNodes: snapshot.totals.domTextNodeCount,
         domFragments: snapshot.totals.domFragmentCount,
         domBinarySearchSteps: snapshot.totals.domBinarySearchStepCount,
-        pretextAttempts: snapshot.totals.pretextMeasurementAttemptCount,
-        pretextSuccesses: snapshot.totals.pretextMeasurementSuccessCount,
       },
     ]);
     console.table(
@@ -354,7 +332,6 @@ class PaginationProfiler {
         buildDecorationsMs: round2(sample.buildDecorationsMs),
         dispatchMs: round2(sample.dispatchMs),
         domMeasurementMs: round2(sample.domMeasurementMs),
-        pretextMeasurementMs: round2(sample.pretextMeasurementMs),
         paragraphPaginationMs: round2(sample.paragraphPaginationMs),
         measuredLineCount: sample.measuredLineCount,
         domAttempts: sample.domMeasurementAttemptCount,

@@ -7,6 +7,7 @@
 import type { Mark, Node as PMNode } from 'prosemirror-model';
 import { parseCalloutMarker } from '../callouts';
 import { parseInlineMarkdown } from '../pm/markdown/parse-inline';
+import { PAGE_BREAK_MARKDOWN } from './parser';
 
 export function serializeDocToMarkdown(doc: PMNode): string {
   const parts: string[] = [];
@@ -63,7 +64,7 @@ function yieldToEventLoop(): Promise<void> {
   });
 }
 
-function serializeBlock(node: PMNode): string | null {
+export function serializeBlock(node: PMNode): string | null {
   switch (node.type.name) {
     case 'paragraph':
       return serializeInline(node);
@@ -99,9 +100,22 @@ function serializeBlock(node: PMNode): string | null {
       return serializeTable(node);
     case 'horizontalRule':
       return '---';
+    case 'figure':
+      return serializeFigure(node);
+    case 'pageBreak':
+      return PAGE_BREAK_MARKDOWN;
     default:
       return serializeInline(node);
   }
+}
+
+function serializeFigure(node: PMNode): string {
+  // The title is one line; a pasted line break would stop the figure parsing back as one.
+  const caption = serializeInline(node)
+    .replace(/\n/g, ' ')
+    .replace(/"/g, '\\"');
+  const title = caption ? ` "${caption}"` : '';
+  return `![${node.attrs.alt ?? ''}](${node.attrs.src}${title})`;
 }
 
 function serializeBlockquote(node: PMNode): string {
@@ -119,22 +133,31 @@ function serializeBlockquote(node: PMNode): string {
 function serializeInline(node: PMNode): string {
   let out = '';
   const activeMarks: Mark[] = [];
+  let codeDelims = { open: '`', close: '`' };
 
   const closeMarks = (marks: readonly Mark[]) => {
     // Close marks in reverse order of opening.
     for (let i = activeMarks.length - 1; i >= 0; i--) {
       const m = activeMarks[i];
       if (!marks.some((n) => n.eq(m))) {
-        out += markClose(m, textTail(out));
+        out +=
+          m.type.name === 'code'
+            ? codeDelims.close
+            : markClose(m, textTail(out));
         activeMarks.splice(i, 1);
       }
     }
   };
 
-  const openMarks = (marks: readonly Mark[]) => {
+  const openMarks = (marks: readonly Mark[], text: string) => {
     for (const m of marks) {
       if (!activeMarks.some((a) => a.eq(m))) {
-        out += markOpen(m);
+        if (m.type.name === 'code') {
+          codeDelims = codeSpanDelimiters(text);
+          out += codeDelims.open;
+        } else {
+          out += markOpen(m);
+        }
         activeMarks.push(m);
       }
     }
@@ -143,8 +166,11 @@ function serializeInline(node: PMNode): string {
   node.forEach((child) => {
     if (child.isText) {
       closeMarks(child.marks);
-      openMarks(child.marks);
-      out += child.marks.some((mark) => mark.type.name === 'noteLink')
+      openMarks(child.marks, child.text ?? '');
+      // Backslashes are literal inside code spans, so escaping there would grow on every round-trip.
+      out += child.marks.some(
+        (mark) => mark.type.name === 'noteLink' || mark.type.name === 'code',
+      )
         ? (child.text ?? '')
         : escapeMarkdownPreservingMath(child.text ?? '');
     } else {
@@ -155,6 +181,17 @@ function serializeInline(node: PMNode): string {
 
   closeMarks([]);
   return out;
+}
+
+// CommonMark: the fence must outrun any backtick run inside; one space each side is stripped on read.
+function codeSpanDelimiters(text: string): { open: string; close: string } {
+  const longestRun = Math.max(
+    0,
+    ...(text.match(/`+/g) ?? []).map((r) => r.length),
+  );
+  const fence = '`'.repeat(longestRun + 1);
+  const pad = /^`|`$|^ .*[^ ].* $/s.test(text) ? ' ' : '';
+  return { open: fence + pad, close: pad + fence };
 }
 
 function renderInlineAtom(node: PMNode): string {
@@ -245,8 +282,6 @@ function markOpen(mark: Mark): string {
       return '<u>';
     case 'strikethrough':
       return '~~';
-    case 'code':
-      return '`';
     case 'link':
       return '[';
     default:
@@ -264,8 +299,6 @@ function markClose(mark: Mark, _preceding: string): string {
       return '</u>';
     case 'strikethrough':
       return '~~';
-    case 'code':
-      return '`';
     case 'link': {
       const href = (mark.attrs.href as string | null) ?? '';
       return `](${href})`;
@@ -280,7 +313,10 @@ function textTail(s: string): string {
 }
 
 function escapeMarkdown(text: string): string {
-  return text.replace(/\\/g, '\\\\').replace(/([*`[\]~])/g, '\\$1');
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/([*`[\]~])/g, '\\$1')
+    .replace(/<(\/?u>)/g, '\\<$1');
 }
 
 // Inline-math spans are emitted verbatim — LaTeX backslashes must not be doubled.
