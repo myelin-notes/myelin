@@ -38,13 +38,28 @@ pub(super) struct FileWrite {
     pub bytes: Option<String>,
 }
 
+// A staged file's bytes already sit in `staged_path`; an unstaged one is a deletion. `bytes` is
+// only read, for a journal left behind by a version that inlined file bytes.
+#[derive(Serialize, Deserialize)]
+struct JournalFile {
+    name: String,
+    #[serde(default)]
+    staged: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    bytes: Option<String>,
+}
+
+fn staged_path(root: &Path, name: &str) -> PathBuf {
+    root.join("files").join(format!(".{name}.journal.tmp"))
+}
+
 #[derive(Serialize, Deserialize)]
 struct Journal {
     #[serde(default)]
     metadata: Vec<FileWrite>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     outbox: Option<Vec<Value>>,
-    files: Vec<FileWrite>,
+    files: Vec<JournalFile>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     sync: Option<SyncState>,
     #[serde(default)]
@@ -73,6 +88,7 @@ pub(super) struct Store {
     persisted_metadata: HashMap<String, Vec<u8>>,
     persisted_sync: Vec<u8>,
     persisted_outbox: Vec<u8>,
+    marker_written: bool,
     dirty_nodes: HashSet<String>,
     dirty_settings: bool,
     metadata_epoch: String,
@@ -171,6 +187,14 @@ fn apply_journal(root: &Path, journal: &Journal) -> Result<(), String> {
                     .decode(bytes)
                     .map_err(|_| "Invalid repository journal bytes")?,
             )?;
+        } else if write.staged {
+            // Already renamed when a crash interrupted an earlier replay of this journal.
+            let staged = staged_path(root, &write.name);
+            if staged.exists() {
+                reject_symlink(&staged)?;
+                fs::rename(&staged, &path).map_err(io)?;
+                sync_directory(&root.join("files"))?;
+            }
         } else if path.exists() {
             fs::remove_file(path).map_err(io)?;
         }
@@ -247,8 +271,17 @@ impl Store {
             apply_journal(&root, &saved)?;
             fs::remove_file(&journal).map_err(io)?;
         }
+        for entry in fs::read_dir(root.join("files")).map_err(io)? {
+            let entry = entry.map_err(io)?;
+            if entry.file_name().to_string_lossy().ends_with(".journal.tmp") {
+                reject_symlink(&entry.path())?;
+                fs::remove_file(entry.path()).map_err(io)?;
+            }
+        }
         let loaded = metadata::load(&root)?;
         let manifest = loaded.manifest;
+        let marker_written =
+            metadata::is_marker(&fs::read(root.join("manifest.json")).unwrap_or_default());
         let outbox_path = root.join("outbox.json");
         reject_symlink(&outbox_path)?;
         let mut recovery_error: Option<String> = None;
@@ -350,6 +383,7 @@ impl Store {
             blocked: None,
             delta_counts: HashMap::new(),
             persisted_metadata: loaded.records,
+            marker_written,
         };
         let directory = store.root.join(".native-updates");
         reject_symlink(&directory)?;
@@ -528,9 +562,8 @@ impl Store {
                     self.mark_node(id);
                 }
             }
-            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types" => {
-                self.dirty_settings = true
-            }
+            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types"
+            | "sync-live-secret" => self.dirty_settings = true,
             _ => {}
         }
         if !self.remote {
@@ -669,21 +702,39 @@ impl Store {
                 bytes: Some(STANDARD.encode(bytes)),
             })
             .collect();
-        if !metadata::is_marker(&fs::read(self.root.join("manifest.json")).unwrap_or_default()) {
+        if !self.marker_written {
             writes.push(FileWrite {
                 name: "manifest.json".into(),
                 bytes: Some(STANDARD.encode(metadata::MARKER)),
             });
         }
+        let outbox_bytes = serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?;
+        let sync_bytes = serde_json::to_vec(&self.sync).map_err(|e| e.to_string())?;
+        let mut staged_files = Vec::new();
+        for file in files {
+            if !valid_component(&file.name) {
+                return Err("Invalid repository journal file path".into());
+            }
+            let staged = file.bytes.is_some();
+            if let Some(bytes) = &file.bytes {
+                atomic_write(
+                    &staged_path(&self.root, &file.name),
+                    &STANDARD
+                        .decode(bytes)
+                        .map_err(|_| "Invalid repository file bytes")?,
+                )?;
+            }
+            staged_files.push(JournalFile {
+                name: file.name,
+                staged,
+                bytes: None,
+            });
+        }
         let journal = Journal {
             metadata: writes,
-            outbox: (self.persisted_outbox
-                != serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?)
-            .then(|| self.outbox.clone()),
-            files,
-            sync: (self.persisted_sync
-                != serde_json::to_vec(&self.sync).map_err(|e| e.to_string())?)
-            .then(|| self.sync.clone()),
+            outbox: (self.persisted_outbox != outbox_bytes).then(|| self.outbox.clone()),
+            files: staged_files,
+            sync: (self.persisted_sync != sync_bytes).then(|| self.sync.clone()),
             updates,
         };
         let path = self.root.join(".native-journal.json");
@@ -700,8 +751,9 @@ impl Store {
         }
         self.dirty_nodes.clear();
         self.dirty_settings = false;
-        self.persisted_sync = serde_json::to_vec(&self.sync).map_err(|e| e.to_string())?;
-        self.persisted_outbox = serde_json::to_vec(&self.outbox).map_err(|e| e.to_string())?;
+        self.persisted_sync = sync_bytes;
+        self.persisted_outbox = outbox_bytes;
+        self.marker_written = true;
         self.data_version += 1;
         self.transaction_active = false;
         Ok(())
@@ -721,8 +773,35 @@ fn valid_op(op: &Value) -> bool {
                 })
         }
         Some(
-            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types",
+            "sync-custom-colors" | "sync-tag-registry" | "sync-pen-presets" | "sync-flag-types"
+            | "sync-live-secret",
         ) => true,
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_replays_staged_journal_and_drops_stale_staging() {
+        let root = std::env::temp_dir().join(format!("myelin-journal-{}", uuid::Uuid::new_v4()));
+        drop(Store::open(root.clone(), false).unwrap());
+        fs::write(staged_path(&root, "x.png"), b"staged bytes").unwrap();
+        fs::write(staged_path(&root, "stale.png"), b"never journaled").unwrap();
+        fs::write(
+            root.join(".native-journal.json"),
+            br#"{"files":[{"name":"x.png","staged":true}]}"#,
+        )
+        .unwrap();
+
+        drop(Store::open(root.clone(), false).unwrap());
+
+        assert_eq!(fs::read(root.join("files/x.png")).unwrap(), b"staged bytes");
+        assert!(!staged_path(&root, "x.png").exists());
+        assert!(!staged_path(&root, "stale.png").exists());
+        assert!(!root.join(".native-journal.json").exists());
+        fs::remove_dir_all(root).unwrap();
     }
 }
