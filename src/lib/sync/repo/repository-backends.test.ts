@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RepositoryConfig } from './config';
 import { hasGitHubToken } from './github/credentials';
 import { hasGoogleDriveToken } from './google-drive/credentials';
-import {
-  createRepositoryBackendRegistry,
-  getRepositoryBackends,
-  normalizeRepositoryConfig,
-  type RepositoryBackendDescriptor,
-} from './repository-backends';
+import { BACKENDS, normalizeRepositoryConfig } from './repository-backends';
 
 interface BackendContractCase {
   config: RepositoryConfig;
@@ -71,15 +66,13 @@ describe('repository backend descriptors', () => {
     vi.mocked(hasGoogleDriveToken).mockResolvedValue(true);
   });
 
-  it('keeps every registered backend on the same contract', async () => {
-    const backends = getRepositoryBackends();
-
-    expect(backends.map((backend) => backend.kind).sort()).toEqual(
+  it('keeps every backend on the same contract', async () => {
+    expect(Object.keys(BACKENDS).sort()).toEqual(
       Object.keys(contractCases).sort(),
     );
 
-    for (const backend of backends) {
-      const contractCase = contractCases[backend.kind];
+    for (const [kind, backend] of Object.entries(BACKENDS)) {
+      const contractCase = contractCases[kind as RepositoryConfig['kind']];
 
       expect(backend.normalizeConfig(contractCase.config)).toEqual(
         contractCase.normalizedConfig,
@@ -98,32 +91,6 @@ describe('repository backend descriptors', () => {
         backend.isFullyConfigured(contractCase.config),
       ).resolves.toBe(true);
     }
-  });
-
-  it('registers a test backend without a central switch', () => {
-    interface TestRepositoryConfig {
-      kind: 'test';
-      id: string;
-    }
-
-    const descriptor: RepositoryBackendDescriptor<TestRepositoryConfig> = {
-      kind: 'test',
-      create: () => {
-        throw new Error('The test descriptor does not create repositories.');
-      },
-      normalizeConfig: (config) => config,
-      storageKey: (config) => config.id,
-      configIdentity: (config) => config.id,
-      discoveryKey: (config) => config.id,
-      isStructurallyComplete: (config) => config.id.length > 0,
-      isFullyConfigured: async (config) => config.id.length > 0,
-    };
-    const registry = createRepositoryBackendRegistry<TestRepositoryConfig>();
-    const config: TestRepositoryConfig = { kind: 'test', id: 'test-1' };
-
-    registry.register(descriptor);
-
-    expect(registry.get(config).storageKey(config)).toBe('test-1');
   });
 
   it("uses each backend's defaults while normalizing config", () => {

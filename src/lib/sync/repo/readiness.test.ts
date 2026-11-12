@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRepository } from './factory';
 import { hasGitHubToken } from './github/credentials';
 import {
+  createRepository,
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
   RepositorySetupIncompleteError,
-} from './readiness';
+} from './repository-backends';
 
 const mockHasGitHubToken = vi.mocked(hasGitHubToken);
 describe('repository readiness', () => {
