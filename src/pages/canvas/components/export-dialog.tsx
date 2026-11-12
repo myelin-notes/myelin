@@ -7,6 +7,7 @@ import type {
 } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
+import { Switch } from '@myelin/ui';
 import { Button } from '@myelin/ui/button';
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { trackEvent } from '@/lib/analytics';
 
 interface ExportDialogProps {
