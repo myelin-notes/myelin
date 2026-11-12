@@ -289,3 +289,11 @@
 .pm-editor .ProseMirror .pm-table-node__column-resizer:active {
   background: linear-gradient(var(--accent-dark), var(--accent-dark)) center / 2px 100% no-repeat;
 }
+
+.pm-editor .ProseMirror .pm-table-node__handles--resizing .pm-table-node__handle-target {
+  display: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handles--resizing .pm-table-node__column-resizer {
+  clip-path: none;
+}

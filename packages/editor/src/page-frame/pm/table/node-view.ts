@@ -180,17 +180,27 @@ export class PageFrameTableNodeView implements NodeView {
     const ratiosAt = (clientX: number) =>
       resizeColumnRatios(start, index, (clientX - startX) / tableWidth);
 
+    const startLeft = Number.parseFloat(resizer.style.left);
+    const { table } = this.tableView;
+
     this.dragRatios = start;
+    this.handleLayer.classList.add('pm-table-node__handles--resizing');
     resizer.setPointerCapture(event.pointerId);
     const onMove = (move: PointerEvent) => {
       this.dragRatios = ratiosAt(move.clientX);
       this.applyColumnRatios(this.dragRatios);
+      // Layout px, same space as the handle layer; rows reflow, so the height changes too.
+      resizer.style.left = `${startLeft + (this.dragRatios[index] - start[index]) * table.offsetWidth}px`;
+      resizer.style.top = `${table.offsetTop}px`;
+      resizer.style.height = `${table.offsetHeight}px`;
     };
     const finish = (end: PointerEvent) => {
       resizer.removeEventListener('pointermove', onMove);
       resizer.removeEventListener('pointerup', finish);
       resizer.removeEventListener('pointercancel', finish);
       this.dragRatios = null;
+      this.handleLayer.classList.remove('pm-table-node__handles--resizing');
+      this.scheduleHandleRender();
       if (end.type !== 'pointerup') {
         this.applyColumnRatios(this.storedColumnRatios() ?? start);
         return;
