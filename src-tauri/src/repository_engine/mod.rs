@@ -5,8 +5,8 @@ mod media_cleanup;
 mod onenote;
 mod references;
 mod remote;
-pub(crate) mod telemetry;
 pub(crate) mod store;
+pub(crate) mod telemetry;
 #[cfg(test)]
 mod tests;
 mod transfer;
@@ -86,6 +86,20 @@ struct RepositoryPreferences {
     tag_registry: Vec<String>,
     pen_presets: Vec<Value>,
     flag_types: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    live_secret: Option<String>,
+}
+
+fn stored_path(state: &Store, node_id: &str) -> Result<Value, String> {
+    let node = &state.manifest["nodes"][node_id];
+    if node["type"] != "file" {
+        return Ok(Value::Null);
+    }
+    Ok(json!(state
+        .root
+        .join("files")
+        .join(file_name(node)?)
+        .to_string_lossy()))
 }
 
 #[derive(Deserialize)]
@@ -227,6 +241,9 @@ pub enum RepositoryOperation {
     },
     Path {
         node_id: String,
+    },
+    Paths {
+        node_ids: Vec<String>,
     },
 }
 
@@ -763,7 +780,12 @@ impl RepositoryOperation {
                         ("tagRegistry", "sync-tag-registry"),
                         ("penPresets", "sync-pen-presets"),
                         ("flagTypes", "sync-flag-types"),
+                        ("liveSecret", "sync-live-secret"),
                     ] {
+                        // A client that predates `liveSecret` omits it; that must not erase the secret.
+                        if settings[field].is_null() {
+                            continue;
+                        }
                         if state.manifest[field] != settings[field] {
                             state.manifest[field] = settings[field].clone();
                             state.queue(kind, None, json!({}));
@@ -778,17 +800,16 @@ impl RepositoryOperation {
                 let bytes = state.read_file(&state.manifest["nodes"][&node_id])?;
                 json!({"bytesBase64": STANDARD.encode(&bytes), "revision": if bytes.is_empty() { None } else { Some(revision(&bytes)) }})
             }
-            Self::Path { node_id } => {
-                let node = &state.manifest["nodes"][&node_id];
-                if node["type"] == "file" {
-                    json!(state
-                        .root
-                        .join("files")
-                        .join(file_name(node)?)
-                        .to_string_lossy())
-                } else {
-                    Value::Null
+            Self::Path { node_id } => stored_path(state, &node_id)?,
+            Self::Paths { node_ids } => {
+                let mut paths = serde_json::Map::new();
+                for id in node_ids {
+                    let path = stored_path(state, &id)?;
+                    if !path.is_null() {
+                        paths.insert(id, path);
+                    }
                 }
+                Value::Object(paths)
             }
             Self::WriteFile {
                 node,

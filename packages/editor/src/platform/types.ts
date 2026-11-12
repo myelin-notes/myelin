@@ -116,5 +116,8 @@ export interface Platform {
   transcription?: TranscriptionCapability;
   codeRunner?: CodeRunnerCapability;
   pdfExport?: PdfExportCapability;
-  createLiveTransport?(noteId: VFSNodeId): LiveDiscoveryTransport;
+  createLiveTransport?(
+    noteId: VFSNodeId,
+    liveSecret: string,
+  ): LiveDiscoveryTransport;
 }

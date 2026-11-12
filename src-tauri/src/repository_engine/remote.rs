@@ -474,6 +474,7 @@ fn replay(manifest: &mut Value, local: &Value, operations: &[Value]) -> Result<(
             Some("sync-tag-registry") => manifest["tagRegistry"] = local["tagRegistry"].clone(),
             Some("sync-pen-presets") => manifest["penPresets"] = local["penPresets"].clone(),
             Some("sync-flag-types") => manifest["flagTypes"] = local["flagTypes"].clone(),
+            Some("sync-live-secret") => manifest["liveSecret"] = local["liveSecret"].clone(),
             _ => return Err("Invalid cached repository operation".into()),
         }
     }
