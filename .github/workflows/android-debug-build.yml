@@ -119,12 +119,14 @@ jobs:
           # debugging — that is what makes this build worth shipping.
           CARGO_PROFILE_DEV_DEBUG: "0"
           CARGO_PROFILE_DEV_OPT_LEVEL: "2"
-        run: yarn tauri android build --debug --apk --target ${{ github.event.inputs.target || 'aarch64' }}
+        run: yarn tauri android build --debug --apk --aab --target ${{ github.event.inputs.target || 'aarch64' }}
 
-      - name: Upload APK artifact
+      - name: Upload APK and AAB artifact
         uses: actions/upload-artifact@v4
         with:
           name: myelin-android-debug
-          path: src-tauri/gen/android/app/build/outputs/apk/*/debug/*.apk
+          path: |
+            src-tauri/gen/android/app/build/outputs/apk/*/debug/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/*Debug/*.aab
           if-no-files-found: error
           retention-days: 14
