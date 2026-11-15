@@ -100,7 +100,7 @@ jobs:
       # CMake cache and fails on whisper.cpp's missing examples/ dir.
       - name: Purge cached whisper-rs-sys build (avoid stale CMake cache reset)
         run: |
-          find src-tauri/target -type d -name 'whisper-rs-sys-*' -prune -exec rm -rf {} + 2>/dev/null || true
+          find src-tauri/target -type d -name 'whisper-rs-sys*' -prune -exec rm -rf {} + 2>/dev/null || true
           echo "Purged whisper-rs-sys build + fingerprint dirs"
 
       - name: Build Android
