@@ -7,6 +7,10 @@ name: Android Debug Build
 #
 # The APK is signed with Gradle's auto-generated debug keystore, not the release
 # key, so it cannot install over an existing release build: uninstall that first.
+#
+# `play` instead builds a release-signed, non-debuggable AAB/APK for Play internal
+# testing. It must run on a preview-* branch and talks to that branch's Pages
+# preview, so purchases go through Polar's sandbox rather than production.
 on:
   workflow_dispatch:
     inputs:
@@ -20,6 +24,11 @@ on:
         default: aarch64
         type: choice
         options: [aarch64, armv7, x86_64, i686]
+      play:
+        description: Release-signed, non-debuggable build for Play internal testing
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: android-debug-build-${{ github.event.inputs.ref || github.ref }}
@@ -35,6 +44,7 @@ jobs:
       VITE_TABLET_LAYOUT: "true"
       VITE_GITHUB_CLIENT_SECRET: ${{ secrets.VITE_GITHUB_CLIENT_SECRET }}
       VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.VITE_GOOGLE_CLIENT_SECRET }}
+      PLAY: ${{ github.event.inputs.play == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,7 +89,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
-          key: android-debug
+          key: android-debug-${{ github.event.inputs.play == 'true' && 'play' || 'debug' }}
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -94,6 +104,36 @@ jobs:
           if [ ! -d src-tauri/gen/android ]; then
             yarn tauri android init
           fi
+
+      - name: Configure Play build
+        if: env.PLAY == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          if [[ "$BRANCH" != preview-* ]]; then
+            echo "::error::play builds must run on a preview-* branch so they use Polar's sandbox (got $BRANCH)"
+            exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is unset"
+            exit 1
+          fi
+          # Same alias rule as scripts/tauri.mjs.
+          ALIAS=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | cut -c1-28)
+          echo "VITE_WEBSITE_URL=https://$ALIAS.myelin-3lc.pages.dev" >> "$GITHUB_ENV"
+          # Slots between release.yml's codes (1000000 + run * 100 + attempt), so this lands above
+          # the last release and below the next. shortcut: wraps after 49 play builds per release.
+          RELEASE_RUN=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 1 --json number -q '.[0].number')
+          echo "VERSION_CODE=$((1000000 + RELEASE_RUN * 100 + 50 + GITHUB_RUN_NUMBER % 49))" >> "$GITHUB_ENV"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > src-tauri/gen/android/release.keystore
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          storeFile=release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
 
       # See release.yml for the full story: a warm Rust cache makes the `cmake`
       # crate re-configure whisper-rs-sys's restored build dir, which resets the
@@ -119,14 +159,20 @@ jobs:
           # debugging — that is what makes this build worth shipping.
           CARGO_PROFILE_DEV_DEBUG: "0"
           CARGO_PROFILE_DEV_OPT_LEVEL: "2"
-        run: yarn tauri android build --debug --apk --aab --target ${{ github.event.inputs.target || 'aarch64' }}
+        run: |
+          TARGET=${{ github.event.inputs.target || 'aarch64' }}
+          if [ "$PLAY" = true ]; then
+            yarn tauri android build --config "{\"bundle\":{\"android\":{\"versionCode\":$VERSION_CODE}}}" --apk --aab --target "$TARGET"
+          else
+            yarn tauri android build --debug --apk --aab --target "$TARGET"
+          fi
 
       - name: Upload APK and AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: myelin-android-debug
+          name: ${{ env.PLAY == 'true' && 'myelin-android-play' || 'myelin-android-debug' }}
           path: |
-            src-tauri/gen/android/app/build/outputs/apk/*/debug/*.apk
-            src-tauri/gen/android/app/build/outputs/bundle/*Debug/*.aab
+            src-tauri/gen/android/app/build/outputs/apk/*/*/*.apk
+            src-tauri/gen/android/app/build/outputs/bundle/*/*.aab
           if-no-files-found: error
           retention-days: 14
