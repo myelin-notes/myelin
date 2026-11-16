@@ -262,10 +262,10 @@ export class StrokeElement extends AnchorableElement {
     }
   }
 
-  // One outline per dash, or a single outline for a solid stroke.
-  private strokeOutlines(): number[][][] {
+  // `paint` holds one outline per dash, or one for a solid stroke. `bounds` is null when empty.
+  private strokeOutlines(): { paint: number[][][]; bounds: number[] | null } {
     if (this.points.length < 3 || this.style.size <= 0) {
-      return [];
+      return { paint: [], bounds: null };
     }
 
     const scale = OUTLINE_SIZE / this.style.size;
@@ -371,18 +371,23 @@ export class StrokeElement extends AnchorableElement {
     }
     // Dashes come from the same smoothed centerline, so they trace exactly where the solid stroke would.
     const [dash, gap] = dashPattern(this.style.size);
-    const outlines = this.style.dashed
+    const paint = this.style.dashed
       ? splitDashes(strokePoints, dash * scale, gap * scale).map((run) =>
           getStrokeOutlinePoints(run, options),
         )
       : [getStrokeOutlinePoints(strokePoints, options)];
-    for (const outline of outlines) {
+    for (const outline of paint) {
       for (const point of outline) {
         point[0] = point[0] / scale + originX;
         point[1] = point[1] / scale + originY;
       }
     }
-    return outlines;
+    return {
+      paint,
+      bounds: centerlineBounds(strokePoints, options).map(
+        (v, i) => v / scale + (i % 2 === 0 ? originX : originY),
+      ),
+    };
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -399,7 +404,7 @@ export class StrokeElement extends AnchorableElement {
   public get paintPath(): Path2D {
     if (this.dirty) {
       // Unsimplified: the kept points change as the tip moves, which would make live ink wobble.
-      this.cachePath(this.strokeOutlines());
+      this.cachePath(this.strokeOutlines().paint);
     }
     return this.cachedPath;
   }
@@ -420,7 +425,7 @@ export class StrokeElement extends AnchorableElement {
     }
     // Same outline perfect-freehand produces on screen, as a filled vector path.
     const { rgb, opacity } = parseCssColor(this.style.color);
-    for (const outline of this.strokeOutlines()) {
+    for (const outline of this.strokeOutlines().paint) {
       if (outline.length < 3) {
         continue;
       }
@@ -477,39 +482,17 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
 
-    const outlines = this.strokeOutlines();
-
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-
-    for (const outline of outlines) {
-      for (let i = 0; i < outline.length; i++) {
-        const x = outline[i][0];
-        const y = outline[i][1];
-        if (x < minX) {
-          minX = x;
-        }
-        if (x > maxX) {
-          maxX = x;
-        }
-        if (y < minY) {
-          minY = y;
-        }
-        if (y > maxY) {
-          maxY = y;
-        }
-      }
+    const { paint, bounds } = this.strokeOutlines();
+    if (bounds) {
+      const [minX, minY, maxX, maxY] = bounds;
+      this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     }
-
-    this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     // Loading a note lands here once per stroke; reusing the outline halves perfect-freehand work.
     const path = new Path2D();
     const tolerance =
       OUTLINE_TOLERANCE /
       Math.max(Math.abs(this.scale.x), Math.abs(this.scale.y));
-    for (const outline of outlines) {
+    for (const outline of paint) {
       appendSimplifiedOutline(path, outline, tolerance);
     }
     this.cachedPath = path;
@@ -615,6 +598,31 @@ function appendSimplifiedOutline(
     }
   }
   path.closePath();
+}
+
+// The centerline's extent widened by the widest radius perfect-freehand can draw,
+// `size * (0.5 - thinning * (0.5 - pressure))`, so the box ignores the dash pattern.
+// Looser than the outline where pressure thins the stroke. Returns [minX, minY, maxX, maxY].
+function centerlineBounds(
+  points: StrokePoint[],
+  options: { size: number; thinning?: number; simulatePressure: boolean },
+): number[] {
+  // Simulated pressure is derived from speed inside perfect-freehand and can reach 1.
+  let pressure = options.simulatePressure ? 1 : 0;
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const { point, pressure: p } of points) {
+    minX = Math.min(minX, point[0]);
+    minY = Math.min(minY, point[1]);
+    maxX = Math.max(maxX, point[0]);
+    maxY = Math.max(maxY, point[1]);
+    pressure = Math.max(pressure, p);
+  }
+  const radius =
+    options.size * (0.5 - (options.thinning ?? 0.5) * (0.5 - pressure));
+  return [minX - radius, minY - radius, maxX + radius, maxY + radius];
 }
 
 // Cuts the centerline at every dash boundary, interpolating the cut points so dashes stay their
