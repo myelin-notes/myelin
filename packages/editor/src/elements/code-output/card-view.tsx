@@ -1,11 +1,12 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import { VirtualList } from '../../components/virtual-list';
 import type {
   CodeRunResult,
   CodeRunSession,
 } from '../../page-frame/pm/code-block/run-store';
+import { FRAME_FIT_WIDTH, OutputItemView } from './output-item';
 
-/** Row height before measurement; corrected once each line mounts. */
+/** Row height before measurement; corrected once each item mounts. */
 const ESTIMATED_LINE_HEIGHT = 18;
 /** Treat the body as "at the bottom" within this many px (tail-follow). */
 const STICK_THRESHOLD = 4;
@@ -14,6 +15,30 @@ const STICK_THRESHOLD = 4;
 // render would force an O(line count) rebuild on every scroll frame.
 const getLineRowKey = (index: number) => String(index);
 const estimateLineHeight = () => ESTIMATED_LINE_HEIGHT;
+
+/** Card size (world px) that shows all content without scrolling. */
+export interface CardFitSize {
+  width: number;
+  height: number;
+}
+
+// Widest fixed-width rich item; text wraps to whatever width the card has, so it contributes 0.
+function naturalContentWidth(content: HTMLElement): number {
+  let width = 0;
+  for (const el of content.querySelectorAll<HTMLElement>(
+    '.canvas-code-output__table-wrap, .canvas-code-output__image, .canvas-code-output__frame',
+  )) {
+    if (el instanceof HTMLImageElement) {
+      width = Math.max(width, parseFloat(el.style.width) || el.naturalWidth);
+    } else if (el instanceof HTMLIFrameElement) {
+      width = Math.max(width, FRAME_FIT_WIDTH);
+    } else {
+      // The wrap is width-constrained; its table child keeps its natural width.
+      width = Math.max(width, el.scrollWidth + el.offsetWidth - el.clientWidth);
+    }
+  }
+  return width;
+}
 
 function formatDuration(ms: number): string {
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -37,6 +62,8 @@ interface CodeOutputCardViewProps {
   session: CodeRunSession | null;
   /** Forwards a ctrl+wheel event to the viewport; see the wheel effect below. */
   onZoomWheel: (event: WheelEvent) => void;
+  /** Reports the size that fits the content whenever it changes. */
+  onFitSize: (size: CardFitSize) => void;
 }
 
 /**
@@ -50,24 +77,67 @@ interface CodeOutputCardViewProps {
 export function CodeOutputCardView({
   session,
   onZoomWheel,
+  onFitSize,
 }: CodeOutputCardViewProps) {
   const running = session?.running === true;
-  const lines = session?.lines ?? [];
+  const items = session?.items ?? [];
   const result = session?.result ?? null;
   const dropped = session?.dropped ?? 0;
 
+  const cardRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
-  // Follow the tail as new lines arrive, unless the user scrolled up. Layout effect so a card
+  const reportFitSize = useEffectEvent(() => {
+    const card = cardRef.current;
+    const body = bodyRef.current;
+    const content = contentRef.current;
+    if (!card || !body || !content) {
+      return;
+    }
+    const style = getComputedStyle(body);
+    const padX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    // offset* sizes ignore the card's zoom transform, so these are world px.
+    onFitSize({
+      // Card borders + any vertical scrollbar.
+      width:
+        naturalContentWidth(content) +
+        padX +
+        card.offsetWidth -
+        body.clientWidth,
+      // Header + card borders.
+      height:
+        content.offsetHeight + padY + card.offsetHeight - body.offsetHeight,
+    });
+  });
+
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) {
+      return;
+    }
+    const observer = new ResizeObserver(() => reportFitSize());
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+
+  // A finished run may leave the content size unchanged but lift the grow-only rule mid-run.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-fit when the run state flips
+  useLayoutEffect(() => {
+    reportFitSize();
+  }, [running]);
+
+  // Follow the tail as new items arrive, unless the user scrolled up. Layout effect so a card
   // mounting with a finished run's output paints at the bottom rather than flashing the top.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when line count grows
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when item count grows
   useLayoutEffect(() => {
     const body = bodyRef.current;
     if (body && stickToBottom.current) {
       body.scrollTop = body.scrollHeight;
     }
-  }, [lines.length]);
+  }, [items.length]);
 
   // The card mounts in the frame chrome layer, outside the subtree the viewport listens on, so
   // ctrl+wheel zoom has to be handed to it explicitly. Native and non-passive because React's own
@@ -87,8 +157,67 @@ export function CodeOutputCardView({
     return () => body.removeEventListener('wheel', handleWheel);
   }, [onZoomWheel]);
 
+  // Dragging a selection onto non-selectable chrome makes WebKit extend it to the nearest
+  // selectable text in DOM order — another card. While dragging, only this card's text stays
+  // selectable (CSS); the selectionchange clamp is a fallback, since it lands a frame late and flashes.
+  useEffect(() => {
+    const body = bodyRef.current;
+    const card = cardRef.current;
+    if (!body || !card) {
+      return;
+    }
+    let dragging = false;
+    const handlePointerDown = () => {
+      dragging = true;
+      card.classList.add('is-selecting');
+      document.documentElement.classList.add('code-output-selecting');
+    };
+    const handlePointerUp = () => {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      card.classList.remove('is-selecting');
+      document.documentElement.classList.remove('code-output-selecting');
+    };
+    const handleSelectionChange = () => {
+      const selection = document.getSelection();
+      const { anchorNode, focusNode } = selection ?? {};
+      if (
+        !dragging ||
+        !selection ||
+        !anchorNode ||
+        !focusNode ||
+        !body.contains(anchorNode) ||
+        body.contains(focusNode)
+      ) {
+        return;
+      }
+      const focusBefore =
+        body.compareDocumentPosition(focusNode) &
+        Node.DOCUMENT_POSITION_PRECEDING;
+      selection.setBaseAndExtent(
+        anchorNode,
+        selection.anchorOffset,
+        body,
+        focusBefore ? 0 : body.childNodes.length,
+      );
+    };
+    body.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      body.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      handlePointerUp();
+    };
+  }, []);
+
   return (
-    <div className="canvas-code-output__card">
+    <div ref={cardRef} className="canvas-code-output__card">
       <div className="canvas-code-output__header">
         <span className="canvas-code-output__lang">
           {session?.language ?? ''}
@@ -125,36 +254,25 @@ export function CodeOutputCardView({
           }
         }}
       >
-        {dropped > 0 ? (
-          <div className="canvas-code-output__line is-stderr">
-            … {dropped} earlier lines dropped
-          </div>
-        ) : null}
-        {lines.length === 0 && !running ? (
-          <div className="canvas-code-output__empty">No output</div>
-        ) : (
-          <VirtualList
-            scrollRef={bodyRef}
-            count={lines.length}
-            estimateHeight={estimateLineHeight}
-            getRowKey={getLineRowKey}
-            gap={0}
-            renderRow={(index) => {
-              const line = lines[index];
-              return (
-                <div
-                  className={
-                    line.stream === 'stderr'
-                      ? 'canvas-code-output__line is-stderr'
-                      : 'canvas-code-output__line'
-                  }
-                >
-                  {line.text === '' ? ' ' : line.text}
-                </div>
-              );
-            }}
-          />
-        )}
+        <div ref={contentRef}>
+          {dropped > 0 ? (
+            <div className="canvas-code-output__line is-stderr">
+              … {dropped} earlier lines dropped
+            </div>
+          ) : null}
+          {items.length === 0 && !running ? (
+            <div className="canvas-code-output__empty">No output</div>
+          ) : (
+            <VirtualList
+              scrollRef={bodyRef}
+              count={items.length}
+              estimateHeight={estimateLineHeight}
+              getRowKey={getLineRowKey}
+              gap={0}
+              renderRow={(index) => <OutputItemView item={items[index]} />}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

@@ -6,8 +6,10 @@ import {
   ImportableFileTypes,
   type VFSNodeId,
 } from '@/lib/sync';
+import { JupyterIcon } from '../brand-icons';
 import { importStoragePath, isStorageFile } from '../files';
 import { getPathBasename } from '../import-tree';
+import { importJupyterFile, isJupyterFile } from '../jupyter';
 import { importMarkdownFile, isMarkdownFile } from '../markdown';
 import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from '../pdf';
 import type { ImportProvider } from './types';
@@ -33,7 +35,7 @@ function partition(files: NativeImportFile[]): PartitionedFiles {
   let mediaCount = 0;
 
   for (const file of files) {
-    if (isMarkdownFile(file) || isPdfFile(file)) {
+    if (isMarkdownFile(file) || isPdfFile(file) || isJupyterFile(file)) {
       supported.push(file);
       noteCount++;
     } else if (isStorageFile(file)) {
@@ -55,7 +57,14 @@ export const filesProvider: ImportProvider = {
     filters: [
       {
         name: 'Importable files',
-        extensions: ['md', 'markdown', 'mdx', 'pdf', ...ImportableFileTypes],
+        extensions: [
+          'md',
+          'markdown',
+          'mdx',
+          'pdf',
+          'ipynb',
+          ...ImportableFileTypes,
+        ],
       },
     ],
     multiple: true,
@@ -71,15 +80,16 @@ export const filesProvider: ImportProvider = {
       type: '',
     }));
     const source = strings.library.importSources.files;
+    const labels = strings.library.importSources[this.id];
     const shared = strings.library.importDialog;
     let scanned: PartitionedFiles | null = null;
 
     // Loose files land straight in `parentId`; no root folder, so nothing to
     // reveal afterwards and nothing for the conflict prompt to resolve.
     return {
-      title: source.title,
-      scanningLabel: source.scanning,
-      emptyLabel: source.empty,
+      title: labels.title,
+      scanningLabel: labels.scanning,
+      emptyLabel: labels.empty,
 
       async scan() {
         for (const file of files) {
@@ -145,6 +155,13 @@ export const filesProvider: ImportProvider = {
               parentId,
               fallbackTitle,
             });
+          } else if (isJupyterFile(file)) {
+            lastId = await importJupyterFile({
+              file: input,
+              repository,
+              parentId,
+              fallbackTitle,
+            });
           } else if (isPdfFile(file)) {
             lastId = await importPdfFile({
               file: input,
@@ -169,5 +186,16 @@ export const filesProvider: ImportProvider = {
         };
       },
     };
+  },
+};
+
+export const jupyterProvider: ImportProvider = {
+  ...filesProvider,
+  id: 'jupyter_notebook',
+  icon: JupyterIcon,
+  picker: {
+    kind: 'native-files',
+    filters: [{ name: 'Jupyter notebooks', extensions: ['ipynb'] }],
+    multiple: true,
   },
 };

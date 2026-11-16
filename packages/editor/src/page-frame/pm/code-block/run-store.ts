@@ -1,9 +1,16 @@
-import type { RunnableLanguage } from '../../../code-runner/contract';
+import type {
+  RunnableLanguage,
+  RunOutputLine,
+} from '../../../code-runner/contract';
 
-export interface CodeRunLine {
-  text: string;
-  stream: 'stdout' | 'stderr';
+/** A parsed Jupyter-style MIME bundle. */
+export interface CodeRunDisplay {
+  kind: 'display';
+  data: Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
+
+export type CodeRunItem = RunOutputLine | CodeRunDisplay;
 
 export interface CodeRunResult {
   exitCode: number | null;
@@ -16,8 +23,8 @@ export interface CodeRunResult {
 export interface CodeRunSession {
   blockId: string;
   language: RunnableLanguage;
-  lines: CodeRunLine[];
-  /** Lines dropped off the front of `lines` at the cap. */
+  items: CodeRunItem[];
+  /** Items dropped off the front of `items` at the cap. */
   dropped: number;
   running: boolean;
   startedAt: number;
@@ -32,8 +39,8 @@ export interface CodeRunSession {
 // still reads as continuous streaming.
 const OUTPUT_FLUSH_MS = 64;
 
-/** Lines a session keeps; older ones are dropped and reported as `dropped`. */
-const MAX_LINES = 2000;
+/** Items a session keeps; older ones are dropped and reported as `dropped`. */
+const MAX_ITEMS = 2000;
 
 // Bridges the vanilla code-block run buttons to the React output cards on the canvas. Run views
 // push output here; CodeOutputCardView subscribes per block id.
@@ -64,7 +71,7 @@ class CodeRunStore {
     this.sessions.set(blockId, {
       blockId,
       language,
-      lines: [],
+      items: [],
       dropped: 0,
       running: true,
       startedAt: Date.now(),
@@ -74,22 +81,22 @@ class CodeRunStore {
     this.emit(blockId);
   }
 
-  appendLine(blockId: string, line: CodeRunLine): void {
-    this.appendLines(blockId, [line]);
+  appendItem(blockId: string, item: CodeRunItem): void {
+    this.appendItems(blockId, [item]);
   }
 
-  /** Append a coalesced batch of lines with a single notify. */
-  appendLines(blockId: string, lines: CodeRunLine[]): void {
+  /** Append a coalesced batch of items with a single notify. */
+  appendItems(blockId: string, items: CodeRunItem[]): void {
     const session = this.sessions.get(blockId);
-    if (!session || lines.length === 0) {
+    if (!session || items.length === 0) {
       return;
     }
-    for (const line of lines) {
-      session.lines.push(line);
+    for (const item of items) {
+      session.items.push(item);
     }
-    const overflow = session.lines.length - MAX_LINES;
+    const overflow = session.items.length - MAX_ITEMS;
     if (overflow > 0) {
-      session.lines.splice(0, overflow);
+      session.items.splice(0, overflow);
       session.dropped += overflow;
     }
     this.scheduleEmit(blockId);

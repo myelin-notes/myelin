@@ -53,18 +53,27 @@ export interface RunCodeRequest {
 }
 
 export interface RunOutputLine {
+  kind: 'line';
   stream: 'stdout' | 'stderr';
   text: string;
 }
 
+export interface RunOutputDisplay {
+  kind: 'display';
+  /** JSON `{data: {mime: value}, metadata}` emitted by the Python bootstrap's `display()`. */
+  bundle: string;
+}
+
+export type RunOutputItem = RunOutputLine | RunOutputDisplay;
+
 export interface RunPollResponse {
-  /** Lines from the caller's cursor onward, capped per response. */
-  lines: RunOutputLine[];
+  /** Items from the caller's cursor onward, capped per response. */
+  items: RunOutputItem[];
   nextCursor: number;
-  /** Lines the backend's ring evicted before the cursor reached them. */
+  /** Items the backend's ring evicted before the cursor reached them. */
   skipped: number;
   /** True only once the process exited and all of its output is in the ring,
-   *  so `finished` with an empty `lines` means fully drained. */
+   *  so `finished` with an empty `items` means fully drained. */
   finished: boolean;
   exitCode: number | null;
   error: string | null;

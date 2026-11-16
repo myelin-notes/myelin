@@ -177,6 +177,14 @@ const fr: typeof en = {
         summary: (count: number) =>
           `${count} fichier${count > 1 ? 's' : ''} importé${count > 1 ? 's' : ''}`,
       },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'Un notebook .ipynb, avec ses cellules Markdown et de code. Format v4 ou ultérieur.',
+        title: 'Importer des notebooks Jupyter',
+        scanning: 'Lecture des notebooks...',
+        empty: 'Aucun des fichiers sélectionnés n’est un notebook',
+      },
       goodnotes_zip: {
         label: 'Importer depuis Goodnotes',
         description: 'Un dossier Goodnotes exporté en PDF.',

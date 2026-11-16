@@ -67,7 +67,7 @@ const es: SiteCopy = {
 
   pages: {
     heading: 'Documentos de verdad, sobre el lienzo.',
-    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código, que Pro te permite ejecutar.',
+    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código, que Pro te permite ejecutar. Los notebooks de Jupyter se importan directamente en uno.',
   },
 
   audioSearch: {
@@ -213,7 +213,7 @@ Sí, en directo y de igual a igual, ya hoy. No hay cuenta de Myelin ni nada en m
 
 ## ¿Puedo importar desde otra app?
 
-Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Notion entra a través de su propia exportación en Markdown y CSV, que lee el importador de archivos; un importador de Notion dedicado, que conserve la jerarquía de páginas, está en la hoja de ruta.
+Sí. Myelin importa un vault de Obsidian, un cuaderno .onepkg o una sección .one de OneNote, una carpeta de Goodnotes exportada como PDF, archivos sueltos de Markdown, PDF, notebooks de Jupyter, imágenes y video, y una carpeta de espacio de trabajo exportada desde el propio Myelin. Notion entra a través de su propia exportación en Markdown y CSV, que lee el importador de archivos; un importador de Notion dedicado, que conserve la jerarquía de páginas, está en la hoja de ruta.
 
 ## ¿Funciona sin conexión?
 
@@ -276,6 +276,17 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Diseño en Páginas, Columnas o Continuo',
         ],
       },
+      code: {
+        label: 'Código',
+        heading: 'Notebooks junto a tus notas.',
+        lede: 'Ejecuta bloques de código dentro de una página y ve el resultado en el lienzo, desde texto hasta tablas y gráficos. Trae contigo tus notebooks de Jupyter. Ejecutar código forma parte de Myelin Notes Pro.',
+        details: [
+          'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C y C++',
+          'Se ejecuta en tu equipo, con las herramientas que ya tienes instaladas',
+          'Los DataFrames de pandas se muestran como tablas y las figuras de matplotlib como imágenes',
+          'Importa notebooks .ipynb con sus celdas de Markdown y de código',
+        ],
+      },
       canvas: {
         label: 'Lienzo',
         heading: 'Un lienzo infinito en el que no te pierdes.',
@@ -324,7 +335,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Las notas son archivos normales en tu disco, en un formato abierto (Yjs)',
           'Funciona sin conexión y sin cuenta',
           'Sincroniza entre dispositivos a través de un repositorio de GitHub que tú controlas',
-          'Importa desde Goodnotes, OneNote, Obsidian, Notion, Markdown y PDF',
+          'Importa desde Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown y PDF',
           'Exporta a PDF, Markdown, una bóveda de Obsidian o JSON del espacio de trabajo',
           'En inglés, español, francés y chino simplificado',
         ],
@@ -370,6 +381,11 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         title: 'Imágenes que fluyen con el texto',
         body: 'Ancla una imagen a una página y el texto le hace sitio. Escribe encima y la imagen baja con las palabras.',
         alt: 'Una foto en una página se ancla, el texto le hace sitio y, al escribir encima, la foto baja',
+      },
+      jupyter: {
+        title: 'Notebooks de Jupyter, importados',
+        body: 'Importa un .ipynb y sus celdas de Markdown y de código se convierten en una página. Ejecuta una celda para recuperar su tabla o gráfico y escribe tus notas al lado con el lápiz.',
+        alt: 'Un notebook de Jupyter se importa como página, una celda de pandas produce una tabla, una de matplotlib un gráfico de líneas, y el lápiz escribe "launch week" con una flecha hacia el pico',
       },
       canvasStyle: {
         title: 'Un estilo para cada lienzo',

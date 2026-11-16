@@ -22,6 +22,13 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const RING_CAP: usize = 10_000;
 /// A line longer than this is cut and the rest of it discarded.
 const MAX_LINE_BYTES: usize = 8 * 1024;
+/// Cap for one display bundle line; a Plotly figure inlines ~5 MB of plotly.js.
+const MAX_DISPLAY_BYTES: usize = 32 * 1024 * 1024;
+/// Retained bytes per execution, so a loop of large displays can't exhaust memory.
+const RING_MAX_BYTES: usize = 256 * 1024 * 1024;
+/// Rich output marker written by python_bootstrap.py: `PREFIX <json bundle> BEL`.
+const DISPLAY_PREFIX: &[u8] = b"\x1b]myelin;";
+const DISPLAY_SUFFIX: u8 = 0x07;
 const POLL_MAX_LINES: usize = 2_000;
 const POLL_MAX_BYTES: usize = 256 * 1024;
 
@@ -32,12 +39,26 @@ enum OutputStream {
     Stderr,
 }
 
-// Jupyter-style rich output would generalize this into an item enum (text line | MIME display
-// bundle | display update); the ring + cursor polling transport stays the same.
 #[derive(Clone, Serialize)]
-struct RunLine {
-    stream: OutputStream,
-    text: String,
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum RunItem {
+    Line {
+        stream: OutputStream,
+        text: String,
+    },
+    /// A MIME bundle as JSON text; parsed by the frontend.
+    Display {
+        bundle: String,
+    },
+}
+
+impl RunItem {
+    fn byte_len(&self) -> usize {
+        match self {
+            RunItem::Line { text, .. } => text.len(),
+            RunItem::Display { bundle } => bundle.len(),
+        }
+    }
 }
 
 enum RunStatus {
@@ -48,12 +69,13 @@ enum RunStatus {
     },
 }
 
-/// `total` is the cursor space: lines ever produced, of which the newest
-/// `lines.len()` are retained. `Done` is set only after both pipe readers hit
+/// `total` is the cursor space: items ever produced, of which the newest
+/// `items.len()` (holding `bytes`) are retained. `Done` is set only after both pipe readers hit
 /// EOF, so a poll observing it knows no further lines are coming.
 struct RunBuffer {
-    lines: VecDeque<RunLine>,
+    items: VecDeque<RunItem>,
     total: u64,
+    bytes: usize,
     status: RunStatus,
 }
 
@@ -102,10 +124,14 @@ pub async fn run_code(
     std::fs::create_dir_all(&dir).map_err(|e| format!("create run dir: {e}"))?;
     std::fs::write(dir.join(plan.source_filename), source)
         .map_err(|e| format!("write source: {e}"))?;
+    for (name, contents) in &plan.support_files {
+        std::fs::write(dir.join(name), contents).map_err(|e| format!("write {name}: {e}"))?;
+    }
 
     let buffer = Arc::new(Mutex::new(RunBuffer {
-        lines: VecDeque::new(),
+        items: VecDeque::new(),
         total: 0,
+        bytes: 0,
         status: RunStatus::Running,
     }));
     let (cancel_tx, cancel_rx) = oneshot::channel::<()>();
@@ -165,11 +191,11 @@ pub async fn cancel_run(
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PollResponse {
-    lines: Vec<RunLine>,
+    items: Vec<RunItem>,
     next_cursor: u64,
     /// Lines evicted from the ring before the caller's cursor reached them.
     skipped: u64,
-    /// With an empty `lines`, the caller has drained everything.
+    /// With an empty `items`, the caller has drained everything.
     finished: bool,
     exit_code: Option<i32>,
     error: Option<String>,
@@ -190,16 +216,17 @@ pub async fn poll_output(
         .ok_or("unknown execution")?;
 
     let buf = buffer.lock().expect("run buffer mutex poisoned");
-    let oldest = buf.total - buf.lines.len() as u64;
+    let oldest = buf.total - buf.items.len() as u64;
     let start = cursor.clamp(oldest, buf.total);
 
-    let mut lines = Vec::new();
+    // The byte cap is checked before each push, so a single oversized display still goes out alone.
+    let mut items = Vec::new();
     let mut bytes = 0usize;
     let mut index = (start - oldest) as usize;
-    while index < buf.lines.len() && lines.len() < POLL_MAX_LINES && bytes < POLL_MAX_BYTES {
-        let line = &buf.lines[index];
-        bytes += line.text.len();
-        lines.push(line.clone());
+    while index < buf.items.len() && items.len() < POLL_MAX_LINES && bytes < POLL_MAX_BYTES {
+        let item = &buf.items[index];
+        bytes += item.byte_len();
+        items.push(item.clone());
         index += 1;
     }
 
@@ -208,7 +235,7 @@ pub async fn poll_output(
         RunStatus::Done { exit_code, error } => (true, *exit_code, error.clone()),
     };
     Ok(PollResponse {
-        lines,
+        items,
         next_cursor: oldest + index as u64,
         skipped: start.saturating_sub(cursor),
         finished,
@@ -232,6 +259,23 @@ pub async fn release_run(
     Ok(())
 }
 
+/// Frame CSP: output may load its chart libraries from a CDN. No `ipc:` source, and the app embeds
+/// this page with `sandbox="allow-scripts"` (opaque origin), so output can't reach Tauri commands.
+const OUTPUT_FRAME_CSP: &str =
+    "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' https:; \
+     style-src 'unsafe-inline' https:; img-src data: blob: https:; font-src data: https:; \
+     connect-src https:; worker-src blob:";
+
+/// Serves the host page for rich HTML output on the `myelin-output` scheme, its own origin, so the
+/// page's CSP (not the app's) applies. The app posts the output HTML into it.
+pub fn output_frame_response() -> tauri::http::Response<Vec<u8>> {
+    tauri::http::Response::builder()
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Content-Security-Policy", OUTPUT_FRAME_CSP)
+        .body(include_bytes!("output_frame.html").to_vec())
+        .expect("static response is valid")
+}
+
 async fn run_to_completion(
     dir: &Path,
     plan: RunPlan,
@@ -249,7 +293,13 @@ async fn run_to_completion(
             return Err(format!("No compiler found — install one of: {names}."));
         };
         for line in String::from_utf8_lossy(&output.stderr).lines() {
-            push_line(buffer, OutputStream::Stderr, line.to_string());
+            push_item(
+                buffer,
+                RunItem::Line {
+                    stream: OutputStream::Stderr,
+                    text: line.to_string(),
+                },
+            );
         }
         if !output.status.success() {
             return Ok(output.status.code());
@@ -332,7 +382,8 @@ async fn wait_or_cancel(
 /// Reads a pipe to EOF into the ring at full speed — the child never blocks on
 /// a slow consumer; the ring drops the middle instead. Splits on `\r` as well
 /// as `\n` so `\r`-rewriting progress bars stream rather than buffering one
-/// giant line for the whole run.
+/// giant line for the whole run. Stdout lines carrying the display marker
+/// become `Display` items and get the larger display cap.
 async fn drain_reader<R: AsyncRead + Unpin + Send + 'static>(
     reader: R,
     stream: OutputStream,
@@ -356,10 +407,10 @@ async fn drain_reader<R: AsyncRead + Unpin + Send + 'static>(
             }
             last_was_cr = byte == b'\r';
             if byte == b'\n' || byte == b'\r' {
-                push_line(&buffer, stream, finish_line(&mut pending, &mut truncated));
+                push_item(&buffer, finish_item(stream, &mut pending, &mut truncated));
             } else if truncated {
                 // Discarding the rest of an over-long line.
-            } else if pending.len() >= MAX_LINE_BYTES {
+            } else if pending.len() >= line_limit(stream, &pending) {
                 truncated = true;
             } else {
                 pending.push(byte);
@@ -368,26 +419,59 @@ async fn drain_reader<R: AsyncRead + Unpin + Send + 'static>(
     }
 
     if !pending.is_empty() || truncated {
-        push_line(&buffer, stream, finish_line(&mut pending, &mut truncated));
+        push_item(&buffer, finish_item(stream, &mut pending, &mut truncated));
     }
 }
 
-fn finish_line(pending: &mut Vec<u8>, truncated: &mut bool) -> String {
-    let mut text = String::from_utf8_lossy(pending).into_owned();
-    if *truncated {
-        text.push_str(" … [truncated]");
+fn is_display(stream: OutputStream, pending: &[u8]) -> bool {
+    matches!(stream, OutputStream::Stdout) && pending.starts_with(DISPLAY_PREFIX)
+}
+
+fn line_limit(stream: OutputStream, pending: &[u8]) -> usize {
+    if is_display(stream, pending) {
+        MAX_DISPLAY_BYTES
+    } else {
+        MAX_LINE_BYTES
     }
+}
+
+fn finish_item(stream: OutputStream, pending: &mut Vec<u8>, truncated: &mut bool) -> RunItem {
+    let item = if is_display(stream, pending) {
+        match (*truncated, &pending[DISPLAY_PREFIX.len()..]) {
+            (false, [json @ .., DISPLAY_SUFFIX]) => RunItem::Display {
+                bundle: String::from_utf8_lossy(json).into_owned(),
+            },
+            _ => RunItem::Line {
+                stream: OutputStream::Stderr,
+                text: format!(
+                    "[display output dropped: over {} MB or malformed]",
+                    MAX_DISPLAY_BYTES / (1024 * 1024)
+                ),
+            },
+        }
+    } else {
+        let mut text = String::from_utf8_lossy(pending).into_owned();
+        if *truncated {
+            text.push_str(" … [truncated]");
+        }
+        RunItem::Line { stream, text }
+    };
     pending.clear();
     *truncated = false;
-    text
+    item
 }
 
-fn push_line(buffer: &Mutex<RunBuffer>, stream: OutputStream, text: String) {
+fn push_item(buffer: &Mutex<RunBuffer>, item: RunItem) {
     let mut buf = buffer.lock().expect("run buffer mutex poisoned");
-    if buf.lines.len() == RING_CAP {
-        buf.lines.pop_front();
+    let size = item.byte_len();
+    while !buf.items.is_empty()
+        && (buf.items.len() == RING_CAP || buf.bytes + size > RING_MAX_BYTES)
+    {
+        let evicted = buf.items.pop_front().expect("non-empty");
+        buf.bytes -= evicted.byte_len();
     }
-    buf.lines.push_back(RunLine { stream, text });
+    buf.bytes += size;
+    buf.items.push_back(item);
     buf.total += 1;
 }
 
@@ -396,5 +480,47 @@ fn spawn_error(program: &str, error: std::io::Error) -> String {
         format!("`{program}` not found — install it to run this block.")
     } else {
         format!("failed to start `{program}`: {error}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn drain(stream: OutputStream, input: Vec<u8>) -> Vec<RunItem> {
+        let buffer = Arc::new(Mutex::new(RunBuffer {
+            items: VecDeque::new(),
+            total: 0,
+            bytes: 0,
+            status: RunStatus::Running,
+        }));
+        drain_reader(std::io::Cursor::new(input), stream, buffer.clone()).await;
+        let items = buffer.lock().unwrap().items.iter().cloned().collect();
+        items
+    }
+
+    #[tokio::test]
+    async fn display_marker_survives_line_cap_and_keeps_order() {
+        let json = format!(
+            "{{\"data\":{{\"text/html\":\"{}\"}}}}",
+            "x".repeat(MAX_LINE_BYTES * 4)
+        );
+        let mut input = b"before\n".to_vec();
+        input.extend_from_slice(DISPLAY_PREFIX);
+        input.extend_from_slice(json.as_bytes());
+        input.extend_from_slice(b"\x07\nafter\n");
+
+        let items = drain(OutputStream::Stdout, input).await;
+        assert!(matches!(&items[0], RunItem::Line { text, .. } if text == "before"));
+        assert!(matches!(&items[1], RunItem::Display { bundle } if *bundle == json));
+        assert!(matches!(&items[2], RunItem::Line { text, .. } if text == "after"));
+    }
+
+    #[tokio::test]
+    async fn display_marker_on_stderr_is_plain_text() {
+        let mut input = DISPLAY_PREFIX.to_vec();
+        input.extend_from_slice(b"{}\x07\n");
+        let items = drain(OutputStream::Stderr, input).await;
+        assert!(matches!(&items[0], RunItem::Line { .. }));
     }
 }

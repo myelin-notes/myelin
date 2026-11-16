@@ -87,6 +87,9 @@ pub fn run() {
         .manage(mcp_server::McpServerState::new())
         .manage(transcription::TranscriptionState::new())
         .manage(code_runner::CodeRunnerState::new())
+        .register_uri_scheme_protocol("myelin-output", |_ctx, _request| {
+            code_runner::output_frame_response()
+        })
         .manage(oauth_loopback::OAuthLoopbackState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,

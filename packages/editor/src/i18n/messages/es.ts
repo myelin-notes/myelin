@@ -172,6 +172,14 @@ const es: typeof en = {
         summary: (count: number) =>
           `Se importaron ${count} archivo${count === 1 ? '' : 's'}`,
       },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'Un cuaderno .ipynb, con sus celdas de Markdown y código. Formato v4 o posterior.',
+        title: 'Importar cuadernos de Jupyter',
+        scanning: 'Leyendo cuadernos...',
+        empty: 'Ninguno de los archivos seleccionados es un cuaderno',
+      },
       goodnotes_zip: {
         label: 'Importar desde Goodnotes',
         description: 'Una carpeta de Goodnotes exportada como PDF.',

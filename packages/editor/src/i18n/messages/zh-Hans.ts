@@ -164,6 +164,14 @@ const zhHans: typeof en = {
           '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
         summary: (count: number) => `已导入 ${count} 个文件`,
       },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          '包含 Markdown 和代码单元的 .ipynb 笔记本。需为 v4 或更高格式。',
+        title: '导入 Jupyter 笔记本',
+        scanning: '正在读取笔记本...',
+        empty: '所选文件中没有笔记本',
+      },
       goodnotes_zip: {
         label: '从 Goodnotes 导入',
         description: '以 PDF 形式导出的 Goodnotes 文件夹。',
