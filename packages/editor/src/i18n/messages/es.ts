@@ -647,6 +647,33 @@ const es: typeof en = {
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
     },
+    transcription: {
+      title: 'Transcripción',
+      eyebrow: 'En el dispositivo',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Incluido. Rápido en cualquier dispositivo, menos preciso.',
+        },
+        small: {
+          label: 'Pequeño',
+          description:
+            'Notablemente más preciso. Funciona bien en la mayoría de los dispositivos.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'El más preciso. Mejor con GPU; la transcripción en vivo puede retrasarse en equipos antiguos.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Descargar',
+      use: 'Usar',
+      inUse: 'En uso',
+      delete: 'Eliminar modelo',
+      downloadFailed: 'Error al descargar el modelo',
+    },
     privacy: {
       title: 'Privacidad',
       eyebrow: 'Datos de uso',

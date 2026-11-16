@@ -654,6 +654,32 @@ const fr: typeof en = {
           `${notes} note${notes > 1 ? 's' : ''} et ${media} fichier${media > 1 ? 's' : ''} multimédia exportés.`,
       },
     },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'Sur l’appareil',
+      models: {
+        base: {
+          label: 'Base',
+          description: 'Inclus. Rapide sur tout appareil, le moins précis.',
+        },
+        small: {
+          label: 'Petit',
+          description:
+            'Nettement plus précis. Fonctionne bien sur la plupart des appareils.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'Le plus précis. Idéal avec un GPU ; la transcription en direct peut prendre du retard sur les ordinateurs anciens.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Télécharger',
+      use: 'Utiliser',
+      inUse: 'Utilisé',
+      delete: 'Supprimer le modèle',
+      downloadFailed: 'Échec du téléchargement du modèle',
+    },
     privacy: {
       title: 'Confidentialité',
       eyebrow: 'Données d’utilisation',

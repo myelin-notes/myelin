@@ -638,6 +638,31 @@ const en = {
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
     },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'On-device',
+      models: {
+        base: {
+          label: 'Base',
+          description: 'Included. Fast on any device, least accurate.',
+        },
+        small: {
+          label: 'Small',
+          description: 'Noticeably more accurate. Runs well on most devices.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'Most accurate. Best with a GPU; live transcripts may lag on older computers.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Download',
+      use: 'Use',
+      inUse: 'In use',
+      delete: 'Delete model',
+      downloadFailed: 'Model download failed',
+    },
     privacy: {
       title: 'Privacy',
       eyebrow: 'Usage Data',

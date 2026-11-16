@@ -615,6 +615,31 @@ const zhHans: typeof en = {
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
     },
+    transcription: {
+      title: '转写',
+      eyebrow: '设备端',
+      models: {
+        base: {
+          label: '基础',
+          description: '内置。在任何设备上都很快，准确度最低。',
+        },
+        small: {
+          label: '小型',
+          description: '准确度明显更高，在大多数设备上运行良好。',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            '准确度最高。建议配合 GPU 使用；在较旧的电脑上实时转写可能会延迟。',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: '下载',
+      use: '使用',
+      inUse: '使用中',
+      delete: '删除模型',
+      downloadFailed: '模型下载失败',
+    },
     privacy: {
       title: '隐私',
       eyebrow: '使用数据',

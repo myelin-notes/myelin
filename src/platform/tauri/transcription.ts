@@ -3,6 +3,7 @@ import type {
   TranscriptionCapability,
   TranscriptSegment,
 } from '@myelin/editor/platform/types';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -84,6 +85,7 @@ async function openSession(
     await session.startListening();
     await invoke('start_audio_transcription', {
       sessionId: session.sessionId,
+      modelId: UserPrefs.get('transcriptionModel'),
     });
     if (stream) {
       await session.startCapture(stream);
