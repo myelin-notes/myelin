@@ -90,11 +90,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
         }
       }}
     >
-      <DialogContent
-        showCloseButton={!busy}
-        className="z-[110] sm:max-w-md"
-        overlayClassName="z-[110]"
-      >
+      <DialogContent showCloseButton={!busy} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{strings.canvas.export.title}</DialogTitle>
           {target?.title && (

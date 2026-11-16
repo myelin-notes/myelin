@@ -1,8 +1,11 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows Apple system authentication APIs."
+description = "Allows Apple system authentication and App Store purchase APIs."
 permissions = [
   "allow-authenticate-web",
   "allow-cancel-web-authentication",
+  "allow-purchase-pro",
+  "allow-pro-entitlement",
+  "allow-storefront",
 ]

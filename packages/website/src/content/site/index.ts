@@ -30,16 +30,17 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'features' | 'privacy' | 'support';
+export type LinkId = 'features' | 'pricing' | 'privacy' | 'support';
 
 /**
  * The header and footer carry the same links. The set itself is the same in
  * every language; only the labels translate.
  */
-export const navLinks: LinkId[] = ['features', 'support', 'privacy'];
+export const navLinks: LinkId[] = ['features', 'pricing', 'support', 'privacy'];
 
 const hrefs: Record<LinkId, string> = {
   features: '/features',
+  pricing: '/pricing',
   privacy: '/privacy',
   support: '/support',
 };
@@ -102,6 +103,17 @@ interface SyncTier {
   live?: boolean;
   title: string;
   body: string;
+}
+
+interface PricingPlan {
+  name: string;
+  price: string;
+  /** One line under the price saying who the plan is for. */
+  tagline: string;
+  /** Heads the checklist. */
+  includesLabel: string;
+  includes: string[];
+  cta: string;
 }
 
 /** Apps the site advertises importing from, keyed for icon lookup. */
@@ -227,6 +239,40 @@ export interface SiteCopy {
     /** Text-only cards in the `connect` section. */
     notes: FeatureNote[];
     closing: { heading: string; body: string };
+  };
+
+  pricing: {
+    meta: { title: string; description: string };
+    eyebrow: string;
+    headline: string;
+    subheadline: string;
+    free: PricingPlan;
+    pro: PricingPlan & {
+      /** Shown beside the price: what kind of payment it is. */
+      priceNote: string;
+      /** Fine print under the buy button. */
+      licenseNote: string;
+      /** Shown when the checkout could not be opened. */
+      checkoutFailed: string;
+    };
+    /** The school-email form that sends a student checkout link. */
+    student: {
+      name: string;
+      tagline: string;
+      price: string;
+      /** Follows `price`, explaining how to qualify. */
+      note: string;
+      emailLabel: string;
+      submit: string;
+      sending: string;
+      sent: string;
+      notAcademic: string;
+      failed: string;
+      /** Shown when an emailed checkout link is forged or past its 24 hours. */
+      linkExpired: string;
+    };
+    faqTitle: string;
+    faqs: Faq[];
   };
 
   linkLabels: Record<LinkId, string>;

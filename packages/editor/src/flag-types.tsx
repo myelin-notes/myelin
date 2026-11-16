@@ -35,9 +35,8 @@ const logger = new Logger('FlagTypes');
 export function defaultFlagTypes(strings: Messages): FlagType[] {
   const names = strings.canvas.flagTypes;
   return [
-    { id: 'todo', name: names.todo, color: '#ef4444' },
     { id: 'review', name: names.review, color: '#eab308' },
-    { id: 'examinable', name: names.examinable, color: '#22c55e' },
+    { id: 'todo', name: names.todo, color: '#ef4444' },
   ];
 }
 

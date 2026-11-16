@@ -150,6 +150,11 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_apple_compliance::init());
     }
 
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(tauri_plugin_play_billing::init());
+    }
+
     #[cfg(mobile)]
     {
         builder = builder.plugin(tauri_plugin_scoped_storage::init());

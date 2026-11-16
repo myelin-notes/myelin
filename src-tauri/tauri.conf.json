@@ -28,7 +28,8 @@
         "deep-link",
         "updater",
         "mobile-folders",
-        "apple-compliance"
+        "apple-compliance",
+        "play-billing"
       ],
       "csp": "default-src 'self' ipc: http://ipc.localhost; style-src 'self' 'unsafe-inline'; img-src 'self' asset: blob: data: https: http://asset.localhost; media-src 'self' asset: blob: https: http://asset.localhost; frame-src 'self' https:; connect-src 'self' ipc: http://ipc.localhost ws: wss: stun: turn: turns: https://us.i.posthog.com https://us-assets.i.posthog.com",
       "assetProtocol": {
@@ -66,7 +67,8 @@
       "minimumSystemVersion": "10.15"
     },
     "iOS": {
-      "developmentTeam": "P4Z946QP26"
+      "developmentTeam": "P4Z946QP26",
+      "minimumSystemVersion": "15.0"
     }
   }
 }

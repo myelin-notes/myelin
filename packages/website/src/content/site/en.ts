@@ -1,4 +1,5 @@
 import type { SiteCopy } from './index';
+import { formatPrice } from './prices';
 
 /**
  * Site style: no em dashes.
@@ -41,7 +42,7 @@ const en: SiteCopy = {
     subheadline:
       'Myelin Notes is a cross-platform note-taking app for Mac, Windows, and Linux. Combine handwriting, typed notes, and PDFs on one canvas. Works offline and is free for personal use.',
     trustLine:
-      'Completely free for personal use · No account required · Your notes are never paywalled',
+      'Free for personal use · No account required · Your notes are never paywalled',
     ctaPrimary: 'Download',
     ctaSecondary: 'Try it in your browser',
   },
@@ -63,13 +64,13 @@ const en: SiteCopy = {
 
   pages: {
     heading: 'Real documents, right on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks you can run.',
+    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run.',
   },
 
   audioSearch: {
     heading: 'Record it. Transcribe it. Find it on the canvas.',
     audioBody:
-      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away.',
+      'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away. Pro adds more accurate models.',
     searchBody:
       'Search your library by note title, tags, and saved text or audio transcripts. Find matches within an open canvas, too.',
   },
@@ -116,7 +117,7 @@ const en: SiteCopy = {
       'Your notes are plain files on your disk, in an open, conflict-free format (Yjs). Nothing is ever locked in.',
       'Everything works fully offline, with no account and no server in the middle.',
       'Your notes stay on your own machine.',
-      'Bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
+      'With Pro, bring your own AI: models connect through a local MCP server, never a cloud we chose for you.',
       'Import from Obsidian or GoodNotes, export to PDF, images, or JSON, and read every line of source on GitHub.',
     ],
   },
@@ -189,7 +190,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes, completely free for personal use. Myelin Notes is in beta, so pricing plans may change.
+Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, and higher limits. Your notes are never paywalled.
 
 ## Where are my notes stored?
 
@@ -265,7 +266,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         details: [
           'Markdown shortcuts for headings, lists, quotes, and formatting',
           'To-do checklists, callouts, and tables',
-          'Math blocks, and code blocks you can run',
+          'Math blocks, and code blocks you can run with Pro',
           '[[Note links]] with hover previews, updated when you rename a note',
           'Embedded images, videos, YouTube, and link cards',
           'Pages, Columns, or Continuous layout',
@@ -297,7 +298,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       agents: {
         label: 'AI agents',
         heading: 'Bring your own AI, on your own machine.',
-        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them.',
+        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them. AI agents are part of Myelin Notes Pro.',
         details: [
           'The server listens only on 127.0.0.1, on a port you choose',
           'Copy the install prompt from Settings to connect your agent',
@@ -368,7 +369,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       },
       canvasStyle: {
         title: 'A style for every canvas',
-        body: 'Pick a grid, dots, lines, or your own image, and set the colors. Each canvas can have its own, and Settings sets the default.',
+        body: 'Pick a grid, dots, lines, or, with Pro, your own image, and set the colors. Each canvas can have its own, and Settings sets the default.',
         alt: 'The Canvas style panel switches the background to lines and picks a warm paper color',
       },
       flags: {
@@ -427,9 +428,101 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
     },
   },
 
+  pricing: {
+    meta: {
+      title: 'Pricing | Myelin Notes',
+      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, and higher limits.`,
+    },
+    eyebrow: 'Pricing',
+    headline: 'Free to use. Pro when you want more.',
+    subheadline:
+      'The free version has nearly everything. Pro is a one-time purchase that unlocks the rest and supports Myelin’s development.',
+    free: {
+      name: 'Free',
+      price: formatPrice('en', 'free'),
+      tagline: 'For personal use, with no time limit.',
+      includesLabel: 'Includes',
+      includes: [
+        'Handwriting, PDFs, pages, and the infinite canvas',
+        'Audio recording with on-device transcription',
+        'GitHub sync and live collaboration',
+        'Import, export, search, and links',
+        'Up to 6 custom pen presets',
+        '2 flag types',
+      ],
+      cta: 'Download',
+    },
+    pro: {
+      name: 'Pro',
+      price: formatPrice('en', 'pro'),
+      priceNote: 'one-time purchase',
+      tagline: 'Pay once. No subscription.',
+      includesLabel: 'Everything in Free, plus',
+      includes: [
+        'AI agents over a local MCP server',
+        'Run code blocks in your pages',
+        'Unlimited flag types',
+        'Unlimited custom pen presets',
+        'Your own images as canvas backgrounds',
+        'More accurate transcription models',
+        'Support Myelin’s development',
+      ],
+      cta: 'Buy Pro',
+      licenseNote:
+        'You get a license key by email. It unlocks Pro on up to 3 of your devices, on any platform.',
+      checkoutFailed: 'We could not open the checkout. Please try again.',
+    },
+    student: {
+      name: 'Student',
+      tagline: 'Everything in Pro, for students with a school email address.',
+      price: formatPrice('en', 'student'),
+      note: 'Enter your school email address and we will send you a link to the student checkout.',
+      emailLabel: 'School email',
+      submit: 'Send link',
+      sending: 'Sending…',
+      sent: 'Check your inbox for the student checkout link.',
+      notAcademic:
+        'We do not recognise that as a school email address. Contact support if your school is missing.',
+      failed: 'We could not send the link. Please try again.',
+      linkExpired: 'This student link has expired. Request a new one below.',
+    },
+    faqTitle: 'Pricing questions',
+    faqs: [
+      {
+        question: 'How do I unlock Pro?',
+        answer:
+          'After you buy Pro on this website, we will email you a license key to enter in Settings → Myelin Notes Pro. On iPhone, iPad, and Android you enter the email you bought with instead.',
+      },
+      {
+        question: 'How many devices can I use it on?',
+        answer:
+          'You can use one key on up to 3 devices on any platform. To move it to a new device, deactivate it on an old one first.',
+      },
+      {
+        question: 'What if I buy Pro in the App Store or Google Play?',
+        answer:
+          'Your purchase unlocks Pro on your phone or tablet and comes with a license key for one additional platform of your choice. To get the key, enter your email in Settings → Myelin Notes Pro on your phone or tablet.',
+      },
+      {
+        question: 'How does student pricing work?',
+        answer: `Enter your school email above and if we recognise your school, we’ll send you a link to buy Pro for ${formatPrice('en', 'student')}. The link expires after 24 hours.`,
+      },
+      {
+        question: 'Is it a subscription?',
+        answer: 'No. Pro is a one-time purchase.',
+      },
+      {
+        question: 'What happens to my notes if I stay on Free?',
+        answer:
+          'Nothing. Your notes are plain files on your disk, and the free version opens all of them.',
+      },
+    ],
+  },
+
   /** Labels for the shared link set; the hrefs live in `index.ts`. */
   linkLabels: {
     features: 'Features',
+    pricing: 'Pricing',
     privacy: 'Privacy',
     support: 'Support',
   },

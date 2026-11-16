@@ -4402,6 +4402,7 @@ dependencies = [
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-opener",
  "tauri-plugin-pencil",
+ "tauri-plugin-play-billing",
  "tauri-plugin-process",
  "tauri-plugin-scoped-storage",
  "tauri-plugin-stronghold",
@@ -8293,6 +8294,14 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-pencil"
+version = "0.1.0"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
+]
+
+[[package]]
+name = "tauri-plugin-play-billing"
 version = "0.1.0"
 dependencies = [
  "tauri",

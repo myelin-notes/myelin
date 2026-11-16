@@ -67,7 +67,8 @@ async function respond(
 export function McpRuntime() {
   const repository = useRepository();
   const strings = useMessages();
-  const enabled = useUserPref('mcpEnabled');
+  const plan = useUserPref('plan');
+  const enabled = useUserPref('mcpEnabled') && plan === 'pro';
   const port = useUserPref('mcpPort');
   const allowDirectWrites = useUserPref('mcpAllowDirectWrites');
 

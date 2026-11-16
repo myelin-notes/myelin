@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useState } from 'react';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
+import { isPro, promptUpgrade } from '@myelin/editor/plan';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Button } from '@myelin/ui/button';
 import { useResettableTimeout } from '@/hooks/use-resettable-timeout';
@@ -13,7 +14,8 @@ const MAX_PORT = 65535;
 
 export function McpSection() {
   const strings = useMessages();
-  const mcpEnabled = useUserPref('mcpEnabled');
+  const plan = useUserPref('plan');
+  const mcpEnabled = useUserPref('mcpEnabled') && plan === 'pro';
   const mcpPort = useUserPref('mcpPort');
   const mcpAllowDirectWrites = useUserPref('mcpAllowDirectWrites');
   const [portDraft, setPortDraft] = useState<string | null>(null);
@@ -23,6 +25,10 @@ export function McpSection() {
   const installPrompt = strings.settings.mcp.installPrompt.prompt(endpoint);
 
   const handleEnabled = () => {
+    if (!isPro()) {
+      promptUpgrade('agents');
+      return;
+    }
     UserPrefs.set('mcpEnabled', !mcpEnabled);
     trackEvent('mcp_enabled', { enabled: !mcpEnabled });
   };
