@@ -154,10 +154,11 @@ async function workspaceJson(
     ),
     media,
     customColors: { pen, highlighter, text, folder },
-    penPresets: penPresets.map(({ tool, color, size }) => ({
+    penPresets: penPresets.map(({ tool, color, size, lineStyle }) => ({
       tool,
       color,
       size,
+      lineStyle,
     })),
     tagRegistry,
   };
