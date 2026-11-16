@@ -663,17 +663,18 @@ const fr: typeof en = {
       models: {
         base: {
           label: 'Base',
-          description: 'Rapide sur tout appareil, le moins précis.',
+          description:
+            'Rapide sur tout appareil. Convient à une voix claire mais fait plus d’erreurs.',
         },
         small: {
           label: 'Petit',
           description:
-            'Nettement plus précis. Fonctionne bien sur la plupart des appareils.',
+            'Plus précis que Base. Fonctionne bien sur la plupart des tablettes et ordinateurs.',
         },
         'large-v3-turbo': {
           label: 'Large v3 Turbo',
           description:
-            'Le plus précis. Idéal avec un GPU ; la transcription en direct peut prendre du retard sur les ordinateurs anciens.',
+            'Le plus précis. Ordinateurs uniquement, idéal avec un GPU. La transcription en direct peut prendre du retard sur les machines anciennes.',
         },
       },
       size: (megabytes: number) => `${megabytes} MB`,

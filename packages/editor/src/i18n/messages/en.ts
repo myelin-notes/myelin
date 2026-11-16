@@ -647,16 +647,18 @@ const en = {
       models: {
         base: {
           label: 'Base',
-          description: 'Fast on any device, least accurate.',
+          description:
+            'Fast on any device. Fine for clear speech but makes more mistakes.',
         },
         small: {
           label: 'Small',
-          description: 'Noticeably more accurate. Runs well on most devices.',
+          description:
+            'More accurate than Base. Runs well on most tablets and computers.',
         },
         'large-v3-turbo': {
           label: 'Large v3 Turbo',
           description:
-            'Most accurate. Best with a GPU; live transcripts may lag on older computers.',
+            'The most accurate. Computers only, and best with a GPU. Live transcripts may fall behind on older machines.',
         },
       },
       size: (megabytes: number) => `${megabytes} MB`,

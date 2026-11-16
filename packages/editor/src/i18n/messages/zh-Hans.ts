@@ -624,16 +624,16 @@ const zhHans: typeof en = {
       models: {
         base: {
           label: '基础',
-          description: '在任何设备上都很快，准确度最低。',
+          description: '在任何设备上都很快。适合清晰的语音，但错误较多。',
         },
         small: {
           label: '小型',
-          description: '准确度明显更高，在大多数设备上运行良好。',
+          description: '比基础模型更准确。在大多数平板和电脑上运行良好。',
         },
         'large-v3-turbo': {
           label: 'Large v3 Turbo',
           description:
-            '准确度最高。建议配合 GPU 使用；在较旧的电脑上实时转写可能会延迟。',
+            '准确度最高。仅限电脑，配合 GPU 效果最佳。在较旧的电脑上实时转写可能会延迟。',
         },
       },
       size: (megabytes: number) => `${megabytes} MB`,

@@ -656,17 +656,18 @@ const es: typeof en = {
       models: {
         base: {
           label: 'Base',
-          description: 'Rápido en cualquier dispositivo, menos preciso.',
+          description:
+            'Rápido en cualquier dispositivo. Sirve para voz clara pero comete más errores.',
         },
         small: {
           label: 'Pequeño',
           description:
-            'Notablemente más preciso. Funciona bien en la mayoría de los dispositivos.',
+            'Más preciso que Base. Funciona bien en la mayoría de tabletas y ordenadores.',
         },
         'large-v3-turbo': {
           label: 'Large v3 Turbo',
           description:
-            'El más preciso. Mejor con GPU; la transcripción en vivo puede retrasarse en equipos antiguos.',
+            'El más preciso. Solo para ordenadores y mejor con GPU. La transcripción en vivo puede retrasarse en equipos antiguos.',
         },
       },
       size: (megabytes: number) => `${megabytes} MB`,
