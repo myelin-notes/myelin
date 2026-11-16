@@ -60,7 +60,7 @@ const fr: SiteCopy = {
 
   pages: {
     heading: 'De vrais documents, directement sur le canevas.',
-    body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code, exécutables avec Pro.',
+    body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code, exécutables avec Pro. Les notebooks Jupyter s’y importent directement.',
   },
 
   audioSearch: {
@@ -205,7 +205,7 @@ Oui, en direct et de pair à pair, dès aujourd’hui. Il n’y a pas de compte 
 
 ## Puis-je importer depuis une autre app ?
 
-Oui. Myelin importe un coffre Obsidian, un bloc-notes OneNote .onepkg ou une section .one, un dossier Goodnotes exporté en PDF, des fichiers Markdown, PDF, images et vidéos isolés, et un dossier d’espace de travail exporté depuis Myelin lui-même. Notion passe par son propre export Markdown et CSV, que l’importeur de fichiers lit ; un importeur Notion dédié qui conserve la hiérarchie des pages est sur la feuille de route.
+Oui. Myelin importe un coffre Obsidian, un bloc-notes OneNote .onepkg ou une section .one, un dossier Goodnotes exporté en PDF, des fichiers Markdown, PDF, notebooks Jupyter, images et vidéos isolés, et un dossier d’espace de travail exporté depuis Myelin lui-même. Notion passe par son propre export Markdown et CSV, que l’importeur de fichiers lit ; un importeur Notion dédié qui conserve la hiérarchie des pages est sur la feuille de route.
 
 ## Fonctionne-t-il hors ligne ?
 
@@ -269,6 +269,17 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Mise en page Pages, Colonnes ou Continu',
         ],
       },
+      code: {
+        label: 'Code',
+        heading: 'Des notebooks à côté de vos notes.',
+        lede: 'Exécutez des blocs de code dans une page et voyez le résultat sur le canevas, du texte aux tableaux et graphiques. Emportez vos notebooks Jupyter avec vous. L’exécution de code fait partie de Myelin Notes Pro.',
+        details: [
+          'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C et C++',
+          'S’exécute sur votre machine, avec les outils déjà installés',
+          'Les DataFrames pandas s’affichent en tableaux, les figures matplotlib en images',
+          'Importez des notebooks .ipynb avec leurs cellules Markdown et de code',
+        ],
+      },
       canvas: {
         label: 'Canevas',
         heading: 'Un canevas infini où l’on ne se perd pas.',
@@ -317,7 +328,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert (Yjs)',
           'Fonctionne entièrement hors ligne, sans compte',
           'Synchronisation entre appareils via un dépôt GitHub que vous contrôlez',
-          'Import depuis Goodnotes, OneNote, Obsidian, Notion, Markdown et PDF',
+          'Import depuis Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown et PDF',
           'Export en PDF, en Markdown, en coffre Obsidian ou en JSON de l’espace de travail',
           'En anglais, espagnol, français et chinois simplifié',
         ],
@@ -363,6 +374,11 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         title: 'Des images qui suivent le texte',
         body: 'Ancrez une image à une page et le texte lui fait de la place. Écrivez au-dessus et l’image descend avec les mots.',
         alt: 'Une photo est ancrée dans une page, le texte lui fait de la place, puis la saisie au-dessus la fait descendre',
+      },
+      jupyter: {
+        title: 'Notebooks Jupyter, importés',
+        body: 'Importez un .ipynb et ses cellules Markdown et de code deviennent une page. Exécutez une cellule pour retrouver son tableau ou son graphique, puis écrivez vos notes à côté au stylet.',
+        alt: 'Un notebook Jupyter est importé en page, une cellule pandas produit un tableau, une cellule matplotlib une courbe, et le stylet écrit « launch week » avec une flèche vers le pic',
       },
       canvasStyle: {
         title: 'Un style pour chaque canevas',

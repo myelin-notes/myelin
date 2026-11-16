@@ -60,6 +60,7 @@ export const FEATURE_SECTION_IDS = [
   'handwriting',
   'pdfs',
   'pages',
+  'code',
   'canvas',
   'sync',
   'agents',
@@ -79,6 +80,7 @@ export type FeatureClipId =
   | 'pdfAnchor'
   | 'slash'
   | 'imageAnchor'
+  | 'jupyter'
   | 'canvasStyle'
   | 'flags'
   | 'liveCollab'

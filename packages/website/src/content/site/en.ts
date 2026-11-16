@@ -64,7 +64,7 @@ const en: SiteCopy = {
 
   pages: {
     heading: 'Real documents, right on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run.',
+    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run. Jupyter notebooks import straight into one.',
   },
 
   audioSearch: {
@@ -210,7 +210,7 @@ Yes, live and peer to peer, today. There is no Myelin account and nothing sittin
 
 ## Can I import from another app?
 
-Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
+Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, Jupyter notebooks, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
 
 ## Does it work offline?
 
@@ -272,6 +272,17 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Pages, Columns, or Continuous layout',
         ],
       },
+      code: {
+        label: 'Code',
+        heading: 'Notebooks that sit next to your notes.',
+        lede: 'Run code blocks right in a page and see the output on the canvas, from plain text to tables and charts. Bring your Jupyter notebooks with you. Running code is part of Myelin Notes Pro.',
+        details: [
+          'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C, and C++',
+          'Runs on your machine, with the toolchains you already have installed',
+          'pandas DataFrames show as tables, matplotlib figures as images',
+          'Import .ipynb notebooks with their Markdown and code cells',
+        ],
+      },
       canvas: {
         label: 'Canvas',
         heading: 'An infinite canvas that stays easy to find your way around.',
@@ -320,7 +331,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Notes are plain files on your disk, in an open format (Yjs)',
           'Works fully offline, with no account',
           'Sync across devices through a GitHub repo you control',
-          'Import from Goodnotes, OneNote, Obsidian, Notion, Markdown, and PDFs',
+          'Import from Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown, and PDFs',
           'Export to PDF, Markdown, an Obsidian vault, or workspace JSON',
           'In English, Spanish, French, and Simplified Chinese',
         ],
@@ -366,6 +377,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         title: 'Images that flow with your text',
         body: 'Anchor an image to a page and the text makes room for it. Type above it and the image moves down with the words.',
         alt: 'A photo on a page is anchored, the text makes room for it, and typing above carries it down',
+      },
+      jupyter: {
+        title: 'Jupyter notebooks, imported',
+        body: 'Import a .ipynb and its Markdown and code cells become a page. Run a cell to get its table or chart back, then write your notes beside it with the pen.',
+        alt: 'A Jupyter notebook is imported as a page, a pandas cell runs into a table, a matplotlib cell into a line chart, and the pen writes "launch week" with an arrow up at the peak',
       },
       canvasStyle: {
         title: 'A style for every canvas',

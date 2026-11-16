@@ -60,7 +60,7 @@ const zhHans: SiteCopy = {
 
   pages: {
     heading: '真正的文档，就在画布上',
-    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及代码块（升级 Pro 即可运行）。',
+    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及代码块（升级 Pro 即可运行）。Jupyter Notebook 可以直接导入为页面框。',
   },
 
   audioSearch: {
@@ -202,7 +202,7 @@ const zhHans: SiteCopy = {
 
 ## 可以从别的应用导入吗？
 
-可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 的内容可以通过它自己的 Markdown 与 CSV 导出导入，由文件导入器读取；能保留页面层级的专用 Notion 导入器已列入计划。
+可以。Myelin 支持导入 Obsidian vault、OneNote 的 .onepkg 笔记本或 .one 分区、导出为 PDF 的 Goodnotes 文件夹，以及零散的 Markdown、PDF、Jupyter Notebook、图片与视频，还有从 Myelin 自身导出的工作区文件夹。Notion 的内容可以通过它自己的 Markdown 与 CSV 导出导入，由文件导入器读取；能保留页面层级的专用 Notion 导入器已列入计划。
 
 ## 离线能用吗？
 
@@ -264,6 +264,17 @@ const zhHans: SiteCopy = {
           '“页面”“分栏”或“连续”布局',
         ],
       },
+      code: {
+        label: '代码',
+        heading: '笔记旁边就是你的 Notebook。',
+        lede: '在页面里直接运行代码块，结果显示在画布上，从文本到表格和图表。也能把 Jupyter Notebook 一起带进来。运行代码属于 Myelin Notes Pro。',
+        details: [
+          'Python、JavaScript、TypeScript、Ruby、Bash、Go、Rust、C 和 C++',
+          '在你的电脑上运行，使用你已安装的工具链',
+          'pandas DataFrame 显示为表格，matplotlib 图形显示为图片',
+          '导入 .ipynb Notebook，保留其中的 Markdown 和代码单元格',
+        ],
+      },
       canvas: {
         label: '画布',
         heading: '一张无限画布，也不会让你迷路',
@@ -312,7 +323,7 @@ const zhHans: SiteCopy = {
           '笔记是你磁盘上的普通文件，采用开放格式（Yjs）',
           '完全离线可用，无需账号',
           '通过你掌控的 GitHub 仓库在设备间同步',
-          '从 Goodnotes、OneNote、Obsidian、Notion、Markdown 和 PDF 导入',
+          '从 Goodnotes、OneNote、Obsidian、Notion、Jupyter、Markdown 和 PDF 导入',
           '导出为 PDF、Markdown、Obsidian 仓库或工作区 JSON',
           '支持英语、西班牙语、法语和简体中文',
         ],
@@ -358,6 +369,11 @@ const zhHans: SiteCopy = {
         title: '图片随文字移动',
         body: '把图片锚定到页面，文字会为它让出位置。在上方输入文字时，图片会随之下移。',
         alt: '页面中的照片被锚定，文字为它让出位置，在上方输入时照片随之下移',
+      },
+      jupyter: {
+        title: '导入 Jupyter Notebook',
+        body: '导入 .ipynb 后，其中的 Markdown 和代码单元格会变成一个页面。运行单元格即可重新得到表格或图表，再用笔在旁边写下笔记。',
+        alt: 'Jupyter Notebook 被导入为页面，pandas 单元格运行出表格，matplotlib 单元格运行出折线图，笔写下“launch week”并画箭头指向峰值',
       },
       canvasStyle: {
         title: '每个画布都有自己的样式',
