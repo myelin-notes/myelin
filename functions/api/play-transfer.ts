@@ -163,7 +163,7 @@ export async function onRequestPost({
     await sendEmail(
       apiKey,
       found.email,
-      `Here is your Myelin Notes Pro license key for Mac, Windows, or Linux:\n\n${found.key}\n\nPaste it in Settings → Myelin Notes Pro on your computer. It works on 1 computer; your Android devices stay unlocked through Google Play.\n\nMyelin Notes`,
+      `Here is your Myelin Notes Pro license key:\n\n${found.key}\n\nIt unlocks Pro on one additional platform of your choice. Paste it in Settings → Myelin Notes Pro on that device. Your Android devices stay unlocked through Google Play.\n\nMyelin Notes`,
       'Your Myelin Notes Pro license key',
     );
     return json({ ok: true });

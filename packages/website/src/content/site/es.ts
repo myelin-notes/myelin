@@ -1,4 +1,5 @@
 import type { SiteCopy } from './index';
+import { formatPrice } from './prices';
 
 /**
  * Spanish (Spain) site copy. Terminology follows the app's own catalog
@@ -192,7 +193,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
+Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
 
 ## ¿Dónde se guardan mis notas?
 
@@ -434,8 +435,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   pricing: {
     meta: {
       title: 'Precios | Myelin Notes',
-      description:
-        'Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de 49,99 USD, o 29,99 USD para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.',
+      description: `Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.`,
     },
     eyebrow: 'Precios',
     headline: 'Gratis para usar. Pro cuando quieras más.',
@@ -443,7 +443,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       'La versión gratuita lo tiene casi todo. Pro es un pago único que desbloquea el resto y apoya el desarrollo de Myelin.',
     free: {
       name: 'Gratis',
-      price: '0 USD',
+      price: formatPrice('es', 'free'),
       tagline: 'Para uso personal, sin límite de tiempo.',
       includesLabel: 'Incluye',
       includes: [
@@ -458,7 +458,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
     },
     pro: {
       name: 'Pro',
-      price: '49,99 USD',
+      price: formatPrice('es', 'pro'),
       priceNote: 'pago único',
       tagline: 'Pagas una vez. Sin suscripción.',
       includesLabel: 'Todo lo de Gratis, y además',
@@ -480,7 +480,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       name: 'Estudiantes',
       tagline:
         'Todo lo de Pro, para estudiantes con un correo de su centro de estudios.',
-      price: '29,99 USD',
+      price: formatPrice('es', 'student'),
       note: 'Introduce el correo de tu centro de estudios y te enviaremos un enlace al pago con precio de estudiante.',
       emailLabel: 'Correo del centro de estudios',
       submit: 'Enviar enlace',
@@ -497,26 +497,25 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       {
         question: '¿Cómo desbloqueo Pro?',
         answer:
-          'Compra Pro aquí y recibirás una clave de licencia por correo. Introdúcela en Ajustes → Myelin Notes Pro. En iPhone y iPad, introduce en su lugar el correo con el que compraste.',
+          'Después de comprar Pro en esta web, te enviaremos por correo una clave de licencia para introducir en Ajustes → Myelin Notes Pro. En iPhone, iPad y Android introduces en su lugar el correo con el que compraste.',
       },
       {
         question: '¿En cuántos dispositivos puedo usarlo?',
         answer:
-          'Una clave desbloquea Pro en hasta 3 de tus dispositivos, en cualquier plataforma. Para moverla, desactívala antes en uno de ellos.',
+          'Puedes usar una clave en hasta 3 dispositivos de cualquier plataforma. Para pasarla a un dispositivo nuevo, desactívala antes en uno antiguo.',
       },
       {
-        question: '¿Y si compro Pro en la App Store?',
+        question: '¿Y si compro Pro en la App Store o Google Play?',
         answer:
-          'Una compra en la App Store desbloquea Pro en tu iPhone y iPad, e incluye además una clave de licencia para 1 ordenador Mac, Windows o Linux. Para recibirla, abre Ajustes → Myelin Notes Pro en tu iPhone o iPad y escribe tu correo. Una compra aquí cubre en cambio hasta 3 dispositivos en cualquier plataforma.',
+          'La compra desbloquea Pro en tu móvil o tableta e incluye una clave de licencia para otra plataforma que elijas. Para recibir la clave, escribe tu correo en Ajustes → Myelin Notes Pro en el móvil o la tableta.',
+      },
+      {
+        question: '¿Cómo funciona el precio para estudiantes?',
+        answer: `Introduce arriba el correo de tu centro y si lo reconocemos, te enviaremos un enlace para comprar Pro por ${formatPrice('es', 'student')}. El enlace caduca a las 24 horas.`,
       },
       {
         question: '¿Es una suscripción?',
         answer: 'No. Pro es un pago único.',
-      },
-      {
-        question: '¿Cómo funciona el precio para estudiantes?',
-        answer:
-          'Introduce el correo de tu centro de estudios en esta página. Si pertenece a un centro reconocido, te enviamos un enlace para comprar Pro por 29,99 USD. El enlace es válido durante 24 horas.',
       },
       {
         question: '¿Qué pasa con mis notas si sigo con la versión gratuita?',

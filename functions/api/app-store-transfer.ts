@@ -175,7 +175,7 @@ export async function onRequestPost({
     await sendEmail(
       apiKey,
       found.email,
-      `Here is your Myelin Notes Pro license key for Mac, Windows, or Linux:\n\n${found.key}\n\nPaste it in Settings → Myelin Notes Pro on your computer. It works on 1 computer; your iPhone and iPad stay unlocked through the App Store.\n\nMyelin Notes`,
+      `Here is your Myelin Notes Pro license key:\n\n${found.key}\n\nIt unlocks Pro on one additional platform of your choice. Paste it in Settings → Myelin Notes Pro on that device. Your iPhone and iPad stay unlocked through the App Store.\n\nMyelin Notes`,
       'Your Myelin Notes Pro license key',
     );
     return json({ ok: true });

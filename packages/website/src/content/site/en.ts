@@ -1,4 +1,5 @@
 import type { SiteCopy } from './index';
+import { formatPrice } from './prices';
 
 /**
  * Site style: no em dashes.
@@ -189,7 +190,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of $49.99, or $29.99 for students, that adds AI agents over MCP, runnable code, and higher limits. Your notes are never paywalled.
+Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, and higher limits. Your notes are never paywalled.
 
 ## Where are my notes stored?
 
@@ -430,8 +431,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   pricing: {
     meta: {
       title: 'Pricing | Myelin Notes',
-      description:
-        'Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of $49.99, or $29.99 for students, for AI agents over MCP, runnable code, and higher limits.',
+      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, and higher limits.`,
     },
     eyebrow: 'Pricing',
     headline: 'Free to use. Pro when you want more.',
@@ -439,7 +439,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       'The free version has nearly everything. Pro is a one-time purchase that unlocks the rest and supports Myelin’s development.',
     free: {
       name: 'Free',
-      price: '$0',
+      price: formatPrice('en', 'free'),
       tagline: 'For personal use, with no time limit.',
       includesLabel: 'Includes',
       includes: [
@@ -454,7 +454,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
     },
     pro: {
       name: 'Pro',
-      price: '$49.99',
+      price: formatPrice('en', 'pro'),
       priceNote: 'one-time purchase',
       tagline: 'Pay once. No subscription.',
       includesLabel: 'Everything in Free, plus',
@@ -475,7 +475,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
     student: {
       name: 'Student',
       tagline: 'Everything in Pro, for students with a school email address.',
-      price: '$29.99',
+      price: formatPrice('en', 'student'),
       note: 'Enter your school email address and we will send you a link to the student checkout.',
       emailLabel: 'School email',
       submit: 'Send link',
@@ -491,26 +491,25 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       {
         question: 'How do I unlock Pro?',
         answer:
-          'Buy Pro here and you get a license key by email. Enter it in Settings → Myelin Notes Pro. On iPhone and iPad, enter the email you bought with instead.',
+          'After you buy Pro on this website, we will email you a license key to enter in Settings → Myelin Notes Pro. On iPhone, iPad, and Android you enter the email you bought with instead.',
       },
       {
         question: 'How many devices can I use it on?',
         answer:
-          'One key unlocks Pro on up to 3 of your devices, on any platform. To move it, deactivate it on one device first.',
+          'You can use one key on up to 3 devices on any platform. To move it to a new device, deactivate it on an old one first.',
       },
       {
-        question: 'What if I buy Pro in the App Store?',
+        question: 'What if I buy Pro in the App Store or Google Play?',
         answer:
-          'An App Store purchase unlocks Pro on your iPhone and iPad, and also includes a license key for 1 Mac, Windows, or Linux computer. To get it, open Settings → Myelin Notes Pro on your iPhone or iPad and enter your email address. A purchase here covers up to 3 devices on any platform instead.',
+          'Your purchase unlocks Pro on your phone or tablet and comes with a license key for one additional platform of your choice. To get the key, enter your email in Settings → Myelin Notes Pro on your phone or tablet.',
+      },
+      {
+        question: 'How does student pricing work?',
+        answer: `Enter your school email above and if we recognise your school, we’ll send you a link to buy Pro for ${formatPrice('en', 'student')}. The link expires after 24 hours.`,
       },
       {
         question: 'Is it a subscription?',
         answer: 'No. Pro is a one-time purchase.',
-      },
-      {
-        question: 'How does student pricing work?',
-        answer:
-          'Enter your school email address on this page. If it belongs to a recognised school, we email you a link to buy Pro for $29.99. The link works for 24 hours.',
       },
       {
         question: 'What happens to my notes if I stay on Free?',

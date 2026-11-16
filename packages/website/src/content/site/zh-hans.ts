@@ -1,4 +1,5 @@
 import type { SiteCopy } from './index';
+import { formatPrice } from './prices';
 
 /**
  * Simplified Chinese site copy. Terminology follows the app's own catalog
@@ -181,7 +182,7 @@ const zhHans: SiteCopy = {
 
 ## 真的免费吗？
 
-是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
+是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
 
 ## 我的笔记保存在哪里？
 
@@ -422,8 +423,7 @@ const zhHans: SiteCopy = {
   pricing: {
     meta: {
       title: '价格 | Myelin Notes',
-      description:
-        'Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 49.99 美元，学生 29.99 美元，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。',
+      description: `Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。`,
     },
     eyebrow: '价格',
     headline: '免费使用，需要更多时再升级 Pro',
@@ -431,7 +431,7 @@ const zhHans: SiteCopy = {
       '免费版几乎包含所有功能。Pro 为一次性购买，解锁其余功能，同时支持 Myelin 的开发。',
     free: {
       name: '免费版',
-      price: '0 美元',
+      price: formatPrice('zh-hans', 'free'),
       tagline: '供个人使用，没有时间限制。',
       includesLabel: '包含',
       includes: [
@@ -446,7 +446,7 @@ const zhHans: SiteCopy = {
     },
     pro: {
       name: 'Pro',
-      price: '49.99 美元',
+      price: formatPrice('zh-hans', 'pro'),
       priceNote: '一次性购买',
       tagline: '一次付费，无需订阅。',
       includesLabel: '包含免费版全部功能，另加',
@@ -467,7 +467,7 @@ const zhHans: SiteCopy = {
     student: {
       name: '学生版',
       tagline: '包含 Pro 全部功能，面向拥有学校邮箱的学生。',
-      price: '29.99 美元',
+      price: formatPrice('zh-hans', 'student'),
       note: '输入你的学校邮箱，我们会把学生价购买链接发送给你。',
       emailLabel: '学校邮箱',
       submit: '发送链接',
@@ -483,26 +483,25 @@ const zhHans: SiteCopy = {
       {
         question: '如何解锁 Pro？',
         answer:
-          '在此购买 Pro 后，你会通过邮件收到许可证密钥。在“设置 → Myelin Notes Pro”中输入即可。在 iPhone 和 iPad 上，请改为输入购买时使用的邮箱。',
+          '在本网站购买 Pro 后，我们会把许可证密钥发到你的邮箱，在“设置 → Myelin Notes Pro”中输入即可。在 iPhone、iPad 和 Android 上则改为输入购买时用的邮箱。',
       },
       {
         question: '可以在几台设备上使用？',
         answer:
-          '一个密钥最多可在任意平台的 3 台设备上解锁 Pro。如需换设备，请先在其中一台上停用。',
+          '一个密钥可以在任意平台的最多 3 台设备上使用。想换到新设备的话，先在旧设备上停用就行。',
       },
       {
-        question: '如果在 App Store 购买 Pro 呢？',
+        question: '如果在 App Store 或 Google Play 购买 Pro 呢？',
         answer:
-          '在 App Store 购买会在你的 iPhone 和 iPad 上解锁 Pro，并额外包含一个可用于 1 台 Mac、Windows 或 Linux 电脑的许可证密钥。在 iPhone 或 iPad 上打开“设置 → Myelin Notes Pro”并输入邮箱即可领取。在此处购买则可在任意平台的最多 3 台设备上使用。',
+          '这样购买会在你的手机或平板上解锁 Pro，还附带一个可用于你另选的一个平台的许可证密钥。在手机或平板的“设置 → Myelin Notes Pro”中输入邮箱就能领取。',
+      },
+      {
+        question: '学生价如何申请？',
+        answer: `在上方输入学校邮箱，如果你的学校已收录，我们会发给你以 ${formatPrice('zh-hans', 'student')} 购买 Pro 的链接。链接 24 小时后失效。`,
       },
       {
         question: '这是订阅吗？',
         answer: '不是。Pro 为一次性购买。',
-      },
-      {
-        question: '学生价如何申请？',
-        answer:
-          '在本页输入你的学校邮箱。如果该邮箱属于已收录的学校，我们会发给你以 29.99 美元购买 Pro 的链接。链接 24 小时内有效。',
       },
       {
         question: '如果一直使用免费版，我的笔记会怎样？',
