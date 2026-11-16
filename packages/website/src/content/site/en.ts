@@ -355,7 +355,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       pdfAnchor: {
         title: 'Notes that stay on the page',
         body: 'What you write on a PDF page is attached to that page. Move the PDF or change its layout, and your notes stay in the same spot on the page. Anchor to page pins images and shapes the same way.',
-        alt: 'A formula on page 2 of a PDF is circled and annotated, then the PDF switches to Columns and the ink moves with its page',
+        alt: 'A formula on page 2 of a PDF is circled and annotated, then a blank page is added above it and the ink moves down with its page',
       },
       slash: {
         title: 'Insert anything with /',
