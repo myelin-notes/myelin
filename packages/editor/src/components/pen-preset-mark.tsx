@@ -11,6 +11,8 @@ const MARK_GEOMETRY: Record<
 };
 
 const BAR_WIDTH = 16;
+// A dashed preset's nib sits inside a dashed ring, so it shrinks to leave the ring room.
+const DASHED_NIB = { from: 3, to: 9 };
 
 interface PenPresetMarkProps {
   preset: PenPreset;
@@ -21,39 +23,56 @@ interface PenPresetMarkProps {
 
 /**
  * A preset's glyph: a round nib for the pen, a chisel bar for the highlighter, filled with the
- * preset's colour and scaled by its stroke. Sized to sit in the same 16px box as a tool icon.
+ * preset's colour and scaled by its stroke, and ringed with dashes for a dashed line style.
+ * Sized to sit in the same 16px box as a tool icon.
  */
 export function PenPresetMark({
   preset,
   onDark,
   className,
 }: PenPresetMarkProps) {
-  const { min, max, from, to } = MARK_GEOMETRY[preset.tool];
+  const dashed = preset.lineStyle === 'dashed';
+  const { min, max } = MARK_GEOMETRY[preset.tool];
+  const { from, to } = dashed ? DASHED_NIB : MARK_GEOMETRY[preset.tool];
   const t = (Math.min(Math.max(preset.size, min), max) - min) / (max - min);
   const thickness = Math.round(from + t * (to - from));
   const isBar = preset.tool === 'highlighter';
   const adaptive = preset.color.toLowerCase() === ADAPTIVE_INK;
+  // The ink sentinel previews what the theme will paint, as `ColorSwatch` does.
+  const color = adaptive
+    ? onDark
+      ? 'var(--text-on-dark)'
+      : 'var(--text-primary)'
+    : preset.color;
+
+  const mark = (
+    <span
+      className="block"
+      style={{
+        width: isBar ? BAR_WIDTH : thickness,
+        height: thickness,
+        borderRadius: isBar ? 2 : '50%',
+        backgroundColor: color,
+        // Without an edge a pale highlighter mark disappears against the popover.
+        boxShadow: 'inset 0 0 0 1px var(--border-ghost)',
+      }}
+    />
+  );
 
   return (
     <span
       className={`flex shrink-0 items-center justify-center ${className ?? ''}`}
     >
-      <span
-        className="block"
-        style={{
-          width: isBar ? BAR_WIDTH : thickness,
-          height: thickness,
-          borderRadius: isBar ? 2 : '50%',
-          // The ink sentinel previews what the theme will paint, as `ColorSwatch` does.
-          backgroundColor: adaptive
-            ? onDark
-              ? 'var(--text-on-dark)'
-              : 'var(--text-primary)'
-            : preset.color,
-          // Without an edge a pale highlighter mark disappears against the popover.
-          boxShadow: 'inset 0 0 0 1px var(--border-ghost)',
-        }}
-      />
+      {dashed ? (
+        <span
+          className="flex size-4 items-center justify-center rounded-full"
+          style={{ border: `1.5px dashed ${color}` }}
+        >
+          {mark}
+        </span>
+      ) : (
+        mark
+      )}
     </span>
   );
 }

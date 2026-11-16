@@ -410,7 +410,7 @@ pub(crate) fn normalize(manifest: &mut Manifest) {
         let color = entry["color"].as_str()?.trim();
         let color = color.strip_prefix('#').unwrap_or(color);
         if color.len() != 6 || !color.bytes().all(|byte| byte.is_ascii_hexdigit()) || !entry["id"].is_string() { return None; }
-        Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max)}))
+        Some(json!({"id": entry["id"], "tool": entry["tool"], "color": format!("#{}", color.to_lowercase()), "size": entry["size"].as_f64()?.clamp(min, max), "lineStyle": if entry["lineStyle"] == "dashed" { "dashed" } else { "solid" }}))
     }).take(12).collect::<Vec<_>>()).unwrap_or_default();
     manifest.pen_presets = json!(presets);
     let flag_types = manifest.flag_types.as_array().map(|entries| entries.iter().filter_map(|entry| {
@@ -461,5 +461,17 @@ mod tests {
             parse_node("a", traversal).is_err(),
             "fileType must be a path component"
         );
+    }
+
+    #[test]
+    fn pen_presets_without_line_style_become_solid() {
+        let mut manifest = empty_manifest();
+        manifest.pen_presets = json!([
+            {"id": "a", "tool": "pen", "color": "#000000", "size": 3},
+            {"id": "b", "tool": "pen", "color": "#000000", "size": 3, "lineStyle": "dashed"},
+        ]);
+        normalize(&mut manifest);
+        assert_eq!(manifest.pen_presets[0]["lineStyle"], "solid");
+        assert_eq!(manifest.pen_presets[1]["lineStyle"], "dashed");
     }
 }

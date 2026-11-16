@@ -34,7 +34,9 @@ export interface WorkspaceJson {
   /** Non-note files; notes carry their own metadata in {@link NoteJson}. */
   media: Record<string, NodeMetaJson>;
   customColors: Record<CustomColorTool, string[]>;
-  penPresets: Omit<PenPreset, 'id'>[];
+  /** `lineStyle` is absent in exports from before line styles. */
+  penPresets: (Omit<PenPreset, 'id' | 'lineStyle'> &
+    Partial<Pick<PenPreset, 'lineStyle'>>)[];
   tagRegistry: string[];
 }
 

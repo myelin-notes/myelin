@@ -1299,7 +1299,8 @@ export class NativeRepository implements Repository {
           (existing) =>
             existing.tool === preset.tool &&
             existing.color === normalized &&
-            existing.size === preset.size,
+            existing.size === preset.size &&
+            existing.lineStyle === preset.lineStyle,
         );
         if (!duplicate) {
           if (presets.length >= MAX_PEN_PRESETS) {
@@ -1336,6 +1337,9 @@ export class NativeRepository implements Repository {
                 ...preset,
                 ...(normalized ? { color: normalized } : {}),
                 ...(changes.size !== undefined ? { size: changes.size } : {}),
+                ...(changes.lineStyle !== undefined
+                  ? { lineStyle: changes.lineStyle }
+                  : {}),
               }
             : preset,
         );

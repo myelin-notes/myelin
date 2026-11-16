@@ -322,6 +322,22 @@ describe('ShapeElement drawToPdf', () => {
     });
   });
 
+  it('dashes only dashed shapes, in page points', () => {
+    const solid = makePdfCtx();
+    new ShapeElement('s', 'line', [0, 0, 100, 0], STYLE).drawToPdf(solid.ctx);
+    expect(solid.items[0]).not.toHaveProperty('dash');
+
+    const dashed = makePdfCtx();
+    new ShapeElement('d', 'line', [0, 0, 100, 0], {
+      ...STYLE,
+      dashed: true,
+    }).drawToPdf(dashed.ctx);
+    const item = dashed.items[0] as { dash: number[]; lineWidth: number };
+    expect(item.dash).toHaveLength(2);
+    // Round caps grow each dash by lineWidth, so the gap must outlast it to stay visible.
+    expect(item.dash[1]).toBeGreaterThan(item.lineWidth);
+  });
+
   it('emits one closed path per closed shape', () => {
     const shapes = [
       new ShapeElement('r', 'rect', [0, 0, 100, 60], STYLE),

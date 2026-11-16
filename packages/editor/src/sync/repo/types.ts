@@ -8,6 +8,8 @@ export type CustomColorTool = 'pen' | 'highlighter' | 'text' | 'folder';
 
 export type PenPresetTool = 'pen' | 'highlighter';
 
+export type PenPresetLineStyle = 'solid' | 'dashed';
+
 /** A saved pen configuration. `id` is stable across edits and reordering. */
 export interface PenPreset {
   id: string;
@@ -15,6 +17,7 @@ export interface PenPreset {
   /** Normalized hex, or the `ADAPTIVE_INK` sentinel. */
   color: string;
   size: number;
+  lineStyle: PenPresetLineStyle;
 }
 
 /** A user-defined flag category, such as a red "To-do". Flags reference it by `id`. */
@@ -29,6 +32,7 @@ export interface FlagType {
 export interface PenPresetChanges {
   color?: string;
   size?: number;
+  lineStyle?: PenPresetLineStyle;
 }
 
 export interface VFSFileNode {
@@ -205,7 +209,7 @@ export interface Repository {
   removeCustomColor(color: string, tool: CustomColorTool): Promise<string[]>;
 
   getPenPresets(): Promise<PenPreset[]>;
-  /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size}` duplicate is a no-op. */
+  /** Throws at `MAX_PEN_PRESETS`; an exact `{tool, color, size, lineStyle}` duplicate is a no-op. */
   addPenPreset(preset: Omit<PenPreset, 'id'>): Promise<PenPreset[]>;
   updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
   reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]>;
