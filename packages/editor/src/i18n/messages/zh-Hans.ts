@@ -618,10 +618,13 @@ const zhHans: typeof en = {
     transcription: {
       title: '转写',
       eyebrow: '设备端',
+      label: '语音转文字模型',
+      description:
+        '将录音转为可搜索的文字。完全在本设备上运行，音频不会离开设备。模型越大越准确，但速度越慢。',
       models: {
         base: {
           label: '基础',
-          description: '内置。在任何设备上都很快，准确度最低。',
+          description: '在任何设备上都很快，准确度最低。',
         },
         small: {
           label: '小型',
@@ -635,8 +638,7 @@ const zhHans: typeof en = {
       },
       size: (megabytes: number) => `${megabytes} MB`,
       download: '下载',
-      use: '使用',
-      inUse: '使用中',
+      included: '内置',
       delete: '删除模型',
       downloadFailed: '模型下载失败',
     },

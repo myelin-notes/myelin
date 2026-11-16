@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Download, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
 import { UserPrefs } from '@myelin/editor/user-prefs';
+import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { invoke } from '@tauri-apps/api/core';
@@ -113,93 +114,128 @@ export function TranscriptionSection() {
           {sectionStrings.eyebrow}
         </span>
       </div>
-      <div className="space-y-2">
-        {models.map((model) => {
-          const modelStrings =
-            sectionStrings.models[
-              model.id as keyof typeof sectionStrings.models
-            ];
-          if (!modelStrings) {
-            return null;
-          }
-          const active = model.id === activeModel;
-          const received = progress[model.id] ?? 0;
-          return (
-            <div
-              key={model.id}
-              className="flex w-full flex-col gap-3 rounded-xl bg-input/40 px-4 py-3 ring-1 ring-border-subtle/70 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <span className="min-w-0">
-                <span className="block font-medium text-sm text-text-primary">
-                  {modelStrings.label}
-                </span>
-                <span className="mt-1 block text-text-muted text-xs leading-relaxed">
-                  {model.downloadable
-                    ? `${modelStrings.description} · ${sectionStrings.size(Math.round(model.bytes / 1e6))}`
-                    : modelStrings.description}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
+      <div className="overflow-hidden rounded-xl bg-input/40 ring-1 ring-border-subtle/70">
+        <div className="px-4 py-3">
+          <span className="block font-medium text-sm text-text-primary">
+            {sectionStrings.label}
+          </span>
+          <span className="mt-1 block text-text-muted text-xs leading-relaxed">
+            {sectionStrings.description}
+          </span>
+        </div>
+        <div
+          role="radiogroup"
+          aria-label={sectionStrings.label}
+          className="divide-y divide-border-subtle/70 border-border-subtle/70 border-t"
+        >
+          {models.map((model) => {
+            const modelStrings =
+              sectionStrings.models[
+                model.id as keyof typeof sectionStrings.models
+              ];
+            if (!modelStrings) {
+              return null;
+            }
+            const active = model.id === activeModel;
+            const percent = Math.floor(
+              ((progress[model.id] ?? 0) / model.bytes) * 100,
+            );
+            return (
+              <div key={model.id} className="flex items-center gap-3 px-4 py-3">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={!model.downloaded}
+                  onClick={() => {
+                    UserPrefs.set('transcriptionModel', model.id);
+                    trackEvent('transcription_model_selected', {
+                      model: model.id,
+                    });
+                  }}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left disabled:cursor-default"
+                >
+                  <span
+                    className={cn(
+                      'flex size-4 shrink-0 items-center justify-center rounded-full ring-1',
+                      active ? 'ring-primary' : 'ring-text-muted/50',
+                      !model.downloaded && 'opacity-40',
+                    )}
+                  >
+                    {active && (
+                      <span className="size-2 rounded-full bg-primary" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex items-baseline gap-2">
+                      <span className="font-medium text-sm text-text-primary">
+                        {modelStrings.label}
+                      </span>
+                      <span className="text-text-muted text-xs tabular-nums">
+                        {model.downloadable
+                          ? sectionStrings.size(Math.round(model.bytes / 1e6))
+                          : sectionStrings.included}
+                      </span>
+                    </span>
+                    <span className="mt-0.5 block text-text-muted text-xs leading-relaxed">
+                      {modelStrings.description}
+                    </span>
+                  </span>
+                </button>
                 {model.downloading ? (
-                  <>
-                    <span className="text-text-muted text-xs tabular-nums">
-                      {Math.floor((received / model.bytes) * 100)}%
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="h-1 w-20 overflow-hidden rounded-full bg-text-muted/20">
+                      <span
+                        className="block h-full bg-primary transition-[width]"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </span>
+                    <span className="w-8 text-right text-text-muted text-xs tabular-nums">
+                      {percent}%
                     </span>
                     <Button
                       type="button"
-                      variant="outline"
-                      size="sm"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={strings.common.cancel}
                       onClick={() =>
                         void invoke('cancel_transcription_model_download', {
                           id: model.id,
                         })
                       }
                     >
-                      {strings.common.cancel}
+                      <X />
                     </Button>
-                  </>
-                ) : model.downloaded ? (
-                  <>
-                    {model.downloadable && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={sectionStrings.delete}
-                        onClick={() => void handleDelete(model.id)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant={active ? 'default' : 'outline'}
-                      size="sm"
-                      aria-pressed={active}
-                      onClick={() => {
-                        UserPrefs.set('transcriptionModel', model.id);
-                        trackEvent('transcription_model_selected', {
-                          model: model.id,
-                        });
-                      }}
-                    >
-                      {active ? sectionStrings.inUse : sectionStrings.use}
-                    </Button>
-                  </>
-                ) : (
+                  </span>
+                ) : !model.downloaded ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="shrink-0"
                     onClick={() => void handleDownload(model.id)}
                   >
+                    <Download />
                     {sectionStrings.download}
                   </Button>
+                ) : (
+                  model.downloadable && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-text-muted"
+                      aria-label={sectionStrings.delete}
+                      onClick={() => void handleDelete(model.id)}
+                    >
+                      <Trash2 />
+                    </Button>
+                  )
                 )}
-              </span>
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

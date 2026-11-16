@@ -641,10 +641,13 @@ const en = {
     transcription: {
       title: 'Transcription',
       eyebrow: 'On-device',
+      label: 'Speech-to-text model',
+      description:
+        'Turns audio recordings into searchable text. Runs entirely on this device, so audio never leaves it. Larger models are more accurate but slower.',
       models: {
         base: {
           label: 'Base',
-          description: 'Included. Fast on any device, least accurate.',
+          description: 'Fast on any device, least accurate.',
         },
         small: {
           label: 'Small',
@@ -658,8 +661,7 @@ const en = {
       },
       size: (megabytes: number) => `${megabytes} MB`,
       download: 'Download',
-      use: 'Use',
-      inUse: 'In use',
+      included: 'Included',
       delete: 'Delete model',
       downloadFailed: 'Model download failed',
     },

@@ -650,11 +650,13 @@ const es: typeof en = {
     transcription: {
       title: 'Transcripción',
       eyebrow: 'En el dispositivo',
+      label: 'Modelo de voz a texto',
+      description:
+        'Convierte las grabaciones de audio en texto con búsqueda. Funciona por completo en este dispositivo, así que el audio nunca sale de él. Los modelos más grandes son más precisos pero más lentos.',
       models: {
         base: {
           label: 'Base',
-          description:
-            'Incluido. Rápido en cualquier dispositivo, menos preciso.',
+          description: 'Rápido en cualquier dispositivo, menos preciso.',
         },
         small: {
           label: 'Pequeño',
@@ -669,8 +671,7 @@ const es: typeof en = {
       },
       size: (megabytes: number) => `${megabytes} MB`,
       download: 'Descargar',
-      use: 'Usar',
-      inUse: 'En uso',
+      included: 'Incluido',
       delete: 'Eliminar modelo',
       downloadFailed: 'Error al descargar el modelo',
     },

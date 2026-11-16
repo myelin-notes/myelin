@@ -657,10 +657,13 @@ const fr: typeof en = {
     transcription: {
       title: 'Transcription',
       eyebrow: 'Sur l’appareil',
+      label: 'Modèle de reconnaissance vocale',
+      description:
+        'Transforme les enregistrements audio en texte consultable. Tout s’exécute sur cet appareil : l’audio ne le quitte jamais. Les modèles plus grands sont plus précis mais plus lents.',
       models: {
         base: {
           label: 'Base',
-          description: 'Inclus. Rapide sur tout appareil, le moins précis.',
+          description: 'Rapide sur tout appareil, le moins précis.',
         },
         small: {
           label: 'Petit',
@@ -675,8 +678,7 @@ const fr: typeof en = {
       },
       size: (megabytes: number) => `${megabytes} MB`,
       download: 'Télécharger',
-      use: 'Utiliser',
-      inUse: 'Utilisé',
+      included: 'Inclus',
       delete: 'Supprimer le modèle',
       downloadFailed: 'Échec du téléchargement du modèle',
     },
