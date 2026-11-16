@@ -148,8 +148,10 @@ html.code-output-selecting .canvas-code-output__card.is-selecting .canvas-code-o
   background: #fff;
 }
 
-/* White like a notebook cell: output HTML assumes a light page. */
+/* White like a notebook cell: output HTML assumes a light page. content-box so the height the frame
+   reports is exactly its viewport; under the global border-box the borders shrank it 2px per report. */
 .canvas-code-output__frame {
+  box-sizing: content-box;
   display: block;
   width: 100%;
   margin: 4px 0;

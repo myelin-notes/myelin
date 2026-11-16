@@ -8,7 +8,8 @@
       // Injected ahead of the output so it catches failed CDN script loads and reports height.
       var HELPER =
         '<script>(function () {' +
-        'var post = function () { parent.postMessage({ type: "height", height: document.documentElement.scrollHeight }, "*"); };' +
+        // offsetHeight, not scrollHeight: scrollHeight is at least the viewport, so it can never shrink.
+        'var post = function () { parent.postMessage({ type: "height", height: document.documentElement.offsetHeight }, "*"); };' +
         'new ResizeObserver(post).observe(document.documentElement);' +
         'var warned = false;' +
         'addEventListener("error", function (e) {' +
@@ -25,10 +26,19 @@
           return;
         }
         var html = String(event.data.html);
-        var head = /<head[^>]*>/i.exec(html);
-        html = head
-          ? html.slice(0, head.index + head[0].length) + HELPER + html.slice(head.index + head[0].length)
-          : HELPER + html;
+        // Fragments (e.g. `<table>` from pandas) would render in quirks mode, where the root element
+        // is stretched to the viewport and so can't report its content height.
+        if (!/^\s*<!doctype/i.test(html)) {
+          html = '<!doctype html>' + html;
+        }
+        var head = /<head(\s[^>]*)?>/i.exec(html);
+        if (head) {
+          var end = head.index + head[0].length;
+          html = html.slice(0, end) + HELPER + html.slice(end);
+        } else {
+          var doctype = /^\s*<!doctype[^>]*>/i.exec(html)[0];
+          html = doctype + HELPER + html.slice(doctype.length);
+        }
         document.open();
         document.write(html);
         document.close();
