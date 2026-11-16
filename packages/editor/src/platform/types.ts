@@ -89,6 +89,8 @@ export interface CodeRunnerCapability {
   pollOutput(executionId: string, cursor: number): Promise<RunPollResponse>;
   /** Frees the backend's output buffer once a run has been drained. */
   releaseRun(executionId: string): Promise<void>;
+  /** Host page for rich HTML output, served from its own origin (see output_frame.html). */
+  outputFrameUrl: string;
 }
 
 export interface PdfExportOptions {

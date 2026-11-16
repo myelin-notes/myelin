@@ -15,6 +15,9 @@ import { CodeOutputCardView } from './card-view';
 
 export const CODE_OUTPUT_DEFAULT_WIDTH = 360;
 export const CODE_OUTPUT_DEFAULT_HEIGHT = 220;
+/** Size a default-sized card grows to when its first rich (display) output arrives. */
+const RICH_OUTPUT_WIDTH = 640;
+const RICH_OUTPUT_HEIGHT = 480;
 const MIN_WIDTH = 220;
 const MIN_HEIGHT = 96;
 /** World-px gap between the page frame's edge and an attached card. */
@@ -278,7 +281,7 @@ export class CodeOutputElement extends AnchorableElement {
     ctx.stroke();
     ctx.fillStyle = palette.border;
     const lineCount = Math.min(
-      Math.max(codeRunStore.getSession(this._blockId)?.lines.length ?? 0, 1),
+      Math.max(codeRunStore.getSession(this._blockId)?.items.length ?? 0, 1),
       Math.floor((this._height - 48) / 18),
     );
     for (let i = 0; i < lineCount; i++) {
@@ -422,10 +425,28 @@ export class CodeOutputElement extends AnchorableElement {
       const version = codeRunStore.getVersion(this._blockId);
       if (version !== this._lastStoreVersion) {
         this._lastStoreVersion = version;
+        this.growForRichOutput();
         this.render();
       }
     });
     this.render();
+  }
+
+  // Plots and tables are cramped at the text-sized default; a size the user chose is kept.
+  private growForRichOutput(): void {
+    if (
+      this._width !== CODE_OUTPUT_DEFAULT_WIDTH ||
+      this._height !== CODE_OUTPUT_DEFAULT_HEIGHT ||
+      !codeRunStore
+        .getSession(this._blockId)
+        ?.items.some((item) => item.kind === 'display')
+    ) {
+      return;
+    }
+    this._width = RICH_OUTPUT_WIDTH;
+    this._height = RICH_OUTPUT_HEIGHT;
+    this.syncToYMap({ width: this._width, height: this._height });
+    this.updateBounds();
   }
 
   /** No-op until the React root is mounted lazily in syncDOM. */

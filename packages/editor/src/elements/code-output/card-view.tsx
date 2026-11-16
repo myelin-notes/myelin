@@ -4,8 +4,9 @@ import type {
   CodeRunResult,
   CodeRunSession,
 } from '../../page-frame/pm/code-block/run-store';
+import { OutputItemView } from './output-item';
 
-/** Row height before measurement; corrected once each line mounts. */
+/** Row height before measurement; corrected once each item mounts. */
 const ESTIMATED_LINE_HEIGHT = 18;
 /** Treat the body as "at the bottom" within this many px (tail-follow). */
 const STICK_THRESHOLD = 4;
@@ -52,22 +53,22 @@ export function CodeOutputCardView({
   onZoomWheel,
 }: CodeOutputCardViewProps) {
   const running = session?.running === true;
-  const lines = session?.lines ?? [];
+  const items = session?.items ?? [];
   const result = session?.result ?? null;
   const dropped = session?.dropped ?? 0;
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
 
-  // Follow the tail as new lines arrive, unless the user scrolled up. Layout effect so a card
+  // Follow the tail as new items arrive, unless the user scrolled up. Layout effect so a card
   // mounting with a finished run's output paints at the bottom rather than flashing the top.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when line count grows
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when item count grows
   useLayoutEffect(() => {
     const body = bodyRef.current;
     if (body && stickToBottom.current) {
       body.scrollTop = body.scrollHeight;
     }
-  }, [lines.length]);
+  }, [items.length]);
 
   // The card mounts in the frame chrome layer, outside the subtree the viewport listens on, so
   // ctrl+wheel zoom has to be handed to it explicitly. Native and non-passive because React's own
@@ -130,29 +131,16 @@ export function CodeOutputCardView({
             … {dropped} earlier lines dropped
           </div>
         ) : null}
-        {lines.length === 0 && !running ? (
+        {items.length === 0 && !running ? (
           <div className="canvas-code-output__empty">No output</div>
         ) : (
           <VirtualList
             scrollRef={bodyRef}
-            count={lines.length}
+            count={items.length}
             estimateHeight={estimateLineHeight}
             getRowKey={getLineRowKey}
             gap={0}
-            renderRow={(index) => {
-              const line = lines[index];
-              return (
-                <div
-                  className={
-                    line.stream === 'stderr'
-                      ? 'canvas-code-output__line is-stderr'
-                      : 'canvas-code-output__line'
-                  }
-                >
-                  {line.text === '' ? ' ' : line.text}
-                </div>
-              );
-            }}
+            renderRow={(index) => <OutputItemView item={items[index]} />}
           />
         )}
       </div>

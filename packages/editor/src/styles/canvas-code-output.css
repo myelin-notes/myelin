@@ -118,3 +118,83 @@
 .canvas-code-output__empty {
   color: var(--text-muted);
 }
+
+.canvas-code-output__image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 4px 0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* White like a notebook cell: output HTML assumes a light page. */
+.canvas-code-output__frame {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+  border: 1px solid var(--border-ghost);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.canvas-code-output__table-wrap {
+  max-height: 360px;
+  overflow: auto;
+  margin: 4px 0;
+  border: 1px solid var(--border-ghost);
+  border-radius: 6px;
+}
+
+.canvas-code-output__table {
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.canvas-code-output__table th {
+  position: sticky;
+  top: 0;
+  padding: 0;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.canvas-code-output__table th button {
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.canvas-code-output__table th button:hover {
+  background: var(--bg-hover-tint);
+}
+
+.canvas-code-output__table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--border-ghost);
+}
+
+.canvas-code-output__table td.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-code-output__table td.is-index {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.canvas-code-output__table-note {
+  position: sticky;
+  left: 0;
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}

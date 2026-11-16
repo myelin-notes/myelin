@@ -7,6 +7,8 @@ pub struct CommandSpec {
 
 pub struct RunPlan {
     pub source_filename: &'static str,
+    /// `(filename, contents)` written next to the source before running.
+    pub support_files: Vec<(&'static str, &'static str)>,
     /// Candidate build commands tried in order; the first compiler present on
     /// PATH wins. Empty for interpreted languages.
     pub build: Vec<CommandSpec>,
@@ -23,14 +25,16 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
     let plan = match language.to_ascii_lowercase().as_str() {
         "python" => RunPlan {
             source_filename: "main.py",
+            support_files: vec![("_myelin_boot.py", include_str!("python_bootstrap.py"))],
             build: vec![],
             run: CommandSpec {
                 program: python_program(),
-                args: vec![join("main.py")],
+                args: vec![join("_myelin_boot.py"), join("main.py")],
             },
         },
         "javascript" => RunPlan {
             source_filename: "main.js",
+            support_files: vec![],
             build: vec![],
             run: CommandSpec {
                 program: "node".into(),
@@ -39,6 +43,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
         },
         "typescript" => RunPlan {
             source_filename: "main.ts",
+            support_files: vec![],
             build: vec![],
             run: CommandSpec {
                 program: "node".into(),
@@ -47,6 +52,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
         },
         "ruby" => RunPlan {
             source_filename: "main.rb",
+            support_files: vec![],
             build: vec![],
             run: CommandSpec {
                 program: "ruby".into(),
@@ -55,6 +61,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
         },
         "bash" => RunPlan {
             source_filename: "main.sh",
+            support_files: vec![],
             build: vec![],
             run: CommandSpec {
                 program: "bash".into(),
@@ -63,6 +70,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
         },
         "go" => RunPlan {
             source_filename: "main.go",
+            support_files: vec![],
             build: vec![],
             run: CommandSpec {
                 program: "go".into(),
@@ -71,6 +79,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
         },
         "rust" => RunPlan {
             source_filename: "main.rs",
+            support_files: vec![],
             build: vec![gnu_compile("rustc", &join("main.rs"), &bin)],
             run: CommandSpec {
                 program: bin,
@@ -81,6 +90,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
             let src = join("main.c");
             RunPlan {
                 source_filename: "main.c",
+                support_files: vec![],
                 build: vec![
                     gnu_compile("cc", &src, &bin),
                     gnu_compile("clang", &src, &bin),
@@ -97,6 +107,7 @@ pub fn resolve_plan(language: &str, dir: &Path) -> Option<RunPlan> {
             let src = join("main.cpp");
             RunPlan {
                 source_filename: "main.cpp",
+                support_files: vec![],
                 build: vec![
                     gnu_compile("c++", &src, &bin),
                     gnu_compile("clang++", &src, &bin),
@@ -159,7 +170,10 @@ mod tests {
     #[test]
     fn compiled_plan_builds_then_runs_binary() {
         let plan = resolve_plan("rust", Path::new("/tmp/run")).unwrap();
-        assert_eq!(plan.build.first().expect("rust has a build step").program, "rustc");
+        assert_eq!(
+            plan.build.first().expect("rust has a build step").program,
+            "rustc"
+        );
         assert!(plan.run.args.is_empty());
     }
 
