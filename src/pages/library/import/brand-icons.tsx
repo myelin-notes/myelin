@@ -8,16 +8,18 @@
  * <svg> would, and it keeps their generic gradient ids (OneNote ships `id="a"`)
  * out of the app's DOM. Re-download to update, and never hand-edit.
  *
- * All three read on the light and the dark theme. Goodnotes is the one to know
+ * All of them read on the light and the dark theme. Goodnotes is the one to know
  * about: its icon carries an opaque white backplate (transparent corners, white
  * centre), so on the dark theme it shows as a white chip rather than a bare
  * glyph like the other two. That is the vendor's app-icon form, not a bug. The
  * press kit's mono pair is the bare-glyph alternative if that ever reads wrong.
  *
  * Sources: the standalone icon on goodnotes.com; the Office brand-icon CDN for
- * OneNote; the SVGs linked from obsidian.md/brand.
+ * OneNote; the SVGs linked from obsidian.md/brand; the logo mark in
+ * github.com/jupyter/design.
  */
 import goodnotesMark from './brand/goodnotes-icon-256.png';
+import jupyterMark from './brand/logomark-orangebody-greyplanets.svg';
 import obsidianMark from './brand/obsidian-logo-gradient.svg';
 import oneNoteMark from './brand/onenote_48x1.svg';
 
@@ -34,3 +36,4 @@ function brandMark(src: string) {
 export const GoodnotesIcon = brandMark(goodnotesMark);
 export const OneNoteIcon = brandMark(oneNoteMark);
 export const ObsidianIcon = brandMark(obsidianMark);
+export const JupyterIcon = brandMark(jupyterMark);

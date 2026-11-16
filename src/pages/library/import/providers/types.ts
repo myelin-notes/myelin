@@ -11,6 +11,7 @@ import type { ImportJob } from '../dialog';
  */
 export type ImportProviderId =
   | 'files'
+  | 'jupyter_notebook'
   | 'goodnotes_zip'
   | 'onenote'
   | 'obsidian_vault'

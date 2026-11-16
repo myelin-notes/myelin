@@ -1,4 +1,4 @@
-import { filesProvider } from './files';
+import { filesProvider, jupyterProvider } from './files';
 import { goodnotesProvider } from './goodnotes';
 import { obsidianProvider } from './obsidian';
 import { onenoteProvider } from './onenote';
@@ -11,6 +11,7 @@ export const IMPORT_PROVIDERS: readonly ImportProvider[] = [
   goodnotesProvider,
   onenoteProvider,
   obsidianProvider,
+  jupyterProvider,
   workspaceJsonProvider,
 ];
 

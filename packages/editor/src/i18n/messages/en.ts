@@ -169,6 +169,14 @@ const en = {
         summary: (count: number) =>
           `Imported ${count} file${count === 1 ? '' : 's'}`,
       },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'A .ipynb notebook, with its Markdown and code cells. Format v4 or newer.',
+        title: 'Import Jupyter Notebooks',
+        scanning: 'Reading notebooks...',
+        empty: 'None of the selected files are notebooks',
+      },
       goodnotes_zip: {
         label: 'Import from Goodnotes',
         description: 'A Goodnotes folder exported as PDFs.',
