@@ -359,7 +359,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       pdfAnchor: {
         title: 'Notas que se quedan en la página',
         body: 'Lo que escribes en una página de un PDF queda unido a esa página. Si mueves el PDF o cambias su disposición, tus notas siguen en el mismo lugar de la página. Anclar a la página fija imágenes y formas de la misma manera.',
-        alt: 'Se rodea y anota una fórmula en la página 2 de un PDF; luego el PDF cambia a Columnas y la tinta se mueve con su página',
+        alt: 'Se rodea y anota una fórmula en la página 2 de un PDF; luego se añade una página en blanco antes y la tinta baja con su página',
       },
       slash: {
         title: 'Inserta lo que quieras con /',

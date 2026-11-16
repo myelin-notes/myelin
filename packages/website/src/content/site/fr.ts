@@ -352,7 +352,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       pdfAnchor: {
         title: 'Des notes qui restent sur la page',
         body: 'Ce que vous écrivez sur une page de PDF est attaché à cette page. Si vous déplacez le PDF ou changez sa disposition, vos notes restent au même endroit de la page. Ancrer à la page fixe aussi les images et les formes.',
-        alt: 'Une formule de la page 2 d’un PDF est entourée et annotée, puis le PDF passe en Colonnes et l’encre suit sa page',
+        alt: 'Une formule de la page 2 d’un PDF est entourée et annotée, puis une page vierge est ajoutée avant elle et l’encre descend avec sa page',
       },
       slash: {
         title: 'Insérez tout avec /',
