@@ -65,6 +65,9 @@ pub enum PageItem {
         stroke: Option<[u8; 3]>,
         #[serde(default)]
         line_width: Option<f32>,
+        /// [dash, gap] in PDF points for `stroke`. Absent draws solid.
+        #[serde(default)]
+        dash: Option<Vec<f32>>,
         #[serde(default)]
         opacity: Option<f32>,
     },

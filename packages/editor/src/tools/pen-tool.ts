@@ -40,6 +40,7 @@ export class PenTool implements ITool {
   protected usePressure: boolean = true;
   /** 0–10 slider position; 0 is raw input. */
   protected stabilization: number = DEFAULT_STABILIZATION * 10;
+  protected lineStyle: LineStyle = 'solid';
 
   private dwellAnchor: Vector2 | null = null;
   private recognitionAttemptedForAnchor: boolean = false;
@@ -68,6 +69,7 @@ export class PenTool implements ITool {
           size: this.size,
           stabilization: this.stabilization / 10,
           simulatePressure: this.usePressure ? undefined : false,
+          ...(this.lineStyle === 'dashed' && { dashed: true }),
         }),
     );
   }
@@ -282,6 +284,19 @@ export class PenTool implements ITool {
         },
       },
       {
+        type: 'choice',
+        key: 'lineStyle',
+        label: strings.canvas.toolOptions.lineStyle,
+        value: this.lineStyle,
+        set: (lineStyle) => {
+          this.lineStyle = lineStyle as LineStyle;
+        },
+        choices: [
+          { value: 'solid', label: strings.canvas.toolOptions.solid },
+          { value: 'dashed', label: strings.canvas.toolOptions.dashed },
+        ],
+      },
+      {
         type: 'toggle',
         key: 'pressure',
         label: strings.canvas.toolOptions.pressure,
@@ -305,6 +320,8 @@ export class PenTool implements ITool {
     ];
   }
 }
+
+type LineStyle = 'solid' | 'dashed';
 
 function distance(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);

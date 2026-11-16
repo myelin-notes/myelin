@@ -741,3 +741,46 @@ describe('StrokeElement outline simplification', () => {
     expect(paintedPath(stroke).segments).toBeGreaterThan(0);
   });
 });
+
+describe('StrokeElement dashed', () => {
+  function dashExtents(points: number[], dashed: boolean): [number, number][] {
+    const stroke = new StrokeElement('dashed', points, false, {
+      ...STYLE,
+      size: 4,
+      dashed,
+    });
+    const extents: [number, number][] = [];
+    stroke.drawToPdf({
+      worldToPagePt: (x, y) => ({ x, y }),
+      ptPerWorldY: 1,
+      push: (item) => {
+        if (item.t === 'path') {
+          const xs = item.pts.filter((_, i) => i % 2 === 0);
+          extents.push([Math.min(...xs), Math.max(...xs)]);
+        }
+      },
+      addImageBase64: () => 0,
+      addFontBase64: () => 0,
+    });
+    return extents;
+  }
+
+  it('fills one outline when solid', () => {
+    expect(dashExtents([0, 0, 0.5, 100, 0, 0.5, 200, 0, 0.5], false)).toEqual([
+      [expect.any(Number), expect.any(Number)],
+    ]);
+  });
+
+  it.each([
+    ['dense', Array.from({ length: 101 }, (_, i) => [i * 2, 0, 0.5]).flat()],
+    ['sparse', [0, 0, 0.5, 100, 0, 0.5, 200, 0, 0.5]],
+  ])('leaves visible gaps along a %s line', (_, points) => {
+    const dashes = dashExtents(points, true);
+    expect(dashes.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < dashes.length; i++) {
+      expect(dashes[i][0]).toBeGreaterThan(dashes[i - 1][1] + 1);
+    }
+    expect(dashes[0][0]).toBeLessThan(1);
+    expect(dashes[dashes.length - 1][1]).toBeGreaterThan(190);
+  });
+});

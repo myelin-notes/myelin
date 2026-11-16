@@ -1,4 +1,8 @@
-import { getStrokeOutlinePoints, getStrokePoints } from 'perfect-freehand';
+import {
+  getStrokeOutlinePoints,
+  getStrokePoints,
+  type StrokePoint,
+} from 'perfect-freehand';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
 import { parseCssColor } from '../pdf-export/color';
@@ -14,11 +18,18 @@ export interface StrokeStyle {
   stabilization?: number;
   /** False for pressure-disabled, uniform-width strokes; absent enables sensor or velocity pressure. */
   simulatePressure?: boolean;
+  /** Absent on solid strokes. */
+  dashed?: boolean;
 }
 
 export type StrokeStyleUpdate = Partial<Pick<StrokeStyle, 'color' | 'size'>>;
 
 export const DEFAULT_STABILIZATION = 0.5;
+
+/** [dash, gap] along the centerline in world units. Round caps add `size` to each dash. */
+export function dashPattern(size: number): [number, number] {
+  return [size * 2 + 8, size * 2.5 + 6];
+}
 
 // perfect-freehand uses fixed 3-unit end filtering and a 1-unit dot offset. Normalize to its
 // default size so those thresholds don't swallow bends or inflate caps on thin strokes.
@@ -132,6 +143,7 @@ export class StrokeElement extends AnchorableElement {
       ...(this.style.simulatePressure === undefined
         ? {}
         : { simulatePressure: this.style.simulatePressure }),
+      ...(this.style.dashed ? { dashed: true } : {}),
       hasPressure: this.hasPressure,
       // Flat [x,y,p, ...] stored as a single Y.Map value rather than a
       // Y.Array<number>: one CRDT item instead of one per coordinate.
@@ -171,6 +183,10 @@ export class StrokeElement extends AnchorableElement {
       },
       simulatePressure: (v) => {
         this.style.simulatePressure = v as boolean;
+        this.dirty = true;
+      },
+      dashed: (v) => {
+        this.style.dashed = v as boolean;
         this.dirty = true;
       },
       hasPressure: (v) => {
@@ -246,7 +262,8 @@ export class StrokeElement extends AnchorableElement {
     }
   }
 
-  private strokeOutline(): number[][] {
+  // One outline per dash, or a single outline for a solid stroke.
+  private strokeOutlines(): number[][][] {
     if (this.points.length < 3 || this.style.size <= 0) {
       return [];
     }
@@ -352,12 +369,20 @@ export class StrokeElement extends AnchorableElement {
         point.vector = [Math.cos(angle), Math.sin(angle)];
       }
     }
-    const outline = getStrokeOutlinePoints(strokePoints, options);
-    for (const point of outline) {
-      point[0] = point[0] / scale + originX;
-      point[1] = point[1] / scale + originY;
+    // Dashes come from the same smoothed centerline, so they trace exactly where the solid stroke would.
+    const [dash, gap] = dashPattern(this.style.size);
+    const outlines = this.style.dashed
+      ? splitDashes(strokePoints, dash * scale, gap * scale).map((run) =>
+          getStrokeOutlinePoints(run, options),
+        )
+      : [getStrokeOutlinePoints(strokePoints, options)];
+    for (const outline of outlines) {
+      for (const point of outline) {
+        point[0] = point[0] / scale + originX;
+        point[1] = point[1] / scale + originY;
+      }
     }
-    return outline;
+    return outlines;
   }
 
   public draw2D(ctx: CanvasRenderingContext2D, _deltaTime: number): void {
@@ -374,15 +399,17 @@ export class StrokeElement extends AnchorableElement {
   public get paintPath(): Path2D {
     if (this.dirty) {
       // Unsimplified: the kept points change as the tip moves, which would make live ink wobble.
-      this.cachePath(this.strokeOutline());
+      this.cachePath(this.strokeOutlines());
     }
     return this.cachedPath;
   }
 
   // The outline is only needed to build the Path2D; it is not retained.
-  private cachePath(outline: number[][]): void {
+  private cachePath(outlines: number[][][]): void {
     const path = new Path2D();
-    appendStrokeOutline(path, outline);
+    for (const outline of outlines) {
+      appendStrokeOutline(path, outline);
+    }
     this.cachedPath = path;
     this.dirty = false;
   }
@@ -392,18 +419,19 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
     // Same outline perfect-freehand produces on screen, as a filled vector path.
-    const outline = this.strokeOutline();
-    if (outline.length < 3) {
-      return;
-    }
-    const pts: number[] = [];
-    for (const [x, y] of outline) {
-      const world = this.localToWorld(x, y);
-      const p = ctx.worldToPagePt(world.x, world.y);
-      pts.push(p.x, p.y);
-    }
     const { rgb, opacity } = parseCssColor(this.style.color);
-    ctx.push({ t: 'path', pts, closed: true, fill: rgb, opacity });
+    for (const outline of this.strokeOutlines()) {
+      if (outline.length < 3) {
+        continue;
+      }
+      const pts: number[] = [];
+      for (const [x, y] of outline) {
+        const world = this.localToWorld(x, y);
+        const p = ctx.worldToPagePt(world.x, world.y);
+        pts.push(p.x, p.y);
+      }
+      ctx.push({ t: 'path', pts, closed: true, fill: rgb, opacity });
+    }
   }
 
   protected isOverLocal(
@@ -449,37 +477,42 @@ export class StrokeElement extends AnchorableElement {
       return;
     }
 
-    const outlinePoints = this.strokeOutline();
+    const outlines = this.strokeOutlines();
 
     let minX = Number.POSITIVE_INFINITY;
     let minY = Number.POSITIVE_INFINITY;
     let maxX = Number.NEGATIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    for (let i = 0; i < outlinePoints.length; i++) {
-      const x = outlinePoints[i][0];
-      const y = outlinePoints[i][1];
-      if (x < minX) {
-        minX = x;
-      }
-      if (x > maxX) {
-        maxX = x;
-      }
-      if (y < minY) {
-        minY = y;
-      }
-      if (y > maxY) {
-        maxY = y;
+    for (const outline of outlines) {
+      for (let i = 0; i < outline.length; i++) {
+        const x = outline[i][0];
+        const y = outline[i][1];
+        if (x < minX) {
+          minX = x;
+        }
+        if (x > maxX) {
+          maxX = x;
+        }
+        if (y < minY) {
+          minY = y;
+        }
+        if (y > maxY) {
+          maxY = y;
+        }
       }
     }
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
     // Loading a note lands here once per stroke; reusing the outline halves perfect-freehand work.
-    this.cachedPath = simplifiedOutlinePath(
-      outlinePoints,
+    const path = new Path2D();
+    const tolerance =
       OUTLINE_TOLERANCE /
-        Math.max(Math.abs(this.scale.x), Math.abs(this.scale.y)),
-    );
+      Math.max(Math.abs(this.scale.x), Math.abs(this.scale.y));
+    for (const outline of outlines) {
+      appendSimplifiedOutline(path, outline, tolerance);
+    }
+    this.cachedPath = path;
     this.dirty = false;
   }
 }
@@ -559,8 +592,11 @@ const outlineFlattener: QuadraticPathSink = {
 // Straight segments through the painted curve, not simplified outline points still traced as curves:
 // a midpoint quadratic over a long edge swings wide of a stroke tip, by up to 0.33 world units.
 // Rendering only; bounds and PDF export use the full outline.
-function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
-  const path = new Path2D();
+function appendSimplifiedOutline(
+  path: Path2D,
+  outline: number[][],
+  tolerance: number,
+): void {
   if (outline.length * 2 > flatKeep.length) {
     flatKeep = new Uint8Array(outline.length * 4);
     flatXY = new Float64Array(outline.length * 8);
@@ -568,7 +604,7 @@ function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
   flatCount = 0;
   appendStrokeOutline(outlineFlattener, outline);
   if (flatCount === 0) {
-    return path;
+    return;
   }
   // Two points enclose nothing to fill, and a dot has to stay a dot.
   const keepAll = markSimplifiedPoints(tolerance) < 3;
@@ -579,7 +615,49 @@ function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
     }
   }
   path.closePath();
-  return path;
+}
+
+// Cuts the centerline at every dash boundary, interpolating the cut points so dashes stay their
+// length however far apart the samples are. Lengths are in the same units as `runningLength`.
+function splitDashes(
+  points: StrokePoint[],
+  dash: number,
+  gap: number,
+): StrokePoint[][] {
+  const dashes: StrokePoint[][] = [];
+  let current: StrokePoint[] | null = [points[0]];
+  let boundary = dash;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    while (boundary < b.runningLength) {
+      const t =
+        (boundary - a.runningLength) / (b.runningLength - a.runningLength);
+      const cut: StrokePoint = {
+        ...b,
+        point: [
+          a.point[0] + (b.point[0] - a.point[0]) * t,
+          a.point[1] + (b.point[1] - a.point[1]) * t,
+        ],
+        pressure: a.pressure + (b.pressure - a.pressure) * t,
+        runningLength: boundary,
+      };
+      if (current) {
+        current.push(cut);
+        dashes.push(current);
+        current = null;
+        boundary += gap;
+      } else {
+        current = [cut];
+        boundary += dash;
+      }
+    }
+    current?.push(b);
+  }
+  if (current) {
+    dashes.push(current);
+  }
+  return dashes;
 }
 
 // Ramer-Douglas-Peucker over the flattened outline: marks each point straying over `tolerance` from

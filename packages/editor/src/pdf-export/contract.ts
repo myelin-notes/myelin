@@ -55,6 +55,8 @@ export type PageItem =
       /** Stroked with round caps/joins. */
       stroke?: Rgb;
       lineWidth?: number;
+      /** [dash, gap] in PDF points for `stroke`. Absent draws solid. */
+      dash?: number[];
       opacity?: number;
     }
   | {
