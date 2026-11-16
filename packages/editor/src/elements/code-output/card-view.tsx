@@ -157,6 +157,65 @@ export function CodeOutputCardView({
     return () => body.removeEventListener('wheel', handleWheel);
   }, [onZoomWheel]);
 
+  // Dragging a selection onto non-selectable chrome makes WebKit extend it to the nearest
+  // selectable text in DOM order — another card. While dragging, only this card's text stays
+  // selectable (CSS); the selectionchange clamp is a fallback, since it lands a frame late and flashes.
+  useEffect(() => {
+    const body = bodyRef.current;
+    const card = cardRef.current;
+    if (!body || !card) {
+      return;
+    }
+    let dragging = false;
+    const handlePointerDown = () => {
+      dragging = true;
+      card.classList.add('is-selecting');
+      document.documentElement.classList.add('code-output-selecting');
+    };
+    const handlePointerUp = () => {
+      if (!dragging) {
+        return;
+      }
+      dragging = false;
+      card.classList.remove('is-selecting');
+      document.documentElement.classList.remove('code-output-selecting');
+    };
+    const handleSelectionChange = () => {
+      const selection = document.getSelection();
+      const { anchorNode, focusNode } = selection ?? {};
+      if (
+        !dragging ||
+        !selection ||
+        !anchorNode ||
+        !focusNode ||
+        !body.contains(anchorNode) ||
+        body.contains(focusNode)
+      ) {
+        return;
+      }
+      const focusBefore =
+        body.compareDocumentPosition(focusNode) &
+        Node.DOCUMENT_POSITION_PRECEDING;
+      selection.setBaseAndExtent(
+        anchorNode,
+        selection.anchorOffset,
+        body,
+        focusBefore ? 0 : body.childNodes.length,
+      );
+    };
+    body.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      body.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      handlePointerUp();
+    };
+  }, []);
+
   return (
     <div ref={cardRef} className="canvas-code-output__card">
       <div className="canvas-code-output__header">

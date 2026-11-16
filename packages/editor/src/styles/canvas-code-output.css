@@ -93,9 +93,6 @@
 
 .canvas-code-output__body {
   pointer-events: auto;
-  user-select: text;
-  -webkit-user-select: text;
-  cursor: text;
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -104,6 +101,29 @@
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-primary);
+}
+
+/* Only text is selectable: a mousedown in the body's padding would otherwise anchor a selection at
+   the nearest text node, which WebKit can find in another card and extend across both. */
+.canvas-code-output__line,
+.canvas-code-output__table td,
+.canvas-code-output__table-note {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+/* Set by the card view for the duration of a selection drag that began in a card. */
+html.code-output-selecting * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html.code-output-selecting .canvas-code-output__card.is-selecting .canvas-code-output__line,
+html.code-output-selecting .canvas-code-output__card.is-selecting .canvas-code-output__table td,
+html.code-output-selecting .canvas-code-output__card.is-selecting .canvas-code-output__table-note {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .canvas-code-output__line {
