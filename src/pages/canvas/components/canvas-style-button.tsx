@@ -3,13 +3,13 @@ import { Palette, X } from 'lucide-react';
 import type * as Y from 'yjs';
 import { clearCanvasStyle, setCanvasStyle } from '@myelin/editor/canvas-style';
 import { useMessages } from '@myelin/editor/i18n';
-import { usePresence } from '@myelin/ui';
-import { Button } from '@myelin/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+  usePresence,
+} from '@myelin/ui';
+import { Button } from '@myelin/ui/button';
 import { useCanvasStyle } from '@/lib/use-canvas-style';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { CanvasStyleEditor } from '@/pages/settings/components/canvas-style-editor';

@@ -171,3 +171,89 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.pm-editor .ProseMirror .pm-figure {
+  margin: 1.15em 0;
+}
+
+.pm-editor .ProseMirror .pm-figure-media {
+  position: relative;
+  margin: 0 auto;
+}
+
+.pm-editor .ProseMirror .pm-figure-media .pm-embed-host {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.pm-editor .ProseMirror .pm-figure-media .pm-embed-image,
+.pm-editor .ProseMirror .pm-figure-media .pm-embed-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pm-editor .ProseMirror .pm-figure-resize {
+  display: none;
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--bg-card);
+  border-radius: 50%;
+  background: var(--accent-dark);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.pm-editor .ProseMirror[contenteditable="true"] .pm-figure-media:hover .pm-figure-resize,
+.pm-editor .ProseMirror[contenteditable="true"] .pm-figure-resize:active {
+  display: block;
+}
+
+@media (pointer: coarse) {
+  .pm-editor .ProseMirror[contenteditable="true"] .pm-figure-resize {
+    display: block;
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.pm-editor .ProseMirror figcaption {
+  margin-top: 0.5em;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  text-align: center;
+}
+
+.pm-editor .ProseMirror[contenteditable="true"] .pm-figure--uncaptioned figcaption::before {
+  content: attr(data-placeholder);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.pm-editor .ProseMirror:not([contenteditable="true"]) .pm-figure--uncaptioned figcaption {
+  display: none;
+}
+
+/* Zero height so pagination's page math is unaffected; the label only marks where it is. */
+.pm-editor .ProseMirror .pm-page-break {
+  position: relative;
+  height: 0;
+  margin: 0;
+}
+
+.pm-editor .ProseMirror[contenteditable="true"] .pm-page-break::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  border-top: 1px dashed var(--border-divider);
+}
+
+.pm-editor[data-page-layout="continuous"] .ProseMirror .pm-page-break {
+  height: 1.5em;
+}

@@ -9,6 +9,8 @@ import {
 import type { ResolveMediaSrc } from './embed/renderer';
 import type { ResolveNoteLink } from './markdown/note-links';
 import { buildNodeViews } from './node-views';
+import type { PageGeometry } from './pagination/core';
+import { flushPagination } from './pagination/plugin';
 import { buildPlugins } from './plugins';
 import { schema } from './schema';
 
@@ -46,10 +48,11 @@ export class PageFrameEditorState {
   }
 
   // Starts non-editable. `onLayout` fires whenever the pagination plugin recomputes layout: page
-  // count, plus the natural content height for `continuous` layout (`null` in paginated/column).
+  // count, plus the natural content height for `continuous` layout (`null` when paginated).
   createView(
     container: HTMLElement,
     onLayout?: (pageCount: number, contentHeight: number | null) => void,
+    getGeometry?: () => PageGeometry,
   ): EditorView {
     if (this._view) {
       this.destroyView();
@@ -62,6 +65,7 @@ export class PageFrameEditorState {
         onLayout,
         this._resolveNoteLink,
         this._resolveMedia,
+        getGeometry,
       ),
     });
 
@@ -81,7 +85,7 @@ export class PageFrameEditorState {
     this._view = new EditorView(mount, {
       state,
       editable: (_state) => editable(),
-      nodeViews: buildNodeViews(this._ensureCodeOutputCard),
+      nodeViews: buildNodeViews(this._ensureCodeOutputCard, this._resolveMedia),
       // Page frames never scroll internally — the canvas follow-cursor pan keeps the caret on screen.
       // PM's default ancestor scroll-walk would scroll the frame's clip boxes and desync the DOM from
       // the canvas-drawn chrome. Nested CodeMirror editors manage their own caret visibility.
@@ -116,6 +120,12 @@ export class PageFrameEditorState {
     }
 
     return this._view;
+  }
+
+  flushLayout(): void {
+    if (this._view) {
+      flushPagination(this._view);
+    }
   }
 
   setEditable(editable: boolean): void {

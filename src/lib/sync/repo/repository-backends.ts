@@ -9,14 +9,17 @@ import {
 } from './google-drive/credentials';
 import { NativeRepository } from './native';
 
-interface RepositoryConfigBase {
-  kind: string;
+export const REPOSITORY_SETUP_INCOMPLETE_MESSAGE =
+  'Finish repository setup in Settings before creating notes.';
+
+export class RepositorySetupIncompleteError extends Error {
+  constructor() {
+    super(REPOSITORY_SETUP_INCOMPLETE_MESSAGE);
+    this.name = 'RepositorySetupIncompleteError';
+  }
 }
 
-export interface RepositoryBackendDescriptor<
-  Config extends RepositoryConfigBase,
-> {
-  readonly kind: Config['kind'];
+interface RepositoryBackendDescriptor<Config extends RepositoryConfig> {
   create(config: Config): NativeRepository;
   normalizeConfig(config: Config): Config;
   storageKey(config: Config): string;
@@ -24,46 +27,6 @@ export interface RepositoryBackendDescriptor<
   discoveryKey(config: Config): string | null;
   isStructurallyComplete(config: Config): boolean;
   isFullyConfigured(config: Config): Promise<boolean>;
-}
-
-export class RepositoryBackendRegistry<Config extends RepositoryConfigBase> {
-  private readonly descriptors = new Map<
-    Config['kind'],
-    RepositoryBackendDescriptor<Config>
-  >();
-
-  register(descriptor: RepositoryBackendDescriptor<Config>): void {
-    if (this.descriptors.has(descriptor.kind)) {
-      throw new Error(
-        `Repository backend already registered: ${descriptor.kind}`,
-      );
-    }
-    this.descriptors.set(descriptor.kind, descriptor);
-  }
-
-  get(config: Config): RepositoryBackendDescriptor<Config> {
-    const descriptor = this.descriptors.get(config.kind);
-    if (!descriptor) {
-      throw new Error(`No repository backend registered: ${config.kind}`);
-    }
-    return descriptor;
-  }
-
-  values(): readonly RepositoryBackendDescriptor<Config>[] {
-    return [...this.descriptors.values()];
-  }
-}
-
-export function createRepositoryBackendRegistry<
-  Config extends RepositoryConfigBase,
->(
-  descriptors: readonly RepositoryBackendDescriptor<Config>[] = [],
-): RepositoryBackendRegistry<Config> {
-  const registry = new RepositoryBackendRegistry<Config>();
-  for (const descriptor of descriptors) {
-    registry.register(descriptor);
-  }
-  return registry;
 }
 
 type LocalRepositoryConfig = Extract<RepositoryConfig, { kind: 'local' }>;
@@ -83,13 +46,12 @@ function normalizeStorageKeyPart(value: string): string {
 
 const localRepositoryBackend: RepositoryBackendDescriptor<LocalRepositoryConfig> =
   {
-    kind: 'local',
     create: () =>
       new NativeRepository({
         kind: 'local-storage',
         storageRoot: '',
         source: null,
-        capabilities: { polling: false, liveSync: false, batchedCommit: false },
+        canCreateNotes: async () => true,
       }),
     normalizeConfig: () => ({ kind: 'local' }),
     storageKey: () => 'local',
@@ -101,14 +63,12 @@ const localRepositoryBackend: RepositoryBackendDescriptor<LocalRepositoryConfig>
 
 const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfig> =
   {
-    kind: 'github',
     create: (config) => {
       const cacheRoot = `repositories/github/${getRepositoryStorageKey(config)}`;
       return new NativeRepository({
         kind: 'github',
         storageRoot: cacheRoot,
         credentialId: config.credentialId,
-        capabilities: { polling: false, liveSync: true, batchedCommit: true },
         source: {
           kind: 'github',
           owner: config.owner,
@@ -117,6 +77,7 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
         },
         getToken: (forceRefresh) =>
           getGitHubToken(config.credentialId, { forceRefresh }),
+        canCreateNotes: () => isRepositoryFullyConfigured(config),
       });
     },
     normalizeConfig: (config) => ({
@@ -156,17 +117,16 @@ const githubRepositoryBackend: RepositoryBackendDescriptor<GitHubRepositoryConfi
 
 const googleDriveRepositoryBackend: RepositoryBackendDescriptor<GoogleDriveRepositoryConfig> =
   {
-    kind: 'google-drive',
     create: (config) => {
       const cacheRoot = `repositories/google-drive/${getRepositoryStorageKey(config)}`;
       return new NativeRepository({
         kind: 'google-drive',
         storageRoot: cacheRoot,
         credentialId: config.credentialId,
-        capabilities: { polling: false, liveSync: true, batchedCommit: false },
         source: { kind: 'google-drive', folderId: config.folderId },
         getToken: (forceRefresh) =>
           getGoogleDriveToken(config.credentialId, { forceRefresh }),
+        canCreateNotes: () => isRepositoryFullyConfigured(config),
       });
     },
     normalizeConfig: (config) => ({
@@ -185,26 +145,22 @@ const googleDriveRepositoryBackend: RepositoryBackendDescriptor<GoogleDriveRepos
     isFullyConfigured: (config) => hasGoogleDriveToken(config.credentialId),
   };
 
-const repositoryBackendRegistry =
-  createRepositoryBackendRegistry<RepositoryConfig>([
-    localRepositoryBackend,
-    githubRepositoryBackend,
-    googleDriveRepositoryBackend,
-  ]);
+export const BACKENDS: Record<
+  RepositoryConfig['kind'],
+  RepositoryBackendDescriptor<RepositoryConfig>
+> = {
+  local: localRepositoryBackend,
+  github: githubRepositoryBackend,
+  'google-drive': googleDriveRepositoryBackend,
+};
 
-export function getRepositoryBackends(): readonly RepositoryBackendDescriptor<RepositoryConfig>[] {
-  return repositoryBackendRegistry.values();
-}
-
-export function getRepositoryBackend(
+function getRepositoryBackend(
   config: RepositoryConfig,
 ): RepositoryBackendDescriptor<RepositoryConfig> {
-  return repositoryBackendRegistry.get(config);
+  return BACKENDS[config.kind];
 }
 
-export function createRepositoryFromConfig(
-  config: RepositoryConfig,
-): NativeRepository {
+export function createRepository(config: RepositoryConfig): NativeRepository {
   return getRepositoryBackend(config).create(config);
 }
 

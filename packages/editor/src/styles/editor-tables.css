@@ -105,6 +105,7 @@
   --pm-table-cell-break-mask-width: 100%;
   --pm-table-cell-break-border-left: 0px;
   --pm-table-cell-break-border-width: 100%;
+  --pm-table-cell-break-top: 0px;
   --pm-table-cell-break-gap-start: 0px;
   --pm-table-cell-break-gap-end: 0px;
   --pm-table-cell-break-border: var(--border-subtle);
@@ -117,7 +118,7 @@
 .pm-editor .ProseMirror .pm-table-node__cell-page-break::after {
   content: "";
   position: absolute;
-  top: 0;
+  top: var(--pm-table-cell-break-top);
   height: var(--pm-table-cell-break-height);
   pointer-events: none;
 }
@@ -258,4 +259,42 @@
 
 .pm-editor .ProseMirror .pm-table-node__handle:hover {
   box-shadow: 0 12px 22px rgb(var(--shadow-rgb) / 0.18);
+}
+
+.pm-editor .ProseMirror .pm-table-node__column-resizer {
+  position: absolute;
+  width: 9px;
+  margin-left: -4px;
+  cursor: col-resize;
+  touch-action: none;
+  pointer-events: auto;
+  /* Leaves a hole over the 22px add-column button centered on the same boundary, which the resizer
+     would otherwise cover and steal clicks from. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(50% - 13px),
+    0 calc(50% - 13px),
+    0 calc(50% + 13px),
+    100% calc(50% + 13px),
+    100% 100%,
+    0 100%
+  );
+}
+
+.pm-editor .ProseMirror:not([contenteditable="true"]) .pm-table-node__column-resizer {
+  display: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__column-resizer:hover,
+.pm-editor .ProseMirror .pm-table-node__column-resizer:active {
+  background: linear-gradient(var(--accent-dark), var(--accent-dark)) center / 2px 100% no-repeat;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handles--resizing .pm-table-node__handle-target {
+  display: none;
+}
+
+.pm-editor .ProseMirror .pm-table-node__handles--resizing .pm-table-node__column-resizer {
+  clip-path: none;
 }

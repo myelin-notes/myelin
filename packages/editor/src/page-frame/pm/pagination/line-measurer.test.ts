@@ -4,72 +4,14 @@ import { paginateParagraph } from './core';
 import {
   DomParagraphLineMeasurer,
   type ParagraphLineMeasurement,
-  PretextParagraphLineMeasurer,
 } from './line-measurer';
-
-vi.mock('@chenglou/pretext', () => ({
-  prepareWithSegments: vi.fn(() => ({ segments: ['hello'] })),
-  layoutWithLines: vi.fn(() => ({
-    lines: [
-      { start: { segmentIndex: 0, graphemeIndex: 0 } },
-      { start: { segmentIndex: 0, graphemeIndex: 3 } },
-    ],
-  })),
-}));
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('PretextParagraphLineMeasurer', () => {
-  it('maps measured line starts back to ProseMirror positions', () => {
-    vi.stubGlobal('getComputedStyle', () => ({
-      fontFamily: 'sans-serif',
-      fontSize: '16px',
-      fontStyle: 'normal',
-      fontWeight: '400',
-      lineHeight: '24px',
-    }));
-    const measurement: ParagraphLineMeasurement = {
-      block: {
-        pos: 10,
-        dom: { clientWidth: 300 } as HTMLElement,
-        height: 48,
-        measuredTop: 0,
-        nodeSize: 7,
-        isBreakableTextBlock: true,
-        isBreakableTableBlock: false,
-        isPageHeightConstrained: false,
-      },
-      view: {
-        state: {
-          doc: {
-            nodeAt: () => ({
-              content: { size: 5 },
-              forEach: () => {},
-              textContent: 'hello',
-            }),
-          },
-        },
-      } as unknown as EditorView,
-      editorScreenTop: 0,
-      invScale: 1,
-      blockNaturalTop: 100,
-      blockShift: 0,
-      metrics: null,
-      measurementCacheGeneration: 0,
-    };
-
-    const lines = new PretextParagraphLineMeasurer().measure(measurement);
-
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatchObject({ naturalTop: 100, naturalBottom: 124 });
-    expect(lines[1].getPos()).toBe(14);
-  });
-});
-
 describe('DomParagraphLineMeasurer', () => {
-  it('caches line results per measurer instance', () => {
+  it('reuses line start offsets per measurer instance', () => {
     class TestText {
       public constructor(public readonly data: string) {}
 
@@ -143,10 +85,7 @@ describe('DomParagraphLineMeasurer', () => {
       } as unknown as EditorView,
       editorScreenTop: 0,
       invScale: 1,
-      blockNaturalTop: 100,
-      blockShift: 0,
       metrics: null,
-      measurementCacheGeneration: 1,
     };
     const first = new DomParagraphLineMeasurer();
 
@@ -156,11 +95,15 @@ describe('DomParagraphLineMeasurer', () => {
 
     expect(lines.map((line) => line.getPos())).toEqual([11, 14]);
     expect(cachedLines.map((line) => line.getPos())).toEqual([11, 14]);
-    expect(createRange).toHaveBeenCalledTimes(rangeCallsAfterFirstMeasurement);
+    // One range to read the rects; the per-line binary search is skipped.
+    expect(createRange).toHaveBeenCalledTimes(
+      rangeCallsAfterFirstMeasurement + 1,
+    );
+    const rangeCallsAfterCachedMeasurement = createRange.mock.calls.length;
 
     new DomParagraphLineMeasurer().measure(measurement);
     expect(createRange.mock.calls.length).toBeGreaterThan(
-      rangeCallsAfterFirstMeasurement,
+      rangeCallsAfterCachedMeasurement + 1,
     );
   });
 });
@@ -176,10 +119,7 @@ describe('DomParagraphLineMeasurer with a second font on a line', () => {
   });
 
   // Each text node holds one rect per visual line it touches, as `Range#getClientRects` reports them.
-  function measureRuns(
-    runs: TestRect[][],
-    breakWidgets: Array<{ bottom: number; height: number }> = [],
-  ) {
+  function measureRuns(runs: TestRect[][]) {
     class TestText {
       public readonly data = 'x'.repeat(40);
       public constructor(public readonly rects: TestRect[]) {}
@@ -225,10 +165,7 @@ describe('DomParagraphLineMeasurer with a second font on a line', () => {
         dom: {
           clientWidth: 584,
           querySelector: () => null,
-          querySelectorAll: () =>
-            breakWidgets.map((widget) => ({
-              getBoundingClientRect: () => widget,
-            })),
+          querySelectorAll: () => [],
         } as unknown as HTMLElement,
         height: 78,
         measuredTop: 0,
@@ -251,10 +188,7 @@ describe('DomParagraphLineMeasurer with a second font on a line', () => {
       } as unknown as EditorView,
       editorScreenTop: 0,
       invScale: 1,
-      blockNaturalTop: 739,
-      blockShift: 0,
       metrics: null,
-      measurementCacheGeneration: 1,
     };
     return new DomParagraphLineMeasurer().measure(measurement);
   }
@@ -280,25 +214,12 @@ describe('DomParagraphLineMeasurer with a second font on a line', () => {
     expect(breaks).toHaveLength(1);
     expect(breaks[0].kind).toBe('inline');
   });
-
-  it('subtracts only the break widgets rendered above a line', () => {
-    const lines = measureRuns(
-      [[sans[0]], [rect(767 + 150, 788 + 150)]],
-      [{ bottom: 915, height: 150 }],
-    );
-
-    expect(lines.map((line) => line.naturalTop)).toEqual([741, 767]);
-  });
 });
 
-it('keeps reserved anchor height while removing only pagination spacer height from line measurements', () => {
+it('reports a reserved anchor gap as its own line', () => {
   const anchor = {
     offsetHeight: 80,
     getBoundingClientRect: () => new DOMRect(0, 170, 100, 80),
-  };
-  const pageBreak = {
-    offsetHeight: 150,
-    getBoundingClientRect: () => new DOMRect(0, 20, 100, 150),
   };
   vi.stubGlobal('document', {
     createRange: () => ({}),
@@ -307,8 +228,7 @@ it('keeps reserved anchor height while removing only pagination spacer height fr
   vi.stubGlobal('NodeFilter', { SHOW_TEXT: 4 });
   const blockDom = {
     querySelector: () => anchor,
-    querySelectorAll: (selector: string) =>
-      selector === '[data-page-break]' ? [pageBreak] : [anchor],
+    querySelectorAll: () => [anchor],
   };
   const measurement: ParagraphLineMeasurement = {
     block: {
@@ -324,16 +244,13 @@ it('keeps reserved anchor height while removing only pagination spacer height fr
     view: { posAtDOM: () => 15 } as unknown as EditorView,
     editorScreenTop: 0,
     invScale: 1,
-    blockNaturalTop: 0,
-    blockShift: 0,
     metrics: null,
-    measurementCacheGeneration: 1,
   };
   const lines = new DomParagraphLineMeasurer().measure(measurement);
   expect(lines).toHaveLength(1);
   expect(lines[0]).toMatchObject({
-    naturalTop: 20,
-    naturalBottom: 100,
+    naturalTop: 170,
+    naturalBottom: 250,
     isAnchorGap: true,
   });
   expect(lines[0].getPos()).toBe(15);

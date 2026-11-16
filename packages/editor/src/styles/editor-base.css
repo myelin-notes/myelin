@@ -12,6 +12,12 @@
      min line-height inflates spacing and breaks KaTeX vlists until edit mode.
      Preflight's 100% doesn't disable it. */
   -webkit-text-size-adjust: none;
+  /* WebKit's UA sheet sets these only on [contenteditable=true], so tables and nbsp-bearing text
+     wrapped differently while editing and pagination jumped on every edit enter. Pinned to the
+     editable values so measurement is the same in both modes. */
+  line-break: after-white-space;
+  overflow-wrap: break-word;
+  -webkit-nbsp-mode: space;
 }
 
 /* The doubled .ProseMirror outranks later block rules with equal specificity
@@ -24,6 +30,27 @@
 }
 
 .pm-editor .ProseMirror.ProseMirror > *:last-child {
+  margin-bottom: 0;
+}
+
+/* An inline `display` on a spacer widget beats this rule, measures the spacer into the layout,
+   and makes pagination alternate between two layouts forever. */
+.pm-editor[data-page-measuring] .ProseMirror [data-page-break] {
+  display: none;
+}
+
+/* A spacer stops the margins around it collapsing. Pagination measures with spacers hidden and
+   sizes each spacer to also cover the gap those margins occupied, so they must not render too. */
+.pm-editor:not([data-page-measuring])
+  .ProseMirror.ProseMirror
+  > [data-page-break="block"]
+  + * {
+  margin-top: 0;
+}
+
+.pm-editor:not([data-page-measuring])
+  .ProseMirror.ProseMirror
+  > :has(+ [data-page-break="block"]) {
   margin-bottom: 0;
 }
 
@@ -110,17 +137,17 @@
 }
 
 .pm-editor .ProseMirror h1 {
-  font-size: 2.35rem;
+  font-size: 2.35em;
   line-height: 42px;
 }
 
 .pm-editor .ProseMirror h2 {
-  font-size: 1.8rem;
+  font-size: 1.8em;
   line-height: 32px;
 }
 
 .pm-editor .ProseMirror h3 {
-  font-size: 1.4rem;
+  font-size: 1.4em;
   line-height: 25px;
 }
 

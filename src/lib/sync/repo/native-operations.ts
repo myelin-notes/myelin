@@ -40,6 +40,7 @@ export interface RepositoryPreferences {
   tagRegistry: string[];
   penPresets: VFSManifest['penPresets'];
   flagTypes: VFSManifest['flagTypes'];
+  liveSecret?: string;
 }
 
 export interface MetadataPatch {
@@ -136,6 +137,7 @@ export interface NativeOperationRequests {
   subscribe: { kind: 'subscribe'; nodeId: string; sessionId: string };
   unsubscribe: { kind: 'unsubscribe'; nodeId: string; sessionId: string };
   path: { kind: 'path'; nodeId: string };
+  paths: { kind: 'paths'; nodeIds: string[] };
   'stage-bytes': {
     kind: 'stage-bytes';
     transferId: string;
@@ -168,6 +170,7 @@ export interface NativeOperationResults {
   subscribe: null;
   unsubscribe: null;
   path: string | null;
+  paths: Record<string, string>;
   'stage-bytes': null;
   'cancel-transfer': null;
   'finish-transfer': NativeRevision | NativeDocumentWrite;

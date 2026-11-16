@@ -33,6 +33,8 @@ export interface VFSManifest {
   tagRegistry: string[];
   penPresets: PenPreset[];
   flagTypes: FlagType[];
+  /** Per-repository secret that scopes live-sync topics; absent until first live-sync use. */
+  liveSecret?: string;
 }
 
 export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
@@ -44,9 +46,6 @@ export const CUSTOM_COLOR_TOOLS: readonly CustomColorTool[] = [
 
 const CURRENT_MANIFEST_VERSION = 3;
 export const FILE_EXT = '.myelin';
-export const VERSION_HISTORY_INTERVAL_MS = 10 * 60 * 1000;
-export const VERSION_HISTORY_MAX_PER_FILE = 32;
-export const VERSION_HISTORY_ROOT_NAME = '.myelin-version-history';
 export function createEmptyManifest(): VFSManifest {
   return {
     version: CURRENT_MANIFEST_VERSION,
@@ -101,19 +100,6 @@ export function createFileNode(
     modifiedAt: now,
     ...(system ? { system } : {}),
   };
-}
-
-export async function computeRevision(
-  bytes: Uint8Array | null,
-): Promise<string | null> {
-  if (!bytes || bytes.byteLength === 0) {
-    return null;
-  }
-
-  const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(bytes));
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('');
 }
 
 export function createDocFromBytes(bytes: Uint8Array | null): Y.Doc {
@@ -173,30 +159,6 @@ export function getFileVersionNodes(
     .filter(isFileVersionNode)
     .filter((node) => node.system.sourceFileId === sourceFileId)
     .sort((left, right) => right.system.capturedAt - left.system.capturedAt);
-}
-
-export function ensureVersionHistoryRoot(
-  manifest: VFSManifest,
-  now: number,
-): VFSNodeId {
-  const existing = Object.values(manifest.nodes).find(
-    (node) =>
-      node.type === 'folder' && node.system?.kind === 'version-history-root',
-  );
-  if (existing?.type === 'folder') {
-    return existing.id;
-  }
-
-  const rootId = createNodeId();
-  manifest.nodes[rootId] = createFolderNode(
-    rootId,
-    VERSION_HISTORY_ROOT_NAME,
-    null,
-    now,
-    { kind: 'version-history-root' },
-  );
-  addChild(manifest, null, rootId);
-  return rootId;
 }
 
 export { addChild, removeChild } from './child-index';
@@ -473,19 +435,6 @@ export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {
   );
 
   return { nodes, links };
-}
-
-export function setStoredNoteLinks(
-  manifest: VFSManifest,
-  sourceId: VFSNodeId,
-  links: readonly StoredNoteLink[],
-): void {
-  if (links.length === 0) {
-    delete manifest.linksBySource[sourceId];
-    return;
-  }
-
-  manifest.linksBySource[sourceId] = links.map((link) => ({ ...link }));
 }
 
 export function getUniqueFileName(

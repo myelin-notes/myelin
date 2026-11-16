@@ -116,6 +116,7 @@ export class CanvasSessionController {
     private readonly uiServices: CanvasUiServices = {
       openChromeMenu: () => {},
       openExportDialog: () => {},
+      openPageSetupDialog: () => {},
     },
     private readonly selectedToolIndexRef: RefObject<number> = { current: 0 },
   ) {}

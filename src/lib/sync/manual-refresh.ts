@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { RepositoryConfig } from './repo/config';
-import { isRepositoryFullyConfigured } from './repo/readiness';
+import { isRepositoryFullyConfigured } from './repo/repository-backends';
 
 export const MANUAL_REPOSITORY_REFRESH_COOLDOWN_MS = 5_000;
 

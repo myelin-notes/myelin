@@ -9,7 +9,7 @@ import { defaultFlagTypes } from '@myelin/editor/flag-types';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import type { CustomColorTool } from '@myelin/editor/sync/repo/types';
 import type { FontEntry, ToolOption } from '@myelin/editor/tools/tool';
-import { Switch } from '@/components/ui/switch';
+import { Switch } from '@myelin/ui';
 import { useCustomColors } from '@/lib/custom-colors';
 import { useMessages } from '@/lib/i18n';
 import { cn } from '@/lib/utils';

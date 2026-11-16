@@ -15,14 +15,14 @@ import {
   type CredentialChange,
   subscribeCredentialChanges,
 } from './repo/credential-vault';
-import { createRepository } from './repo/factory';
 import type { NativeRepository } from './repo/native';
 import { noteContentIndex } from './repo/note-content-index';
 import { credentialTokenKey } from './repo/oauth/client';
-import { isRepositoryFullyConfigured } from './repo/readiness';
 import {
+  createRepository,
   getRepositoryConfigIdentity,
   getRepositoryStorageKey,
+  isRepositoryFullyConfigured,
 } from './repo/repository-backends';
 import {
   getRepositoryConfig,

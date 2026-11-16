@@ -30,14 +30,6 @@ function withTag(tag: number, payload: Uint8Array): Uint8Array {
   return bytes;
 }
 
-function isPeerMode(value: unknown): value is PeerMode {
-  return (
-    value === 'owner-device' ||
-    value === 'guest-editor' ||
-    value === 'guest-viewer'
-  );
-}
-
 function isPeerMessageKind(value: unknown): value is PeerMessageKind {
   return value === 'hello' || value === 'heartbeat' || value === 'left';
 }
@@ -56,9 +48,8 @@ function decodePeerMessage(bytes: Uint8Array): PeerControlMessage | null {
     const peerId =
       typeof raw.peerId === 'string' ? raw.peerId.trim() : undefined;
     const kind = raw.kind;
-    const mode = raw.mode;
 
-    if (!peerId || !isPeerMessageKind(kind) || !isPeerMode(mode)) {
+    if (!peerId || !isPeerMessageKind(kind)) {
       return null;
     }
 
@@ -66,7 +57,8 @@ function decodePeerMessage(bytes: Uint8Array): PeerControlMessage | null {
       type: 'peer',
       peerId,
       kind,
-      mode,
+      // Older peers may send a guest mode; every peer is an owner device now.
+      mode: 'owner-device',
     };
   } catch {
     return null;

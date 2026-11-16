@@ -30,7 +30,6 @@ export {
   type ReadableRepository,
   type RepositoryConfig,
 } from './repo/config';
-export { createRepository } from './repo/factory';
 export {
   fetchGitHubBranches,
   fetchGitHubOrgs,
@@ -80,11 +79,12 @@ export {
 } from './repo/google-drive/folders';
 export { NativeRepository } from './repo/native';
 export {
+  createRepository,
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
   REPOSITORY_SETUP_INCOMPLETE_MESSAGE,
   RepositorySetupIncompleteError,
-} from './repo/readiness';
+} from './repo/repository-backends';
 export {
   getRepositoryConfig,
   setRepositoryConfig,

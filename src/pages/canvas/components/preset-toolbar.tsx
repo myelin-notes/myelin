@@ -19,7 +19,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@myelin/ui';
 import { useUserPref } from '@/lib/use-user-pref';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 

@@ -10,25 +10,15 @@ import type { MetadataPatch } from '@/lib/sync/repo/native-operations';
 import { noteContentIndex } from '@/lib/sync/repo/note-content-index';
 import { extractStoredNoteLinks } from '@/lib/sync/repo/note-link-index';
 import {
-  computeRevision,
   createDocFromBytes,
   createEmptyManifest,
-  ensureVersionHistoryRoot,
   getStoredFileName,
-  isFileVersionNode as isConcreteFileVersionNode,
-  setStoredNoteLinks,
-  toFileVersion,
-  VERSION_HISTORY_INTERVAL_MS,
-  VERSION_HISTORY_MAX_PER_FILE,
   type VFSManifest,
 } from '@/lib/sync/repo/shared';
 import type {
   FileImportSource,
   FileType,
-  FileVersion,
   RenameReferencesResult,
-  RepositoryCapabilities,
-  StoredNoteLink,
   VFSFileNode,
   VFSNodeId,
 } from '@/lib/sync/repo/types';
@@ -39,18 +29,13 @@ const logger = new Logger('TestRepository');
 /** Storage boundary for tests of shared repository behavior; native sync has its own tests. */
 export class TestRepository extends NativeRepository {
   readonly kind = 'local-storage';
-  readonly capabilities: RepositoryCapabilities = {
-    polling: false,
-    liveSync: false,
-    batchedCommit: false,
-  };
 
   constructor(private readonly testStorageRoot = '') {
     super({
       kind: 'local-storage',
       storageRoot: testStorageRoot,
       source: null,
-      capabilities: { polling: false, liveSync: false, batchedCommit: false },
+      canCreateNotes: async () => true,
     });
   }
 
@@ -96,7 +81,7 @@ export class TestRepository extends NativeRepository {
       throw new Error('Repository file is missing');
     }
     const revision = await this.saveFileBytes(node, result.update!);
-    await this.onFileSaved(nodeId, result.links);
+    await this.onFileSaved(nodeId);
     return {
       stateVector: result.stateVector,
       revision,
@@ -111,69 +96,12 @@ export class TestRepository extends NativeRepository {
     return async () => {};
   }
 
-  override async createFileVersionIfDue(
-    nodeId: VFSNodeId,
-    options: { force?: boolean } = {},
-  ): Promise<FileVersion | null> {
-    const node = await this.getNode(nodeId);
-    if (!node || node.type !== 'file' || node.system) {
-      return null;
-    }
-
-    const bytes = await this.readFileBytes(nodeId);
-    if (!bytes) {
-      return null;
-    }
-
-    const now = Date.now();
-    const sourceRevision = await computeRevision(bytes);
-    const versions = await this.listFileVersions(nodeId);
-    const latest = versions[0];
-    if (versions.some((version) => version.sourceRevision === sourceRevision)) {
-      return null;
-    }
-    if (
-      !options.force &&
-      latest &&
-      now - latest.capturedAt < VERSION_HISTORY_INTERVAL_MS
-    ) {
-      return null;
-    }
-
-    const parentId = await this.getOrCreateVersionHistoryRoot();
-    const versionId = await this.createFile(
-      `${node.name} ${new Date(now).toISOString()}`,
-      node.fileType,
-      parentId,
-      bytes,
-      {
-        system: {
-          kind: 'file-version',
-          sourceFileId: node.id,
-          sourceFileType: node.fileType,
-          sourceName: node.name,
-          sourceRevision,
-          capturedAt: now,
-          byteLength: bytes.byteLength,
-        },
-      },
-    );
-
-    await this.enforceFileVersionLimit(nodeId);
-
-    const versionNode = await this.getNode(versionId);
-    return isConcreteFileVersionNode(versionNode)
-      ? toFileVersion(versionNode)
-      : null;
-  }
-
   override async writeFileBytes(
     nodeId: VFSNodeId,
     bytes: Uint8Array,
   ): Promise<void> {
-    const links = await this.extractStoredNoteLinksForBytes(nodeId, bytes);
     await super.writeFileBytes(nodeId, bytes);
-    await this.onFileSaved(nodeId, links);
+    await this.onFileSaved(nodeId);
   }
 
   override async importFile(
@@ -241,6 +169,7 @@ export class TestRepository extends NativeRepository {
   ): Promise<string> {
     const storage = getRepositoryTestStorage();
     for (const { node, links: providedLinks } of patch.nodes) {
+      // MCP link tests need the links the native engine would derive from saved bytes.
       let links = providedLinks;
       if (node.type === 'file' && node.fileType === 'mcanvas' && !node.system) {
         const path = this.path(`files/${getStoredFileName(node)}`);
@@ -294,7 +223,7 @@ export class TestRepository extends NativeRepository {
       : null;
     return {
       bytes: bytes?.length ? bytes : null,
-      revision: await computeRevision(bytes),
+      revision: null,
     };
   }
 
@@ -306,7 +235,7 @@ export class TestRepository extends NativeRepository {
       this.path(`files/${getStoredFileName(node)}`),
       bytes,
     );
-    return (await computeRevision(bytes)) ?? '';
+    return '';
   }
 
   protected override async deleteFileBytes(
@@ -349,24 +278,13 @@ export class TestRepository extends NativeRepository {
       : null;
   }
 
-  override getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
-    return this.getStoredAbsolutePath(nodeId);
-  }
-
-  protected async onFileSaved(
-    nodeId: VFSNodeId,
-    links?: readonly StoredNoteLink[],
-  ): Promise<void> {
+  protected async onFileSaved(nodeId: VFSNodeId): Promise<void> {
     let indexable = false;
     await this.mutateMetadata('Touch file', { nodes: [nodeId] }, (manifest) => {
       const node = manifest.nodes[nodeId];
       if (node && node.type === 'file') {
         node.modifiedAt = Date.now();
         indexable = node.fileType === 'mcanvas' && !node.system;
-        // Snapshots are system nodes; their links must not enter the graph.
-        if (node.fileType === 'mcanvas' && !node.system && links) {
-          setStoredNoteLinks(manifest, nodeId, links);
-        }
       }
     });
     if (indexable) {
@@ -380,39 +298,6 @@ export class TestRepository extends NativeRepository {
         .catch((error) => {
           logger.error('Could not queue note for indexing', error, { nodeId });
         });
-    }
-  }
-
-  private async extractStoredNoteLinksForBytes(
-    nodeId: VFSNodeId,
-    bytes: Uint8Array,
-  ): Promise<StoredNoteLink[] | undefined> {
-    const node = await this.getNode(nodeId);
-    if (node?.type !== 'file' || node.fileType !== 'mcanvas') {
-      return undefined;
-    }
-
-    return extractStoredNoteLinks(createDocFromBytes(bytes));
-  }
-
-  private async getOrCreateVersionHistoryRoot(): Promise<VFSNodeId> {
-    const targets = { nodes: [] as string[] };
-    return this.mutateMetadata(
-      'Create version history root',
-      targets,
-      (manifest) => {
-        const id = ensureVersionHistoryRoot(manifest, Date.now());
-        targets.nodes.push(id);
-        return id;
-      },
-    );
-  }
-
-  private async enforceFileVersionLimit(nodeId: VFSNodeId): Promise<void> {
-    const versions = await this.listFileVersions(nodeId);
-    const expired = versions.slice(VERSION_HISTORY_MAX_PER_FILE);
-    for (const version of expired) {
-      await this.deleteNode(version.id);
     }
   }
 }

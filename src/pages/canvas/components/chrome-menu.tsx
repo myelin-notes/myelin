@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -116,48 +117,52 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
             } as const)
           : ({ role: 'menuitem' } as const);
         return (
-          <button
-            key={item.id}
-            ref={(el) => {
-              itemRefs.current[index] = el;
-            }}
-            type="button"
-            {...roleProps}
-            tabIndex={index === focusedIndex ? 0 : -1}
-            onPointerDown={(e) => {
-              // Mouse menu interaction should not steal focus from an active
-              // page-frame editor; the click still fires normally.
-              e.preventDefault();
-            }}
-            onFocus={() => setFocusedIndex(index)}
-            onClick={() => {
-              item.onSelect();
-              onClose();
-            }}
-            className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2 text-left text-sm outline-none transition-colors ${
-              danger
-                ? 'text-destructive hover:bg-destructive/10'
-                : 'text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:text-text-primary'
-            }`}
-          >
-            {Icon && (
-              <Icon
-                className={
-                  danger
-                    ? 'size-4 text-destructive'
-                    : 'size-4 text-text-muted transition-colors group-hover:text-text-secondary'
-                }
-              />
+          <Fragment key={item.id}>
+            {item.separatorBefore && index > 0 && (
+              <hr className="-mx-1.5 my-1.5 border-border border-t" />
             )}
-            <span className="flex-1 truncate">{item.label}</span>
-            {item.checked && (
-              <CheckIcon
-                aria-hidden="true"
-                className="size-4 text-text-primary"
-                strokeWidth={1.5}
-              />
-            )}
-          </button>
+            <button
+              ref={(el) => {
+                itemRefs.current[index] = el;
+              }}
+              type="button"
+              {...roleProps}
+              tabIndex={index === focusedIndex ? 0 : -1}
+              onPointerDown={(e) => {
+                // Mouse menu interaction should not steal focus from an active
+                // page-frame editor; the click still fires normally.
+                e.preventDefault();
+              }}
+              onFocus={() => setFocusedIndex(index)}
+              onClick={() => {
+                item.onSelect();
+                onClose();
+              }}
+              className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2 text-left text-sm outline-none transition-colors ${
+                danger
+                  ? 'text-destructive hover:bg-destructive/10'
+                  : 'text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:text-text-primary'
+              }`}
+            >
+              {Icon && (
+                <Icon
+                  className={
+                    danger
+                      ? 'size-4 text-destructive'
+                      : 'size-4 text-text-muted transition-colors group-hover:text-text-secondary'
+                  }
+                />
+              )}
+              <span className="flex-1 truncate">{item.label}</span>
+              {item.checked && (
+                <CheckIcon
+                  aria-hidden="true"
+                  className="size-4 text-text-primary"
+                  strokeWidth={1.5}
+                />
+              )}
+            </button>
+          </Fragment>
         );
       })}
     </div>

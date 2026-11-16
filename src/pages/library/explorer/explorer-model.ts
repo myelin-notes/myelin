@@ -10,7 +10,7 @@ import type {
 import {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
-} from '@/lib/sync/repo/readiness';
+} from '@/lib/sync/repo/repository-backends';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
 
 export type ExplorerSortMode =

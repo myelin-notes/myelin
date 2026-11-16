@@ -19,13 +19,6 @@ export type RepositoryConfig =
       credentialId: string;
     };
 
-export interface RepositoryLifecycle {
-  initialize(): Promise<void>;
-  refresh(): Promise<void>;
-  flushPending(): Promise<void>;
-  dispose(): Promise<void>;
-}
-
 export interface RepositoryRuntimeStatus {
   online: boolean;
   pendingRemoteWrites: number;
@@ -44,19 +37,8 @@ export interface RepositoryRuntimeStatus {
   dataVersion: number;
 }
 
-export interface RepositoryStatusSource {
-  getRuntimeStatus(): RepositoryRuntimeStatus;
-  subscribeStatus(
-    listener: (status: RepositoryRuntimeStatus) => void,
-  ): () => void;
-}
-
 /** A repository that can be read and have its note documents loaded. */
 export type ReadableRepository = Repository & DocumentSource;
-
-export type ActiveRepository = ReadableRepository &
-  RepositoryLifecycle &
-  RepositoryStatusSource;
 
 export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = { kind: 'local' };
 

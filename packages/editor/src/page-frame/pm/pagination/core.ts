@@ -1,10 +1,20 @@
 export const PAGE_HEIGHT = 880;
 export const PAGE_PADDING = 48;
 export const PAGE_GAP = 40;
-// Also surfaced to CSS as --pm-content-height (see plugin.ts / editor-blocks.css)
-// so the page-capped block max-height tracks this constant.
 export const CONTENT_HEIGHT = PAGE_HEIGHT - PAGE_PADDING * 2; // 784
 export const PAGE_BREAK_GAP = PAGE_PADDING + PAGE_GAP + PAGE_PADDING; // 136
+
+/** Page dimensions in CSS px; per frame, since page size and margins are document settings. */
+export interface PageGeometry {
+  contentHeight: number;
+  /** Distance from the bottom of one page's content to the top of the next's. */
+  breakGap: number;
+}
+
+export const DEFAULT_PAGE_GEOMETRY: PageGeometry = {
+  contentHeight: CONTENT_HEIGHT,
+  breakGap: PAGE_BREAK_GAP,
+};
 
 export type BreakKind = 'block' | 'inline' | 'table-row';
 
@@ -14,6 +24,8 @@ export interface Break {
   kind: BreakKind;
   /** Renders after the anchor gap at the same position instead of before it. */
   afterAnchorGap?: boolean;
+  /** Renders before embed widgets at the same position, which otherwise come first. */
+  beforeEmbeds?: boolean;
 }
 
 export interface ParagraphPaginationResult {
@@ -25,8 +37,8 @@ export interface ParagraphPaginationResult {
 }
 
 /**
- * One visual line inside a paragraph, in CSS pixels relative to the editor content top, as if no
- * pagination decorations existed. `getPos` is lazy — called only when the loop decides to emit a
+ * One visual line inside a paragraph, in CSS pixels relative to the editor content top, measured
+ * with pagination spacers hidden. `getPos` is lazy — called only when the loop decides to emit a
  * break at this line, so measurers can defer expensive DOM lookups.
  */
 export interface ParagraphLine {
@@ -38,8 +50,9 @@ export interface ParagraphLine {
 
 export interface TableRowLine extends ParagraphLine {
   isHeaderRow?: boolean;
-  splitLines?: ParagraphLine[];
-  measureSplitLines?: () => ParagraphLine[];
+  /** Text lines of each cell, top to bottom. */
+  cellLines?: ParagraphLine[][];
+  measureCellLines?: () => ParagraphLine[][];
 }
 
 export interface PaginationBlock {
@@ -50,27 +63,18 @@ export interface PaginationBlock {
   isBreakableTextBlock: boolean;
   isBreakableTableBlock: boolean;
   isPageHeightConstrained: boolean;
-}
-
-export interface ParagraphMeasurementState {
-  blockNaturalTop: number;
-  blockShift: number;
-  cumulativeShift: number;
-  pageBoundary: number;
-  pageStart: number;
+  /** Moves to the next page rather than end a page without the block after it. */
+  keepWithNext?: boolean;
+  /** A manual page break: whatever follows starts a new page. */
+  forcesPageBreak?: boolean;
+  isEmbed?: boolean;
 }
 
 interface CalculateBreakLayoutOptions<Block extends PaginationBlock> {
   blocks: readonly Block[];
-  existingBreaks: readonly Break[];
-  measureParagraphLines: (
-    block: Block,
-    state: ParagraphMeasurementState,
-  ) => ParagraphLine[];
-  measureTableRows?: (
-    block: Block,
-    state: ParagraphMeasurementState,
-  ) => TableRowLine[];
+  geometry?: PageGeometry;
+  measureParagraphLines: (block: Block) => ParagraphLine[];
+  measureTableRows?: (block: Block) => TableRowLine[];
   now?: () => number;
   onOverflowingBlock?: (block: Block) => void;
   onOverflowingParagraph?: (block: Block) => void;
@@ -83,8 +87,7 @@ interface CalculateBreakLayoutOptions<Block extends PaginationBlock> {
 }
 
 /**
- * The *only* pagination algorithm for paragraphs. It doesn't know how the lines were measured —
- * Pretext or DOM — it walks them in order, checks whether each crosses the current page boundary
+ * The *only* pagination algorithm for paragraphs. It walks lines in order, checks whether each crosses the current page boundary
  * in effective coordinates (natural + accumulated shift), and emits a widget break when one does.
  */
 export function paginateParagraph(
@@ -94,6 +97,7 @@ export function paginateParagraph(
   initialPageStart: number,
   initialPageBoundary: number,
   initialCumulativeShift: number,
+  { contentHeight, breakGap }: PageGeometry = DEFAULT_PAGE_GEOMETRY,
 ): ParagraphPaginationResult {
   const breaks: Break[] = [];
   let pageStart = initialPageStart;
@@ -113,7 +117,7 @@ export function paginateParagraph(
     // Crosses the boundary. Emit a break unless the line is already at
     // the top of the current page (oversized/first-line case).
     if (lineEffectiveTop > pageStart) {
-      const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
+      const spacer = pageBoundary + breakGap - lineEffectiveTop;
       if (spacer > 0) {
         if (lineIndex === 0) {
           // If the paragraph's first visual line doesn't fit, move the whole paragraph with a block break:
@@ -142,8 +146,8 @@ export function paginateParagraph(
       }
     }
 
-    pageStart = pageBoundary + PAGE_BREAK_GAP;
-    pageBoundary = pageStart + CONTENT_HEIGHT;
+    pageStart = pageBoundary + breakGap;
+    pageBoundary = pageStart + contentHeight;
     pageAdvances++;
   }
 
@@ -158,6 +162,7 @@ export function paginateTableRows(
   initialPageBoundary: number,
   initialCumulativeShift: number,
   tableNaturalTop: number = rows[0]?.naturalTop ?? 0,
+  { contentHeight, breakGap }: PageGeometry = DEFAULT_PAGE_GEOMETRY,
 ): ParagraphPaginationResult {
   const breaks: Break[] = [];
   let pageStart = initialPageStart;
@@ -166,7 +171,7 @@ export function paginateTableRows(
   let pageAdvances = 0;
   let segmentStartRowIndex = 0;
   let headerRowCount = 0;
-  const splitLineCache = new Map<TableRowLine, ParagraphLine[]>();
+  const cellLineCache = new Map<TableRowLine, ParagraphLine[][]>();
 
   while (
     headerRowCount < rows.length &&
@@ -179,72 +184,109 @@ export function paginateTableRows(
   }
 
   const advancePage = () => {
-    pageStart = pageBoundary + PAGE_BREAK_GAP;
-    pageBoundary = pageStart + CONTENT_HEIGHT;
+    pageStart = pageBoundary + breakGap;
+    pageBoundary = pageStart + contentHeight;
     pageAdvances++;
   };
 
-  const getSplitLines = (row: TableRowLine): ParagraphLine[] => {
-    const cached = splitLineCache.get(row);
+  const getCellLines = (row: TableRowLine): ParagraphLine[][] => {
+    const cached = cellLineCache.get(row);
     if (cached) {
       return cached;
     }
 
-    const splitLines = row.splitLines ?? row.measureSplitLines?.() ?? [];
-    splitLineCache.set(row, splitLines);
-    return splitLines;
+    const cellLines = row.cellLines ?? row.measureCellLines?.() ?? [];
+    cellLineCache.set(row, cellLines);
+    return cellLines;
   };
 
+  // Every cell breaks at its own first overflowing line, so all cells resume at the next page top.
+  // A spacer in one cell alone would leave the others' lines straddling the gap.
   const splitInsideRow = (row: TableRowLine): boolean => {
-    const splitLines = getSplitLines(row);
-    if (splitLines.length === 0) {
+    const cells = getCellLines(row).filter((lines) => lines.length > 0);
+    if (cells.length === 0) {
       return false;
     }
 
-    let didSplit = false;
-    let segmentHasFittingLine = false;
+    const rowShift = cumulativeShift;
+    const cellShifts = cells.map(() => 0);
+    const cursors = cells.map(() => 0);
+    const hasFittingLine = cells.map(() => false);
+    const cellBreaks: Break[] = [];
+    let isFirstBoundary = true;
 
-    for (const line of splitLines) {
-      const lineEffectiveTop = line.naturalTop + cumulativeShift;
-      const lineEffectiveBottom = line.naturalBottom + cumulativeShift;
-
-      if (lineEffectiveBottom <= pageBoundary) {
-        if (lineEffectiveBottom > pageStart) {
-          segmentHasFittingLine = true;
-        }
-        continue;
-      }
-
-      let appliedSpacer = 0;
-      if (lineEffectiveTop > pageStart && segmentHasFittingLine) {
-        const spacer = pageBoundary + PAGE_BREAK_GAP - lineEffectiveTop;
-        if (spacer > 0) {
-          const pos = line.getPos();
-          if (pos !== null) {
-            const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
-            breaks.push({ pos: clamped, spacer, kind: 'inline' });
-            cumulativeShift += spacer;
-            appliedSpacer = spacer;
-            didSplit = true;
+    for (;;) {
+      const crossings: Array<{ cell: number; index: number }> = [];
+      for (let cell = 0; cell < cells.length; cell++) {
+        const lines = cells[cell];
+        while (cursors[cell] < lines.length) {
+          const line = lines[cursors[cell]];
+          const bottom = line.naturalBottom + rowShift + cellShifts[cell];
+          if (bottom > pageBoundary) {
+            crossings.push({ cell, index: cursors[cell] });
+            break;
           }
+          if (bottom > pageStart) {
+            hasFittingLine[cell] = true;
+          }
+          cursors[cell]++;
         }
       }
+      if (crossings.length === 0) {
+        break;
+      }
 
-      if (!didSplit) {
+      let maxCrossingBottom = 0;
+      for (const { cell, index } of crossings) {
+        const line = cells[cell][index];
+        const top = line.naturalTop + rowShift + cellShifts[cell];
+        if (top > pageStart && !hasFittingLine[cell] && isFirstBoundary) {
+          return false;
+        }
+        const spacer = pageBoundary + breakGap - top;
+        const pos =
+          top > pageStart && hasFittingLine[cell] && spacer > 0
+            ? line.getPos()
+            : null;
+        if (pos !== null) {
+          const clamped = Math.max(tablePos + 1, Math.min(pos, tableEnd - 1));
+          cellBreaks.push({ pos: clamped, spacer, kind: 'inline' });
+          cellShifts[cell] += spacer;
+        }
+        maxCrossingBottom = Math.max(
+          maxCrossingBottom,
+          line.naturalBottom + rowShift + cellShifts[cell],
+        );
+        cursors[cell] = index + 1;
+      }
+
+      if (isFirstBoundary && cellBreaks.length === 0) {
         return false;
       }
+      isFirstBoundary = false;
 
-      const shiftedLineBottom = lineEffectiveBottom + appliedSpacer;
       do {
         advancePage();
-      } while (shiftedLineBottom > pageBoundary);
-
-      segmentHasFittingLine = shiftedLineBottom > pageStart;
+      } while (maxCrossingBottom > pageBoundary);
+      for (const { cell, index } of crossings) {
+        hasFittingLine[cell] =
+          cells[cell][index].naturalBottom + rowShift + cellShifts[cell] >
+          pageStart;
+      }
     }
 
-    if (!didSplit) {
-      return false;
+    breaks.push(...cellBreaks.sort((a, b) => a.pos - b.pos));
+    let naturalContentBottom = Number.NEGATIVE_INFINITY;
+    let shiftedContentBottom = Number.NEGATIVE_INFINITY;
+    for (let cell = 0; cell < cells.length; cell++) {
+      const bottom = cells[cell][cells[cell].length - 1].naturalBottom;
+      naturalContentBottom = Math.max(naturalContentBottom, bottom);
+      shiftedContentBottom = Math.max(
+        shiftedContentBottom,
+        bottom + cellShifts[cell],
+      );
     }
+    cumulativeShift += shiftedContentBottom - naturalContentBottom;
 
     const shiftedRowBottom = row.naturalBottom + cumulativeShift;
     while (shiftedRowBottom > pageBoundary) {
@@ -265,10 +307,10 @@ export function paginateTableRows(
 
     const rowHeight = row.naturalBottom - row.naturalTop;
     const canSplitInsideRow =
-      row.splitLines !== undefined || row.measureSplitLines !== undefined;
+      row.cellLines !== undefined || row.measureCellLines !== undefined;
     if (
       canSplitInsideRow &&
-      (rowHeight > CONTENT_HEIGHT || rowEffectiveTop < pageBoundary) &&
+      (rowHeight > contentHeight || rowEffectiveTop < pageBoundary) &&
       splitInsideRow(row)
     ) {
       segmentStartRowIndex = rowIndex;
@@ -291,7 +333,7 @@ export function paginateTableRows(
     const breakTop = shouldMoveWholeTable
       ? tableNaturalTop + cumulativeShift
       : rowEffectiveTop;
-    const spacer = pageBoundary + PAGE_BREAK_GAP - breakTop;
+    const spacer = pageBoundary + breakGap - breakTop;
     if (spacer > 0) {
       if (shouldMoveWholeTable) {
         breaks.push({ pos: tablePos, spacer, kind: 'block' });
@@ -318,7 +360,7 @@ export function paginateTableRows(
 
 export function calculateBreakLayout<Block extends PaginationBlock>({
   blocks,
-  existingBreaks,
+  geometry = DEFAULT_PAGE_GEOMETRY,
   measureParagraphLines,
   measureTableRows,
   now,
@@ -330,30 +372,125 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
   breaks: Break[];
   pageCount: number;
 } {
-  const sorted = [...existingBreaks].sort((a, b) => a.pos - b.pos);
-
+  const { contentHeight, breakGap } = geometry;
   const newBreaks: Break[] = [];
   let pageStart = 0;
-  let pageBoundary = CONTENT_HEIGHT;
+  let pageBoundary = contentHeight;
   let pageCount = 1;
   let cumulativeShift = 0;
-  let previousPassShift = 0;
-  let nextPreviousBreakIndex = 0;
+  let previousBottom: number | null = null;
+  let forceBreak = false;
 
-  for (const block of blocks) {
-    while (
-      nextPreviousBreakIndex < sorted.length &&
-      sorted[nextPreviousBreakIndex].pos <= block.pos
+  const advancePage = () => {
+    pageStart = pageBoundary + breakGap;
+    pageBoundary = pageStart + contentHeight;
+    pageCount++;
+  };
+
+  // The bottom of the smallest piece of `block` that must share a page with what precedes it.
+  const firstPieceBottom = (block: Block): number => {
+    if (block.isBreakableTextBlock) {
+      const first = measureParagraphLines(block)[0];
+      return first ? first.naturalBottom : block.measuredTop + block.height;
+    }
+    if (block.isBreakableTableBlock && measureTableRows) {
+      const rows = measureTableRows(block);
+      const firstBody = rows.find((row) => !row.isHeaderRow) ?? rows[0];
+      return firstBody ? firstBody.naturalBottom : block.measuredTop;
+    }
+    return (
+      block.measuredTop +
+      (block.isPageHeightConstrained
+        ? Math.min(block.height, contentHeight)
+        : block.height)
+    );
+  };
+
+  // Walks a run of keep-with-next blocks to the first block that isn't one.
+  const strandedAtPageEnd = (index: number): boolean => {
+    let next = index + 1;
+    while (blocks[next]?.keepWithNext) {
+      next++;
+    }
+    const follower = blocks[next];
+    if (!follower || follower.forcesPageBreak) {
+      return false;
+    }
+    if (
+      follower.measuredTop + follower.height + cumulativeShift <=
+      pageBoundary
     ) {
-      previousPassShift += sorted[nextPreviousBreakIndex].spacer;
-      nextPreviousBreakIndex++;
+      return false;
+    }
+    const followerBottom = firstPieceBottom(follower);
+    // Moving the run is pointless when it can't share a page with the follower anyway, e.g. a
+    // page-tall code block; it would only leave the run alone on a page of its own.
+    if (followerBottom - blocks[index].measuredTop > contentHeight) {
+      return false;
+    }
+    return followerBottom + cumulativeShift > pageBoundary;
+  };
+
+  for (let index = 0; index < blocks.length; index++) {
+    const block = blocks[index];
+    // A spacer stops the margins around it collapsing, so editor-base.css zeroes them and the
+    // spacer absorbs the gap they occupied. Without this a block's position would depend on
+    // whether it already has a break, and layout on edit history.
+    const marginGap =
+      previousBottom === null
+        ? 0
+        : Math.max(0, block.measuredTop - previousBottom);
+    previousBottom = block.measuredTop + block.height;
+
+    if (block.forcesPageBreak) {
+      forceBreak = true;
+      continue;
     }
 
-    const blockShift = previousPassShift;
-    const blockNaturalTop = block.measuredTop - blockShift;
-    const blockEffectiveTop = blockNaturalTop + cumulativeShift;
+    const withMarginGap = (breaks: readonly Break[]): Break[] =>
+      breaks.map((b) =>
+        b.kind === 'block' && b.pos === block.pos
+          ? { ...b, spacer: b.spacer + marginGap }
+          : b,
+      );
+
+    // A block taller than a page can end short of the page it spilled onto; what follows it would
+    // otherwise sit in the gap between sheets. 0.5px absorbs float noise from earlier spacers.
+    const shortOfPage = pageStart - (block.measuredTop + cumulativeShift);
+    if (shortOfPage > 0.5) {
+      newBreaks.push({
+        pos: block.pos,
+        spacer: shortOfPage + marginGap,
+        kind: 'block',
+        ...(block.isEmbed && { beforeEmbeds: true }),
+      });
+      cumulativeShift += shortOfPage;
+    }
+
+    const startsMidPage = () => {
+      const top = block.measuredTop + cumulativeShift;
+      return top > pageStart && top < pageBoundary;
+    };
+    if (
+      (forceBreak || (block.keepWithNext && strandedAtPageEnd(index))) &&
+      startsMidPage()
+    ) {
+      const spacer =
+        pageBoundary + breakGap - (block.measuredTop + cumulativeShift);
+      newBreaks.push({
+        pos: block.pos,
+        spacer: spacer + marginGap,
+        kind: 'block',
+        ...(block.isEmbed && { beforeEmbeds: true }),
+      });
+      cumulativeShift += spacer;
+      advancePage();
+    }
+    forceBreak = false;
+
+    const blockEffectiveTop = block.measuredTop + cumulativeShift;
     const blockHeight = block.isPageHeightConstrained
-      ? Math.min(block.height, CONTENT_HEIGHT)
+      ? Math.min(block.height, contentHeight)
       : block.height;
     const blockEffectiveBottom = blockEffectiveTop + blockHeight;
 
@@ -363,13 +500,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
 
     if (block.isBreakableTextBlock && blockEffectiveTop < pageBoundary) {
       onOverflowingParagraph?.(block);
-      const lines = measureParagraphLines(block, {
-        blockNaturalTop,
-        blockShift,
-        cumulativeShift,
-        pageStart,
-        pageBoundary,
-      });
+      const lines = measureParagraphLines(block);
       onParagraphMeasured?.(block, lines);
       const paragraphStartedAt = now?.() ?? 0;
       const result = paginateParagraph(
@@ -379,13 +510,14 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
         pageStart,
         pageBoundary,
         cumulativeShift,
+        geometry,
       );
       onParagraphPaginated?.(
         block,
         result,
         now ? now() - paragraphStartedAt : 0,
       );
-      newBreaks.push(...result.breaks);
+      newBreaks.push(...withMarginGap(result.breaks));
       cumulativeShift = result.cumulativeShift;
       pageStart = result.pageStart;
       pageBoundary = result.pageBoundary;
@@ -398,13 +530,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
       blockEffectiveTop < pageBoundary &&
       measureTableRows
     ) {
-      const rows = measureTableRows(block, {
-        blockNaturalTop,
-        blockShift,
-        cumulativeShift,
-        pageStart,
-        pageBoundary,
-      });
+      const rows = measureTableRows(block);
       const tableStartedAt = now?.() ?? 0;
       const result = paginateTableRows(
         rows,
@@ -413,10 +539,11 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
         pageStart,
         pageBoundary,
         cumulativeShift,
-        blockNaturalTop,
+        block.measuredTop,
+        geometry,
       );
       onParagraphPaginated?.(block, result, now ? now() - tableStartedAt : 0);
-      newBreaks.push(...result.breaks);
+      newBreaks.push(...withMarginGap(result.breaks));
       cumulativeShift = result.cumulativeShift;
       pageStart = result.pageStart;
       pageBoundary = result.pageBoundary;
@@ -427,9 +554,14 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
     onOverflowingBlock?.(block);
     let spacerApplied = 0;
     if (blockEffectiveTop > pageStart) {
-      const spacer = pageBoundary + PAGE_BREAK_GAP - blockEffectiveTop;
+      const spacer = pageBoundary + breakGap - blockEffectiveTop;
       if (spacer > 0) {
-        newBreaks.push({ pos: block.pos, spacer, kind: 'block' });
+        newBreaks.push({
+          pos: block.pos,
+          spacer: spacer + marginGap,
+          kind: 'block',
+          ...(block.isEmbed && { beforeEmbeds: true }),
+        });
         cumulativeShift += spacer;
         spacerApplied = spacer;
       }
@@ -437,9 +569,7 @@ export function calculateBreakLayout<Block extends PaginationBlock>({
 
     const finalBottom = blockEffectiveTop + spacerApplied + blockHeight;
     do {
-      pageStart = pageBoundary + PAGE_BREAK_GAP;
-      pageBoundary = pageStart + CONTENT_HEIGHT;
-      pageCount++;
+      advancePage();
     } while (finalBottom > pageBoundary);
   }
 

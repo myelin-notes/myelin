@@ -138,4 +138,19 @@ describe('Logger', () => {
       },
     );
   });
+
+  it('redacts sensitive metadata before it reaches the error reporter', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reporter = vi.fn();
+    setLogErrorReporter(reporter);
+
+    new Logger('Sync').error('failed', { token: 'abc', noteId: 'n1' });
+    setLogErrorReporter(null);
+
+    expect(reporter).toHaveBeenCalledWith(expect.any(Error), {
+      subsystem: 'Sync',
+      token: '[REDACTED]',
+      noteId: 'n1',
+    });
+  });
 });

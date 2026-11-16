@@ -22,6 +22,7 @@ interface FillTextCall {
   text: string;
   x: number;
   y: number;
+  font: string;
 }
 
 // measureText returns a width proportional to length, so word-wrap is deterministic without a real
@@ -29,8 +30,10 @@ interface FillTextCall {
 function createStubContext(): {
   ctx: CanvasRenderingContext2D;
   fillTexts: FillTextCall[];
+  rects: { x: number; w: number; h: number }[];
 } {
   const fillTexts: FillTextCall[] = [];
+  const rects: { x: number; w: number; h: number }[] = [];
   const ctx = {
     font: '',
     fillStyle: '',
@@ -38,12 +41,14 @@ function createStubContext(): {
     lineWidth: 0,
     textBaseline: 'alphabetic',
     fillText(text: string, x: number, y: number) {
-      fillTexts.push({ text, x, y });
+      fillTexts.push({ text, x, y, font: ctx.font });
     },
     measureText(text: string) {
       return { width: text.length * 8 } as TextMetrics;
     },
-    fillRect() {},
+    fillRect(x: number, _y: number, w: number, h: number) {
+      rects.push({ x, w, h });
+    },
     beginPath() {},
     moveTo() {},
     lineTo() {},
@@ -55,7 +60,7 @@ function createStubContext(): {
     restore() {},
     translate() {},
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, fillTexts };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, fillTexts, rects };
 }
 
 function paragraph(text: string): ProseMirrorNode {
@@ -118,6 +123,34 @@ describe('renderPageFrameThumbnail', () => {
     for (let i = 1; i < ys.length; i++) {
       expect(ys[i]).toBeGreaterThan(ys[i - 1]);
     }
+  });
+
+  it('draws inline marks with their own font and decorations', () => {
+    const mark = (name: string) => [schema.marks[name].create()];
+    const doc = makeDoc([
+      schema.nodes.paragraph.create(null, [
+        schema.text('plain '),
+        schema.text('strong', mark('bold')),
+        schema.text(' '),
+        schema.text('slanted', mark('italic')),
+        schema.text(' '),
+        schema.text('mono', mark('code')),
+        schema.text(' '),
+        schema.text('under', mark('underline')),
+      ]),
+    ]);
+    const { ctx, fillTexts, rects } = createStubContext();
+
+    renderPageFrameThumbnail(doc, ctx, OPTS, PALETTE);
+
+    const fontOf = (text: string) =>
+      fillTexts.find((c) => c.text === text)?.font;
+    expect(fontOf('plain ')).toBe('16px sans-serif');
+    expect(fontOf('strong')).toBe('bold 16px sans-serif');
+    expect(fontOf('slanted')).toBe('italic 16px sans-serif');
+    expect(fontOf('mono')).toBe('16px monospace');
+    const under = fillTexts.find((c) => c.text === 'under')!;
+    expect(rects).toContainEqual({ x: under.x, w: 5 * 8, h: 1 });
   });
 
   it('does not throw on an empty doc', () => {

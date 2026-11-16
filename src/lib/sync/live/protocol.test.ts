@@ -50,9 +50,26 @@ describe('peer presence messages', () => {
     });
   });
 
+  it('accepts a legacy guest mode from older peers as an owner device', () => {
+    expect(
+      decodeMessage(
+        encodePeerJson({
+          peerId: 'peer-a',
+          kind: 'hello',
+          mode: 'guest-viewer',
+        }),
+      ),
+    ).toEqual({
+      type: 'peer',
+      peerId: 'peer-a',
+      kind: 'hello',
+      mode: 'owner-device',
+    });
+  });
+
   it('rejects messages missing required fields', () => {
     expect(
-      decodeMessage(encodePeerJson({ peerId: 'peer-a', kind: 'hello' })),
+      decodeMessage(encodePeerJson({ peerId: 'peer-a', mode: 'owner-device' })),
     ).toBeNull();
   });
 });

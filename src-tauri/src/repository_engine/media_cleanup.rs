@@ -4,8 +4,9 @@ use super::{
     FileWrite, Store,
 };
 use crate::repository_bootstrap::reject_symlink;
+use crate::repository_metadata::Node;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -64,7 +65,7 @@ fn referenced(root: &Path) -> Result<HashSet<String>, String> {
 /// only saw what had been synced, so anything a document here still points at is kept and published
 /// again. Returns whether anything was. A failed scan keeps everything: an unneeded file is cheap and
 /// a lost one is not.
-pub(super) fn settle_removed(state: &mut Store, removed: Vec<Value>) -> Result<bool, String> {
+pub(super) fn settle_removed(state: &mut Store, removed: Vec<Node>) -> Result<bool, String> {
     if removed.is_empty() {
         return Ok(false);
     }
@@ -72,12 +73,11 @@ pub(super) fn settle_removed(state: &mut Store, removed: Vec<Value>) -> Result<b
     let mut files = Vec::new();
     let mut restored = false;
     for node in removed {
-        let hash = node["id"].as_str().ok_or("Invalid repository node ID")?;
+        let hash = node.id.clone();
         let name = file_name(&node)?;
-        let needed = referenced.as_ref().is_none_or(|set| set.contains(hash));
+        let needed = referenced.as_ref().is_none_or(|set| set.contains(&hash));
         if needed && state.root.join("files").join(&name).exists() {
-            let hash = hash.to_owned();
-            state.manifest["nodes"][&hash] = node;
+            state.manifest.nodes.insert(hash.clone(), node);
             state.queue("upsert-manifest-node", Some(&hash), json!({}));
             state.queue("push-note", Some(&hash), json!({"baseFileRevision": null}));
             restored = true;
@@ -108,16 +108,11 @@ pub(super) fn clean(state: &mut Store, now: u64) -> Result<usize, String> {
         return Ok(0);
     }
     let referenced = referenced(&state.root)?;
-    let unused: Vec<Value> = state.manifest["nodes"]
-        .as_object()
-        .unwrap()
+    let unused: Vec<Node> = state
+        .manifest
+        .nodes
         .values()
-        .filter(|node| {
-            node["system"]["kind"] == "media"
-                && node["id"]
-                    .as_str()
-                    .is_some_and(|id| !referenced.contains(id))
-        })
+        .filter(|node| node.is_media() && !referenced.contains(&node.id))
         .cloned()
         .collect();
     let mut progress = Progress {
@@ -126,17 +121,14 @@ pub(super) fn clean(state: &mut Store, now: u64) -> Result<usize, String> {
     };
     let mut files = Vec::new();
     for node in unused {
-        let hash = node["id"].as_str().ok_or("Invalid repository node ID")?;
+        let hash = node.id.as_str();
         let first = saved.first_unused_at.get(hash).copied().unwrap_or(now);
         if now.saturating_sub(first) < UNUSED_FOR_MS {
             progress.first_unused_at.insert(hash.to_owned(), first);
             continue;
         }
         state.transaction_active = true;
-        state.manifest["nodes"]
-            .as_object_mut()
-            .unwrap()
-            .remove(hash);
+        state.manifest.nodes.remove(hash);
         state.queue(
             "delete-manifest-node",
             Some(hash),

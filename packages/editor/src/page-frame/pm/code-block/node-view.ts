@@ -23,6 +23,7 @@ import {
   forwardNestedContentUpdate,
   forwardNestedSelectionUpdate,
 } from '../nested-editor/pm-sync';
+import { PAGE_GEOMETRY_ATTRIBUTE } from '../pagination/invalidation-controller';
 import {
   collectRunSource,
   type FenceSource,
@@ -130,15 +131,15 @@ export class CodeBlockNodeView implements NodeView {
     this.runView.setLanguage(parseBlockLanguage(this.node.textContent));
     this.syncBlockId();
 
-    // The .pm-page-capped max-height tracks data-page-layout, which the frame
-    // can flip after this view mounts (e.g. switching to continuous in
-    // settings) — re-measure the outer height when it does.
+    // The .pm-page-capped max-height tracks data-page-layout and the page geometry, which the
+    // frame can change after this view mounts (switching to continuous, or new page size or
+    // margins) — re-measure the outer height when they do.
     const layoutHost = this.view.dom.closest(`.${PM_EDITOR_CLASS}`);
     if (layoutHost) {
       this.layoutObserver = new MutationObserver(() => this.syncHeight());
       this.layoutObserver.observe(layoutHost, {
         attributes: true,
-        attributeFilter: ['data-page-layout'],
+        attributeFilter: ['data-page-layout', PAGE_GEOMETRY_ATTRIBUTE],
       });
     }
 

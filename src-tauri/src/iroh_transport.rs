@@ -130,10 +130,11 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         repository: Option<(String, String)>,
     ) -> Result<String, String> {
-        self.attach_topic(app, note_id, transport_id, repository, vec![])
+        self.attach_topic(app, note_id, live_secret, transport_id, repository, vec![])
             .await?;
         Ok(EndpointTicket::new(self.endpoint.addr()).to_string())
     }
@@ -142,6 +143,7 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         ticket: &str,
         repository: Option<(String, String)>,
@@ -152,8 +154,15 @@ impl IrohRuntime {
         let bootstrap = vec![endpoint_addr.id];
         self.memory_lookup.add_endpoint_info(endpoint_addr);
 
-        self.attach_topic(app, note_id, transport_id, repository, bootstrap)
-            .await
+        self.attach_topic(
+            app,
+            note_id,
+            live_secret,
+            transport_id,
+            repository,
+            bootstrap,
+        )
+        .await
     }
 
     /// Look up the topic, validate the transport, and clone out the sender so
@@ -187,6 +196,7 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         repository: Option<(String, String)>,
         bootstrap: Vec<EndpointId>,
@@ -195,7 +205,7 @@ impl IrohRuntime {
 
         let topic = self
             .gossip
-            .subscribe(note_topic_id(note_id), bootstrap)
+            .subscribe(note_topic_id(live_secret, note_id), bootstrap)
             .await
             .map_err(|err| format!("Failed to join iroh topic: {err}"))?;
         let (sender, mut receiver) = topic.split();
@@ -335,8 +345,8 @@ impl IrohRuntime {
     }
 }
 
-fn note_topic_id(note_id: &str) -> TopicId {
-    let hash = Sha256::digest(note_id.as_bytes());
+fn note_topic_id(live_secret: &str, note_id: &str) -> TopicId {
+    let hash = Sha256::digest(format!("{live_secret}\0{note_id}").as_bytes());
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(&hash);
     TopicId::from_bytes(bytes)
@@ -409,6 +419,7 @@ pub async fn iroh_host(
     app: AppHandle,
     state: tauri::State<'_, IrohState>,
     note_id: String,
+    live_secret: String,
     transport_id: String,
     repository_handle: Option<String>,
 ) -> Result<String, String> {
@@ -424,7 +435,7 @@ pub async fn iroh_host(
         .await?
         .as_mut()
         .expect("runtime initialized")
-        .host(&app, &note_id, &transport_id, repository)
+        .host(&app, &note_id, &live_secret, &transport_id, repository)
         .await
 }
 
@@ -433,6 +444,7 @@ pub async fn iroh_join(
     app: AppHandle,
     state: tauri::State<'_, IrohState>,
     note_id: String,
+    live_secret: String,
     transport_id: String,
     ticket: String,
     repository_handle: Option<String>,
@@ -449,7 +461,14 @@ pub async fn iroh_join(
         .await?
         .as_mut()
         .expect("runtime initialized")
-        .join(&app, &note_id, &transport_id, &ticket, repository)
+        .join(
+            &app,
+            &note_id,
+            &live_secret,
+            &transport_id,
+            &ticket,
+            repository,
+        )
         .await
 }
 
@@ -529,4 +548,15 @@ pub async fn iroh_leave(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::note_topic_id;
+
+    #[test]
+    fn topic_depends_on_secret() {
+        assert_ne!(note_topic_id("a", "note"), note_topic_id("b", "note"));
+        assert_eq!(note_topic_id("a", "note"), note_topic_id("a", "note"));
+    }
 }

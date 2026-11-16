@@ -1,4 +1,3 @@
-import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import {
   getElementDescriptor,
@@ -13,8 +12,8 @@ import {
   PAGE_WIDTH,
   type PageLayout,
 } from '@myelin/editor/elements/page-frame-constants';
+import { readPageFrameDoc } from '@myelin/editor/page-frame/markdown/legacy-content';
 import { serializeDocToMarkdown } from '@myelin/editor/page-frame/markdown/serializer';
-import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { ReadableRepository, VFSFileNode, VFSNodeId } from '@/lib/sync';
 import { roundBounds } from './bounds';
@@ -311,8 +310,10 @@ export function findElementMap(
 }
 
 function pageFrameDoc(ydoc: YDocManager, pageFrameId: string) {
-  const fragment = ydoc.getXmlFragment(pageFrameId);
-  return yXmlFragmentToProseMirrorRootNode(fragment, schema);
+  return readPageFrameDoc(
+    findElementMap(ydoc, pageFrameId),
+    ydoc.getXmlFragment(pageFrameId),
+  );
 }
 
 function pageFramePlainText(ydoc: YDocManager, pageFrameId: string): string {
