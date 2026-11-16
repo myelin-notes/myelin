@@ -64,29 +64,34 @@ export function selectionHighlightPlugin(): Plugin {
   return new Plugin({
     props: {
       decorations(state) {
-        const { from, to } = state.selection;
-        if (from === to) {
+        if (state.selection.empty) {
           return DecorationSet.empty;
         }
 
-        const decorations = [
-          Decoration.inline(from, to, { class: 'pm-selection' }),
-        ];
-        state.doc.nodesBetween(from, to, (node, pos) => {
-          if (
-            (node.type.name === 'bulletListItem' ||
-              node.type.name === 'orderedListItem' ||
-              node.type.name === 'checkListItem') &&
-            from <= pos &&
-            to >= pos + node.nodeSize
-          ) {
-            decorations.push(
-              Decoration.node(pos, pos + node.nodeSize, {
-                class: 'pm-list-marker-selected',
-              }),
-            );
-          }
-        });
+        // Per range, not from..to: a CellSelection's from..to also spans the unselected cells between.
+        const decorations: Decoration[] = [];
+        for (const { $from, $to } of state.selection.ranges) {
+          const from = $from.pos;
+          const to = $to.pos;
+          decorations.push(
+            Decoration.inline(from, to, { class: 'pm-selection' }),
+          );
+          state.doc.nodesBetween(from, to, (node, pos) => {
+            if (
+              (node.type.name === 'bulletListItem' ||
+                node.type.name === 'orderedListItem' ||
+                node.type.name === 'checkListItem') &&
+              from <= pos &&
+              to >= pos + node.nodeSize
+            ) {
+              decorations.push(
+                Decoration.node(pos, pos + node.nodeSize, {
+                  class: 'pm-list-marker-selected',
+                }),
+              );
+            }
+          });
+        }
 
         return DecorationSet.create(state.doc, decorations);
       },

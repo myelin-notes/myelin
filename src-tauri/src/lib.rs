@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod android_exit;
 mod clipboard;
 mod code_runner;
 mod crash_reports;
@@ -98,7 +99,7 @@ pub fn run() {
             repository_engine::repository_release,
             repository_engine::repository_auth_response,
             note_text_index::index_note_text,
-            note_text_index::list_note_bookmarks,
+            note_text_index::list_note_flags,
             note_text_index::remove_note_text_index,
             pdf_export::export_pdf,
             pdf_export::export_pdf_ios,
@@ -122,6 +123,7 @@ pub fn run() {
             oauth_loopback::oauth_loopback_wait,
             oauth_loopback::oauth_loopback_cancel,
             onenote_import::scan_onenote,
+            onenote_import::discard_onenote_scan,
             import_files::import_file_name,
             crash_reports::configure_crash_reporting,
             crash_reports::acknowledge_crash_report,
@@ -146,6 +148,11 @@ pub fn run() {
     #[cfg(target_os = "ios")]
     {
         builder = builder.plugin(tauri_plugin_apple_compliance::init());
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(tauri_plugin_play_billing::init());
     }
 
     #[cfg(mobile)]

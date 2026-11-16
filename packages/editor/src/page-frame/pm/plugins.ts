@@ -6,12 +6,14 @@ import { ySyncPlugin, yUndoPlugin } from 'y-prosemirror';
 import type * as Y from 'yjs';
 import { anchorGapsPlugin } from './anchoring';
 import type { ResolveMediaSrc } from './embed/renderer';
+import { figureMarkdownPlugin } from './figure/plugin';
 import { buildKeymap, calloutCaretAnchorCleanupPlugin } from './keymap';
 import { embedPreviewPlugin } from './markdown/embeds';
 import {
   fenceMarkdownInputRules,
   fenceMarkdownNormalizationPlugin,
 } from './markdown/fence-commands';
+import { inlineMarkInputRules } from './markdown/inline-marks';
 import { linkMarkdownPlugin } from './markdown/links';
 import {
   noteLinkMarkdownPlugin,
@@ -26,6 +28,7 @@ import {
 } from './math/block-commands';
 import { mathPreviewPlugin } from './math/plugin';
 import { mermaidPreviewPlugin } from './mermaid/plugin';
+import type { PageGeometry } from './pagination/core';
 import { paginationPlugin } from './pagination/plugin';
 import { schema } from './schema';
 import { searchHighlightPlugin } from './search-highlight';
@@ -84,16 +87,19 @@ export function buildPlugins(
   onLayout?: (pageCount: number, contentHeight: number | null) => void,
   resolveNoteLink?: ResolveNoteLink,
   resolveMedia?: ResolveMediaSrc,
+  getGeometry?: () => PageGeometry,
 ): Plugin[] {
   const plugins: Plugin[] = [
     ySyncPlugin(yXmlFragment),
     yUndoPlugin(),
     prefixMarkdownInputRules(schema),
+    inlineMarkInputRules(schema),
     fenceMarkdownInputRules(schema),
     fenceMarkdownNormalizationPlugin(schema),
     mathBlockInputRules(schema),
     mathBlockNormalizationPlugin(schema),
     noteLinkMarkdownPlugin(schema, resolveNoteLink),
+    figureMarkdownPlugin(schema),
     embedPreviewPlugin(resolveMedia),
     linkMarkdownPlugin(schema),
     markdownPastePlugin(),
@@ -104,7 +110,7 @@ export function buildPlugins(
     calloutCaretAnchorCleanupPlugin(),
     buildKeymap(schema),
     anchorGapsPlugin(),
-    paginationPlugin(onLayout),
+    paginationPlugin(onLayout, getGeometry),
     selectionHighlightPlugin(),
     searchHighlightPlugin(),
     wordSelectionDragPlugin(),

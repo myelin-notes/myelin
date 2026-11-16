@@ -7,7 +7,9 @@ import { registerShutdownTask } from '@/lib/shutdown-tasks';
 import {
   CloudflareLiveDiscoveryClient,
   createLiveDiscoveryRoomId,
+  getLiveDiscoveryRepositoryKey,
   type NoteSession,
+  useRepository,
   useRepositoryStatus,
 } from '@/lib/sync';
 import { LivePeerDiscoveryCoordinator } from '@/lib/sync/live/discovery-coordinator';
@@ -17,6 +19,7 @@ const logger = new Logger('useLivePeerDiscovery');
 export function useLivePeerDiscovery(
   noteSession: NoteSession | null,
 ): Error | null {
+  const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const visible = useDocumentVisible();
   const [pauseError, setPauseError] = useState<Error | null>(null);
@@ -68,8 +71,13 @@ export function useLivePeerDiscovery(
     const unregisterShutdownTask = registerShutdownTask(stopDiscovery);
 
     void (async () => {
+      if (!getLiveDiscoveryRepositoryKey(repositoryStatus.config)) {
+        return;
+      }
+      const liveSecret = await repository.getLiveSecret();
       const roomId = await createLiveDiscoveryRoomId(
         repositoryStatus.config,
+        liveSecret,
         noteSession.id,
       );
       if (disposed || !roomId) {
@@ -82,7 +90,7 @@ export function useLivePeerDiscovery(
           baseUrl: LIVE_DISCOVERY_URL,
           roomId,
         }),
-        createTransport: (noteId) => createLiveTransport(noteId),
+        createTransport: (noteId) => createLiveTransport(noteId, liveSecret),
         onPauseChange: setLiveDiscoveryPause,
       });
 
@@ -100,7 +108,7 @@ export function useLivePeerDiscovery(
       unregisterShutdownTask();
       void stopDiscovery();
     };
-  }, [noteSession, repositoryStatus.config, visible]);
+  }, [noteSession, repository, repositoryStatus.config, visible]);
 
   return pauseError;
 }

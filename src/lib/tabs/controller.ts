@@ -183,13 +183,6 @@ function findPane(node: LayoutNode, paneId: PaneId): PaneNode | null {
   return null;
 }
 
-export function findPaneInLayout(
-  node: LayoutNode,
-  paneId: PaneId,
-): PaneNode | null {
-  return findPane(node, paneId);
-}
-
 function findPaneForTab(node: LayoutNode, tabId: TabId): PaneNode | null {
   if (node.type === 'pane') {
     return node.tabs.some((tab) => tab.id === tabId) ? node : null;
@@ -597,6 +590,14 @@ export class TabStateController {
   }
 
   togglePanePage(page: PanePage, paneId?: PaneId): void {
+    const pane = findPane(
+      this.state.layout,
+      paneId ?? this.state.focusedPaneId,
+    );
+    this.showPanePage(pane?.activePage === page ? undefined : page, paneId);
+  }
+
+  showPanePage(page: PanePage | undefined, paneId?: PaneId): void {
     const state = this.state;
     const pane = findPane(state.layout, paneId ?? state.focusedPaneId);
     if (!pane) {
@@ -604,10 +605,7 @@ export class TabStateController {
     }
 
     this.commit({
-      layout: replacePane(state.layout, {
-        ...pane,
-        activePage: pane.activePage === page ? undefined : page,
-      }),
+      layout: replacePane(state.layout, { ...pane, activePage: page }),
       focusedPaneId: pane.id,
     });
   }

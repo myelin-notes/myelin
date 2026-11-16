@@ -9,19 +9,20 @@ import {
 import { Logger } from '@myelin/shared/logger';
 import { isTauri } from '@tauri-apps/api/core';
 import { createSyncCompletionTracker } from './analytics';
+import { RepositoryMediaMigrationGate } from './media-migration-gate';
 import type { RepositoryConfig, RepositoryRuntimeStatus } from './repo/config';
 import {
   type CredentialChange,
   subscribeCredentialChanges,
 } from './repo/credential-vault';
-import { createRepository } from './repo/factory';
 import type { NativeRepository } from './repo/native';
 import { noteContentIndex } from './repo/note-content-index';
 import { credentialTokenKey } from './repo/oauth/client';
-import { isRepositoryFullyConfigured } from './repo/readiness';
 import {
+  createRepository,
   getRepositoryConfigIdentity,
   getRepositoryStorageKey,
+  isRepositoryFullyConfigured,
 } from './repo/repository-backends';
 import {
   getRepositoryConfig,
@@ -60,6 +61,7 @@ function createRepositoryStatus(config: RepositoryConfig): RepositoryStatus {
     lastRemoteSyncAt: null,
     lastError: null,
     syncing: false,
+    mediaMigration: null,
     dataVersion: 0,
   };
 }
@@ -75,6 +77,7 @@ function mergeRuntimeStatus(
     lastRemoteSyncAt: runtimeStatus.lastRemoteSyncAt,
     lastError: runtimeStatus.lastError,
     syncing: runtimeStatus.syncing,
+    mediaMigration: runtimeStatus.mediaMigration,
     dataVersion: runtimeStatus.dataVersion,
   };
 }
@@ -233,6 +236,9 @@ export function RepositoryProvider({
   return (
     <RepositoryContext.Provider value={contextValue}>
       <RepositoryShutdownGate />
+      <RepositoryMediaMigrationGate
+        key={getRepositoryConfigIdentity(resolvedConfig)}
+      />
       {children}
     </RepositoryContext.Provider>
   );

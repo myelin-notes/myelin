@@ -2,7 +2,7 @@ import type { FileType, VFSNodeId } from '@/lib/sync';
 
 export type TabId = string;
 export type PaneId = string;
-export type PanePage = 'graph' | 'settings';
+export type PanePage = 'graph' | 'flags' | 'settings';
 
 export type TabTarget =
   | { type: 'graph' }
@@ -12,7 +12,7 @@ export type TabTarget =
       id: VFSNodeId;
       pageFrameName?: string | null;
       pageFrameId?: string | null;
-      bookmarkId?: string | null;
+      flagId?: string | null;
     }
   | { type: 'image'; id: VFSNodeId; fileType: FileType }
   | { type: 'csv'; id: VFSNodeId }

@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::Mutex;
 
 use onenote_parser::Parser;
 use onenote_parser::contents::{
@@ -42,8 +43,20 @@ const DEFAULT_FONT_PX: f32 = 16.0;
 const DEFAULT_TEXT_COLOR: &str = "#1a1a1a";
 const DEFAULT_INK_COLOR: &str = "#191c1e";
 
+/// ISF `StylusTip.Rectangle`: OneNote's highlighters use it, its pens leave the tip unset.
+const RECTANGLE_PEN_TIP: u8 = 1;
+
+/// Same alpha as `HighlighterTool`, so imported highlights match ones drawn in Myelin.
+const HIGHLIGHTER_ALPHA: f32 = 0.3;
+
+/// The last scan, so confirming an import skips a second parse. Held until that import, the next
+/// scan or `discard_onenote_scan`.
+static LAST_SCAN: Mutex<Option<(String, ImportedNotebook)>> = Mutex::new(None);
+
 pub(crate) struct ImportedNotebook {
     pub(crate) sections: Vec<ImportedSection>,
+    /// Why each skipped top-level entry failed to parse, with its name removed.
+    pub(crate) failed_sections: Vec<String>,
 }
 
 pub(crate) struct ImportedSection {
@@ -87,32 +100,61 @@ pub(crate) struct ImportedStroke {
     pub(crate) points: Vec<f32>,
     pub(crate) color: String,
     pub(crate) size: f32,
+    /// Highlighters hold a constant width; simulated pressure widens dense strokes by up to 1.5x.
+    pub(crate) highlighter: bool,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OneNotePreview {
     pages: usize,
     sections: usize,
+    failed_sections: Vec<String>,
 }
 
 #[tauri::command]
 pub async fn scan_onenote(app: AppHandle, path: FilePath) -> Result<OneNotePreview, String> {
     tokio::task::spawn_blocking(move || {
-        let notebook = read_notebook(&app, path)?;
-        Ok(OneNotePreview {
+        let key = path.to_string();
+        let notebook = parse_path(&app, path)?;
+        let preview = OneNotePreview {
             pages: notebook
                 .sections
                 .iter()
                 .map(|section| section.pages.len())
                 .sum(),
             sections: notebook.sections.len(),
-        })
+            failed_sections: notebook.failed_sections.clone(),
+        };
+        *LAST_SCAN.lock().unwrap() = Some((key, notebook));
+        Ok(preview)
     })
     .await
     .map_err(|e| format!("OneNote scan task panicked: {e}"))?
 }
 
+// Async so dropping a large notebook stays off the main thread.
+#[tauri::command]
+pub async fn discard_onenote_scan() {
+    *LAST_SCAN.lock().unwrap() = None;
+}
+
 pub(crate) fn read_notebook(app: &AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
+    match take_scan(&path.to_string()) {
+        Some(notebook) => Ok(notebook),
+        None => parse_path(app, path),
+    }
+}
+
+fn take_scan(key: &str) -> Option<ImportedNotebook> {
+    LAST_SCAN
+        .lock()
+        .unwrap()
+        .take_if(|(scanned, _)| scanned == key)
+        .map(|(_, notebook)| notebook)
+}
+
+fn parse_path(app: &AppHandle, path: FilePath) -> Result<ImportedNotebook, String> {
     let bytes = crate::import_files::FileImportSource::Path { path }.read(app)?;
     parse_file(&bytes)
 }
@@ -134,6 +176,7 @@ fn parse_single_section(bytes: &[u8]) -> Result<ImportedNotebook, String> {
 
     Ok(ImportedNotebook {
         sections: vec![convert_section(&section, String::new())],
+        failed_sections: Vec::new(),
     })
 }
 
@@ -144,7 +187,26 @@ fn parse_package(bytes: &[u8]) -> Result<ImportedNotebook, String> {
 
     let mut sections = Vec::new();
     collect_sections(notebook.entries(), "", 0, &mut sections);
-    Ok(ImportedNotebook { sections })
+    Ok(ImportedNotebook {
+        sections,
+        failed_sections: notebook
+            .report()
+            .warnings()
+            .iter()
+            .map(|warning| failure_reason(warning.message()))
+            .collect(),
+    })
+}
+
+/// Section names are note content, which the privacy policy keeps on device, and
+/// the parser only reports "failed to import section {path}: {error}" where
+/// `error` can repeat the path. Sanitized paths never contain ':'.
+fn failure_reason(message: &str) -> String {
+    message
+        .strip_prefix("failed to import section ")
+        .and_then(|rest| rest.split_once(": "))
+        .map(|(path, error)| error.replace(path, "<section>"))
+        .unwrap_or_else(|| "unrecognized parser warning".to_string())
 }
 
 fn collect_sections(
@@ -267,6 +329,7 @@ fn convert_page(page: &Page) -> ImportedPage {
             _ => {}
         }
     }
+    merge_overlapping_highlighters(&mut elements);
 
     ImportedPage {
         title: page.title_text().map(str::to_string),
@@ -472,14 +535,111 @@ fn collect_strokes(ink: &Ink, out: &mut Vec<ImportedStroke>) {
             ),
             color: stroke
                 .color()
-                .map(colorref_u32_to_hex)
+                .map(|color| ink_color(color, stroke.transparency()))
                 .unwrap_or_else(|| DEFAULT_INK_COLOR.to_string()),
             size: half_inches_to_px(stroke.width() / HIMETRIC_PER_HALF_INCH),
+            highlighter: stroke.pen_tip() == Some(RECTANGLE_PEN_TIP),
         });
     }
 
     for group in ink.child_groups() {
         collect_strokes(group, out);
+    }
+}
+
+/// Every stroke is its own canvas fill, so translucent strokes stack where they overlap, while
+/// OneNote's mask pen paints an overlap once. A stroke element stores a centre line rather than an
+/// outline, so overlapping strokes of one colour and size are joined into one line, and one fill.
+/// Each line is walked there and back so the join hops only between points already inside the ink;
+/// a straight end-to-start bridge would paint across the page.
+fn merge_overlapping_highlighters(elements: &mut [ImportedElement]) {
+    let mut highlighters = Vec::new();
+    for element in elements.iter_mut() {
+        if let ImportedElement::Ink { strokes } = element {
+            highlighters.extend(strokes.iter_mut().filter(|stroke| stroke.highlighter));
+        }
+    }
+
+    for i in 0..highlighters.len() {
+        let (earlier, later) = highlighters.split_at_mut(i + 1);
+        let stroke = &mut earlier[i];
+        // The later stroke absorbs the earlier, keeping the highlight above everything it covered.
+        for other in later {
+            if other.color != stroke.color || other.size != stroke.size {
+                continue;
+            }
+            let Some((at, from)) = closest_points(&other.points, &stroke.points, stroke.size)
+            else {
+                continue;
+            };
+            close_walk(&mut stroke.points);
+            close_walk(&mut other.points);
+            let resume = [other.points[at * 2], other.points[at * 2 + 1]];
+            let walk = [
+                &stroke.points[from * 2..],
+                &stroke.points[2..(from + 1) * 2],
+            ]
+            .concat();
+            let insert_at = (at + 1) * 2;
+            other
+                .points
+                .splice(insert_at..insert_at, walk.into_iter().chain(resume));
+            stroke.points.clear();
+            break;
+        }
+    }
+
+    for element in elements.iter_mut() {
+        if let ImportedElement::Ink { strokes } = element {
+            strokes.retain(|stroke| !stroke.points.is_empty());
+        }
+    }
+}
+
+/// Indices of the nearest pair of points closer than `limit`, or `None` if the lines stay further
+/// apart than that.
+fn closest_points(a: &[f32], b: &[f32], limit: f32) -> Option<(usize, usize)> {
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+    for point in b.chunks_exact(2) {
+        min_x = min_x.min(point[0]);
+        min_y = min_y.min(point[1]);
+        max_x = max_x.max(point[0]);
+        max_y = max_y.max(point[1]);
+    }
+
+    let mut closest = None;
+    let mut closest_distance = limit * limit;
+    for (i, p) in a.chunks_exact(2).enumerate() {
+        if p[0] < min_x - limit
+            || p[0] > max_x + limit
+            || p[1] < min_y - limit
+            || p[1] > max_y + limit
+        {
+            continue;
+        }
+        for (j, q) in b.chunks_exact(2).enumerate() {
+            let distance = (p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2);
+            if distance < closest_distance {
+                closest_distance = distance;
+                closest = Some((i, j));
+            }
+        }
+    }
+    closest
+}
+
+/// Appends the way back to the start so the line can be entered and left at any point. A line that
+/// already ends where it starts is left alone, which stops a chain of merges doubling it every time.
+fn close_walk(points: &mut Vec<f32>) {
+    if points[..2] != points[points.len() - 2..] {
+        let back: Vec<f32> = points
+            .chunks_exact(2)
+            .rev()
+            .skip(1)
+            .flatten()
+            .copied()
+            .collect();
+        points.extend(back);
     }
 }
 
@@ -520,6 +680,16 @@ fn colorref_u32_to_hex(value: u32) -> String {
     format!("#{r:02x}{g:02x}{b:02x}")
 }
 
+/// OneNote's own value (about 50%) buries the writing under a highlight on a dark canvas, so any
+/// translucent stroke takes Myelin's highlighter alpha instead.
+fn ink_color(color: u32, transparency: Option<u8>) -> String {
+    if transparency.unwrap_or(0) == 0 {
+        return colorref_u32_to_hex(color);
+    }
+    let [r, g, b, _] = color.to_le_bytes();
+    format!("rgba({r},{g},{b},{HIGHLIGHTER_ALPHA})")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -540,6 +710,21 @@ mod tests {
     }
 
     #[test]
+    fn a_scan_is_only_reused_for_the_file_it_read_and_only_once() {
+        *LAST_SCAN.lock().unwrap() = Some((
+            "a.onepkg".to_string(),
+            ImportedNotebook {
+                sections: Vec::new(),
+                failed_sections: Vec::new(),
+            },
+        ));
+
+        assert!(take_scan("b.onepkg").is_none());
+        assert!(take_scan("a.onepkg").is_some());
+        assert!(take_scan("a.onepkg").is_none());
+    }
+
+    #[test]
     fn strips_math_delimiters_but_keeps_the_expression() {
         assert_eq!(clean_text("a\u{FDD0}b\u{FDEE}c\u{FDEF}d"), "abcd");
         assert_eq!(clean_text("plain text"), "plain text");
@@ -554,12 +739,123 @@ mod tests {
         assert_eq!(colorref_u32_to_hex(9_129_728), "#004f8b");
     }
 
+    fn highlighter(color: &str, start: (f32, f32), points: usize) -> ImportedStroke {
+        ImportedStroke {
+            points: (0..points)
+                .flat_map(|i| [start.0 + i as f32 * 5.0, start.1])
+                .collect(),
+            color: color.to_string(),
+            size: 10.0,
+            highlighter: true,
+        }
+    }
+
+    fn merged_strokes(strokes: Vec<ImportedStroke>) -> Vec<ImportedStroke> {
+        // One container per stroke: OneNote splits ink across containers on a page.
+        let mut elements: Vec<_> = strokes
+            .into_iter()
+            .map(|stroke| ImportedElement::Ink {
+                strokes: vec![stroke],
+            })
+            .collect();
+        merge_overlapping_highlighters(&mut elements);
+        elements
+            .into_iter()
+            .flat_map(|element| match element {
+                ImportedElement::Ink { strokes } => strokes,
+                _ => unreachable!(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn overlapping_highlighters_join_without_bridging_across_the_page() {
+        let first = highlighter("yellow", (0.0, 0.0), 7);
+        // Crosses `first` mid-line, so a join at either line's ends would jump further than `size`.
+        let second = ImportedStroke {
+            points: (0..7)
+                .flat_map(|i| [15.0, -15.0 + i as f32 * 5.0])
+                .collect(),
+            ..highlighter("yellow", (0.0, 0.0), 7)
+        };
+        let (first_points, second_points) = (first.points.clone(), second.points.clone());
+        let strokes = merged_strokes(vec![
+            first,
+            second,
+            highlighter("yellow", (0.0, 500.0), 7),
+            highlighter("cyan", (0.0, 0.0), 7),
+            ImportedStroke {
+                highlighter: false,
+                ..highlighter("yellow", (0.0, 0.0), 7)
+            },
+        ]);
+
+        assert_eq!(
+            strokes.len(),
+            4,
+            "far, other-colour and pen strokes stay apart"
+        );
+        let merged: Vec<&[f32]> = strokes[0].points.chunks_exact(2).collect();
+        for point in first_points
+            .chunks_exact(2)
+            .chain(second_points.chunks_exact(2))
+        {
+            assert!(merged.contains(&point), "lost {point:?}");
+        }
+        for step in merged.windows(2) {
+            let distance = (step[0][0] - step[1][0]).hypot(step[0][1] - step[1][1]);
+            assert!(
+                distance <= 10.0,
+                "{step:?} paints a band outside the highlights"
+            );
+        }
+    }
+
+    #[test]
+    fn a_chain_of_merges_does_not_keep_doubling_the_line() {
+        let strokes: Vec<_> = (0..12)
+            .map(|i| highlighter("yellow", (i as f32 * 20.0, 0.0), 7))
+            .collect();
+        let original_points: usize = strokes.iter().map(|stroke| stroke.points.len() / 2).sum();
+
+        let merged = merged_strokes(strokes);
+
+        assert_eq!(merged.len(), 1);
+        assert!(merged[0].points.len() / 2 <= original_points * 3);
+    }
+
+    #[test]
+    fn translucent_ink_takes_the_highlighter_alpha() {
+        // 0x0000FFFF is yellow in COLORREF order; 128 is what OneNote's highlighters store.
+        assert_eq!(ink_color(0x0000_FFFF, Some(128)), "rgba(255,255,0,0.3)");
+        assert_eq!(ink_color(0x0000_FFFF, Some(0)), "#ffff00");
+        assert_eq!(ink_color(0x0000_FFFF, None), "#ffff00");
+    }
+
     #[test]
     fn auto_color_falls_back_to_the_canvas_default() {
         assert_eq!(color_ref_to_hex(ColorRef::Auto), None);
         assert_eq!(
             color_ref_to_hex(ColorRef::Manual { r: 1, g: 2, b: 3 }),
             Some("#010203".to_string())
+        );
+    }
+
+    #[test]
+    fn failure_reason_drops_the_section_name() {
+        assert_eq!(
+            failure_reason("failed to import section Solids 2.one: Unexpected end of file"),
+            "Unexpected end of file"
+        );
+        assert_eq!(
+            failure_reason(
+                "failed to import section Lab/Notes.one: Not a section file: Lab/Notes.one"
+            ),
+            "Not a section file: <section>"
+        );
+        assert_eq!(
+            failure_reason("Solids 2.one could not be read"),
+            "unrecognized parser warning"
         );
     }
 

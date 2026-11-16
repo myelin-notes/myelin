@@ -18,9 +18,12 @@ import { toggleMark } from 'prosemirror-commands';
 import type { MarkType } from 'prosemirror-model';
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 import { AddColorSwatch } from '../../components/add-color-swatch';
 import { ColorSwatch } from '../../components/color-swatch';
 import { CustomColorSwatch } from '../../components/custom-color-swatch';
+import { FontSizeField } from '../../components/font-size-field';
+import { useKeepPopoverOnScreen } from '../../components/use-keep-popover-on-screen';
 import { useCustomColors } from '../../custom-colors';
 import { PM_UPDATE_EVENT } from '../../events';
 import {
@@ -68,6 +71,10 @@ const FONTS: { label: string; value: string | null }[] = [
   },
 ];
 
+const MIN_FONT_PT = 6;
+const MAX_FONT_PT = 96;
+const PT_PER_PX = 0.75;
+
 const EDGE_MARGIN = 8;
 const SELECTION_GAP = 8;
 
@@ -77,13 +84,16 @@ function setAttributedMark(
   markType: MarkType,
   attrs: Record<string, unknown> | null,
 ): void {
-  const { from, to } = view.state.selection;
-  if (from === to) {
+  const { selection, tr } = view.state;
+  if (selection.empty) {
     return;
   }
-  let tr = view.state.tr.removeMark(from, to, markType);
-  if (attrs) {
-    tr = tr.addMark(from, to, markType.create(attrs));
+  // A CellSelection holds one range per cell; from..to covers only the first.
+  for (const { $from, $to } of selection.ranges) {
+    tr.removeMark($from.pos, $to.pos, markType);
+    if (attrs) {
+      tr.addMark($from.pos, $to.pos, markType.create(attrs));
+    }
   }
   view.dispatch(tr);
   view.focus();
@@ -94,8 +104,9 @@ function setAttributedMark(
 function selectionScreenRect(
   view: EditorView,
 ): { centerX: number; top: number; bottom: number } | null {
-  const { from, to, empty } = view.state.selection;
-  if (empty) {
+  const { from, to, empty, $from, $to } = view.state.selection;
+  // Code blocks allow no marks, so every toolbar action would be a no-op.
+  if (empty || ($from.sameParent($to) && $from.parent.type.spec.code)) {
     return null;
   }
   const start = getPageFramePmScreenRectForPos(view, from);
@@ -160,10 +171,15 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   const [colorAttrs, setColorAttrs] = useState<Record<string, unknown> | null>(
     null,
   );
+  const [fontSizePt, setFontSizePt] = useState(12);
+  // Selection range the toolbar was last placed for. Restyling text (size, bold, font) shifts the
+  // selection's rect; re-placing on that would move the button out from under repeated clicks.
+  const placedForRef = useRef<string | null>(null);
 
   const sync = useEffectEvent(() => {
     const rect = selectionScreenRect(view);
     if (!rect) {
+      placedForRef.current = null;
       setVisible(false);
       setOpenMenu(null);
       return;
@@ -192,28 +208,54 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
       attrsEqual(current, nextColorAttrs) ? current : nextColorAttrs,
     );
 
+    // Without a uniform size mark, show the size of the text at the selection start.
+    const sizeMark = uniformSelectionMarkAttrs(
+      view.state,
+      schema.marks.fontSize,
+    );
+    const startDom = view.domAtPos(view.state.selection.from).node;
+    const startElement =
+      startDom instanceof Element ? startDom : startDom.parentElement;
+    setFontSizePt(
+      (sizeMark?.size as number | undefined) ??
+        (startElement
+          ? Math.round(
+              Number.parseFloat(getComputedStyle(startElement).fontSize) *
+                PT_PER_PX,
+            )
+          : 12),
+    );
+
+    setVisible(true);
     const toolbar = ref.current;
+    const { from, to } = view.state.selection;
+    const placementKey = `${from}:${to}`;
+    if (toolbar && placedForRef.current === placementKey) {
+      return;
+    }
+    // Only lock once placed with the real toolbar size, not the fallback below.
+    placedForRef.current = toolbar ? placementKey : null;
     const width = toolbar?.offsetWidth ?? 260;
     const height = toolbar?.offsetHeight ?? 40;
 
+    const visible = getVisibleViewportBounds();
     let left = rect.centerX - width / 2;
     left = Math.max(
-      EDGE_MARGIN,
-      Math.min(left, window.innerWidth - width - EDGE_MARGIN),
+      visible.left + EDGE_MARGIN,
+      Math.min(left, visible.right - width - EDGE_MARGIN),
     );
 
     const above = rect.top - height - SELECTION_GAP;
     const below = rect.bottom + SELECTION_GAP;
     const top =
-      above >= EDGE_MARGIN
+      above >= visible.top + EDGE_MARGIN
         ? above
-        : Math.min(below, window.innerHeight - height - EDGE_MARGIN);
+        : Math.min(below, visible.bottom - height - EDGE_MARGIN);
 
     const nextStyle = { left, top };
     setStyle((current) =>
       styleEqual(current, nextStyle) ? current : nextStyle,
     );
-    setVisible(true);
   });
   const handleDocumentPointerDown = useEffectEvent((event: PointerEvent) => {
     if (pickerOpen || swatchMenuOpen) {
@@ -229,6 +271,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     if (view.dom.contains(target)) {
       return;
     }
+    placedForRef.current = null;
     setOpenMenu(null);
     setVisible(false);
   });
@@ -339,14 +382,17 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   return createPortal(
     <div
       ref={ref}
-      className="fade-in-0 zoom-in-95 fixed z-50 flex animate-in items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
+      data-page-frame-preserve-focus
+      className="fade-in-0 zoom-in-95 fixed z-50 flex w-max max-w-[calc(100vw-1rem)] animate-in flex-wrap items-center gap-1 rounded-xl bg-card/80 p-1 shadow-ambient backdrop-blur-[24px] duration-150"
       style={{
         ...style,
         border: '1px solid var(--border-ghost)',
       }}
       onPointerDown={(e) => {
-        // Keep PM selection intact when interacting with the toolbar.
-        e.preventDefault();
+        // Keep PM selection intact when interacting with the toolbar. Inputs still need focus to type.
+        if (!(e.target instanceof HTMLInputElement)) {
+          e.preventDefault();
+        }
       }}
     >
       {TOGGLE_MARKS.map(({ key, icon: Icon, mark, label }) => (
@@ -396,6 +442,18 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
           </Popover>
         )}
       </div>
+
+      <FontSizeField
+        value={fontSizePt}
+        min={MIN_FONT_PT}
+        max={MAX_FONT_PT}
+        step={1}
+        preserveFocus
+        touchTargets
+        onChange={(size) =>
+          setAttributedMark(view, schema.marks.fontSize, { size })
+        }
+      />
 
       <div className="relative">
         <ToolbarButton
@@ -504,8 +562,11 @@ function Divider() {
 }
 
 function Popover({ children }: { children: React.ReactNode }) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  useKeepPopoverOnScreen(popoverRef);
   return (
     <div
+      ref={popoverRef}
       className="fade-in-0 zoom-in-95 absolute top-full left-1/2 z-[51] mt-1 min-w-[180px] animate-in overflow-hidden rounded-xl bg-popover/95 p-1 shadow-ambient backdrop-blur-2xl duration-100"
       style={{
         transform: 'translateX(-50%)',

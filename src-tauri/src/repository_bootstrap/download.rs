@@ -48,6 +48,8 @@ impl Default for RemoteEndpoints {
     }
 }
 
+const STALL_TIMEOUT: Duration = Duration::from_secs(if cfg!(test) { 5 } else { 120 });
+
 pub(crate) struct RemoteClient {
     pub(crate) client: Client,
     pub(crate) token: String,
@@ -79,9 +81,12 @@ fn copy_durable(source: &Path, destination: &Path) -> std::io::Result<()> {
 
 impl RemoteClient {
     pub(crate) fn new(token: String, github: bool) -> Result<Self, String> {
+        // Bounds stalls, not transfers: a total limit failed a 1 GB tarball that took just over 120s.
+        // shortcut: closing the app waits out an in-flight download, cancel on release if noticed.
         let client = Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(120))
+            .connect_timeout(Duration::from_secs(30))
+            .read_timeout(STALL_TIMEOUT)
             .build()
             .map_err(|_| "Repository download client unavailable")?;
         Ok(Self {
@@ -118,13 +123,10 @@ impl RemoteClient {
                     .body(serde_json::to_vec(body).map_err(|_| "Invalid repository request")?);
             }
             trace.add("http_request_count", 1);
-            let response = request
-                .send()
-                .await
-                .map_err(|_| {
-                    trace.add("http_transport_error_count", 1);
-                    format!("{label} before receiving a response")
-                })?;
+            let response = request.send().await.map_err(|_| {
+                trace.add("http_transport_error_count", 1);
+                format!("{label} before receiving a response")
+            })?;
             let status = response.status().as_u16();
             if status >= 400 && status != 404 {
                 trace.add("http_error_count", 1);
@@ -148,7 +150,7 @@ impl RemoteClient {
             {
                 return Ok(response);
             }
-            return Err(format!("{label} ({status})"));
+            return Err(status_error(response, label).await);
         }
         Err(format!("{label}: exhausted retries"))
     }
@@ -160,7 +162,8 @@ impl RemoteClient {
         url: Url,
         body: Option<Value>,
     ) -> Result<Value, String> {
-        let response = require_success(self.request(label, method, url, body).await?, label)?;
+        let response =
+            require_success(self.request(label, method, url, body).await?, label).await?;
         let bytes = response
             .bytes()
             .await
@@ -194,11 +197,30 @@ fn retry_delay(response: &Response, attempt: usize, github: bool) -> Option<Dura
     ))
 }
 
-pub(crate) fn require_success(response: Response, label: &str) -> Result<Response, String> {
+pub(crate) async fn require_success(response: Response, label: &str) -> Result<Response, String> {
     if response.status().is_success() {
         Ok(response)
     } else {
-        Err(format!("{label} ({})", response.status().as_u16()))
+        Err(status_error(response, label).await)
+    }
+}
+
+// GitHub puts the reason in `message`, Drive in `error.message`; the status alone can't tell a
+// missing repository from a rule violation or an oversized file.
+async fn status_error(response: Response, label: &str) -> String {
+    let status = response.status().as_u16();
+    let body = response
+        .bytes()
+        .await
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .unwrap_or_default();
+    match body["message"]
+        .as_str()
+        .or(body["error"]["message"].as_str())
+    {
+        Some(message) => format!("{label} ({status}): {message}"),
+        None => format!("{label} ({status})"),
     }
 }
 
@@ -210,28 +232,23 @@ pub(crate) fn endpoint(base: &str, segments: &[&str]) -> Result<Url, String> {
     Ok(url)
 }
 
-pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
+pub(crate) fn manifest_files(manifest: &metadata::Manifest) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
-    for (key, node) in manifest["nodes"]
-        .as_object()
-        .ok_or("Invalid repository manifest")?
-    {
-        if node["type"] == "folder" {
+    for (key, node) in &manifest.nodes {
+        if node.is_folder() {
             continue;
         }
-        if node["type"] != "file" {
-            return Err("Invalid repository manifest node".into());
+        if !valid_component(&node.id) || node.id != *key {
+            return Err("Invalid repository file ID".into());
         }
-        let id = node["id"]
-            .as_str()
-            .filter(|id| valid_component(id) && *id == key)
-            .ok_or("Invalid repository file ID")?;
-        let file_type = node["fileType"]
-            .as_str()
+        let file_type = node
+            .file_type
+            .as_deref()
             .filter(|value| valid_component(value))
             .ok_or("Invalid repository file type")?;
         files.push(format!(
-            "{id}.{}",
+            "{}.{}",
+            node.id,
             if file_type == "mcanvas" {
                 "myelin"
             } else {
@@ -242,6 +259,7 @@ pub(crate) fn manifest_files(manifest: &Value) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+#[cfg(test)]
 pub(crate) async fn download_repository(
     stage: &Path,
     source: RepositorySource,
@@ -390,7 +408,7 @@ async fn download_github(
     }
     let archive = stage.join(".archive.tar.gz");
     save_response(
-        require_success(response, "GitHub tarball request failed")?,
+        require_success(response, "GitHub tarball request failed").await?,
         &archive,
         "GitHub tarball download failed",
     )
@@ -613,33 +631,24 @@ async fn write_github_snapshot(
     if manifest_bytes.is_empty() {
         return Ok(None);
     }
-    let manifest = if metadata::is_marker(&manifest_bytes)
-        || (metadata::legacy::parse_manifest(&manifest_bytes).is_err()
-            && entries
-                .keys()
-                .any(|path| path == metadata::SETTINGS || metadata::is_metadata_path(path)))
+    if !stage.join("manifest.json").exists() {
+        write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
+    }
+    for path in entries
+        .keys()
+        .filter(|path| *path == metadata::SETTINGS || metadata::is_metadata_path(path))
     {
-        if !stage.join("manifest.json").exists() {
-            write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
-        }
-        for path in entries
-            .keys()
-            .filter(|path| *path == metadata::SETTINGS || metadata::is_metadata_path(path))
+        let sha = blob_revision(path)?;
+        let destination = stage.join(path);
+        if !cached
+            .get(path.as_str())
+            .is_some_and(|file| file.link(&destination, sha, None))
         {
-            let sha = blob_revision(path)?;
-            let destination = stage.join(path);
-            if !cached
-                .get(path.as_str())
-                .is_some_and(|file| file.link(&destination, sha, None))
-            {
-                let bytes = blobs.read(sha).await?;
-                write_durable(&destination, &bytes)?;
-            }
+            let bytes = blobs.read(sha).await?;
+            write_durable(&destination, &bytes)?;
         }
-        metadata::load(stage)?.manifest
-    } else {
-        metadata::legacy::parse_manifest(&manifest_bytes)?
-    };
+    }
+    let manifest = metadata::load(stage)?.manifest;
     let files = manifest_files(&manifest)?;
     let mut size = 0;
     for name in &files {
@@ -654,9 +663,6 @@ async fn write_github_snapshot(
         let bytes = blobs.read(sha).await?;
         size += bytes.len() as u64;
         write_durable(&destination, &bytes)?;
-    }
-    if !stage.join("manifest.json").exists() {
-        write_durable(&stage.join("manifest.json"), &manifest_bytes)?;
     }
     write_durable(&stage.join(".remote-revision"), revision.as_bytes())?;
     let revisions = files
@@ -753,16 +759,10 @@ fn extract_archive(stage: &Path) -> Result<(usize, u64), String> {
         )?;
         return Ok((0, 0));
     }
-    let manifest = if metadata::is_marker(&bytes)
-        || (metadata::legacy::parse_manifest(&bytes).is_err() && !records.is_empty())
-    {
-        for (path, bytes) in records {
-            write_durable(&stage.join(path), &bytes)?;
-        }
-        metadata::load(stage)?.manifest
-    } else {
-        metadata::legacy::parse_manifest(&bytes)?
-    };
+    for (path, bytes) in records {
+        write_durable(&stage.join(path), &bytes)?;
+    }
+    let manifest = metadata::load(stage)?.manifest;
     let files = manifest_files(&manifest)?;
     let mut remaining: HashMap<_, _> = files
         .iter()
@@ -890,7 +890,8 @@ async fn download_drive_entry(
             .request("Google Drive download failed", Method::GET, url, None)
             .await?,
         "Google Drive download failed",
-    )?;
+    )
+    .await?;
     save_response(response, destination, "Google Drive download failed").await
 }
 
@@ -930,54 +931,42 @@ async fn download_drive(
     } else {
         HashMap::new()
     };
-    let settings_entry = if metadata::legacy::parse_manifest(&bytes).is_err() {
-        find_drive(client, endpoints, folder, metadata::SETTINGS, false).await?
-    } else {
-        None
-    };
-    let sidecars = metadata::is_marker(&bytes)
-        || (metadata::legacy::parse_manifest(&bytes).is_err()
-            && (settings_entry.is_some()
-                || entries.keys().any(|name| name.ends_with(metadata::SUFFIX))));
-    let fresh = bytes.is_empty() && !sidecars;
-    if fresh {
+    let settings_entry = find_drive(client, endpoints, folder, metadata::SETTINGS, false).await?;
+    if bytes.is_empty()
+        && settings_entry.is_none()
+        && !entries.keys().any(|name| name.ends_with(metadata::SUFFIX))
+    {
         write_durable(
             &stage.join(metadata::SETTINGS),
             &metadata::settings(&metadata::empty_manifest())?,
         )?;
     }
-    let sidecars = sidecars || fresh;
-    let manifest = if sidecars {
-        if let Some(entry) = &settings_entry {
-            if !entry.head_revision_id.as_deref().is_some_and(|revision| {
-                cached.get(metadata::SETTINGS).is_some_and(|file| {
-                    file.link(&stage.join(metadata::SETTINGS), revision, Some(&entry.id))
-                })
-            }) {
-                download_drive_entry(client, endpoints, entry, &stage.join(metadata::SETTINGS))
-                    .await?;
-            }
+    if let Some(entry) = &settings_entry {
+        if !entry.head_revision_id.as_deref().is_some_and(|revision| {
+            cached.get(metadata::SETTINGS).is_some_and(|file| {
+                file.link(&stage.join(metadata::SETTINGS), revision, Some(&entry.id))
+            })
+        }) {
+            download_drive_entry(client, endpoints, entry, &stage.join(metadata::SETTINGS)).await?;
         }
-        for (name, entry) in entries
-            .iter()
-            .filter(|(name, _)| name.ends_with(metadata::SUFFIX))
-        {
-            let path = format!("files/{name}");
-            if !metadata::is_metadata_path(&path) {
-                return Err("Invalid Google Drive metadata path".into());
-            }
-            if !entry.head_revision_id.as_deref().is_some_and(|revision| {
-                cached
-                    .get(&path)
-                    .is_some_and(|file| file.link(&stage.join(&path), revision, Some(&entry.id)))
-            }) {
-                download_drive_entry(client, endpoints, entry, &stage.join(&path)).await?;
-            }
+    }
+    for (name, entry) in entries
+        .iter()
+        .filter(|(name, _)| name.ends_with(metadata::SUFFIX))
+    {
+        let path = format!("files/{name}");
+        if !metadata::is_metadata_path(&path) {
+            return Err("Invalid Google Drive metadata path".into());
         }
-        metadata::load(stage)?.manifest
-    } else {
-        metadata::legacy::parse_manifest(&bytes)?
-    };
+        if !entry.head_revision_id.as_deref().is_some_and(|revision| {
+            cached
+                .get(&path)
+                .is_some_and(|file| file.link(&stage.join(&path), revision, Some(&entry.id)))
+        }) {
+            download_drive_entry(client, endpoints, entry, &stage.join(&path)).await?;
+        }
+    }
+    let manifest = metadata::load(stage)?.manifest;
     let files = manifest_files(&manifest)?;
     let mut size = 0;
     for batch in files.chunks(8) {
@@ -1033,9 +1022,7 @@ async fn download_drive(
     if find_drive(client, endpoints, folder, "manifest.json", false).await? != manifest_entry {
         return Err("Google Drive manifest changed during download".into());
     }
-    if sidecars
-        && find_drive(client, endpoints, folder, metadata::SETTINGS, false).await? != settings_entry
-    {
+    if find_drive(client, endpoints, folder, metadata::SETTINGS, false).await? != settings_entry {
         return Err("Google Drive metadata changed during download".into());
     }
     if let Some(query) = query {

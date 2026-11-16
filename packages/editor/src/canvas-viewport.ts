@@ -435,13 +435,21 @@ export class CanvasViewport {
     } else {
       this.cancelAnimation();
       // Two-finger scroll on trackpad / mouse wheel → pan.
+      // Some platforms already move shift+wheel onto deltaX and some leave it on deltaY, so take
+      // whichever axis carries it.
+      const [deltaX, deltaY] = evt.shiftKey
+        ? [
+            Math.abs(evt.deltaX) > Math.abs(evt.deltaY)
+              ? evt.deltaX
+              : evt.deltaY,
+            0,
+          ]
+        : [evt.deltaX, evt.deltaY];
       // In edit mode, lock wheel pan to the edited element's page axis.
       const dx =
-        !this.editMode || this.editModePanAxis === 'horizontal'
-          ? -evt.deltaX
-          : 0;
+        !this.editMode || this.editModePanAxis === 'horizontal' ? -deltaX : 0;
       const dy =
-        !this.editMode || this.editModePanAxis === 'vertical' ? -evt.deltaY : 0;
+        !this.editMode || this.editModePanAxis === 'vertical' ? -deltaY : 0;
       this._offset.x += dx / this._zoom;
       this._offset.y += dy / this._zoom;
       this.notifyViewChange();

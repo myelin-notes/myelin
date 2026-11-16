@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Columns2,
+  Flag,
   Home,
   MoreHorizontal,
   Network,
@@ -122,6 +123,9 @@ export const TabBar = memo(function TabBar({
   }, []);
   const toggleGraph = useCallback(() => {
     controller.togglePanePage('graph', pane.id);
+  }, [controller, pane.id]);
+  const toggleFlags = useCallback(() => {
+    controller.togglePanePage('flags', pane.id);
   }, [controller, pane.id]);
   const toggleSettings = useCallback(() => {
     controller.togglePanePage('settings', pane.id);
@@ -430,6 +434,16 @@ export const TabBar = memo(function TabBar({
             className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
           >
             <Network className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleFlags}
+            aria-label={strings.flagsPage.title}
+            title={strings.flagsPage.title}
+            aria-pressed={pane.activePage === 'flags'}
+            className="flex size-7 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary aria-pressed:bg-hover-tint aria-pressed:text-text-primary"
+          >
+            <Flag className="size-4" />
           </button>
           <button
             type="button"

@@ -17,6 +17,14 @@ export interface PenPreset {
   size: number;
 }
 
+/** A user-defined flag category, such as a red "To-do". Flags reference it by `id`. */
+export interface FlagType {
+  id: string;
+  name: string;
+  /** Normalized hex. */
+  color: string;
+}
+
 /** Partial edit. Absent fields are left as they are. */
 export interface PenPresetChanges {
   color?: string;
@@ -52,6 +60,7 @@ export type VFSNode = VFSFileNode | VFSFolderNode;
 
 export type VFSSystemMetadata =
   | { kind: 'version-history-root' }
+  | { kind: 'media'; byteLength: number }
   | {
       kind: 'file-version';
       sourceFileId: VFSNodeId;
@@ -127,15 +136,8 @@ export interface SearchNodesOptions {
   limit?: number;
 }
 
-export interface RepositoryCapabilities {
-  polling: boolean;
-  liveSync: boolean;
-  batchedCommit: boolean;
-}
-
 export interface Repository {
   readonly kind: string;
-  readonly capabilities: RepositoryCapabilities;
 
   getNode(nodeId: VFSNodeId): Promise<VFSNode | null>;
   listDirectory(
@@ -195,7 +197,6 @@ export interface Repository {
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   /** `null` clears back to the default color. */
   setFolderColor(nodeId: VFSNodeId, color: string | null): Promise<void>;
-  getRevealPath(nodeId: VFSNodeId): Promise<string | null>;
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 
@@ -209,6 +210,10 @@ export interface Repository {
   updatePenPreset(id: string, changes: PenPresetChanges): Promise<PenPreset[]>;
   reorderPenPresets(ids: readonly string[]): Promise<PenPreset[]>;
   removePenPreset(id: string): Promise<PenPreset[]>;
+
+  /** Empty until the user first edits the list; callers show the default types meanwhile. */
+  getFlagTypes(): Promise<FlagType[]>;
+  setFlagTypes(types: readonly FlagType[]): Promise<FlagType[]>;
 
   getRegistryTags(): Promise<string[]>;
   addRegistryTags(tags: string[]): Promise<string[]>;

@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -7,6 +8,7 @@ import {
 } from 'react';
 import { Check as CheckIcon } from 'lucide-react';
 import type { ChromeMenuItem } from '@myelin/editor/chrome-menu';
+import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
 
 interface ChromeMenuProps {
   anchor: DOMRect;
@@ -99,7 +101,7 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fade-in-0 slide-in-from-top-1 zoom-in-95 pointer-events-auto fixed z-[100] min-w-[200px] origin-top-right animate-in overflow-hidden rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+      className="fade-in-0 slide-in-from-top-1 zoom-in-95 pointer-events-auto fixed z-[100] max-h-[calc(var(--app-height)-1.5rem)] min-w-[200px] origin-top-right animate-in overflow-y-auto rounded-xl bg-popover/90 p-1.5 shadow-ambient outline-none backdrop-blur-2xl duration-[140ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
       style={{ top: pos.top, left: pos.left, minWidth: MENU_MIN_WIDTH }}
       role="menu"
       onKeyDown={onMenuKeyDown}
@@ -115,48 +117,52 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
             } as const)
           : ({ role: 'menuitem' } as const);
         return (
-          <button
-            key={item.id}
-            ref={(el) => {
-              itemRefs.current[index] = el;
-            }}
-            type="button"
-            {...roleProps}
-            tabIndex={index === focusedIndex ? 0 : -1}
-            onPointerDown={(e) => {
-              // Mouse menu interaction should not steal focus from an active
-              // page-frame editor; the click still fires normally.
-              e.preventDefault();
-            }}
-            onFocus={() => setFocusedIndex(index)}
-            onClick={() => {
-              item.onSelect();
-              onClose();
-            }}
-            className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2 text-left text-sm outline-none transition-colors ${
-              danger
-                ? 'text-destructive hover:bg-destructive/10'
-                : 'text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:text-text-primary'
-            }`}
-          >
-            {Icon && (
-              <Icon
-                className={
-                  danger
-                    ? 'size-4 text-destructive'
-                    : 'size-4 text-text-muted transition-colors group-hover:text-text-secondary'
-                }
-              />
+          <Fragment key={item.id}>
+            {item.separatorBefore && index > 0 && (
+              <hr className="-mx-1.5 my-1.5 border-border border-t" />
             )}
-            <span className="flex-1 truncate">{item.label}</span>
-            {item.checked && (
-              <CheckIcon
-                aria-hidden="true"
-                className="size-4 text-text-primary"
-                strokeWidth={1.5}
-              />
-            )}
-          </button>
+            <button
+              ref={(el) => {
+                itemRefs.current[index] = el;
+              }}
+              type="button"
+              {...roleProps}
+              tabIndex={index === focusedIndex ? 0 : -1}
+              onPointerDown={(e) => {
+                // Mouse menu interaction should not steal focus from an active
+                // page-frame editor; the click still fires normally.
+                e.preventDefault();
+              }}
+              onFocus={() => setFocusedIndex(index)}
+              onClick={() => {
+                item.onSelect();
+                onClose();
+              }}
+              className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2 text-left text-sm outline-none transition-colors ${
+                danger
+                  ? 'text-destructive hover:bg-destructive/10'
+                  : 'text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:text-text-primary'
+              }`}
+            >
+              {Icon && (
+                <Icon
+                  className={
+                    danger
+                      ? 'size-4 text-destructive'
+                      : 'size-4 text-text-muted transition-colors group-hover:text-text-secondary'
+                  }
+                />
+              )}
+              <span className="flex-1 truncate">{item.label}</span>
+              {item.checked && (
+                <CheckIcon
+                  aria-hidden="true"
+                  className="size-4 text-text-primary"
+                  strokeWidth={1.5}
+                />
+              )}
+            </button>
+          </Fragment>
         );
       })}
     </div>
@@ -168,21 +174,26 @@ function computePosition(
   menuHeight: number,
   menuWidth: number,
 ): { top: number; left: number } {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const visible = getVisibleViewportBounds();
   const width = Math.max(menuWidth, MENU_MIN_WIDTH);
 
   // Prefer right-aligned under the anchor; fall back to left-aligned if
   // that would clip the left edge.
   let left = anchor.right - width;
-  if (left < VIEWPORT_PAD) {
+  if (left < visible.left + VIEWPORT_PAD) {
     left = anchor.left;
   }
-  left = Math.max(VIEWPORT_PAD, Math.min(left, vw - width - VIEWPORT_PAD));
+  left = Math.max(
+    visible.left + VIEWPORT_PAD,
+    Math.min(left, visible.right - width - VIEWPORT_PAD),
+  );
 
   let top = anchor.bottom + MENU_SIDE_OFFSET;
-  if (menuHeight > 0 && top + menuHeight > vh - VIEWPORT_PAD) {
-    top = Math.max(VIEWPORT_PAD, anchor.top - MENU_SIDE_OFFSET - menuHeight);
+  if (menuHeight > 0 && top + menuHeight > visible.bottom - VIEWPORT_PAD) {
+    top = Math.max(
+      visible.top + VIEWPORT_PAD,
+      anchor.top - MENU_SIDE_OFFSET - menuHeight,
+    );
   }
 
   return { top, left };

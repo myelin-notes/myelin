@@ -1,7 +1,6 @@
 import type { EditorView } from 'prosemirror-view';
 import type { ParagraphLine } from './core';
 import type {
-  PaginationBlockInfo,
   ParagraphLineMeasurement,
   ParagraphLineMeasurer,
 } from './line-measurer';
@@ -57,28 +56,44 @@ interface CachedTextOnlyParagraphLines {
   width: number;
 }
 
-interface CachedTextOnlyParagraphLineBox {
-  charOffset: number;
-  relativeBottom: number;
-  relativeTop: number;
-}
-
-interface CachedTextOnlyParagraphLineResult {
-  contentSize: number;
-  generation: number;
-  height: number;
-  lineBoxes: CachedTextOnlyParagraphLineBox[];
-  text: string;
-  width: number;
-}
-
 interface DomParagraphLineCaches {
   domLineFragments: WeakMap<HTMLElement, CachedParagraphTextLineFragments>;
   textOnlyLines: Map<number, CachedTextOnlyParagraphLines>;
-  textOnlyResults: WeakMap<HTMLElement, CachedTextOnlyParagraphLineResult>;
 }
 
 const MAX_TEXT_ONLY_PARAGRAPH_CACHE_ENTRIES = 200;
+
+// Compares centres, not tops: a second font on a line can start a px off the first (WebKit puts JetBrains
+// Mono 1px above Hanken Grotesk), and an exact 1px gap in viewport px also depends on canvas zoom.
+function isSameVisualLine(
+  rect: { top: number; bottom: number },
+  line: { top: number; bottom: number },
+): boolean {
+  const center = (rect.top + rect.bottom) / 2;
+  return center > line.top && center < line.bottom;
+}
+
+// Tops on one line differ only by per-font metric rounding. Keeping the lowest stops the break spacer from
+// depending on which font happens to start the line; a wider offset is a superscript or similar, not rounding.
+function settleLineTop(
+  rect: { top: number; bottom: number },
+  line: { top: number },
+): void {
+  const offset = rect.top - line.top;
+  if (offset > 0 && offset < (rect.bottom - rect.top) * 0.1) {
+    line.top = rect.top;
+  }
+}
+
+function createNaturalRectMapper({
+  editorScreenTop,
+  invScale,
+}: ParagraphLineMeasurement) {
+  return (rect: { top: number; bottom: number }) => ({
+    naturalTop: (rect.top - editorScreenTop) * invScale,
+    naturalBottom: (rect.bottom - editorScreenTop) * invScale,
+  });
+}
 
 function countVisibleRects(rects: DOMRectList | DOMRect[]): number {
   let count = 0;
@@ -194,7 +209,8 @@ function mergeVisibleTextLineRects(
       const startCharOffset = startOffsetsByEntry
         ? entry.textOffsetBase + startOffsetsByEntry[entryIndex][rectIndex]
         : null;
-      if (last && Math.abs(rect.top - last.top) < 1) {
+      if (last && isSameVisualLine(rect, last)) {
+        settleLineTop(rect, last);
         if (rect.bottom > last.bottom) {
           last.bottom = rect.bottom;
         }
@@ -304,43 +320,6 @@ function rememberTextOnlyParagraphLineCache(
   }
 }
 
-function canReuseTextOnlyParagraphLineResultCache(
-  cached: CachedTextOnlyParagraphLineResult | undefined,
-  paragraph: TextOnlyParagraphInfo,
-  generation: number,
-  width: number,
-  height: number,
-): cached is CachedTextOnlyParagraphLineResult {
-  if (
-    !cached ||
-    cached.generation !== generation ||
-    cached.text !== paragraph.text ||
-    cached.contentSize !== paragraph.contentSize ||
-    cached.lineBoxes.length === 0
-  ) {
-    return false;
-  }
-  return (
-    Math.abs(cached.width - width) <= 0.5 &&
-    Math.abs(cached.height - height) <= 0.5
-  );
-}
-
-function linesFromCachedTextOnlyParagraphLineResult(
-  cached: CachedTextOnlyParagraphLineResult,
-  block: PaginationBlockInfo,
-  blockNaturalTop: number,
-): ParagraphLine[] {
-  return cached.lineBoxes.map((lineBox) => ({
-    naturalTop: blockNaturalTop + lineBox.relativeTop,
-    naturalBottom: blockNaturalTop + lineBox.relativeBottom,
-    getPos: () =>
-      block.pos +
-      1 +
-      Math.max(0, Math.min(lineBox.charOffset, cached.contentSize)),
-  }));
-}
-
 // `Range#getClientRects()` gives the visual line fragments but not which character starts each.
 // Binary-search the prefix length where the rect count grows: that's the first char of the next line.
 function collectDomLineFragments(
@@ -429,55 +408,24 @@ function collectDomLineFragments(
   return { fragments, cacheEntry: nextCacheEntry };
 }
 
-// Fallback when Pretext can't handle the block (mentions, images). Remembers the text
-// node/offset starting each fragment, which ties split positions to the rendered DOM instead of
+// Remembers the text node/offset starting each fragment, which ties split positions to the rendered DOM instead of
 // caret hit-testing — the latter changes when the editor flips between editable and read-only.
 function measureLinesWithDom(
   measurement: ParagraphLineMeasurement,
   caches: DomParagraphLineCaches,
 ): ParagraphLine[] {
-  const {
-    block,
-    view,
-    editorScreenTop,
-    invScale,
-    blockNaturalTop,
-    blockShift,
-    metrics,
-    measurementCacheGeneration,
-  } = measurement;
+  const { block, view, metrics } = measurement;
   const startedAt = metrics ? performance.now() : 0;
 
   const textOnlyParagraph = getTextOnlyParagraphInfo(view, block.pos);
   if (textOnlyParagraph) {
     const width = block.dom.clientWidth;
-    const cachedLineResult = caches.textOnlyResults.get(block.dom);
-    if (
-      blockNaturalTop !== null &&
-      measurementCacheGeneration !== null &&
-      width > 0 &&
-      canReuseTextOnlyParagraphLineResultCache(
-        cachedLineResult,
-        textOnlyParagraph,
-        measurementCacheGeneration,
-        width,
-        block.height,
-      )
-    ) {
-      return linesFromCachedTextOnlyParagraphLineResult(
-        cachedLineResult,
-        block,
-        blockNaturalTop,
-      );
-    }
-
     if (metrics) {
       metrics.domMeasurementAttemptCount++;
     }
 
     const textNodeRects = collectVisibleTextNodeRects(block.dom, metrics);
     if (textNodeRects.length === 0) {
-      caches.textOnlyResults.delete(block.dom);
       if (metrics) {
         metrics.domMeasurementMs += performance.now() - startedAt;
       }
@@ -521,84 +469,18 @@ function measureLinesWithDom(
       }
     }
 
-    let lineSpacing = 0;
-    if (mergedRects.length >= 3) {
-      let min = Number.POSITIVE_INFINITY;
-      for (let i = 1; i < mergedRects.length; i++) {
-        const gap = mergedRects[i].top - mergedRects[i - 1].top;
-        if (gap > 0 && gap < min) {
-          min = gap;
-        }
-      }
-      if (Number.isFinite(min)) {
-        lineSpacing = min;
-      }
-    }
-    if (lineSpacing <= 0) {
-      const cs = getComputedStyle(block.dom);
-      const parsed = Number.parseFloat(cs.lineHeight);
-      if (Number.isFinite(parsed) && parsed > 0) {
-        lineSpacing = parsed / invScale;
-      } else {
-        lineSpacing = mergedRects[0].bottom - mergedRects[0].top;
-      }
-    }
-    const tolerance = 1;
-
-    const lines: ParagraphLine[] = new Array(mergedRects.length);
-    const lineBoxes: CachedTextOnlyParagraphLineBox[] = new Array(
-      mergedRects.length,
-    );
-    let innerShiftViewport = 0;
-    let prevTop = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < mergedRects.length; i++) {
-      const rect = mergedRects[i];
-      if (prevTop !== Number.NEGATIVE_INFINITY) {
-        const excess = rect.top - prevTop - lineSpacing;
-        if (excess > tolerance) {
-          innerShiftViewport += excess;
-        }
-      }
-      prevTop = rect.top;
-
-      const measuredTop = (rect.top - editorScreenTop) * invScale;
-      const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
-      const totalExistingShift = blockShift + innerShiftViewport * invScale;
+    const naturalRect = createNaturalRectMapper(measurement);
+    const lines: ParagraphLine[] = mergedRects.map((rect, i) => {
       const charOffset = lineStartOffsets[i] ?? 0;
-      const naturalTop = measuredTop - totalExistingShift;
-      const naturalBottom = measuredBottom - totalExistingShift;
-
-      lines[i] = {
-        naturalTop,
-        naturalBottom,
+      return {
+        ...naturalRect(rect),
         getPos: () =>
           block.pos +
           1 +
           Math.max(0, Math.min(charOffset, textOnlyParagraph.contentSize)),
       };
-      lineBoxes[i] = {
-        charOffset,
-        relativeTop:
-          blockNaturalTop === null ? 0 : naturalTop - blockNaturalTop,
-        relativeBottom:
-          blockNaturalTop === null ? 0 : naturalBottom - blockNaturalTop,
-      };
-    }
+    });
 
-    if (
-      blockNaturalTop !== null &&
-      measurementCacheGeneration !== null &&
-      width > 0
-    ) {
-      caches.textOnlyResults.set(block.dom, {
-        text: textOnlyParagraph.text,
-        contentSize: textOnlyParagraph.contentSize,
-        generation: measurementCacheGeneration,
-        width,
-        height: block.height,
-        lineBoxes,
-      });
-    }
     if (metrics) {
       metrics.domMeasurementSuccessCount++;
       metrics.domMeasurementMs += performance.now() - startedAt;
@@ -627,7 +509,8 @@ function measureLinesWithDom(
       textNodeIndex++;
       for (const fragment of fragments) {
         const last = rects[rects.length - 1];
-        if (last && Math.abs(fragment.top - last.top) < 1) {
+        if (last && isSameVisualLine(fragment, last)) {
+          settleLineTop(fragment, last);
           if (fragment.bottom > last.bottom) {
             last.bottom = fragment.bottom;
           }
@@ -655,63 +538,17 @@ function measureLinesWithDom(
     return [];
   }
 
-  // Detect natural line spacing: the minimum adjacent gap when we have
-  // enough rects, else fall back to computed CSS.
-  let lineSpacing = 0;
-  if (rects.length >= 3) {
-    let min = Number.POSITIVE_INFINITY;
-    for (let i = 1; i < rects.length; i++) {
-      const gap = rects[i].top - rects[i - 1].top;
-      if (gap > 0 && gap < min) {
-        min = gap;
+  const naturalRect = createNaturalRectMapper(measurement);
+  const lines: ParagraphLine[] = rects.map((rect) => ({
+    ...naturalRect(rect),
+    getPos: () => {
+      try {
+        return view.posAtDOM(rect.startNode, rect.startOffset, 1);
+      } catch {
+        return null;
       }
-    }
-    if (Number.isFinite(min)) {
-      lineSpacing = min;
-    }
-  }
-  if (lineSpacing <= 0) {
-    const cs = getComputedStyle(block.dom);
-    const parsed = Number.parseFloat(cs.lineHeight);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      lineSpacing = parsed / invScale; // cs is CSS px; rect gaps are viewport px
-    } else {
-      lineSpacing = rects[0].bottom - rects[0].top;
-    }
-  }
-  const tolerance = 1;
-
-  // Walk rects. Any adjacent gap larger than `lineSpacing` is a widget from
-  // a prior pass; its excess contributes to cumulative inner shift.
-  const lines: ParagraphLine[] = new Array(rects.length);
-  let innerShiftViewport = 0;
-  let prevTop = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < rects.length; i++) {
-    const rect = rects[i];
-    if (prevTop !== Number.NEGATIVE_INFINITY) {
-      const excess = rect.top - prevTop - lineSpacing;
-      if (excess > tolerance) {
-        innerShiftViewport += excess;
-      }
-    }
-    prevTop = rect.top;
-
-    const measuredTop = (rect.top - editorScreenTop) * invScale;
-    const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
-    const totalExistingShift = blockShift + innerShiftViewport * invScale;
-
-    lines[i] = {
-      naturalTop: measuredTop - totalExistingShift,
-      naturalBottom: measuredBottom - totalExistingShift,
-      getPos: () => {
-        try {
-          return view.posAtDOM(rect.startNode, rect.startOffset, 1);
-        } catch {
-          return null;
-        }
-      },
-    };
-  }
+    },
+  }));
   if (metrics) {
     metrics.domMeasurementSuccessCount++;
     metrics.domMeasurementMs += performance.now() - startedAt;
@@ -722,28 +559,8 @@ function measureLinesWithDom(
 function measureAnchoredParagraph(
   measurement: ParagraphLineMeasurement,
 ): ParagraphLine[] {
-  const { block, view, editorScreenTop, invScale, blockShift, metrics } =
-    measurement;
-  const breaks = Array.from(
-    block.dom.querySelectorAll<HTMLElement>('[data-page-break]'),
-    (dom) => ({
-      rect: dom.getBoundingClientRect(),
-      height: dom.offsetHeight,
-    }),
-  );
-  const naturalRect = (rect: { top: number; bottom: number }) => {
-    const shift =
-      blockShift +
-      breaks.reduce(
-        (sum, entry) =>
-          sum + (entry.rect.bottom <= rect.top + 0.5 ? entry.height : 0),
-        0,
-      );
-    return {
-      naturalTop: (rect.top - editorScreenTop) * invScale - shift,
-      naturalBottom: (rect.bottom - editorScreenTop) * invScale - shift,
-    };
-  };
+  const { block, view, metrics } = measurement;
+  const naturalRect = createNaturalRectMapper(measurement);
   const lines: ParagraphLine[] = [];
   for (const entry of collectVisibleTextNodeRects(block.dom, metrics)) {
     const offsets = computeVisibleTextLineStartOffsets(entry, metrics);
@@ -770,7 +587,6 @@ export class DomParagraphLineMeasurer implements ParagraphLineMeasurer {
   private readonly caches: DomParagraphLineCaches = {
     domLineFragments: new WeakMap(),
     textOnlyLines: new Map(),
-    textOnlyResults: new WeakMap(),
   };
 
   public measure(measurement: ParagraphLineMeasurement): ParagraphLine[] {

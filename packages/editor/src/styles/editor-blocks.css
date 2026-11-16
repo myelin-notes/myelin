@@ -5,9 +5,7 @@
   border-radius: 18px;
   background: var(--bg-code);
   color: var(--text-primary);
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.95rem;
   line-height: 1.55;
 }
@@ -17,12 +15,11 @@
 }
 
 /* Blocks that can't break across pages (code blocks, math previews, embeds)
-   cap at the pagination CONTENT_HEIGHT and scroll past it. Continuous layout
+   cap at the page's content height and scroll past it. Continuous layout
    has no pages to overflow, so the cap lifts there. Scroll behavior is each
    block's own concern (overflow on itself or an inner scroller).
-   --pm-content-height is set from the CONTENT_HEIGHT constant
-   (pagination/core.ts) by the pagination plugin so the two can't drift; the
-   784px fallback mirrors its current value for pre-pagination paints. */
+   The page-frame DOM layer sets --pm-content-height from each frame's page
+   geometry; the 784px fallback is the default page's. */
 .pm-editor:not([data-page-layout="continuous"]) .ProseMirror .pm-page-capped {
   max-height: var(--pm-content-height, 784px);
 }
@@ -83,19 +80,18 @@
   color: color-mix(in srgb, var(--text-muted) 72%, transparent);
 }
 
-.pm-editor .ProseMirror .pm-md-bold {
-  color: var(--text-primary);
-  font-weight: 650;
-}
-
-.pm-editor .ProseMirror .pm-md-italic {
-  font-style: italic;
+/* A second font on a line rounds half-leading differently per engine: a line with inline code was 27px
+   in WebKit and 26px in Chromium. A zero line-height keeps these spans from growing the line box. */
+.pm-editor .ProseMirror code,
+.pm-editor .ProseMirror .pm-md-inline-code,
+.pm-editor .ProseMirror .pm-md-math,
+.pm-editor .ProseMirror span[style*="font-family"] {
+  line-height: 0;
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code {
   position: relative;
   z-index: 0;
-  line-height: inherit;
   vertical-align: baseline;
 }
 
@@ -115,9 +111,7 @@
 
 .pm-editor .ProseMirror .pm-md-inline-code {
   border-radius: 0.35rem;
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 .pm-editor .ProseMirror .pm-md-inline-code::before {
@@ -126,9 +120,7 @@
 }
 
 .pm-editor .ProseMirror .pm-md-math {
-  font-family:
-    "SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code",
-    "Source Code Pro", Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.92em;
 }
 
@@ -139,6 +131,7 @@
    resolve to bogus screen rects that fling the viewport. */
 .pm-editor .ProseMirror .pm-math-source-hidden {
   font-size: 0;
+  line-height: 0;
   letter-spacing: 0;
 }
 

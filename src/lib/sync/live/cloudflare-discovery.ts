@@ -18,6 +18,8 @@ function normalizeBaseUrl(baseUrl: string): string {
 export class CloudflareLiveDiscoveryClient implements LiveDiscoveryClient {
   private readonly baseUrl: string;
   private readonly roomId: string;
+  // Returned by the first publish of a record; required to refresh or remove it.
+  private readonly tokens = new Map<string, string>();
 
   constructor(options: CloudflareLiveDiscoveryClientOptions) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl);
@@ -27,11 +29,16 @@ export class CloudflareLiveDiscoveryClient implements LiveDiscoveryClient {
   async publish(
     record: LiveDiscoveryRecordInput,
   ): Promise<LiveDiscoveryRecord[]> {
-    const response = await this.request(this.recordsUrl(), {
-      method: 'POST',
-      body: JSON.stringify(record),
-    });
-    return parseLiveDiscoveryRecords(await response.json());
+    const response = await this.request(
+      this.recordsUrl(),
+      { method: 'POST', body: JSON.stringify(record) },
+      this.tokens.get(record.recordId),
+    );
+    const body = (await response.json()) as { token?: unknown };
+    if (typeof body.token === 'string') {
+      this.tokens.set(record.recordId, body.token);
+    }
+    return parseLiveDiscoveryRecords(body);
   }
 
   async list(): Promise<LiveDiscoveryRecord[]> {
@@ -42,9 +49,12 @@ export class CloudflareLiveDiscoveryClient implements LiveDiscoveryClient {
   }
 
   async remove(recordId: string): Promise<void> {
-    await this.request(`${this.recordsUrl()}/${encodeURIComponent(recordId)}`, {
-      method: 'DELETE',
-    });
+    await this.request(
+      `${this.recordsUrl()}/${encodeURIComponent(recordId)}`,
+      { method: 'DELETE' },
+      this.tokens.get(recordId),
+    );
+    this.tokens.delete(recordId);
   }
 
   private recordsUrl(): string {
@@ -54,12 +64,14 @@ export class CloudflareLiveDiscoveryClient implements LiveDiscoveryClient {
   private async request(
     url: string,
     init: { method: 'GET' | 'POST' | 'DELETE'; body?: string },
+    token?: string,
   ): Promise<Response> {
     const response = await fetch(url, {
       method: init.method,
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
+        ...(token ? { 'X-Record-Token': token } : {}),
       },
       body: init.body,
     });

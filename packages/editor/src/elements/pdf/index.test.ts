@@ -11,6 +11,7 @@ import {
 import { Logger } from '@myelin/shared/logger';
 import type { CanvasViewport } from '../../canvas-viewport';
 import {
+  cleanupPdfPage,
   getPdfDocumentPageSizes,
   getPdfPageTexts,
   openPdfDocument,
@@ -31,6 +32,7 @@ vi.mock('../../pdf-renderer', async () => {
     );
   return {
     ...actual,
+    cleanupPdfPage: vi.fn(),
     getPdfDocumentPageSizes: vi.fn(),
     getPdfPageTexts: vi.fn(async () => []),
     openPdfDocument: vi.fn(),
@@ -592,6 +594,59 @@ describe('PdfElement thumbnail rendering', () => {
       300,
       150,
     );
+  });
+
+  it('frees its page canvases and pdf.js page caches once drawn', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    mockImmediatePageRender();
+
+    await element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 400));
+    const { canvas } = vi.mocked(renderPdfPageToCanvas).mock.calls[0][0];
+    expect(canvas.width).toBeGreaterThan(1);
+
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+
+    expect(canvas.width).toBe(1);
+    expect(canvas.height).toBe(1);
+    expect(cleanupPdfPage).toHaveBeenCalledWith(expect.anything(), 0);
+
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+    expect(context.drawImage).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a render whole when a timed-out render overlaps it and draws first', async () => {
+    const element = await createLoadedElement();
+    stubCanvasDocument();
+    const renders: (() => void)[] = [];
+    vi.mocked(renderPdfPageToCanvas).mockImplementation(() => ({
+      promise: new Promise<void>((resolve) => {
+        renders.push(resolve);
+      }),
+      cancel: vi.fn(),
+    }));
+
+    const older = element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 400));
+    await flushPromises();
+    const newer = element.prepareThumbnail(0.5, new DOMRect(0, 0, 612, 1500));
+    await flushPromises();
+    // The newer render's first page lands, then the older render finishes and draws.
+    renders[1]();
+    await flushPromises();
+    renders[0]();
+    await older;
+    element.drawThumbnail(
+      { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+      0,
+    );
+
+    renders[2]();
+    await newer;
+    const context = { drawImage: vi.fn() };
+    element.drawThumbnail(context as unknown as CanvasRenderingContext2D, 0);
+
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
   });
 
   it('renders every page intersecting the capture region', async () => {

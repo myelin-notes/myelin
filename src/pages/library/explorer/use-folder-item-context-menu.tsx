@@ -4,7 +4,6 @@ import { useCustomColors } from '@myelin/editor/custom-colors';
 import { Logger } from '@myelin/shared/logger';
 import type { VFSFolderNode } from '@/lib/sync';
 import { useRepository } from '@/lib/sync';
-import { BookmarksDialog } from '../bookmarks-dialog';
 import { TagManageDialog } from '../tag-manage-dialog';
 import { FolderColorSubmenu } from './folder-color-submenu';
 import { DEFAULT_FOLDER_COLOR } from './folder-colors';
@@ -35,7 +34,6 @@ export function useFolderItemContextMenu(
   const [menuOpen, setMenuOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const {
@@ -75,7 +73,6 @@ export function useFolderItemContextMenu(
       onRename={startRenaming}
       onRemove={handleRemove}
       onManageTags={() => setTagDialogOpen(true)}
-      onShowBookmarks={() => setBookmarksOpen(true)}
       createSubmenu={options?.createSubmenu}
     >
       <FolderColorSubmenu
@@ -103,11 +100,6 @@ export function useFolderItemContextMenu(
         nodeId={node.id}
         nodeName={node.name}
         onChanged={onChanged}
-      />
-      <BookmarksDialog
-        open={bookmarksOpen}
-        onOpenChange={setBookmarksOpen}
-        folderId={node.id}
       />
       <ColorPickerDialog
         open={pickerOpen}

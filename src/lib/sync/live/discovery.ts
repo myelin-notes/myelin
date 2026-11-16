@@ -98,14 +98,14 @@ export function getLiveDiscoveryRepositoryKey(
 
 export async function createLiveDiscoveryRoomId(
   config: RepositoryConfig,
+  liveSecret: string,
   noteId: VFSNodeId,
 ): Promise<string | null> {
-  const repositoryKey = getLiveDiscoveryRepositoryKey(config);
-  if (!repositoryKey) {
+  if (!getLiveDiscoveryRepositoryKey(config)) {
     return null;
   }
 
-  return sha256Hex(`${repositoryKey}\0${noteId}`);
+  return sha256Hex(`${liveSecret}\0${noteId}`);
 }
 
 export function createLiveDiscoveryRecordInput(params: {

@@ -1,5 +1,5 @@
 import type { EditorView } from 'prosemirror-view';
-import { type Break, calculateBreakLayout } from './core';
+import { type Break, calculateBreakLayout, type PageGeometry } from './core';
 import type {
   PaginationBlockInfo,
   ParagraphLineMeasurer,
@@ -14,35 +14,23 @@ export function calculatePaginationLayout(
   view: EditorView,
   editorScreenTop: number,
   invScale: number,
-  existingBreaks: Break[],
+  geometry: PageGeometry,
   metrics: PaginationRunMetrics | null,
-  measurementCacheGeneration: number,
-  paragraphLineMeasurer: ParagraphLineMeasurer,
-  tableLineMeasurer: ParagraphLineMeasurer,
+  lineMeasurer: ParagraphLineMeasurer,
 ): { breaks: Break[]; pageCount: number } {
   return calculateBreakLayout({
     blocks,
-    existingBreaks,
-    measureParagraphLines: (block, state) =>
-      paragraphLineMeasurer.measure({
+    geometry,
+    measureParagraphLines: (block) =>
+      lineMeasurer.measure({
         block,
         view,
         editorScreenTop,
         invScale,
-        blockNaturalTop: state.blockNaturalTop,
-        blockShift: state.blockShift,
         metrics,
-        measurementCacheGeneration,
       }),
-    measureTableRows: (block, state) =>
-      measureTableRows(
-        block,
-        view,
-        editorScreenTop,
-        invScale,
-        state.blockShift,
-        tableLineMeasurer,
-      ),
+    measureTableRows: (block) =>
+      measureTableRows(block, view, editorScreenTop, invScale, lineMeasurer),
     now: metrics ? () => performance.now() : undefined,
     onOverflowingParagraph: () => {
       if (metrics) {

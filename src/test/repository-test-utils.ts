@@ -1,4 +1,3 @@
-import * as Y from 'yjs';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import type { VFSNodeId } from '@/lib/sync';
@@ -321,8 +320,21 @@ export function createPluginFsModule() {
       currentStorage.rename(oldPath, newPath),
     writeFile: async (path: string, bytes: Uint8Array) =>
       currentStorage.writeFile(path, bytes),
-    writeTextFile: async (path: string, text: string) =>
-      currentStorage.writeTextFile(path, text),
+    stat: async (path: string) => ({
+      size: new TextEncoder().encode(currentStorage.readText(path) ?? '')
+        .byteLength,
+    }),
+    writeTextFile: async (
+      path: string,
+      text: string,
+      options?: { append?: boolean },
+    ) =>
+      currentStorage.writeTextFile(
+        path,
+        options?.append
+          ? `${currentStorage.readText(path) ?? ''}${text}`
+          : text,
+      ),
   };
 }
 
@@ -339,25 +351,4 @@ export async function createCanvasNoteState(
     update: ydoc.encodeState(),
     stateVector: ydoc.encodeStateVector(),
   };
-}
-
-export function createNoteState(text: string): {
-  update: Uint8Array;
-  stateVector: Uint8Array;
-} {
-  const doc = new Y.Doc();
-  doc.getText('content').insert(0, text);
-  return {
-    update: Y.encodeStateAsUpdate(doc),
-    stateVector: Y.encodeStateVector(doc),
-  };
-}
-
-export function readNoteText(update: Uint8Array | null): string {
-  if (!update) {
-    return '';
-  }
-  const doc = new Y.Doc();
-  Y.applyUpdate(doc, update);
-  return doc.getText('content').toString();
 }

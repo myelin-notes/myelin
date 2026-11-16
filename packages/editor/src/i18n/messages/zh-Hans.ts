@@ -4,6 +4,7 @@ const zhHans: typeof en = {
   common: {
     close: '关闭',
     cancel: '取消',
+    done: '完成',
     clear: '清除',
     copy: '复制',
     copied: '已复制',
@@ -11,6 +12,32 @@ const zhHans: typeof en = {
     none: '无',
     never: '从不',
     or: '或',
+  },
+  plan: {
+    title: '升级到 Myelin Notes Pro',
+    description: '一次性购买，支持开发并解锁一些超酷的功能！',
+    haveLicense: '我有许可证',
+    features: {
+      agents: {
+        title: '通过 MCP 使用 AI 代理',
+        description: '让你已在使用的 AI 应用读取你的笔记，并在你允许时写入。',
+      },
+      code: {
+        title: '运行代码块',
+        description: '运行页面中的代码，并在旁边查看输出。',
+      },
+      canvasImage: {
+        title: '自定义画布背景',
+        description: '将任意图片用作笔记背后的背景。',
+      },
+      limits: {
+        title: '更高的上限',
+        description:
+          '最多 8 种旗标类型、每篇笔记不限旗标数量，以及 16 个笔预设。',
+      },
+    },
+    upgrade: '升级',
+    purchaseFailed: '无法完成购买。',
   },
   tabBar: {
     library: '资料库',
@@ -57,6 +84,10 @@ const zhHans: typeof en = {
       openGraph: {
         label: '打开关系图谱',
         description: '呈现画布笔记之间的显式链接',
+      },
+      openFlags: {
+        label: '打开旗标',
+        description: '浏览并清理笔记中的旗标',
       },
       importMarkdown: {
         label: '导入 Markdown',
@@ -152,6 +183,7 @@ const zhHans: typeof en = {
         sections: (count: number) => `${count} 个分区`,
         summary: (count: number) => `已导入 ${count} 个页面`,
         skipped: (count: number) => `有 ${count} 个页面无法导入`,
+        skippedSections: (count: number) => `有 ${count} 个分区无法读取`,
       },
       obsidian_vault: {
         label: '从 Obsidian 导入',
@@ -184,6 +216,7 @@ const zhHans: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `正在导入 ${current}/${total}…`,
+        preparing: '正在准备导入…',
         cancelling: '正在取消…',
       },
       summary: {
@@ -247,7 +280,6 @@ const zhHans: typeof en = {
 
       rename: '重命名',
       manageTags: '管理标签',
-      bookmarks: '书签',
       color: '颜色',
       versionHistory: '版本历史',
       revealInFileManager: '在文件管理器中显示',
@@ -261,11 +293,6 @@ const zhHans: typeof en = {
       yes: '更新',
       no: '跳过',
     },
-    bookmarksDialog: {
-      title: '书签',
-      empty: '此文件夹中还没有书签。',
-      loadFailed: '无法加载书签',
-    },
     tagDialog: {
       title: '管理标签',
       description: (name: string) => `${name} 的标签`,
@@ -275,6 +302,21 @@ const zhHans: typeof en = {
       createNew: '创建新标签',
       placeholder: '标签名称…',
     },
+  },
+  flagsPage: {
+    title: '旗标',
+    searchPlaceholder: '搜索旗标、笔记、文件夹...',
+    empty: '还没有旗标。',
+    allTypes: '全部',
+    noMatches: '没有匹配的旗标。',
+    loadFailed: '无法加载旗标',
+    selectAll: '全选',
+    selected: (count: number) => `已选择 ${count} 个`,
+    changeType: '更改类型',
+    delete: '删除',
+    deleteTitle: (count: number) => `删除 ${count} 个旗标？`,
+    deleteDescription: '它们将从所在笔记中移除。',
+    editFailed: '无法更新旗标',
   },
   graph: {
     title: '关系图谱',
@@ -396,13 +438,22 @@ const zhHans: typeof en = {
         pressButton: '按下笔按钮…',
         notPen: '这是鼠标，不是笔',
       },
+      toolbarSide: {
+        label: '工具栏位置',
+        description: '工具栏位于画布的哪一侧。左手书写者可能更喜欢右侧。',
+        options: {
+          left: '左侧',
+          right: '右侧',
+        },
+      },
     },
     pageFrameEditing: {
       title: '页面框编辑',
       eyebrow: '文档视图',
       defaultPageLayout: {
         label: '默认页面布局',
-        description: '选择新页面框的内容排列方式。PDF 仅支持页面或分栏。',
+        description:
+          '选择新文档的内容排列方式。分栏仅适用于 PDF，连续仅适用于页面框。',
         options: {
           vertical: '页面',
           horizontal: '分栏',
@@ -672,17 +723,17 @@ const zhHans: typeof en = {
           label: '文本工具',
           description: '创建新的文本节点',
         },
-        'canvas:tool-bookmark': {
-          label: '书签工具',
-          description: '放置书签旗标',
+        'canvas:tool-flag': {
+          label: '旗标工具',
+          description: '放置旗标',
         },
-        'canvas:bookmark-previous': {
-          label: '上一个书签',
-          description: '跳到此画布中的上一个书签',
+        'canvas:flag-previous': {
+          label: '上一个旗标',
+          description: '跳到此画布中的上一个旗标',
         },
-        'canvas:bookmark-next': {
-          label: '下一个书签',
-          description: '跳到此画布中的下一个书签',
+        'canvas:flag-next': {
+          label: '下一个旗标',
+          description: '跳到此画布中的下一个旗标',
         },
         'canvas:insert-frame': {
           label: '插入页面框',
@@ -714,6 +765,59 @@ const zhHans: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: '升级',
+      active: '已激活',
+      thanks: {
+        label: 'Pro 已激活',
+        description: '感谢你支持 Myelin，祝使用愉快！',
+      },
+      key: {
+        label: '许可证密钥',
+        description: '粘贴购买邮件中的密钥。一个密钥最多可用于 3 台设备。',
+        descriptionAndroid: '已有许可证密钥？请在此输入。',
+        action: '激活',
+      },
+      buy: {
+        label: '购买 Pro',
+        description: '在 Myelin 网站一次性购买。',
+        descriptionIos: '一次性购买，在你的 Apple 设备上解锁 Pro。',
+        descriptionAndroid: '通过 Google Play 一次性购买。',
+        action: '购买 Pro',
+      },
+      restore: {
+        label: '恢复购买',
+        description: '解锁你已用此 Apple ID 购买的 Pro。',
+        action: '恢复',
+        none: '未找到此 Apple ID 的 App Store 购买记录。',
+      },
+      email: {
+        label: '已经拥有 Pro？',
+        description: '输入购买时使用的邮箱地址，我们会给你发送验证码。',
+        codeSent: '输入我们通过邮件发送的 8 位验证码。',
+        codeLabel: '验证码',
+        send: '发送验证码',
+        verify: '验证',
+      },
+      desktop: {
+        label: '在电脑上使用 Pro',
+        description:
+          '输入你的邮箱，我们会发送适用于 Mac、Windows 或 Linux 的许可证密钥。可用于 1 台电脑。',
+        send: '发送密钥',
+        sent: '请查看收件箱中的许可证密钥。',
+      },
+      deactivate: {
+        label: '此设备',
+        description: '从此设备移除 Pro，为其他设备腾出名额。',
+        action: '停用',
+      },
+      errors: {
+        invalid: '该密钥或验证码无效。',
+        limit: '此密钥已在允许的所有设备上激活。请先在其中一台上停用。',
+        failed: '无法连接许可证服务器，请重试。',
+      },
+    },
     about: {
       title: '关于',
       eyebrow: '应用程序',
@@ -735,6 +839,16 @@ const zhHans: typeof en = {
       pages: '页面',
       continuous: '连续',
       columns: '分栏',
+      figureCaptionPlaceholder: '添加图注',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      customSize: '自定义',
+      customSizeHint: '拖动页面左右边缘来调整宽度。',
+      pageNumbers: '页码',
+      pageSetup: '页面设置',
+      pageSize: '尺寸',
+      pageMargins: '页边距',
+      inchesUnit: '英寸',
       export: '导出',
     },
     export: {
@@ -758,6 +872,10 @@ const zhHans: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: '分页符',
+        subtitle: '开始新的一页',
+      },
       heading1: {
         title: '一级标题',
         subtitle: '将此块转换为顶级标题',
@@ -851,15 +969,28 @@ const zhHans: typeof en = {
       title: '反向链接',
       linkedMentions: '链接提及',
     },
-    bookmarks: {
-      title: '书签',
-      untitled: '书签',
+    flags: {
+      title: '旗标',
+      untitled: '旗标',
       pdfPage: (fileName: string, page: number) =>
         `${fileName} · 第 ${page} 页`,
       rename: '重命名',
       remove: '删除',
-      previous: '上一个书签',
-      next: '下一个书签',
+      previous: '上一个旗标',
+      next: '下一个旗标',
+      changeType: '更改旗标类型',
+    },
+    flagTypes: {
+      todo: '待办',
+      review: '待复查',
+      newFlag: '新建旗标',
+      edit: '编辑旗标',
+      remove: '删除旗标',
+      name: '旗标名称',
+      removeTitle: (name: string) => `删除“${name}”？`,
+      removeDescription: (count: number) =>
+        `有 ${count} 个旗标使用此类型，它们也会从笔记中删除。`,
+      removeConfirm: '删除',
     },
     toolbar: {
       clickForOptions: '点击查看选项',
@@ -980,7 +1111,7 @@ const zhHans: typeof en = {
       highlighter: '荧光笔',
       eraser: '橡皮擦',
       text: '文本',
-      bookmark: '书签',
+      flag: '旗标',
     },
     toolOptions: {
       color: '颜色',
@@ -1001,6 +1132,7 @@ const zhHans: typeof en = {
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',
       increaseFontSize: '增大字号',
+      flagType: '旗标',
     },
     embedComposer: {
       dropToEmbed: '拖放以嵌入',
@@ -1044,8 +1176,6 @@ const zhHans: typeof en = {
       livePaused: '实时同步已暂停',
       peerModes: {
         'owner-device': '所有者设备',
-        'guest-editor': '访客编辑',
-        'guest-viewer': '访客查看',
       },
       repositoryStatus: {
         localOnly: '仅本地',
@@ -1080,12 +1210,12 @@ const zhHans: typeof en = {
     pdfAnchoring: {
       title: '将笔记锚定到 PDF 页面',
       description:
-        '在 PDF 页面上手绘的内容会固定在该页，“锚定到页面”也能把图片和形状固定上去。移动 PDF 或切换为“分栏”时，它们会跟随页面。',
+        '写在 PDF 某一页上的内容会附着在那一页。移动 PDF 或更改版式时，笔记仍留在页面上原来的位置。用“锚定到页面”也可以这样固定图片和形状。',
     },
-    bookmarks: {
-      title: '在画布上添加书签',
+    flags: {
+      title: '在画布上插上旗标',
       description:
-        '使用书签工具（B）插上旗标。在画布顶部打开旗标列表，或按 [ 和 ] 在旗标之间跳转。',
+        '使用旗标工具（B）插上旗标，并选择类型或自建类型。在画布顶部的列表中或按 [ 和 ] 在旗标之间跳转，打开右上角的“旗标”即可查看所有笔记中的旗标。',
     },
     canvasStyle: {
       title: '为每个画布设置样式',
@@ -1197,6 +1327,17 @@ const zhHans: typeof en = {
         toolbarHint: '其他内容都可以通过工具栏顶部的 + 按钮添加。',
       },
     },
+  },
+  mediaMigration: {
+    title: '正在优化存储',
+    description:
+      '请在完成前保持 Myelin 打开。同时请更新其他设备上的 Myelin，否则图片、PDF 和音频可能显示为空白。',
+    preparing: '正在准备…',
+    progress: (completed: number, total: number) =>
+      `第 ${completed} 个，共 ${total} 个文档`,
+    finishing: '正在完成上传…',
+    unreachable: '当前无法连接到你的仓库。恢复连接后将自动完成。',
+    continueWithoutWaiting: '继续，不再等待',
   },
   shutdown: {
     title: '正在保存更改…',

@@ -29,8 +29,6 @@ const PROVIDER: RemoteOAuthProvider<GitHubOAuthStartPayload> = {
   clearToken: clearGitHubToken,
 };
 
-export type GitHubAuthState = RemoteAuthState;
-
 export function useGitHubAuth(
   credentialId: string,
   enabled: boolean,

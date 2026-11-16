@@ -41,33 +41,32 @@ describe('live discovery room ids', () => {
   it('derives no room for local repositories', async () => {
     expect(getLiveDiscoveryRepositoryKey({ kind: 'local' })).toBeNull();
     await expect(
-      createLiveDiscoveryRoomId({ kind: 'local' }, 'note-1'),
+      createLiveDiscoveryRoomId({ kind: 'local' }, 'secret', 'note-1'),
     ).resolves.toBeNull();
   });
 
-  it('normalizes GitHub repository identity before hashing', async () => {
-    const first = await createLiveDiscoveryRoomId(
-      {
-        kind: 'github',
-        owner: 'Myelin-Notes',
-        repo: 'Myelin',
-        branch: undefined,
-        credentialId: 'credential-a',
-      },
+  it('changes with the repository secret and not with credentials', async () => {
+    const config = {
+      kind: 'github',
+      owner: 'o',
+      repo: 'r',
+      branch: undefined,
+      credentialId: 'credential-a',
+    } as const;
+    const first = await createLiveDiscoveryRoomId(config, 'secret-a', 'note-1');
+    const sameSecret = await createLiveDiscoveryRoomId(
+      { ...config, credentialId: 'credential-b' },
+      'secret-a',
       'note-1',
     );
-    const second = await createLiveDiscoveryRoomId(
-      {
-        kind: 'github',
-        owner: 'myelin-notes',
-        repo: 'myelin',
-        branch: 'main',
-        credentialId: 'credential-b',
-      },
+    const otherSecret = await createLiveDiscoveryRoomId(
+      config,
+      'secret-b',
       'note-1',
     );
 
     expect(first).toMatch(/^[a-f0-9]{64}$/);
-    expect(first).toBe(second);
+    expect(first).toBe(sameSecret);
+    expect(first).not.toBe(otherSecret);
   });
 });

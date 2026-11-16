@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { CustomColorsProvider } from '@myelin/editor/custom-colors';
+import { FlagTypesProvider } from '@myelin/editor/flag-types';
 import { I18nProvider } from '@myelin/editor/i18n';
 import { setPlatform } from '@myelin/editor/platform';
 import { setAnalyticsSink } from '@myelin/shared/analytics';
@@ -11,6 +12,7 @@ import {
 } from '@myelin/shared/logger';
 import { disableNativePinchZoom } from '@/lib/disable-native-pinch-zoom';
 import { markBootComplete, reportFatalError } from '@/lib/fatal-error';
+import { refreshPlan } from '@/lib/license';
 import { tauriPlatform } from '@/platform/tauri';
 import { writeLogs } from '@/platform/tauri/log-sink';
 import App from './App';
@@ -44,13 +46,16 @@ try {
     posthog.captureException(error, context);
   });
   initRustErrorReporting();
+  void refreshPlan();
   disableNativePinchZoom();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <I18nProvider>
         <RepositoryProvider>
           <CustomColorsProvider>
-            <App />
+            <FlagTypesProvider>
+              <App />
+            </FlagTypesProvider>
           </CustomColorsProvider>
         </RepositoryProvider>
       </I18nProvider>

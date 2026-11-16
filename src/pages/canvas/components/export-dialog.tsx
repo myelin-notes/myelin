@@ -7,6 +7,7 @@ import type {
 } from '@myelin/editor/export/export-controller';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
+import { Switch } from '@myelin/ui';
 import { Button } from '@myelin/ui/button';
 import {
   Dialog,
@@ -16,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 import { trackEvent } from '@/lib/analytics';
 
 interface ExportDialogProps {
@@ -90,11 +90,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
         }
       }}
     >
-      <DialogContent
-        showCloseButton={!busy}
-        className="z-[110] sm:max-w-md"
-        overlayClassName="z-[110]"
-      >
+      <DialogContent showCloseButton={!busy} className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{strings.canvas.export.title}</DialogTitle>
           {target?.title && (

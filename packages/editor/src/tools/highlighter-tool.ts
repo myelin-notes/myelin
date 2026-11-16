@@ -5,7 +5,7 @@ import type { MessageGetter } from '../i18n';
 import { PenTool } from './pen-tool';
 import type { SvgIcon, ToolId, ToolOption } from './tool';
 
-const HIGHLIGHT_COLORS = [
+export const HIGHLIGHT_COLORS = [
   '#facc15',
   '#4ade80',
   '#60a5fa',

@@ -99,8 +99,7 @@ export const codeBlockEditorTheme = EditorView.theme({
     fontSize: '14px',
   },
   '.cm-scroller': {
-    fontFamily:
-      '"SFMono-Regular", "SF Mono", ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace',
+    fontFamily: 'var(--font-mono)',
     lineHeight: '1.5',
     overflow: 'auto',
   },

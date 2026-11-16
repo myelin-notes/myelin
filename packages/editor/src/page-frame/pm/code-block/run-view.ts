@@ -6,6 +6,7 @@ import type {
   RunPollResponse,
 } from '../../../code-runner/contract';
 import type { EnsureCodeOutputCard } from '../../../elements/code-output/bridge';
+import { isPro, promptUpgrade } from '../../../plan';
 import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
@@ -109,6 +110,10 @@ export class CodeBlockRunView {
     if (!codeRunner) {
       return;
     }
+    if (!isPro()) {
+      promptUpgrade('code');
+      return;
+    }
     const payload = this.options.collectSource();
     if (!payload) {
       return;
@@ -136,7 +141,6 @@ export class CodeBlockRunView {
           this.options.view,
           this.options.blockDom,
         ),
-        pageLayout: this.pageLayout(),
       });
     }
 
@@ -263,10 +267,6 @@ export class CodeBlockRunView {
 
   private frameUuid(): string | null {
     return this.editorHost()?.dataset.frameUuid ?? null;
-  }
-
-  private pageLayout(): string {
-    return this.editorHost()?.getAttribute('data-page-layout') ?? 'vertical';
   }
 
   private setRunning(running: boolean): void {

@@ -2,6 +2,7 @@ const en = {
   common: {
     close: 'Close',
     cancel: 'Cancel',
+    done: 'Done',
     clear: 'Clear',
     copy: 'Copy',
     copied: 'Copied',
@@ -9,6 +10,35 @@ const en = {
     none: 'None',
     never: 'Never',
     or: 'or',
+  },
+  plan: {
+    title: 'Upgrade to Myelin Notes Pro',
+    description:
+      'A one-time purchase, support the development and unlock some cool features!',
+    haveLicense: 'I have a license',
+    features: {
+      agents: {
+        title: 'AI agents over MCP',
+        description:
+          'Let the AI app you already use read your notes and, when you allow it, write to them.',
+      },
+      code: {
+        title: 'Run code blocks',
+        description:
+          'Run the code in a page and see its output right beside it.',
+      },
+      canvasImage: {
+        title: 'Your own canvas background',
+        description: 'Use any image as the background behind your notes.',
+      },
+      limits: {
+        title: 'Higher limits',
+        description:
+          'Up to 8 flag types, unlimited flags per note, and 16 pen presets.',
+      },
+    },
+    upgrade: 'Upgrade',
+    purchaseFailed: 'The purchase could not be completed.',
   },
   tabBar: {
     library: 'Library',
@@ -56,6 +86,10 @@ const en = {
       openGraph: {
         label: 'Open graph',
         description: 'Map explicit links between canvas notes',
+      },
+      openFlags: {
+        label: 'Open flags',
+        description: 'Browse and clean up flags across your notes',
       },
       importMarkdown: {
         label: 'Import Markdown',
@@ -159,6 +193,8 @@ const en = {
           `Imported ${count} page${count === 1 ? '' : 's'}`,
         skipped: (count: number) =>
           `${count} page${count === 1 ? '' : 's'} could not be imported`,
+        skippedSections: (count: number) =>
+          `${count} section${count === 1 ? '' : 's'} could not be read`,
       },
       obsidian_vault: {
         label: 'Import from Obsidian',
@@ -192,6 +228,7 @@ const en = {
       progress: {
         importing: (current: number, total: number) =>
           `Importing ${current} of ${total}...`,
+        preparing: 'Preparing import...',
         cancelling: 'Cancelling...',
       },
       summary: {
@@ -258,7 +295,6 @@ const en = {
 
       rename: 'Rename',
       manageTags: 'Manage Tags',
-      bookmarks: 'Bookmarks',
       color: 'Color',
       versionHistory: 'Version History',
       revealInFileManager: 'Reveal in File Manager',
@@ -272,11 +308,6 @@ const en = {
       yes: 'Update',
       no: 'Skip',
     },
-    bookmarksDialog: {
-      title: 'Bookmarks',
-      empty: 'No bookmarks in this folder yet.',
-      loadFailed: 'Could not load bookmarks',
-    },
     tagDialog: {
       title: 'Manage Tags',
       description: (name: string) => `Tags on ${name}`,
@@ -286,6 +317,22 @@ const en = {
       createNew: 'Create new tag',
       placeholder: 'Tag name...',
     },
+  },
+  flagsPage: {
+    title: 'Flags',
+    searchPlaceholder: 'Search flags, notes, folders...',
+    empty: 'No flags yet.',
+    allTypes: 'All',
+    noMatches: 'No flags match.',
+    loadFailed: 'Could not load flags',
+    selectAll: 'Select all',
+    selected: (count: number) => `${count} selected`,
+    changeType: 'Change type',
+    delete: 'Delete',
+    deleteTitle: (count: number) =>
+      `Delete ${count} ${count === 1 ? 'flag' : 'flags'}?`,
+    deleteDescription: 'They will be removed from their notes.',
+    editFailed: 'Could not update flags',
   },
   graph: {
     title: 'Graph',
@@ -408,6 +455,15 @@ const en = {
         pressButton: 'Press a pen button...',
         notPen: 'That was a mouse, not a pen',
       },
+      toolbarSide: {
+        label: 'Toolbar side',
+        description:
+          'Which edge of the canvas the tools toolbar sits on. Left-handed writers may prefer the right.',
+        options: {
+          left: 'Left',
+          right: 'Right',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Page Frame Editing',
@@ -415,7 +471,7 @@ const en = {
       defaultPageLayout: {
         label: 'Default page layout',
         description:
-          'Choose how new page frames arrange content. PDFs use Pages or Columns only.',
+          'Choose how new documents arrange content. Columns applies to PDFs only, and Continuous to page frames only.',
         options: {
           vertical: 'Pages',
           horizontal: 'Columns',
@@ -695,17 +751,17 @@ const en = {
           label: 'Text Tool',
           description: 'Create a new text node',
         },
-        'canvas:tool-bookmark': {
-          label: 'Bookmark Tool',
-          description: 'Place a bookmark flag',
+        'canvas:tool-flag': {
+          label: 'Flag Tool',
+          description: 'Place a flag',
         },
-        'canvas:bookmark-previous': {
-          label: 'Previous Bookmark',
-          description: 'Jump to the previous bookmark in this canvas',
+        'canvas:flag-previous': {
+          label: 'Previous Flag',
+          description: 'Jump to the previous flag in this canvas',
         },
-        'canvas:bookmark-next': {
-          label: 'Next Bookmark',
-          description: 'Jump to the next bookmark in this canvas',
+        'canvas:flag-next': {
+          label: 'Next Flag',
+          description: 'Jump to the next flag in this canvas',
         },
         'canvas:insert-frame': {
           label: 'Insert Page Frame',
@@ -737,6 +793,64 @@ const en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Upgrade',
+      active: 'Active',
+      thanks: {
+        label: 'Pro is active',
+        description: 'Thanks for supporting Myelin. Enjoy!',
+      },
+      key: {
+        label: 'License key',
+        description:
+          'Paste the key from your purchase email. One key works on up to 3 devices.',
+        descriptionAndroid: 'Already have a license key? Enter it here.',
+        action: 'Activate',
+      },
+      buy: {
+        label: 'Buy Pro',
+        description: 'A one-time purchase from the Myelin website.',
+        descriptionIos:
+          'A one-time purchase that unlocks Pro on your Apple devices.',
+        descriptionAndroid: 'A one-time purchase through Google Play.',
+        action: 'Buy Pro',
+      },
+      restore: {
+        label: 'Restore purchases',
+        description: 'Unlock Pro you already bought with this Apple ID.',
+        action: 'Restore',
+        none: 'No App Store purchase was found for this Apple ID.',
+      },
+      email: {
+        label: 'Already have Pro?',
+        description:
+          'Enter the email address you bought it with and we will send you a code.',
+        codeSent: 'Enter the 8-digit code we emailed you.',
+        codeLabel: 'Code',
+        send: 'Send code',
+        verify: 'Verify',
+      },
+      desktop: {
+        label: 'Use Pro on your computer',
+        description:
+          'Enter your email and we will send you a license key for Mac, Windows, or Linux. It works on 1 computer.',
+        send: 'Send key',
+        sent: 'Check your inbox for your license key.',
+      },
+      deactivate: {
+        label: 'This device',
+        description:
+          'Remove Pro from this device to free a slot for another one.',
+        action: 'Deactivate',
+      },
+      errors: {
+        invalid: 'That key or code is not valid.',
+        limit:
+          'This key is already active on as many devices as it allows. Deactivate it on one of them first.',
+        failed: 'Could not reach the license server. Please try again.',
+      },
+    },
     about: {
       title: 'About',
       eyebrow: 'Application',
@@ -758,6 +872,16 @@ const en = {
       pages: 'Pages',
       continuous: 'Continuous',
       columns: 'Columns',
+      figureCaptionPlaceholder: 'Add a caption',
+      letterSize: 'Letter',
+      a4Size: 'A4',
+      customSize: 'Custom',
+      customSizeHint: "Drag the page's side edges to set its width.",
+      pageNumbers: 'Page numbers',
+      pageSetup: 'Page setup',
+      pageSize: 'Size',
+      pageMargins: 'Margins',
+      inchesUnit: 'in',
       export: 'Export',
     },
     export: {
@@ -781,6 +905,10 @@ const en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Page break',
+        subtitle: 'Start a new page',
+      },
       heading1: {
         title: 'Heading 1',
         subtitle: 'Turn this block into a top-level heading',
@@ -874,14 +1002,29 @@ const en = {
       title: 'Backlinks',
       linkedMentions: 'Linked mentions',
     },
-    bookmarks: {
-      title: 'Bookmarks',
-      untitled: 'Bookmark',
+    flags: {
+      title: 'Flags',
+      untitled: 'Flag',
       pdfPage: (fileName: string, page: number) => `${fileName} · p.${page}`,
       rename: 'Rename',
       remove: 'Remove',
-      previous: 'Previous bookmark',
-      next: 'Next bookmark',
+      previous: 'Previous flag',
+      next: 'Next flag',
+      changeType: 'Change flag type',
+    },
+    flagTypes: {
+      todo: 'To-do',
+      review: 'Review',
+      newFlag: 'New flag',
+      edit: 'Edit flag',
+      remove: 'Delete flag',
+      name: 'Flag name',
+      removeTitle: (name: string) => `Delete “${name}”?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 flag uses this type. It will be deleted from your notes too.'
+          : `${count} flags use this type. They will be deleted from your notes too.`,
+      removeConfirm: 'Delete',
     },
     toolbar: {
       clickForOptions: 'click for options',
@@ -1003,7 +1146,7 @@ const en = {
       highlighter: 'Highlighter',
       eraser: 'Eraser',
       text: 'Text',
-      bookmark: 'Bookmark',
+      flag: 'Flag',
     },
     toolOptions: {
       color: 'Color',
@@ -1024,6 +1167,7 @@ const en = {
       deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',
       increaseFontSize: 'Increase font size',
+      flagType: 'Flag',
     },
     embedComposer: {
       dropToEmbed: 'Drop to embed',
@@ -1067,8 +1211,6 @@ const en = {
       livePaused: 'Live sync paused',
       peerModes: {
         'owner-device': 'Owner device',
-        'guest-editor': 'Guest editor',
-        'guest-viewer': 'Guest viewer',
       },
       repositoryStatus: {
         localOnly: 'Local only',
@@ -1103,12 +1245,12 @@ const en = {
     pdfAnchoring: {
       title: 'Anchor notes to PDF pages',
       description:
-        'Drawings on a PDF page stay on that page, and Anchor to page pins images and shapes to it. They follow the page when you move the PDF or switch it to Columns.',
+        'What you write on a PDF page is attached to that page. Move the PDF or change its layout, and your notes stay in the same spot on the page. Anchor to page pins images and shapes the same way.',
     },
-    bookmarks: {
-      title: 'Bookmark spots on your canvas',
+    flags: {
+      title: 'Flag spots on your canvas',
       description:
-        'Use the Bookmark tool (B) to drop a flag. Open the list of flags at the top of the canvas, or press [ and ] to jump between them.',
+        'Use the Flag tool (B) to drop a flag, and pick its type or make your own. Jump between flags from the list at the top of the canvas or with [ and ], and open Flags at the top right to see them across all your notes.',
     },
     canvasStyle: {
       title: 'Give each canvas its own style',
@@ -1233,6 +1375,18 @@ const en = {
           'Use the + button at the top of the toolbar to add anything else.',
       },
     },
+  },
+  mediaMigration: {
+    title: 'Optimizing storage',
+    description:
+      'Please keep Myelin open until this finishes. Also update Myelin on your other devices, or images, PDFs and audio may appear blank there.',
+    preparing: 'Preparing…',
+    progress: (completed: number, total: number) =>
+      `${completed} of ${total} documents`,
+    finishing: 'Finishing upload…',
+    unreachable:
+      'Your repository can’t be reached right now. This will finish by itself once it’s back.',
+    continueWithoutWaiting: 'Continue without waiting',
   },
   shutdown: {
     title: 'Saving changes…',

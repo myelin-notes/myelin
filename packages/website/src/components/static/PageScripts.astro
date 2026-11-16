@@ -1,0 +1,50 @@
+---
+// Shared by the static pages: upgrades download links and runs the scroll reveals.
+---
+
+<script>
+  import {
+    autoDownloadUrl,
+    detectPlatform,
+    fetchDownloadUrls,
+  } from '../../lib/downloads';
+  import type { PlatformKey } from '../../content/site/links';
+
+  // Every download link ships pointing at the releases page; upgrade the ones
+  // whose platform has a real installer in the latest release. "auto" means the
+  // link is a bare "Download", so it follows the visitor's OS. Anything left
+  // unresolved (no JS, GitHub unreachable) keeps the releases page, which is a
+  // working destination on its own.
+  void fetchDownloadUrls().then((urls) => {
+    const detected = detectPlatform();
+    const links =
+      document.querySelectorAll<HTMLAnchorElement>('a[data-download]');
+    for (const link of links) {
+      const attr = link.dataset.download;
+      const url =
+        attr === 'auto'
+          ? autoDownloadUrl(urls, detected)
+          : urls[attr as PlatformKey];
+      if (url) {
+        link.href = url;
+      }
+    }
+  });
+
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in');
+            observer.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px' },
+    );
+    document
+      .querySelectorAll('.reveal, .reveal-scale, .ink-scroll')
+      .forEach((el) => observer.observe(el));
+  }
+</script>

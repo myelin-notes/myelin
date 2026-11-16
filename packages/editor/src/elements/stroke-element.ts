@@ -16,6 +16,8 @@ export interface StrokeStyle {
   simulatePressure?: boolean;
 }
 
+export type StrokeStyleUpdate = Partial<Pick<StrokeStyle, 'color' | 'size'>>;
+
 export const DEFAULT_STABILIZATION = 0.5;
 
 // perfect-freehand uses fixed 3-unit end filtering and a 1-unit dot offset. Normalize to its
@@ -31,6 +33,10 @@ const POINT_FLUSH_INTERVAL_MS = 300;
 // stroke keeps perfect-freehand's velocity simulation, which is what a mouse wants.
 const NO_SENSOR_PRESSURE = 0.5;
 
+// World units; 0.55 device px at most at MAX_ZOOM on a 2x display. Imported ink packs outline points
+// ~0.4 device px apart at 60%, and redrawing all of them every frame was what made dense notes lag.
+const OUTLINE_TOLERANCE = 0.05;
+
 export class StrokeElement extends AnchorableElement {
   protected box: DOMRect;
   protected dirty: boolean = true;
@@ -38,9 +44,24 @@ export class StrokeElement extends AnchorableElement {
 
   /** Wall-clock of the last Yjs flush, for throttling live writes. */
   private lastFlush: number = 0;
+  private live = false;
+
+  /** Receiving samples from the local pen, from the first until {@link commit}. */
+  public get isLive(): boolean {
+    return this.live;
+  }
 
   public get strokeStyle(): StrokeStyle {
     return this.style;
+  }
+
+  public setStrokeStyle(updates: StrokeStyleUpdate): void {
+    this.style = { ...this.style, ...updates };
+    if (updates.size !== undefined) {
+      this.updateBounds();
+    }
+    this.syncToYMap(updates);
+    this.onTransformChanged?.();
   }
 
   /** World-space [x, y] coordinates of the recorded stroke points. */
@@ -133,12 +154,16 @@ export class StrokeElement extends AnchorableElement {
   public override bindToYMap(yMap: Y.Map<unknown>): void {
     super.bindToYMap(yMap);
     this.bindYFields(yMap, {
+      // Undo and remote edits land here; setStrokeStyle handles local ones.
       color: (v) => {
         this.style.color = v as string;
+        this.onTransformChanged?.();
       },
       size: (v) => {
         this.style.size = v as number;
         this.dirty = true;
+        this.updateBounds();
+        this.onTransformChanged?.();
       },
       stabilization: (v) => {
         this.style.stabilization = v as number;
@@ -161,6 +186,7 @@ export class StrokeElement extends AnchorableElement {
   }
 
   public addPoint(x: number, y: number, pressure: number | undefined) {
+    this.live = true;
     const isFirst = this.points.length === 0;
     this.points.push(x, y, pressure ?? 0);
     this.dirty = true;
@@ -205,6 +231,7 @@ export class StrokeElement extends AnchorableElement {
 
   /** Persist the full point buffer to Yjs. Called when the stroke is finished. */
   public commit(): void {
+    this.live = false;
     this.flushPoints();
   }
 
@@ -337,17 +364,27 @@ export class StrokeElement extends AnchorableElement {
     if (this.points.length < 3) {
       return;
     }
-    if (this.dirty) {
-      // The outline is only needed to build the Path2D; it is not retained.
-      const outline = this.strokeOutline();
-      const path = new Path2D();
-      appendStrokeOutline(path, outline);
-      this.cachedPath = path;
-      this.dirty = false;
-    }
-
     ctx.fillStyle = resolveInkColor(this.style.color);
-    ctx.fill(this.cachedPath);
+    // One fill per stroke on purpose. Merging same-colored strokes into one Path2D took a dense note
+    // from 47 to 16 fps in WKWebView, and saves under 1ms a frame on simplified outlines.
+    ctx.fill(this.paintPath);
+  }
+
+  /** Replaced whenever the shape changes, so its identity shows a cached paint is stale. */
+  public get paintPath(): Path2D {
+    if (this.dirty) {
+      // Unsimplified: the kept points change as the tip moves, which would make live ink wobble.
+      this.cachePath(this.strokeOutline());
+    }
+    return this.cachedPath;
+  }
+
+  // The outline is only needed to build the Path2D; it is not retained.
+  private cachePath(outline: number[][]): void {
+    const path = new Path2D();
+    appendStrokeOutline(path, outline);
+    this.cachedPath = path;
+    this.dirty = false;
   }
 
   public override drawToPdf(ctx: PdfHarvestContext): void {
@@ -419,7 +456,9 @@ export class StrokeElement extends AnchorableElement {
     let maxX = Number.NEGATIVE_INFINITY;
     let maxY = Number.NEGATIVE_INFINITY;
 
-    for (const [x, y] of outlinePoints) {
+    for (let i = 0; i < outlinePoints.length; i++) {
+      const x = outlinePoints[i][0];
+      const y = outlinePoints[i][1];
       if (x < minX) {
         minX = x;
       }
@@ -435,6 +474,13 @@ export class StrokeElement extends AnchorableElement {
     }
 
     this.box = new DOMRect(minX, minY, maxX - minX, maxY - minY);
+    // Loading a note lands here once per stroke; reusing the outline halves perfect-freehand work.
+    this.cachedPath = simplifiedOutlinePath(
+      outlinePoints,
+      OUTLINE_TOLERANCE /
+        Math.max(Math.abs(this.scale.x), Math.abs(this.scale.y)),
+    );
+    this.dirty = false;
   }
 }
 
@@ -485,4 +531,100 @@ export function appendStrokeOutline(
   }
 
   path.closePath();
+}
+
+// Reused between strokes: allocating these per point cost more than the outlines themselves.
+let flatXY = new Float64Array(8192);
+let flatKeep = new Uint8Array(4096);
+let flatCount = 0;
+const flatRanges: number[] = [];
+
+const outlineFlattener: QuadraticPathSink = {
+  moveTo(x, y) {
+    flatXY[0] = x;
+    flatXY[1] = y;
+    flatCount = 1;
+  },
+  quadraticCurveTo(cx, cy, x, y) {
+    const end = flatCount * 2;
+    flatXY[end] = (flatXY[end - 2] + 2 * cx + x) / 4;
+    flatXY[end + 1] = (flatXY[end - 1] + 2 * cy + y) / 4;
+    flatXY[end + 2] = x;
+    flatXY[end + 3] = y;
+    flatCount += 2;
+  },
+  closePath() {},
+};
+
+// Straight segments through the painted curve, not simplified outline points still traced as curves:
+// a midpoint quadratic over a long edge swings wide of a stroke tip, by up to 0.33 world units.
+// Rendering only; bounds and PDF export use the full outline.
+function simplifiedOutlinePath(outline: number[][], tolerance: number): Path2D {
+  const path = new Path2D();
+  if (outline.length * 2 > flatKeep.length) {
+    flatKeep = new Uint8Array(outline.length * 4);
+    flatXY = new Float64Array(outline.length * 8);
+  }
+  flatCount = 0;
+  appendStrokeOutline(outlineFlattener, outline);
+  if (flatCount === 0) {
+    return path;
+  }
+  // Two points enclose nothing to fill, and a dot has to stay a dot.
+  const keepAll = markSimplifiedPoints(tolerance) < 3;
+  path.moveTo(flatXY[0], flatXY[1]);
+  for (let i = 1; i < flatCount; i++) {
+    if (keepAll || flatKeep[i] === 1) {
+      path.lineTo(flatXY[i * 2], flatXY[i * 2 + 1]);
+    }
+  }
+  path.closePath();
+  return path;
+}
+
+// Ramer-Douglas-Peucker over the flattened outline: marks each point straying over `tolerance` from
+// the chord around it in `flatKeep`, and returns how many are kept.
+function markSimplifiedPoints(tolerance: number): number {
+  const xy = flatXY;
+  const keep = flatKeep;
+  keep.fill(0, 0, flatCount);
+  keep[0] = 1;
+  keep[flatCount - 1] = 1;
+  let kept = 2;
+  const toleranceSquared = tolerance * tolerance;
+  flatRanges.length = 0;
+  flatRanges.push(0, flatCount - 1);
+  while (flatRanges.length > 0) {
+    const end = flatRanges.pop()!;
+    const start = flatRanges.pop()!;
+    const startX = xy[start * 2];
+    const startY = xy[start * 2 + 1];
+    const chordX = xy[end * 2] - startX;
+    const chordY = xy[end * 2 + 1] - startY;
+    const chordSquared = chordX * chordX + chordY * chordY;
+    let farthest = -1;
+    let farthestSquared = toleranceSquared;
+    for (let i = start + 1; i < end; i++) {
+      const x = xy[i * 2] - startX;
+      const y = xy[i * 2 + 1] - startY;
+      // An outline can close on itself, leaving no chord to project onto.
+      const along =
+        chordSquared > 0
+          ? Math.min(1, Math.max(0, (x * chordX + y * chordY) / chordSquared))
+          : 0;
+      const awayX = x - along * chordX;
+      const awayY = y - along * chordY;
+      const distanceSquared = awayX * awayX + awayY * awayY;
+      if (distanceSquared > farthestSquared) {
+        farthest = i;
+        farthestSquared = distanceSquared;
+      }
+    }
+    if (farthest >= 0) {
+      keep[farthest] = 1;
+      kept += 1;
+      flatRanges.push(start, farthest, farthest, end);
+    }
+  }
+  return kept;
 }

@@ -561,8 +561,8 @@ export abstract class DrawableElement {
   }
 
   /**
-   * Whether a sole selection of this element shows the rotate knob right now. DOM-backed elements
-   * keep this off: `syncDOM` positions their overlay unrotated.
+   * Whether a selection holding this element can show the rotate knob right now. DOM-backed
+   * elements keep this off: `syncDOM` positions their overlay unrotated.
    */
   public get rotatable(): boolean {
     return false;

@@ -4,6 +4,7 @@ const es: typeof en = {
   common: {
     close: 'Cerrar',
     cancel: 'Cancelar',
+    done: 'Listo',
     clear: 'Limpiar',
     copy: 'Copiar',
     copied: 'Copiado',
@@ -11,6 +12,35 @@ const es: typeof en = {
     none: 'Ninguno',
     never: 'Nunca',
     or: 'o',
+  },
+  plan: {
+    title: 'Mejora a Myelin Notes Pro',
+    description:
+      'Un pago único: apoya el desarrollo y desbloquea funciones geniales.',
+    haveLicense: 'Tengo una licencia',
+    features: {
+      agents: {
+        title: 'Agentes de IA por MCP',
+        description:
+          'Deja que la app de IA que ya usas lea tus notas y, si lo permites, escriba en ellas.',
+      },
+      code: {
+        title: 'Ejecuta bloques de código',
+        description:
+          'Ejecuta el código de una página y ve el resultado justo al lado.',
+      },
+      canvasImage: {
+        title: 'Tu propio fondo de lienzo',
+        description: 'Usa cualquier imagen como fondo detrás de tus notas.',
+      },
+      limits: {
+        title: 'Límites más altos',
+        description:
+          'Hasta 8 tipos de bandera, banderas ilimitadas por nota y 16 ajustes de lápiz.',
+      },
+    },
+    upgrade: 'Mejorar',
+    purchaseFailed: 'No se pudo completar la compra.',
   },
   tabBar: {
     library: 'Biblioteca',
@@ -58,6 +88,10 @@ const es: typeof en = {
       openGraph: {
         label: 'Abrir grafo',
         description: 'Mapear enlaces explícitos entre notas de lienzo',
+      },
+      openFlags: {
+        label: 'Abrir banderas',
+        description: 'Explorar y limpiar las banderas de tus notas',
       },
       importMarkdown: {
         label: 'Importar Markdown',
@@ -161,6 +195,8 @@ const es: typeof en = {
           `Se ${count === 1 ? 'importó' : 'importaron'} ${count} página${count === 1 ? '' : 's'}`,
         skipped: (count: number) =>
           `No se ${count === 1 ? 'pudo' : 'pudieron'} importar ${count} página${count === 1 ? '' : 's'}`,
+        skippedSections: (count: number) =>
+          `No se ${count === 1 ? 'pudo' : 'pudieron'} leer ${count} ${count === 1 ? 'sección' : 'secciones'}`,
       },
       obsidian_vault: {
         label: 'Importar desde Obsidian',
@@ -196,6 +232,7 @@ const es: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `Importando ${current} de ${total}...`,
+        preparing: 'Preparando la importación...',
         cancelling: 'Cancelando...',
       },
       summary: {
@@ -264,7 +301,6 @@ const es: typeof en = {
 
       rename: 'Renombrar',
       manageTags: 'Administrar etiquetas',
-      bookmarks: 'Marcadores',
       color: 'Color',
       versionHistory: 'Historial de versiones',
       revealInFileManager: 'Mostrar en el explorador de archivos',
@@ -278,11 +314,6 @@ const es: typeof en = {
       yes: 'Actualizar',
       no: 'Omitir',
     },
-    bookmarksDialog: {
-      title: 'Marcadores',
-      empty: 'Aún no hay marcadores en esta carpeta.',
-      loadFailed: 'No se pudieron cargar los marcadores',
-    },
     tagDialog: {
       title: 'Administrar etiquetas',
       description: (name: string) => `Etiquetas en ${name}`,
@@ -292,6 +323,23 @@ const es: typeof en = {
       createNew: 'Crear nueva etiqueta',
       placeholder: 'Nombre de la etiqueta...',
     },
+  },
+  flagsPage: {
+    title: 'Banderas',
+    searchPlaceholder: 'Buscar banderas, notas, carpetas...',
+    empty: 'Aún no hay banderas.',
+    allTypes: 'Todas',
+    noMatches: 'Ninguna bandera coincide.',
+    loadFailed: 'No se pudieron cargar las banderas',
+    selectAll: 'Seleccionar todo',
+    selected: (count: number) =>
+      `${count} ${count === 1 ? 'seleccionada' : 'seleccionadas'}`,
+    changeType: 'Cambiar tipo',
+    delete: 'Eliminar',
+    deleteTitle: (count: number) =>
+      `¿Eliminar ${count} ${count === 1 ? 'bandera' : 'banderas'}?`,
+    deleteDescription: 'Se quitarán de sus notas.',
+    editFailed: 'No se pudieron actualizar las banderas',
   },
   graph: {
     title: 'Grafo',
@@ -415,6 +463,15 @@ const es: typeof en = {
         pressButton: 'Pulsa un botón del lápiz...',
         notPen: 'Eso fue un ratón, no un lápiz',
       },
+      toolbarSide: {
+        label: 'Lado de la barra de herramientas',
+        description:
+          'En qué borde del lienzo se coloca la barra de herramientas. Quienes escriben con la izquierda quizá prefieran la derecha.',
+        options: {
+          left: 'Izquierda',
+          right: 'Derecha',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Edición de marcos de página',
@@ -422,7 +479,7 @@ const es: typeof en = {
       defaultPageLayout: {
         label: 'Diseño de página predeterminado',
         description:
-          'Elige cómo los nuevos marcos de página organizan su contenido. Los PDF solo usan Páginas o Columnas.',
+          'Elige cómo se organizan los documentos nuevos. Columnas solo se aplica a los PDF y Continuo solo a los marcos de página.',
         options: {
           vertical: 'Páginas',
           horizontal: 'Columnas',
@@ -703,17 +760,17 @@ const es: typeof en = {
           label: 'Herramienta de texto',
           description: 'Crear un nuevo nodo de texto',
         },
-        'canvas:tool-bookmark': {
-          label: 'Herramienta de marcador',
-          description: 'Colocar una bandera de marcador',
+        'canvas:tool-flag': {
+          label: 'Herramienta de bandera',
+          description: 'Colocar una bandera',
         },
-        'canvas:bookmark-previous': {
-          label: 'Marcador anterior',
-          description: 'Ir al marcador anterior de este lienzo',
+        'canvas:flag-previous': {
+          label: 'Bandera anterior',
+          description: 'Ir a la bandera anterior de este lienzo',
         },
-        'canvas:bookmark-next': {
-          label: 'Marcador siguiente',
-          description: 'Ir al siguiente marcador de este lienzo',
+        'canvas:flag-next': {
+          label: 'Bandera siguiente',
+          description: 'Ir a la siguiente bandera de este lienzo',
         },
         'canvas:insert-frame': {
           label: 'Insertar marco de página',
@@ -745,6 +802,66 @@ const es: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Mejorar',
+      active: 'Activo',
+      thanks: {
+        label: 'Pro está activo',
+        description: 'Gracias por apoyar a Myelin. ¡Que lo disfrutes!',
+      },
+      key: {
+        label: 'Clave de licencia',
+        description:
+          'Pega la clave del correo de tu compra. Una clave sirve en hasta 3 dispositivos.',
+        descriptionAndroid:
+          '¿Ya tienes una clave de licencia? Introdúcela aquí.',
+        action: 'Activar',
+      },
+      buy: {
+        label: 'Comprar Pro',
+        description: 'Un pago único en el sitio web de Myelin.',
+        descriptionIos:
+          'Un pago único que desbloquea Pro en tus dispositivos Apple.',
+        descriptionAndroid: 'Una compra única a través de Google Play.',
+        action: 'Comprar Pro',
+      },
+      restore: {
+        label: 'Restaurar compras',
+        description: 'Desbloquea el Pro que ya compraste con este Apple ID.',
+        action: 'Restaurar',
+        none: 'No se encontró ninguna compra en la App Store para este Apple ID.',
+      },
+      email: {
+        label: '¿Ya tienes Pro?',
+        description:
+          'Escribe el correo con el que lo compraste y te enviaremos un código.',
+        codeSent: 'Escribe el código de 8 dígitos que te enviamos.',
+        codeLabel: 'Código',
+        send: 'Enviar código',
+        verify: 'Verificar',
+      },
+      desktop: {
+        label: 'Usa Pro en tu ordenador',
+        description:
+          'Escribe tu correo y te enviaremos una clave de licencia para Mac, Windows o Linux. Sirve en 1 ordenador.',
+        send: 'Enviar clave',
+        sent: 'Revisa tu bandeja de entrada para ver tu clave de licencia.',
+      },
+      deactivate: {
+        label: 'Este dispositivo',
+        description:
+          'Quita Pro de este dispositivo para liberar un lugar para otro.',
+        action: 'Desactivar',
+      },
+      errors: {
+        invalid: 'Esa clave o código no es válido.',
+        limit:
+          'Esta clave ya está activa en todos los dispositivos que permite. Desactívala primero en uno de ellos.',
+        failed:
+          'No se pudo conectar con el servidor de licencias. Inténtalo de nuevo.',
+      },
+    },
     about: {
       title: 'Acerca de',
       eyebrow: 'Aplicación',
@@ -766,6 +883,17 @@ const es: typeof en = {
       pages: 'Páginas',
       continuous: 'Continuo',
       columns: 'Columnas',
+      figureCaptionPlaceholder: 'Añadir una leyenda',
+      letterSize: 'Carta',
+      a4Size: 'A4',
+      customSize: 'Personalizado',
+      customSizeHint:
+        'Arrastra los bordes laterales de la página para ajustar su ancho.',
+      pageNumbers: 'Números de página',
+      pageSetup: 'Configurar página',
+      pageSize: 'Tamaño',
+      pageMargins: 'Márgenes',
+      inchesUnit: 'in',
       export: 'Exportar',
     },
     export: {
@@ -789,6 +917,10 @@ const es: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Salto de página',
+        subtitle: 'Empieza una página nueva',
+      },
       heading1: {
         title: 'Encabezado 1',
         subtitle: 'Convierte este bloque en un encabezado de nivel superior',
@@ -883,14 +1015,29 @@ const es: typeof en = {
       title: 'Backlinks',
       linkedMentions: 'Menciones enlazadas',
     },
-    bookmarks: {
-      title: 'Marcadores',
-      untitled: 'Marcador',
+    flags: {
+      title: 'Banderas',
+      untitled: 'Bandera',
       pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
       rename: 'Renombrar',
       remove: 'Eliminar',
-      previous: 'Marcador anterior',
-      next: 'Marcador siguiente',
+      previous: 'Bandera anterior',
+      next: 'Bandera siguiente',
+      changeType: 'Cambiar tipo de bandera',
+    },
+    flagTypes: {
+      todo: 'Pendiente',
+      review: 'Revisar',
+      newFlag: 'Nueva bandera',
+      edit: 'Editar bandera',
+      remove: 'Eliminar bandera',
+      name: 'Nombre de la bandera',
+      removeTitle: (name: string) => `¿Eliminar «${name}»?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 bandera usa este tipo. También se eliminará de tus notas.'
+          : `${count} banderas usan este tipo. También se eliminarán de tus notas.`,
+      removeConfirm: 'Eliminar',
     },
     toolbar: {
       clickForOptions: 'clic para opciones',
@@ -1012,7 +1159,7 @@ const es: typeof en = {
       highlighter: 'Resaltador',
       eraser: 'Borrador',
       text: 'Texto',
-      bookmark: 'Marcador',
+      flag: 'Bandera',
     },
     toolOptions: {
       color: 'Color',
@@ -1033,6 +1180,7 @@ const es: typeof en = {
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
       increaseFontSize: 'Aumentar tamaño de fuente',
+      flagType: 'Bandera',
     },
     embedComposer: {
       dropToEmbed: 'Soltar para insertar',
@@ -1078,8 +1226,6 @@ const es: typeof en = {
       livePaused: 'Sincronización en vivo pausada',
       peerModes: {
         'owner-device': 'Dispositivo propietario',
-        'guest-editor': 'Editor invitado',
-        'guest-viewer': 'Lector invitado',
       },
       repositoryStatus: {
         localOnly: 'Solo local',
@@ -1114,12 +1260,12 @@ const es: typeof en = {
     pdfAnchoring: {
       title: 'Ancla notas a las páginas de un PDF',
       description:
-        'Lo que dibujas en una página de un PDF se queda en esa página, y Anclar a la página fija en ella imágenes y formas. Siguen a la página cuando mueves el PDF o lo cambias a Columnas.',
+        'Lo que escribes en una página de un PDF queda unido a esa página. Si mueves el PDF o cambias su disposición, tus notas siguen en el mismo lugar de la página. Anclar a la página fija imágenes y formas de la misma manera.',
     },
-    bookmarks: {
+    flags: {
       title: 'Marca lugares en tu lienzo',
       description:
-        'Usa la herramienta Marcador (B) para poner una bandera. Abre la lista de banderas en la parte superior del lienzo o pulsa [ y ] para saltar entre ellas.',
+        'Usa la herramienta Bandera (B) para poner una bandera, y elige su tipo o crea el tuyo. Salta entre banderas desde la lista en la parte superior del lienzo o con [ y ], y abre Banderas arriba a la derecha para verlas en todas tus notas.',
     },
     canvasStyle: {
       title: 'Un estilo para cada lienzo',
@@ -1242,6 +1388,18 @@ const es: typeof en = {
           'Usa el botón + en la parte superior de la barra de herramientas para añadir cualquier otra cosa.',
       },
     },
+  },
+  mediaMigration: {
+    title: 'Optimizando el almacenamiento',
+    description:
+      'Mantén Myelin abierto hasta que termine. Actualiza también Myelin en tus otros dispositivos; de lo contrario, las imágenes, los PDF y el audio podrían aparecer en blanco.',
+    preparing: 'Preparando…',
+    progress: (completed: number, total: number) =>
+      `${completed} de ${total} documentos`,
+    finishing: 'Terminando la subida…',
+    unreachable:
+      'No se puede acceder a tu repositorio en este momento. Esto terminará por sí solo cuando vuelva a estar disponible.',
+    continueWithoutWaiting: 'Continuar sin esperar',
   },
   shutdown: {
     title: 'Guardando cambios…',

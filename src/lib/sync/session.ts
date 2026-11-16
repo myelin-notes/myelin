@@ -115,35 +115,13 @@ export class NoteSession {
       ? YDocManager.fromUpdate(initial.update)
       : new YDocManager();
     const session = new NoteSession(nodeId, ydoc, syncTarget, initial);
-    try {
-      session.unsubscribeNative = await syncTarget.subscribeDocument(
-        nodeId,
-        (change) => {
-          if (session.closed || session.replaced) {
-            return;
-          }
-          if (
-            change.replacement ||
-            change.generation !== session.nativeGeneration
-          ) {
-            session.invalidateNativeDocument();
-            return;
-          }
-          if (change.update) {
-            session.applyUpdate(
-              change.update,
-              change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
-            );
-          }
-        },
-        session.nativeSessionId,
-      );
-      await session.pull();
-    } catch (error) {
-      await session.unsubscribeNative?.();
-      session.ydoc.doc.destroy();
-      throw error;
-    }
+    // Two IPC round trips the loaded document doesn't need to render; queued so save() and
+    // close() still wait for them.
+    void session
+      .enqueueOperation(() => session.subscribeNativeAndPull())
+      .catch((error) => {
+        logger.error('Failed to subscribe note session', error, { nodeId });
+      });
     logger.info('Opened note session', {
       nodeId,
       revision: initial.revision,
@@ -285,6 +263,40 @@ export class NoteSession {
     }
 
     await this.closing;
+  }
+
+  // The pull catches updates landed between the initial load and the subscription.
+  private async subscribeNativeAndPull(): Promise<void> {
+    try {
+      this.unsubscribeNative = await this.syncTarget.subscribeDocument(
+        this.id,
+        (change) => {
+          if (this.closed || this.replaced) {
+            return;
+          }
+          if (
+            change.replacement ||
+            change.generation !== this.nativeGeneration
+          ) {
+            this.invalidateNativeDocument();
+            return;
+          }
+          if (change.update) {
+            this.applyUpdate(
+              change.update,
+              change.origin === 'peer' ? PEER_ORIGIN : REPOSITORY_SYNC_ORIGIN,
+            );
+          }
+        },
+        this.nativeSessionId,
+      );
+    } catch (error) {
+      this.setStatus({
+        lastError: error instanceof Error ? error : new Error(String(error)),
+      });
+      throw error;
+    }
+    await this.pullInternal();
   }
 
   private async pullInternal(): Promise<Uint8Array | null> {

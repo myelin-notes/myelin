@@ -58,12 +58,9 @@ interface GroupScaleInteraction {
 type ScaleInteraction = ElementScaleInteraction | GroupScaleInteraction;
 
 interface RotateInteraction {
-  element: DrawableElement;
-  /** Local-space point held fixed in world space while turning. */
-  localPivot: Vector2;
+  /** Center of the selection's world bounds at grab; fixed so the drag doesn't chase the refit box. */
   worldPivot: Vector2;
-  originalRotation: number;
-  originalOffset: Vector2;
+  transforms: { element: DrawableElement; offset: Vector2; rotation: number }[];
   startPointerAngle: number;
 }
 
@@ -170,21 +167,22 @@ export class SelectTool implements ITool {
     // Handle centres sit outside the content bounds, so they stay reachable without stealing thin
     // strokes' interior.
     const handle = canvas.hitSelectionHandle(point, event.pointerType);
-    if (handle?.control?.kind === 'rotate' && selectedElements.length === 1) {
-      const element = selectedElements[0];
-      const local = element.localBoundingBox;
-      const localPivot = {
-        x: local.x + local.width / 2,
-        y: local.y + local.height / 2,
+    if (handle?.control?.kind === 'rotate' && selectionBounds) {
+      // For a sole element this is also its own center: a turned box's AABB shares its center.
+      const worldPivot = {
+        x: selectionBounds.x + selectionBounds.width / 2,
+        y: selectionBounds.y + selectionBounds.height / 2,
       };
-      const worldPivot = element.localToWorld(localPivot.x, localPivot.y);
       this.mode = SelectMode.Rotating;
       this.rotateInteraction = {
-        element,
-        localPivot,
         worldPivot,
-        originalRotation: element.rotation,
-        originalOffset: { ...element.offset },
+        transforms: selectedElements
+          .filter((element) => !element.locked)
+          .map((element) => ({
+            element,
+            offset: { ...element.offset },
+            rotation: element.rotation,
+          })),
         startPointerAngle: Math.atan2(
           point.y - worldPivot.y,
           point.x - worldPivot.x,
@@ -491,18 +489,24 @@ export class SelectTool implements ITool {
         if (!interaction) {
           break;
         }
-        const { element, localPivot, worldPivot } = interaction;
-        let rotation =
-          interaction.originalRotation +
+        const { transforms, worldPivot } = interaction;
+        let turn =
           Math.atan2(position.y - worldPivot.y, position.x - worldPivot.x) -
           interaction.startPointerAngle;
         if (_event.shiftKey) {
-          rotation = Math.round(rotation / ROTATE_SNAP) * ROTATE_SNAP;
+          // A sole element snaps its absolute rotation; a group has no single one, so it snaps the turn.
+          const base = transforms.length === 1 ? transforms[0].rotation : 0;
+          turn = Math.round((base + turn) / ROTATE_SNAP) * ROTATE_SNAP - base;
         }
         canvas.transact(() => {
-          element.setRotation(rotation);
-          const moved = element.localToWorld(localPivot.x, localPivot.y);
-          element.translate(worldPivot.x - moved.x, worldPivot.y - moved.y);
+          for (const { element, offset, rotation } of transforms) {
+            const arm = rotateVector(
+              { x: offset.x - worldPivot.x, y: offset.y - worldPivot.y },
+              turn,
+            );
+            element.setRotation(rotation + turn);
+            element.setOffset(worldPivot.x + arm.x, worldPivot.y + arm.y);
+          }
         });
         break;
       }
@@ -585,7 +589,9 @@ export class SelectTool implements ITool {
       }
       case SelectMode.Rotating: {
         if (this.rotateInteraction) {
-          canvas.anchoring?.finishTransform([this.rotateInteraction.element]);
+          canvas.anchoring?.finishTransform(
+            this.rotateInteraction.transforms.map((item) => item.element),
+          );
         }
         break;
       }
@@ -653,13 +659,13 @@ export class SelectTool implements ITool {
       }
     }
     if (this.mode === SelectMode.Rotating && this.rotateInteraction) {
-      const { element, originalRotation, originalOffset } =
-        this.rotateInteraction;
-      if (
-        element.rotation !== originalRotation ||
-        element.offset.x !== originalOffset.x ||
-        element.offset.y !== originalOffset.y
-      ) {
+      const changed = this.rotateInteraction.transforms.some(
+        ({ element, offset, rotation }) =>
+          element.rotation !== rotation ||
+          element.offset.x !== offset.x ||
+          element.offset.y !== offset.y,
+      );
+      if (changed) {
         canvas.undo();
       }
     }

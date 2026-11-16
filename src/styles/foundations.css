@@ -205,6 +205,12 @@
    editor's own tokens in @myelin/editor/styles.css; both are imported by
    index.css ahead of this file. */
 :root {
+  /* The height `#root` leaves its content. 100dvh alone also counts the system
+     bars, which edge-to-edge Android and iOS windows run underneath. */
+  --app-height: calc(
+    100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+
   /* Note graph — faint connective line plus a green accent for a selected
      node's outgoing links; incoming links reuse --accent-dark. Nodes are flat
      solid discs: a muted slate by default, swapping to a high-contrast fill

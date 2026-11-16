@@ -8,11 +8,6 @@ import {
 } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import type * as Y from 'yjs';
-import {
-  type LayoutLine,
-  layoutWithLines,
-  prepareWithSegments,
-} from '@chenglou/pretext';
 import { resolveInkColor } from '../../canvas-theme';
 import type { CanvasViewport } from '../../canvas-viewport';
 import type { DrawableCanvas } from '../../drawable-canvas';
@@ -38,6 +33,7 @@ import {
   getSelectionStyle,
   textSchema,
 } from './rich-text';
+import { measureTextWidth, wrapTextLines } from './wrap';
 
 export interface TextStyle {
   color: string;
@@ -61,7 +57,7 @@ const DEFAULT_BOX_HEIGHT = 80;
 /**
  * A free-floating text box. The text is a DOM overlay at all times — display and editing share one
  * persistent rich-text view, so entering edit mode only toggles focus and editability instead of
- * swapping render paths. draw2D is a no-op; the pretext layout in `_cachedLines` remains the source
+ * swapping render paths. draw2D is a no-op; the canvas-measured wrap in `_cachedLines` remains the source
  * for PDF export, thumbnails, and the headless bounding-box fallback.
  */
 export class TextElement
@@ -75,7 +71,7 @@ export class TextElement
   private _boxHeight: number = DEFAULT_BOX_HEIGHT;
   private _editing: boolean = false;
   private _canvas: DrawableCanvas | null = null;
-  private _cachedLines: LayoutLine[] = [];
+  private _cachedLines: string[] = [];
   private _cachedLineHeight: number = 0;
 
   private _richText = docFromText('');
@@ -521,7 +517,7 @@ export class TextElement
 
     const lh = this._cachedLineHeight;
     for (let i = 0; i < this._cachedLines.length; i++) {
-      ctx.fillText(this._cachedLines[i].text, 0, i * lh);
+      ctx.fillText(this._cachedLines[i], 0, i * lh);
     }
   }
 
@@ -547,7 +543,7 @@ export class TextElement
     const sizePt = fontSize * ctx.ptPerWorldY;
 
     for (let i = 0; i < this._cachedLines.length; i++) {
-      const text = this._cachedLines[i].text;
+      const text = this._cachedLines[i];
       if (!text) {
         continue;
       }
@@ -600,17 +596,13 @@ export class TextElement
     if (this._text) {
       const fontString = `${fontSize}px ${this._style.fontFamily}`;
       const effectiveWidth = this._boxWidth * sx;
-      const prepared = prepareWithSegments(this._text, fontString);
-      this._cachedLines = layoutWithLines(
-        prepared,
-        effectiveWidth,
-        lineHeight,
-      ).lines;
+      this._cachedLines = wrapTextLines(this._text, effectiveWidth, (text) =>
+        measureTextWidth(text, fontString),
+      );
 
       // The DOM view is the real renderer, so when mounted measure its content height directly — the
-      // box then matches the displayed wrapping exactly, including trailing blank lines from
-      // Shift+Enter that pretext's normal-whitespace layout collapses. pretext's line count is the
-      // fallback for headless paths (PDF export, thumbnails, before the first render frame).
+      // box then matches the displayed wrapping exactly. The wrapped line count is the fallback for
+      // headless paths (PDF export, thumbnails, before the first render frame).
       const domHeight = this.measureDomTextHeight();
       const textHeight =
         domHeight > 0 ? domHeight : this._cachedLines.length * lineHeight;

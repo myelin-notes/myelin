@@ -1,3 +1,4 @@
+use crate::android_exit::ExitDetails;
 use crate::native_crash::{self, CrashWriter};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -24,7 +25,19 @@ pub struct CrashReport {
     code: u64,
     detail: String,
     address: String,
+    #[serde(default)]
+    panics: Option<String>,
+    #[serde(default)]
+    pid: Option<u32>,
+    #[serde(default, skip_deserializing)]
+    exit: Option<ExitDetails>,
 }
+
+const MAX_PANICS: usize = 4;
+const MAX_PANIC_CHARS: usize = 2048;
+// Pids get reused, so an exit only belongs to a report if it happened around the crash.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+const EXIT_MATCH_WINDOW_MS: i64 = 60_000;
 
 pub struct CrashReports(Mutex<ReportStore>);
 
@@ -88,6 +101,7 @@ impl ReportStore {
                 if bytes.len() < 32 {
                     fs::remove_file(&path).map_err(|error| error.to_string())?;
                     let _ = fs::remove_file(path.with_extension("bin"));
+                    let _ = fs::remove_file(path.with_extension("panics"));
                     continue;
                 }
                 let values = [0, 8, 16, 24].map(|offset| {
@@ -100,6 +114,7 @@ impl ReportStore {
                 report.detail = format!("{:#x}", values[2]);
                 report.address = format!("{:#x}", values[3]);
                 report.reason = native_reason(&report.platform, report.code);
+                report.panics = fs::read_to_string(path.with_extension("panics")).ok();
             }
             pending.push(report);
         }
@@ -115,6 +130,9 @@ impl ReportStore {
             code: 0,
             detail: "0x0".to_string(),
             address: "0x0".to_string(),
+            panics: None,
+            pid: Some(std::process::id()),
+            exit: None,
         };
         let file = OpenOptions::new()
             .create_new(true)
@@ -133,6 +151,10 @@ impl ReportStore {
             _handler: None,
         };
         store.save(&store.current)?;
+        install_panic_hook(
+            store.directory.join(format!("{}.panics", store.current.id)),
+            store.enabled.clone(),
+        );
         #[cfg(not(target_os = "ios"))]
         {
             Ok(Self {
@@ -199,6 +221,7 @@ impl ReportStore {
         fs::remove_file(self.directory.join(format!("{id}.json")))
             .map_err(|error| error.to_string())?;
         let _ = fs::remove_file(self.directory.join(format!("{id}.bin")));
+        let _ = fs::remove_file(self.directory.join(format!("{id}.panics")));
         self.pending.remove(index);
         Ok(())
     }
@@ -216,6 +239,51 @@ impl ReportStore {
         };
         self.save(&report)
     }
+}
+
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn attach_exits(reports: &mut [CrashReport], exits: &[(u32, i64, ExitDetails)]) {
+    for report in reports
+        .iter_mut()
+        .filter(|report| report.kind == "native_crash")
+    {
+        let Ok(crashed) = chrono::DateTime::parse_from_rfc3339(&report.timestamp) else {
+            continue;
+        };
+        report.exit = exits
+            .iter()
+            .find(|(pid, at, _)| {
+                Some(*pid) == report.pid
+                    && (at - crashed.timestamp_millis()).abs() < EXIT_MATCH_WINDOW_MS
+            })
+            .map(|(_, _, details)| details.clone());
+    }
+}
+
+// A panic that aborts leaves nothing else behind: stderr goes nowhere on Android and stripped builds
+// can't name frames. Most panics are caught by their task, so reports only read this after a crash.
+fn install_panic_hook(path: PathBuf, enabled: Arc<AtomicBool>) {
+    let previous = std::panic::take_hook();
+    let recent = Mutex::new(Vec::new());
+    std::panic::set_hook(Box::new(move |info| {
+        if enabled.load(Ordering::Relaxed) {
+            if let Ok(mut recent) = recent.try_lock() {
+                // Keeps the first panic, often the root cause, and the latest, which is what aborted.
+                if recent.len() == MAX_PANICS {
+                    recent.remove(1);
+                }
+                let thread = std::thread::current();
+                let entry = format!(
+                    "{} [{}] {info}",
+                    chrono::Utc::now().to_rfc3339(),
+                    thread.name().unwrap_or("unnamed"),
+                );
+                recent.push(entry.chars().take(MAX_PANIC_CHARS).collect::<String>());
+                let _ = fs::write(&path, recent.join("\n"));
+            }
+        }
+        previous(info);
+    }));
 }
 
 fn native_reason(platform: &str, code: u64) -> String {
@@ -272,17 +340,43 @@ pub fn webview_terminated(app: &AppHandle, label: &str, reason: &str) {
 }
 
 #[tauri::command]
-pub fn configure_crash_reporting(
+pub async fn configure_crash_reporting(
+    webview: tauri::Webview,
     state: State<'_, CrashReports>,
     enabled: bool,
     distinct_id: Option<String>,
     session_id: Option<String>,
 ) -> Result<Vec<CrashReport>, String> {
-    state
+    let reports = state
         .0
         .lock()
         .map_err(|error| error.to_string())?
-        .configure(enabled, distinct_id, session_id)
+        .configure(enabled, distinct_id, session_id)?;
+    #[cfg(target_os = "android")]
+    {
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut reports = reports;
+            let pids: Vec<u32> = reports
+                .iter()
+                .filter(|report| report.kind == "native_crash")
+                .filter_map(|report| report.pid)
+                .collect();
+            if !pids.is_empty() {
+                match crate::android_exit::read_exits(&webview, pids) {
+                    Ok(exits) => attach_exits(&mut reports, &exits),
+                    Err(error) => eprintln!("could not read Android exit records: {error}"),
+                }
+            }
+            reports
+        })
+        .await
+        .map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = webview;
+        Ok(reports)
+    }
 }
 
 #[tauri::command]
@@ -312,7 +406,77 @@ mod tests {
                 Some("crashed-session".into()),
             )
             .unwrap();
+        let _ = std::thread::Builder::new()
+            .name("caught-panic".into())
+            .spawn(|| panic!("worker failed"))
+            .unwrap()
+            .join();
         std::process::abort();
+    }
+
+    fn saved_report(pid: Option<u32>, timestamp: &str) -> CrashReport {
+        CrashReport {
+            id: uuid::Uuid::new_v4().to_string(),
+            kind: "native_crash".into(),
+            reason: String::new(),
+            app_version: "1.0.0".into(),
+            platform: "android".into(),
+            timestamp: timestamp.into(),
+            distinct_id: None,
+            session_id: None,
+            code: 6,
+            detail: "0x0".into(),
+            address: "0x0".into(),
+            panics: None,
+            pid,
+            exit: None,
+        }
+    }
+
+    #[test]
+    fn matches_android_exits_by_pid_and_time_and_serializes_their_details() {
+        let crashed_at = chrono::DateTime::parse_from_rfc3339("2026-11-03T00:04:54Z")
+            .unwrap()
+            .timestamp_millis();
+        let details = ExitDetails {
+            reason: 5,
+            rss_kb: 2048,
+            tombstone: crate::android_exit::Tombstone {
+                abort_message: Some("fdsan: double close".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut reports = [
+            saved_report(Some(10), "2026-11-03T00:04:54Z"),
+            saved_report(Some(11), "2026-11-03T00:04:54Z"),
+            saved_report(None, "2026-11-03T00:04:54Z"),
+        ];
+        attach_exits(
+            &mut reports,
+            &[
+                (10, crashed_at + 900, details.clone()),
+                // The same pid dying again hours later is a different process.
+                (11, crashed_at + 7_200_000, details),
+            ],
+        );
+        let sent = serde_json::to_value(&reports[0]).unwrap();
+        assert_eq!(sent["exit"]["reason"], 5);
+        assert_eq!(sent["exit"]["rssKb"], 2048);
+        assert_eq!(sent["exit"]["abortMessage"], "fdsan: double close");
+        assert!(reports[1].exit.is_none());
+        assert!(reports[2].exit.is_none());
+    }
+
+    #[test]
+    fn loads_reports_saved_by_older_versions() {
+        let report: CrashReport = serde_json::from_str(
+            r#"{"id":"a","kind":"native_crash","reason":"","appVersion":"0.3.3",
+                "platform":"android","timestamp":"2026-11-03T00:04:54Z","distinctId":null,
+                "sessionId":null,"code":6,"detail":"0x0","address":"0x0"}"#,
+        )
+        .unwrap();
+        assert!(report.panics.is_none() && report.pid.is_none());
     }
 
     #[test]
@@ -340,21 +504,32 @@ mod tests {
                 assert_eq!(report.session_id.as_deref(), Some("crashed-session"));
                 assert!(report.reason.contains("abort"));
                 assert_ne!(report.code, 0);
+                let panics = report.panics.as_deref().unwrap();
+                assert!(panics.contains("[caught-panic]"));
+                assert!(panics.contains("crash_reports.rs"));
+                assert!(panics.contains("worker failed"));
                 let id = report.id.clone();
                 store.acknowledge("../../unrelated").unwrap();
                 assert_eq!(store.pending.len(), 1);
                 store.acknowledge(&id).unwrap();
                 assert!(!store.directory.join(format!("{id}.json")).exists());
+                assert!(!store.directory.join(format!("{id}.panics")).exists());
                 store
                     .configure(true, Some("new-person".into()), Some("new-session".into()))
                     .unwrap();
                 store
                     .webview_terminated("main", "renderer crashed")
                     .unwrap();
+                let _ = std::thread::spawn(|| panic!("caught before a clean exit")).join();
             }
         }
         let mut store = ReportStore::new(&directory, "3.0.0").unwrap();
         assert_eq!(store.pending.len(), 1);
+        assert!(!fs::read_dir(&store.directory).unwrap().any(|entry| entry
+            .unwrap()
+            .path()
+            .extension()
+            .is_some_and(|ext| ext == "panics")));
         assert_eq!(store.pending[0].kind, "webview_termination");
         assert_eq!(store.pending[0].app_version, "2.0.0");
         store.configure(false, None, None).unwrap();

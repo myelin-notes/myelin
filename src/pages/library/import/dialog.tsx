@@ -63,6 +63,8 @@ export interface ImportJob {
     conflictResolution: ConflictResolution;
     onProgress: (progress: ImportProgress) => void;
   }): Promise<ImportSummaryData>;
+  /** Releases what `scan` kept for `run`. Called on close, once any running scan has settled. */
+  dispose?(): void;
 }
 
 const previewIcons: Record<ImportPreviewLine['icon'], ReactNode> = {
@@ -94,12 +96,15 @@ export function ImportDialog({ job, onImported, onClose }: ImportDialogProps) {
   const importedSummaryRef = useRef<ImportSummaryData | null>(null);
   const jobRef = useRef(job);
   jobRef.current = job;
+  const scanRef = useRef<Promise<ImportPreviewData> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await jobRef.current.scan();
+        // In a ref so StrictMode's second effect run doesn't scan the file again.
+        scanRef.current ??= jobRef.current.scan();
+        const data = await scanRef.current;
         if (cancelled) {
           return;
         }
@@ -121,6 +126,8 @@ export function ImportDialog({ job, onImported, onClose }: ImportDialogProps) {
   }, []);
 
   const handleClose = useCallback(() => {
+    const dispose = () => jobRef.current.dispose?.();
+    scanRef.current?.then(dispose, dispose);
     if (importedSummaryRef.current) {
       onImported(importedSummaryRef.current);
     }
@@ -239,31 +246,34 @@ export function ImportDialog({ job, onImported, onClose }: ImportDialogProps) {
           </div>
         )}
 
-        {phase.kind === 'importing' && (
+        {phase.kind === 'importing' && !phase.progress && (
+          <div className="flex items-center gap-3 py-6">
+            <LoaderCircle className="size-5 shrink-0 animate-spin text-text-muted" />
+            <span className="text-sm text-text-secondary">
+              {strings.library.importDialog.progress.preparing}
+            </span>
+          </div>
+        )}
+
+        {phase.kind === 'importing' && phase.progress && (
           <div className="flex flex-col gap-3 py-2">
             <div className="h-1.5 overflow-hidden rounded-full bg-surface">
               <div
                 className="h-full rounded-full bg-accent-dark transition-[width] duration-300 ease-out"
                 style={{
-                  width: phase.progress
-                    ? `${(phase.progress.current / phase.progress.total) * 100}%`
-                    : '0%',
+                  width: `${(phase.progress.current / phase.progress.total) * 100}%`,
                 }}
               />
             </div>
             <p className="text-sm text-text-secondary">
-              {phase.progress
-                ? strings.library.importDialog.progress.importing(
-                    phase.progress.current,
-                    phase.progress.total,
-                  )
-                : strings.library.importDialog.progress.importing(0, 0)}
+              {strings.library.importDialog.progress.importing(
+                phase.progress.current,
+                phase.progress.total,
+              )}
             </p>
-            {phase.progress && (
-              <p className="truncate text-text-muted text-xs">
-                {phase.progress.fileName}
-              </p>
-            )}
+            <p className="truncate text-text-muted text-xs">
+              {phase.progress.fileName}
+            </p>
           </div>
         )}
 

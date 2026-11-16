@@ -3,24 +3,30 @@ import { setPlatform } from '../platform';
 import type { VFSNodeId } from '../sync/types';
 import { createFakePlatform } from '../test/fake-platform';
 import {
+  clearAllThumbnails,
+  ensureThumbnail,
   regenerateThumbnailNow,
   registerThumbnailProducer,
+  removeThumbnail,
   requestThumbnailRegeneration,
+  settleThumbnail,
 } from './service';
 
 const writeArtifact = vi.fn(async () => {});
+const removeArtifact = vi.fn(async () => {});
 
 describe('thumbnail service', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     writeArtifact.mockClear();
+    removeArtifact.mockClear();
     setPlatform(
       createFakePlatform({
         artifactCache: {
           getUrl: async () => null,
           read: async () => null,
           write: writeArtifact,
-          remove: async () => {},
+          remove: removeArtifact,
         },
       }),
     );
@@ -114,8 +120,8 @@ describe('thumbnail service', () => {
 
     await vi.waitFor(() => {
       expect(render).toHaveBeenCalledTimes(2);
+      expect(writeArtifact).toHaveBeenCalledTimes(2);
     });
-    expect(writeArtifact).toHaveBeenCalledTimes(2);
   });
 
   it('does not remove a newer producer after an old unregister flush finishes', async () => {
@@ -149,6 +155,133 @@ describe('thumbnail service', () => {
     expect(newRender).toHaveBeenCalledTimes(2);
 
     unregisterNew();
+  });
+
+  it('renders a note with no cached thumbnail, even if it closes before the delay', async () => {
+    const nodeId = 'thumbnail-missing' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    await ensureThumbnail(nodeId, { delayMs: 3_000 });
+    expect(render).not.toHaveBeenCalled();
+
+    unregister();
+    await vi.waitFor(() => {
+      expect(writeArtifact).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('leaves an existing thumbnail alone', async () => {
+    const nodeId = 'thumbnail-present' as VFSNodeId;
+    setPlatform(
+      createFakePlatform({
+        artifactCache: {
+          getUrl: async () => 'asset://thumbnail.png',
+          read: async () => null,
+          write: writeArtifact,
+          remove: async () => {},
+        },
+      }),
+    );
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    await ensureThumbnail(nodeId, { delayMs: 3_000 });
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(render).not.toHaveBeenCalled();
+
+    unregister();
+  });
+
+  it('gives up on a stuck render so teardown and later renders can proceed', async () => {
+    const nodeId = 'thumbnail-stuck-render' as VFSNodeId;
+    let finishStuckRender!: (blob: Blob) => void;
+    const render = vi
+      .fn<() => Promise<Blob>>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Blob>((resolve) => {
+            finishStuckRender = resolve;
+          }),
+      )
+      .mockResolvedValue(new Blob(['fresh']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    const stuck = regenerateThumbnailNow(nodeId);
+    const settled = settleThumbnail(nodeId);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([stuck, settled]);
+
+    expect(writeArtifact).not.toHaveBeenCalled();
+
+    await regenerateThumbnailNow(nodeId);
+
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
+
+    // A partial image would never be replaced, so a late result has to stay dropped.
+    finishStuckRender(new Blob(['late']));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(writeArtifact).toHaveBeenCalledTimes(1);
+
+    unregister();
+  });
+
+  it('does not write a deleted note back when its tab closes', async () => {
+    const nodeId = 'thumbnail-removed-pending' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    requestThumbnailRegeneration(nodeId);
+    await removeThumbnail(nodeId);
+    unregister();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(removeArtifact).toHaveBeenCalledWith(`Thumbnails/${nodeId}.png`);
+    expect(render).not.toHaveBeenCalled();
+    expect(writeArtifact).not.toHaveBeenCalled();
+  });
+
+  it('deletes the file after a render already writing it', async () => {
+    const nodeId = 'thumbnail-removed-inflight' as VFSNodeId;
+    let finishRender!: (blob: Blob) => void;
+    const unregister = registerThumbnailProducer(nodeId, {
+      render: () =>
+        new Promise<Blob>((resolve) => {
+          finishRender = resolve;
+        }),
+    });
+
+    const rendering = regenerateThumbnailNow(nodeId);
+    const removing = removeThumbnail(nodeId);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(removeArtifact).not.toHaveBeenCalled();
+
+    finishRender(new Blob(['thumbnail']));
+    await Promise.all([rendering, removing]);
+
+    expect(writeArtifact.mock.invocationCallOrder[0]).toBeLessThan(
+      removeArtifact.mock.invocationCallOrder[0],
+    );
+
+    unregister();
+  });
+
+  it('does not write a thumbnail back after clearing them all', async () => {
+    const nodeId = 'thumbnail-cleared-pending' as VFSNodeId;
+    const render = vi.fn(async () => new Blob(['thumbnail']));
+    const unregister = registerThumbnailProducer(nodeId, { render });
+
+    requestThumbnailRegeneration(nodeId);
+    await clearAllThumbnails();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(removeArtifact).toHaveBeenCalledWith('Thumbnails');
+    expect(writeArtifact).not.toHaveBeenCalled();
+
+    unregister();
   });
 
   it('does not render on unregister without a pending regeneration', () => {

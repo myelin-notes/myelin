@@ -40,7 +40,7 @@ const ACTION_ICONS: Partial<Record<Action, LucideIcon>> = {
   'canvas:tool-highlighter': Highlighter,
   'canvas:tool-eraser': Eraser,
   'canvas:tool-text': Type,
-  'canvas:tool-bookmark': Flag,
+  'canvas:tool-flag': Flag,
   'canvas:insert-frame': Square,
   'canvas:insert-embed': ImagePlus,
   'editor:bold': Bold,

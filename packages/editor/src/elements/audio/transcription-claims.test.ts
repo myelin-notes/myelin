@@ -116,14 +116,6 @@ describe('shouldAutoTranscribe', () => {
     ).toBe(false);
   });
 
-  it('never resumes as a guest client', () => {
-    expect(
-      shouldAutoTranscribe(
-        input({ claimPeerId: 'peer-b', localMode: 'guest-editor' }),
-      ),
-    ).toBe(false);
-  });
-
   it('does nothing once the transcript is set', () => {
     expect(
       shouldAutoTranscribe(
@@ -198,9 +190,8 @@ describe('canTranscribeHere', () => {
     expect(canTranscribeHere(input({ claimPeerId: 'peer-gone' }))).toBe(true);
   });
 
-  it('blocks incapable and guest clients', () => {
+  it('blocks incapable clients', () => {
     expect(canTranscribeHere(input({ localCapable: false }))).toBe(false);
-    expect(canTranscribeHere(input({ localMode: 'guest-viewer' }))).toBe(false);
   });
 });
 
@@ -219,15 +210,6 @@ describe('shouldClaimOnRecordingStart', () => {
       shouldClaimOnRecordingStart({
         transcriptionSessionStarted: false,
         localMode: 'owner-device',
-      }),
-    ).toBe(false);
-  });
-
-  it('never claims as a guest', () => {
-    expect(
-      shouldClaimOnRecordingStart({
-        transcriptionSessionStarted: true,
-        localMode: 'guest-editor',
       }),
     ).toBe(false);
   });

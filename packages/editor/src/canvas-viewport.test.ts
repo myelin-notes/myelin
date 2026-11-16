@@ -13,12 +13,14 @@ function createViewport() {
     parentElement: target,
     width: 800,
     height: 600,
-  } as HTMLCanvasElement;
+    getBoundingClientRect: () => new DOMRect(0, 0, 800, 600),
+  } as unknown as HTMLCanvasElement;
   const viewport = new CanvasViewport(canvas);
 
-  const wheel = (deltaX: number, deltaY: number) => {
+  const wheel = (deltaX: number, deltaY: number, shiftKey = false) => {
     const event = {
       ctrlKey: false,
+      shiftKey,
       deltaX,
       deltaY,
       preventDefault: vi.fn(),
@@ -52,7 +54,7 @@ describe('CanvasViewport palm rejection', () => {
   it('does not pinch or pan from a broad touch contact', () => {
     const { viewport, touchStart, touchMove } = createViewport();
     const touches = [
-      { clientX: 100, clientY: 100, radiusX: 40, radiusY: 10 },
+      { clientX: 100, clientY: 100, radiusX: 70, radiusY: 10 },
       { clientX: 200, clientY: 200, radiusX: 10, radiusY: 10 },
     ];
 
@@ -61,6 +63,20 @@ describe('CanvasViewport palm rejection', () => {
 
     expect(viewport.offset).toEqual({ x: 0, y: 0 });
     expect(viewport.zoom).toBe(1);
+  });
+
+  it('pinches and pans with firmly pressed fingers', () => {
+    const { viewport, touchStart, touchMove } = createViewport();
+    // iPad reports a firm fingertip as radius 41.8.
+    const touches = [
+      { clientX: 100, clientY: 100, radiusX: 41.8, radiusY: 41.8 },
+      { clientX: 200, clientY: 100, radiusX: 41.8, radiusY: 41.8 },
+    ];
+
+    touchStart(touches);
+    touchMove(touches.map((t) => ({ ...t, clientY: 150 })));
+
+    expect(viewport.offset).toEqual({ x: 0, y: 50 });
   });
 });
 
@@ -90,6 +106,16 @@ describe('CanvasViewport edit-mode wheel panning', () => {
     wheel(120, 50);
 
     expect(viewport.offset).toEqual({ x: -120, y: 0 });
+  });
+
+  it('pans horizontally on shift+wheel whether or not the platform swapped the axis', () => {
+    const { viewport, wheel } = createViewport();
+
+    wheel(0, 100, true);
+    expect(viewport.offset).toEqual({ x: -100, y: 0 });
+
+    wheel(100, 0, true);
+    expect(viewport.offset).toEqual({ x: -200, y: 0 });
   });
 });
 

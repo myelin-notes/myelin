@@ -1,5 +1,4 @@
 import type * as Y from 'yjs';
-import type { DrawableElement } from '../elements/drawable-element';
 import {
   ELEMENT_DESCRIPTORS,
   getElementDescriptor,
@@ -104,15 +103,6 @@ function summarizeElements(
 
 export function describeElementType(type: number | null | undefined): string {
   return getElementDescriptor(type)?.name ?? `unknown:${String(type)}`;
-}
-
-export function summarizeDrawableElements(
-  elements: readonly DrawableElement[],
-) {
-  return summarizeElements(elements.length, (position) => ({
-    uuid: elements[position]?.uuid ?? null,
-    type: elements[position]?.type ?? null,
-  }));
 }
 
 export function summarizeYDoc(doc: Y.Doc) {

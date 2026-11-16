@@ -1,4 +1,5 @@
 import * as Y from 'yjs';
+import { Logger } from '@myelin/shared/logger';
 import {
   canMoveElementOrderForSelection,
   type ElementReorderDirection,
@@ -11,6 +12,7 @@ import { isBackgroundElement } from './elements/element-type';
 import { LOCAL_ORIGIN, type YDocManager } from './ydoc-manager';
 
 export const ELEMENT_Z_ORDER_KEY = 'zOrder';
+const logger = new Logger('CanvasDocumentBinding');
 
 type YElementsDeepObserver = Parameters<
   Y.Array<Y.Map<unknown>>['observeDeep']
@@ -78,7 +80,14 @@ export class CanvasDocumentBinding {
   public destroy(): void {
     this.ydoc.elements.unobserveDeep(this.yElementsObserver);
     for (const element of this.store.all()) {
-      this.onElementRemoved(element);
+      // One failure must not leave the rest of the note's elements undisposed.
+      try {
+        this.onElementRemoved(element);
+      } catch (error) {
+        logger.error('Failed to dispose element', error, {
+          uuid: element.uuid,
+        });
+      }
     }
     this.store.clear();
   }

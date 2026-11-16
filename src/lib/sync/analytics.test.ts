@@ -22,6 +22,7 @@ function status(patch: Partial<RepositoryStatus> = {}): RepositoryStatus {
     lastRemoteSyncAt: 1,
     lastError: null,
     syncing: false,
+    mediaMigration: null,
     dataVersion: 0,
     ...patch,
   };

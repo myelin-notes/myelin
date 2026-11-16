@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     str::FromStr,
+    sync::atomic::{AtomicUsize, Ordering},
 };
 
 use bytes::Bytes;
@@ -16,18 +17,42 @@ use n0_future::StreamExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter, Manager};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{oneshot, Mutex, MutexGuard};
 const GOSSIP_MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
 
 pub struct IrohState {
     runtime: Mutex<Option<IrohRuntime>>,
+    // Host/join calls waiting on `online()` without the lock; leave must not shut the runtime
+    // down under them. Only changed while holding `runtime`.
+    connecting: AtomicUsize,
 }
 
 impl IrohState {
     pub fn new() -> Self {
         Self {
             runtime: Mutex::new(None),
+            connecting: AtomicUsize::new(0),
         }
+    }
+
+    /// Starts the runtime if needed and returns it locked once its endpoint is online.
+    async fn lock_online(&self) -> Result<MutexGuard<'_, Option<IrohRuntime>>, String> {
+        let endpoint = {
+            let mut runtime = self.runtime.lock().await;
+            if runtime.is_none() {
+                *runtime = Some(IrohRuntime::start().await?);
+            }
+            self.connecting.fetch_add(1, Ordering::SeqCst);
+            runtime
+                .as_ref()
+                .expect("runtime initialized")
+                .endpoint
+                .clone()
+        };
+        endpoint.online().await;
+        let runtime = self.runtime.lock().await;
+        self.connecting.fetch_sub(1, Ordering::SeqCst);
+        Ok(runtime)
     }
 }
 
@@ -105,10 +130,11 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         repository: Option<(String, String)>,
     ) -> Result<String, String> {
-        self.attach_topic(app, note_id, transport_id, repository, vec![])
+        self.attach_topic(app, note_id, live_secret, transport_id, repository, vec![])
             .await?;
         Ok(EndpointTicket::new(self.endpoint.addr()).to_string())
     }
@@ -117,6 +143,7 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         ticket: &str,
         repository: Option<(String, String)>,
@@ -127,8 +154,15 @@ impl IrohRuntime {
         let bootstrap = vec![endpoint_addr.id];
         self.memory_lookup.add_endpoint_info(endpoint_addr);
 
-        self.attach_topic(app, note_id, transport_id, repository, bootstrap)
-            .await
+        self.attach_topic(
+            app,
+            note_id,
+            live_secret,
+            transport_id,
+            repository,
+            bootstrap,
+        )
+        .await
     }
 
     /// Look up the topic, validate the transport, and clone out the sender so
@@ -162,6 +196,7 @@ impl IrohRuntime {
         &mut self,
         app: &AppHandle,
         note_id: &str,
+        live_secret: &str,
         transport_id: &str,
         repository: Option<(String, String)>,
         bootstrap: Vec<EndpointId>,
@@ -170,7 +205,7 @@ impl IrohRuntime {
 
         let topic = self
             .gossip
-            .subscribe(note_topic_id(note_id), bootstrap)
+            .subscribe(note_topic_id(live_secret, note_id), bootstrap)
             .await
             .map_err(|err| format!("Failed to join iroh topic: {err}"))?;
         let (sender, mut receiver) = topic.split();
@@ -310,8 +345,8 @@ impl IrohRuntime {
     }
 }
 
-fn note_topic_id(note_id: &str) -> TopicId {
-    let hash = Sha256::digest(note_id.as_bytes());
+fn note_topic_id(live_secret: &str, note_id: &str) -> TopicId {
+    let hash = Sha256::digest(format!("{live_secret}\0{note_id}").as_bytes());
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(&hash);
     TopicId::from_bytes(bytes)
@@ -384,6 +419,7 @@ pub async fn iroh_host(
     app: AppHandle,
     state: tauri::State<'_, IrohState>,
     note_id: String,
+    live_secret: String,
     transport_id: String,
     repository_handle: Option<String>,
 ) -> Result<String, String> {
@@ -394,23 +430,12 @@ pub async fn iroh_host(
         }
         None => None,
     };
-    let endpoint = {
-        let mut runtime = state.runtime.lock().await;
-        if runtime.is_none() {
-            *runtime = Some(IrohRuntime::start().await?);
-        }
-        runtime
-            .as_ref()
-            .expect("runtime initialized")
-            .endpoint
-            .clone()
-    };
-    endpoint.online().await;
-    let mut runtime = state.runtime.lock().await;
-    runtime
+    state
+        .lock_online()
+        .await?
         .as_mut()
         .expect("runtime initialized")
-        .host(&app, &note_id, &transport_id, repository)
+        .host(&app, &note_id, &live_secret, &transport_id, repository)
         .await
 }
 
@@ -419,6 +444,7 @@ pub async fn iroh_join(
     app: AppHandle,
     state: tauri::State<'_, IrohState>,
     note_id: String,
+    live_secret: String,
     transport_id: String,
     ticket: String,
     repository_handle: Option<String>,
@@ -430,23 +456,19 @@ pub async fn iroh_join(
         }
         None => None,
     };
-    let endpoint = {
-        let mut runtime = state.runtime.lock().await;
-        if runtime.is_none() {
-            *runtime = Some(IrohRuntime::start().await?);
-        }
-        runtime
-            .as_ref()
-            .expect("runtime initialized")
-            .endpoint
-            .clone()
-    };
-    endpoint.online().await;
-    let mut runtime = state.runtime.lock().await;
-    runtime
+    state
+        .lock_online()
+        .await?
         .as_mut()
         .expect("runtime initialized")
-        .join(&app, &note_id, &transport_id, &ticket, repository)
+        .join(
+            &app,
+            &note_id,
+            &live_secret,
+            &transport_id,
+            &ticket,
+            repository,
+        )
         .await
 }
 
@@ -469,7 +491,12 @@ pub(crate) async fn broadcast_document(
         let mut data = vec![1];
         data.extend(update);
         if let Err(error) = sender.broadcast(Bytes::from(data)).await {
-            eprintln!("[iroh] native document broadcast failed: {error}");
+            crate::error_report::report_error(
+                app,
+                "IrohTransport",
+                "Native document broadcast failed",
+                error,
+            );
         }
     }
 }
@@ -515,10 +542,21 @@ pub async fn iroh_leave(
     active.leave(&note_id, &transport_id);
     // An idle endpoint still pings its relay every 15s and re-probes the network every ~20s, which
     // keeps a mobile radio awake. Host and join start a fresh one on demand.
-    if active.topics.is_empty() {
+    if active.topics.is_empty() && state.connecting.load(Ordering::SeqCst) == 0 {
         if let Some(idle) = runtime.take() {
             idle.shutdown().await;
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::note_topic_id;
+
+    #[test]
+    fn topic_depends_on_secret() {
+        assert_ne!(note_topic_id("a", "note"), note_topic_id("b", "note"));
+        assert_eq!(note_topic_id("a", "note"), note_topic_id("a", "note"));
+    }
 }

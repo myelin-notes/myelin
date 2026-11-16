@@ -15,6 +15,7 @@ import {
 } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { BetaFeedbackBanner } from '@/pages/library/beta-feedback-banner';
+import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
 import { RecentCard } from '@/pages/library/recent-card';
 
 const logger = new Logger('HomePage');
@@ -25,6 +26,7 @@ export function HomePage() {
   const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
+  const setupState = useExplorerSetupState(repositoryStatus.config);
   const tabController = useTabController();
   const scrollRef = useRef<HTMLElement | null>(null);
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
@@ -67,18 +69,12 @@ export function HomePage() {
     tabController,
   ]);
 
-  // Load recents on mount, and reload when a remote sync lands or any local
-  // repository mutation occurs (e.g. creating a file for a new tab).
-  // `dataVersion` is the only refresh signal for local repos, where
-  // `lastRemoteSyncAt` stays null.
+  // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
+  // bump `dataVersion`.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     void loadRecentFiles();
-  }, [
-    loadRecentFiles,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+  }, [loadRecentFiles, repositoryStatus.dataVersion]);
 
   return (
     <div className="relative flex h-full w-full bg-page">
@@ -115,6 +111,7 @@ export function HomePage() {
             <Button
               size="lg"
               className="mt-7"
+              disabled={setupState !== 'ready'}
               onClick={() => void createCanvas()}
             >
               <Plus />

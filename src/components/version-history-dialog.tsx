@@ -151,25 +151,25 @@ export function VersionHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid max-h-[min(640px,calc(100vh-2rem))] gap-0 overflow-hidden p-0 sm:max-w-md">
-        <DialogHeader className="border-border-subtle border-b px-5 py-4">
+      <DialogContent className="flex max-h-[min(640px,calc(var(--app-height)-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        <DialogHeader className="shrink-0 border-border-subtle border-b px-5 py-4">
           <DialogTitle>{strings.versionHistory.title}</DialogTitle>
           <DialogDescription className="truncate">
             {strings.versionHistory.description(fileName)}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[430px] min-h-[220px] p-3">
+        <div className="flex max-h-[430px] min-h-24 flex-col p-3">
           {loadingVersions ? (
-            <div className="flex h-[220px] items-center justify-center text-text-muted">
+            <div className="flex h-[220px] min-h-0 items-center justify-center text-text-muted">
               <LoaderCircle className="size-5 animate-spin" />
             </div>
           ) : versions.length === 0 ? (
-            <div className="flex h-[220px] items-center justify-center px-4 text-center text-sm text-text-muted">
+            <div className="flex h-[220px] min-h-0 items-center justify-center px-4 text-center text-sm text-text-muted">
               {strings.versionHistory.empty}
             </div>
           ) : (
-            <div className="flex max-h-[404px] flex-col gap-1 overflow-y-auto pr-1">
+            <div className="flex min-h-0 flex-col gap-1 overflow-y-auto pr-1">
               {versions.map((version) => {
                 const selected = version.id === selectedVersionId;
                 return (
@@ -200,7 +200,7 @@ export function VersionHistoryDialog({
           )}
         </div>
 
-        <DialogFooter className="px-5 pb-5">
+        <DialogFooter className="shrink-0 px-5 pb-5">
           <Button
             type="button"
             onClick={restoreSelectedVersion}

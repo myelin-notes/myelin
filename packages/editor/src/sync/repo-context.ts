@@ -5,7 +5,11 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { ActiveRepository, RepositoryConfig } from './repo/config';
+import type {
+  ReadableRepository,
+  RepositoryConfig,
+  RepositoryRuntimeStatus,
+} from './repo/config';
 
 export interface RepositoryStatus {
   config: RepositoryConfig;
@@ -15,12 +19,13 @@ export interface RepositoryStatus {
   lastRemoteSyncAt: number | null;
   lastError: Error | null;
   syncing: boolean;
+  mediaMigration: RepositoryRuntimeStatus['mediaMigration'];
   /** Bumped on every local repository mutation so views can refresh in sync. */
   dataVersion: number;
 }
 
 export interface RepositoryContextValue {
-  repository: ActiveRepository;
+  repository: ReadableRepository;
   status: RepositoryStatus;
 }
 
@@ -28,7 +33,7 @@ export const RepositoryContext = createContext<RepositoryContextValue | null>(
   null,
 );
 
-export function useRepository(): ActiveRepository {
+export function useRepository(): ReadableRepository {
   const context = useContext(RepositoryContext);
   if (!context) {
     throw new Error('useRepository must be used within a RepositoryProvider.');

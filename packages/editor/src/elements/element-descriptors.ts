@@ -1,8 +1,8 @@
 import { AudioElement } from './audio/element';
-import { BookmarkElement } from './bookmark-element';
 import { CodeOutputElement } from './code-output/element';
 import type { DrawableElement } from './drawable-element';
 import { ElementType } from './element-type';
+import { FlagElement } from './flag-element';
 import { ImageElement } from './image-element';
 import { LatexElement } from './latex/element';
 import { PageFrameElement } from './page-frame-element';
@@ -88,9 +88,9 @@ export const ELEMENT_DESCRIPTORS = [
     externalSummary: 'unknown-compatible',
   },
   {
-    type: ElementType.BOOKMARK,
-    name: 'bookmark',
-    create: (uuid) => new BookmarkElement(uuid),
+    type: ElementType.FLAG,
+    name: 'flag',
+    create: (uuid) => new FlagElement(uuid),
     externalSummary: 'unknown-compatible',
   },
 ] as const satisfies readonly ElementDescriptor[];

@@ -1,23 +1,16 @@
 import type { EditorView } from 'prosemirror-view';
-import { CONTENT_HEIGHT } from './core';
+
+export const PAGE_GEOMETRY_ATTRIBUTE = 'data-page-geometry';
 
 export function observePaginationInvalidations(
   view: EditorView,
-  schedule: (followUpPasses?: number) => void,
-  shouldIgnoreResizeInvalidation: () => boolean,
-  followUpPasses: number,
+  schedule: () => void,
 ): () => void {
   const cleanup: Array<() => void> = [];
-  const requestFollowUpPagination = () => {
-    schedule(followUpPasses);
-  };
 
   if (typeof ResizeObserver !== 'undefined') {
     const resizeObserver = new ResizeObserver(() => {
-      if (shouldIgnoreResizeInvalidation()) {
-        return;
-      }
-      requestFollowUpPagination();
+      schedule();
     });
     resizeObserver.observe(view.dom);
     cleanup.push(() => {
@@ -25,19 +18,16 @@ export function observePaginationInvalidations(
     });
   }
 
-  // Switching between vertical and continuous changes no editor styles, so the ResizeObserver
-  // never fires for that toggle. Watch the layout attribute directly.
+  // Switching layout or page size changes no editor height until pagination runs, so the
+  // ResizeObserver never fires for it. Watch the attributes directly.
   const layoutHost = view.dom.closest('.pm-editor');
-  if (layoutHost instanceof HTMLElement) {
-    // Single source of truth for the page-break cap: page-capped blocks in editor-blocks.css read
-    // this var, so CONTENT_HEIGHT and the CSS max-height can't drift apart.
-    layoutHost.style.setProperty('--pm-content-height', `${CONTENT_HEIGHT}px`);
-  }
   if (layoutHost && typeof MutationObserver !== 'undefined') {
-    const layoutObserver = new MutationObserver(requestFollowUpPagination);
+    const layoutObserver = new MutationObserver(() => {
+      schedule();
+    });
     layoutObserver.observe(layoutHost, {
       attributes: true,
-      attributeFilter: ['data-page-layout'],
+      attributeFilter: ['data-page-layout', PAGE_GEOMETRY_ATTRIBUTE],
     });
     cleanup.push(() => {
       layoutObserver.disconnect();
@@ -45,15 +35,18 @@ export function observePaginationInvalidations(
   }
 
   const fontSet = document.fonts;
+  const onFontsChanged = () => {
+    schedule();
+  };
 
-  void fontSet.ready.then(requestFollowUpPagination);
-  fontSet.addEventListener('loadingdone', requestFollowUpPagination);
-  fontSet.addEventListener('loadingerror', requestFollowUpPagination);
-  view.dom.addEventListener('focusin', requestFollowUpPagination);
+  void fontSet.ready.then(onFontsChanged);
+  fontSet.addEventListener('loadingdone', onFontsChanged);
+  fontSet.addEventListener('loadingerror', onFontsChanged);
+  view.dom.addEventListener('focusin', onFontsChanged);
   cleanup.push(() => {
-    fontSet.removeEventListener('loadingdone', requestFollowUpPagination);
-    fontSet.removeEventListener('loadingerror', requestFollowUpPagination);
-    view.dom.removeEventListener('focusin', requestFollowUpPagination);
+    fontSet.removeEventListener('loadingdone', onFontsChanged);
+    fontSet.removeEventListener('loadingerror', onFontsChanged);
+    view.dom.removeEventListener('focusin', onFontsChanged);
   });
 
   return () => {

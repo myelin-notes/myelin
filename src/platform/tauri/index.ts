@@ -59,5 +59,6 @@ export const tauriPlatform: Platform = {
   transcription,
   codeRunner,
   pdfExport,
-  createLiveTransport: (noteId) => new IrohTransport(noteId),
+  createLiveTransport: (noteId, liveSecret) =>
+    new IrohTransport(noteId, liveSecret),
 };

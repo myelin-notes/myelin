@@ -29,10 +29,14 @@ if (typeof globalThis.DOMRect === 'undefined') {
   });
 }
 
-// StrokeElement allocates a Path2D in its constructor; the `node` environment has none. draw2D is
-// never exercised in these tests.
+// StrokeElement builds a Path2D whenever its bounds update; the `node` environment has none.
 if (typeof globalThis.Path2D === 'undefined') {
-  class Path2DPolyfill {}
+  class Path2DPolyfill {
+    moveTo() {}
+    lineTo() {}
+    quadraticCurveTo() {}
+    closePath() {}
+  }
   Object.defineProperty(globalThis, 'Path2D', {
     configurable: true,
     value: Path2DPolyfill,
@@ -79,11 +83,13 @@ beforeEach(() => {
 
 vi.mock('@myelin/editor/thumbnails', () => ({
   clearAllThumbnails: async () => {},
+  ensureThumbnail: async () => {},
   getThumbnailUrl: async () => null,
   regenerateThumbnailNow: async () => {},
   registerThumbnailProducer: () => () => {},
   removeThumbnail: async () => {},
   requestThumbnailRegeneration: () => {},
+  settleThumbnail: async () => {},
   subscribeThumbnail: () => () => {},
 }));
 

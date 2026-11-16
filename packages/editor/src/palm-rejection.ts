@@ -1,7 +1,9 @@
 // Covers only a hand settling into a *new* contact just after the tip leaves — one already resting
 // is a known palm. That lands within a few frames; every ms beyond is time the user cannot pan.
 const GRACE_MS = 150;
-const PALM_CONTACT_MIN_PX = 64;
+// iOS quantizes touch radius in ~10.4pt steps (20.9, 31.3, 41.8, 52.2, 62.7…). A normal fingertip
+// is 31.3 and a firm or flattened one 41.8–52.2, so the old 64px diameter cut killed real pinches.
+const PALM_CONTACT_MIN_PX = 110;
 
 export function isBroadTouch(width: number, height: number): boolean {
   return Math.max(width, height) >= PALM_CONTACT_MIN_PX;

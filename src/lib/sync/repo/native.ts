@@ -35,6 +35,7 @@ import type {
   WriteFileOperation,
 } from './native-operations';
 import { noteContentIndex } from './note-content-index';
+import { RepositorySetupIncompleteError } from './repository-backends';
 import {
   addChild,
   createFileNode,
@@ -52,7 +53,6 @@ import {
   getRecentFiles,
   getStats,
   getUniqueFileName,
-  isNodeWithinFolder,
   listDirectoryNodes,
   listHierarchicalTags,
   listTags,
@@ -69,16 +69,17 @@ import type {
   FileImportSource,
   FileType,
   FileVersion,
+  FlagEdit,
+  FlagType,
   NodeSearchResult,
   NoteBacklink,
-  NoteBookmark,
+  NoteFlag,
   NoteIndexItem,
   PenPreset,
   PenPresetChanges,
   RenameReferencesRequest,
   RenameReferencesResult,
   Repository,
-  RepositoryCapabilities,
   RepositoryNoteGraph,
   RepositoryStats,
   RepositoryTag,
@@ -126,8 +127,8 @@ export type NativeRepositorySource =
   | { kind: 'google-drive'; folderId: string };
 
 export type NativeRepositoryOptions = {
-  capabilities: RepositoryCapabilities;
   storageRoot: string;
+  canCreateNotes: () => Promise<boolean>;
 } & (
   | {
       kind: 'local-storage';
@@ -154,7 +155,12 @@ function encode(bytes: Uint8Array): string {
 }
 
 function decode(base64: string): Uint8Array {
-  return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 // Announce deleted files so the tab layer can close tabs bound to them. Guarded
@@ -167,8 +173,23 @@ function emitNodesDeleted(ids: VFSNodeId[]): void {
   window.dispatchEvent(new CustomEvent(NODES_DELETED_EVENT, { detail }));
 }
 
+const METADATA_MAX_RETRIES = 4;
+
+function isConflictError(error: unknown): boolean {
+  return String(error).includes('Native metadata conflict');
+}
+
+// Operations that never change the manifest, so they keep the read cache valid.
+const READ_ONLY_OPERATIONS: ReadonlySet<string> = new Set([
+  'manifest',
+  'read-file',
+  'path',
+  'paths',
+  'subscribe',
+  'unsubscribe',
+]);
+
 export class NativeRepository implements Repository {
-  readonly capabilities: RepositoryCapabilities;
   readonly kind: string;
   private handle = '';
   private initializing: Promise<void> | null = null;
@@ -177,10 +198,15 @@ export class NativeRepository implements Repository {
   private readonly unlisteners: UnlistenFn[] = [];
   private unlistenDiagnostics: UnlistenFn | null = null;
   private nativeVersion = -1;
+  // Shared by read paths only. Mutators load their own copy through `loadMetadataImpl`, so a
+  // failed save can't leave edits in it.
+  private metadataCache: Promise<{
+    manifest: VFSManifest;
+    revision: string;
+  }> | null = null;
 
   constructor(private readonly backend: NativeRepositoryOptions) {
     this.kind = backend.kind;
-    this.capabilities = backend.capabilities;
   }
 
   get nativeRepositoryHandle(): string {
@@ -224,6 +250,7 @@ export class NativeRepository implements Repository {
       this.unlisteners.push(
         await listen<DataEvent>('repository-data', ({ payload }) => {
           if (payload.repositoryId === this.repositoryId && !this.disposed) {
+            this.metadataCache = null;
             void this.onData(payload).catch((error) =>
               logger.error('Could not refresh native repository index', error),
             );
@@ -308,12 +335,16 @@ export class NativeRepository implements Repository {
     const dataVersion =
       this.getRuntimeStatus().dataVersion +
       (status.dataVersion !== this.nativeVersion ? 1 : 0);
+    if (status.dataVersion !== this.nativeVersion) {
+      this.metadataCache = null;
+    }
     this.nativeVersion = status.dataVersion;
     this.updateRuntimeStatus({
       online: status.online,
       pendingRemoteWrites: status.pendingRemoteWrites,
       lastRemoteSyncAt: status.lastRemoteSyncAt,
       syncing: status.syncing,
+      mediaMigration: status.mediaMigration,
       dataVersion,
       lastError: status.lastError
         ? this.syncError(status.lastError, invalidateAuth)
@@ -356,10 +387,16 @@ export class NativeRepository implements Repository {
     if (this.disposed || !this.handle) {
       throw new Error('Repository is closed');
     }
-    return invoke<NativeOperationResults[K]>('repository_operation', {
-      handle: this.handle,
-      operation,
-    });
+    try {
+      return await invoke<NativeOperationResults[K]>('repository_operation', {
+        handle: this.handle,
+        operation,
+      });
+    } finally {
+      if (!READ_ONLY_OPERATIONS.has(operation.kind)) {
+        this.metadataCache = null;
+      }
+    }
   }
 
   protected loadMetadataImpl(): Promise<{
@@ -378,12 +415,6 @@ export class NativeRepository implements Repository {
       revision: revision ?? '',
     });
     return result.revision;
-  }
-  protected isConflictError(error: unknown): boolean {
-    return String(error).includes('Native metadata conflict');
-  }
-  protected metadataMaxRetries(): number {
-    return 4;
   }
   protected async loadFileBytes(
     nodeId: VFSNodeId,
@@ -482,6 +513,9 @@ export class NativeRepository implements Repository {
     bytes?: Uint8Array,
     options?: CreateFileOptions,
   ): Promise<VFSNodeId> {
+    if (fileType === 'mcanvas' && !(await this.backend.canCreateNotes())) {
+      throw new RepositorySetupIncompleteError();
+    }
     const node = createFileNode(
       createNodeId(),
       name,
@@ -552,9 +586,6 @@ export class NativeRepository implements Repository {
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null> {
     return this.operation({ kind: 'path', nodeId });
   }
-  getRevealPath(nodeId: VFSNodeId): Promise<string | null> {
-    return this.getStoredAbsolutePath(nodeId);
-  }
   async refresh(): Promise<void> {
     await this.initialize();
     try {
@@ -563,11 +594,9 @@ export class NativeRepository implements Repository {
       throw this.syncError(String(error));
     }
   }
-  flushPending(): Promise<void> {
-    return this.refresh();
-  }
   async dispose(): Promise<void> {
     this.disposed = true;
+    this.metadataCache = null;
     await this.initializing?.catch(() => undefined);
     for (const unlisten of this.unlisteners.splice(0)) {
       unlisten();
@@ -688,6 +717,7 @@ export class NativeRepository implements Repository {
     lastRemoteSyncAt: null,
     lastError: null,
     syncing: false,
+    mediaMigration: null,
     dataVersion: 0,
   };
 
@@ -774,7 +804,7 @@ export class NativeRepository implements Repository {
   ): Promise<void> {
     let pendingManifest = manifest;
     let pendingRevision = revision;
-    const maxRetries = this.metadataMaxRetries();
+    const maxRetries = METADATA_MAX_RETRIES;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         await this.saveMetadataImpl(
@@ -784,12 +814,13 @@ export class NativeRepository implements Repository {
           ),
           pendingRevision,
         );
+        this.metadataCache = null;
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
         return;
       } catch (error) {
-        if (attempt >= maxRetries - 1 || !this.isConflictError(error)) {
+        if (attempt >= maxRetries - 1 || !isConflictError(error)) {
           throw error;
         }
         const fresh = await this.loadMetadataImpl();
@@ -810,7 +841,13 @@ export class NativeRepository implements Repository {
     revision: string | null;
   }> {
     if (this.metadataBatchDepth === 0) {
-      return this.loadMetadataImpl();
+      const load = (this.metadataCache ??= this.loadMetadataImpl());
+      load.catch(() => {
+        if (this.metadataCache === load) {
+          this.metadataCache = null;
+        }
+      });
+      return load;
     }
     if (!this.metadataBatchLoad) {
       const load = this.loadMetadataImpl();
@@ -938,33 +975,47 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
-  /** Bookmark flags in every canvas under the folder, read from saved files. */
-  async listBookmarks(folderId: VFSNodeId): Promise<NoteBookmark[]> {
+  /** Flags in every canvas, read from saved files. */
+  async listFlags(): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
-    const sources: NoteIndexItem[] = [];
-    for (const node of Object.values(manifest.nodes)) {
-      if (
-        node.type !== 'file' ||
-        node.fileType !== 'mcanvas' ||
-        node.system ||
-        !isNodeWithinFolder(manifest, node, folderId)
-      ) {
-        continue;
-      }
-      const path = await this.getStoredAbsolutePath(node.id);
-      if (path) {
-        sources.push({ nodeId: node.id, path });
-      }
-    }
+    const sources = await this.noteIndexItems(manifest);
     const flags = await invoke<
-      { nodeId: VFSNodeId; id: string; label: string }[]
-    >('list_note_bookmarks', { sources });
-    return flags.map(({ nodeId, id, label }) => ({
-      noteId: nodeId,
-      noteName: manifest.nodes[nodeId]?.name ?? '',
-      id,
-      label,
-    }));
+      { nodeId: VFSNodeId; id: string; label: string; flagTypeId: string }[]
+    >('list_note_flags', {
+      repoId: noteContentIndex.repoIdFor(this),
+      sources,
+    });
+    return flags.map(({ nodeId, id, label, flagTypeId }) => {
+      const note = manifest.nodes[nodeId];
+      const folderPath: string[] = [];
+      for (
+        let folder = note && manifest.nodes[note.parentId ?? ''];
+        folder;
+        folder = manifest.nodes[folder.parentId ?? '']
+      ) {
+        folderPath.unshift(folder.name);
+      }
+      return {
+        noteId: nodeId,
+        noteName: note?.name ?? '',
+        folderPath,
+        noteModifiedAt: note?.modifiedAt ?? 0,
+        id,
+        label,
+        flagTypeId,
+      };
+    });
+  }
+
+  async editFlags(
+    flags: readonly Pick<NoteFlag, 'noteId' | 'id'>[],
+    edit: FlagEdit,
+  ): Promise<void> {
+    const flagIds: Record<VFSNodeId, string[]> = {};
+    for (const flag of flags) {
+      (flagIds[flag.noteId] ??= []).push(flag.id);
+    }
+    await this.operation({ kind: 'edit-flags', flagIds, edit });
   }
 
   async getNoteGraph(): Promise<RepositoryNoteGraph> {
@@ -1126,22 +1177,20 @@ export class NativeRepository implements Repository {
 
   async listNoteIndexItems(): Promise<NoteIndexItem[]> {
     const { manifest } = await this.loadMetadata();
-    const items: NoteIndexItem[] = [];
-    let inspected = 0;
-    for (const id in manifest.nodes) {
-      const node = manifest.nodes[id];
-      if (node.type !== 'file' || node.fileType !== 'mcanvas' || node.system) {
-        continue;
-      }
-      const path = await this.getStoredAbsolutePath(node.id);
-      if (path) {
-        items.push({ nodeId: node.id, path });
-      }
-      if (++inspected % 100 === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    }
-    return items;
+    return this.noteIndexItems(manifest);
+  }
+
+  private async noteIndexItems(
+    manifest: VFSManifest,
+  ): Promise<NoteIndexItem[]> {
+    const nodeIds = Object.values(manifest.nodes)
+      .filter(
+        (node) =>
+          node.type === 'file' && node.fileType === 'mcanvas' && !node.system,
+      )
+      .map((node) => node.id);
+    const paths = await this.operation({ kind: 'paths', nodeIds });
+    return Object.entries(paths).map(([nodeId, path]) => ({ nodeId, path }));
   }
 
   async getCustomColors(tool: CustomColorTool): Promise<string[]> {
@@ -1186,6 +1235,47 @@ export class NativeRepository implements Repository {
           (c) => c !== normalized,
         );
         return [...manifest.colors[tool]];
+      },
+    );
+  }
+
+  async getFlagTypes(): Promise<FlagType[]> {
+    const { manifest } = await this.loadMetadata();
+    return manifest.flagTypes.map((type) => ({ ...type }));
+  }
+
+  async setFlagTypes(types: readonly FlagType[]): Promise<FlagType[]> {
+    const normalized = types.map(({ id, name, color }) => {
+      const normalizedColor = normalizeCustomColor(color);
+      if (!normalizedColor) {
+        throw new Error(`Invalid color: ${color}`);
+      }
+      return { id, name, color: normalizedColor };
+    });
+    return this.mutateMetadata(
+      'Set flag types',
+      { settings: true },
+      (manifest) => {
+        manifest.flagTypes = normalized;
+        return normalized.map((type) => ({ ...type }));
+      },
+    );
+  }
+
+  async getLiveSecret(): Promise<string> {
+    const { manifest } = await this.loadMetadata();
+    if (manifest.liveSecret) {
+      return manifest.liveSecret;
+    }
+    return this.mutateMetadata(
+      'Create live secret',
+      { settings: true },
+      (m) => {
+        m.liveSecret ??= Array.from(
+          crypto.getRandomValues(new Uint8Array(32)),
+          (b) => b.toString(16).padStart(2, '0'),
+        ).join('');
+        return m.liveSecret;
       },
     );
   }
@@ -1349,6 +1439,8 @@ export class NativeRepository implements Repository {
             colors: manifest.colors,
             tagRegistry: manifest.tagRegistry,
             penPresets: manifest.penPresets,
+            flagTypes: manifest.flagTypes,
+            liveSecret: manifest.liveSecret,
           }
         : null,
     };
@@ -1368,7 +1460,7 @@ export class NativeRepository implements Repository {
       return result;
     }
 
-    const maxRetries = this.metadataMaxRetries();
+    const maxRetries = METADATA_MAX_RETRIES;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       const { manifest, revision } = await this.loadMetadataImpl();
       const result = mutator(manifest);
@@ -1378,12 +1470,13 @@ export class NativeRepository implements Repository {
           this.metadataPatch(manifest, [targets]),
           revision,
         );
+        this.metadataCache = null;
         this.updateRuntimeStatus({
           dataVersion: this.runtimeStatus.dataVersion + 1,
         });
         return result;
       } catch (error) {
-        if (attempt < maxRetries - 1 && this.isConflictError(error)) {
+        if (attempt < maxRetries - 1 && isConflictError(error)) {
           continue;
         }
         throw error;

@@ -24,7 +24,7 @@ interface UseCanvasEngineArgs {
   recordingOwnerId: TabId;
   thumbnailRootRef: React.RefObject<HTMLElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  bgHostRef: React.RefObject<HTMLDivElement | null>;
+  bgCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   overlayCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   domOverlayRef: React.RefObject<HTMLDivElement | null>;
   wheelRef: React.RefObject<WheelPickerHandle | null>;
@@ -44,7 +44,7 @@ export function useCanvasEngine({
   recordingOwnerId,
   thumbnailRootRef,
   canvasRef,
-  bgHostRef,
+  bgCanvasRef,
   overlayCanvasRef,
   domOverlayRef,
   wheelRef,
@@ -75,7 +75,7 @@ export function useCanvasEngine({
     id,
     recordingOwnerId,
     canvasRef,
-    bgHostRef,
+    bgCanvasRef,
     overlayCanvasRef,
     domOverlayRef,
     drawableCanvasRef,
@@ -161,12 +161,12 @@ export function useCanvasEngine({
         onDown: () => onInsertEmbed(),
       },
       {
-        action: 'canvas:bookmark-previous',
-        onDown: () => drawableCanvasRef.current?.stepBookmark(-1),
+        action: 'canvas:flag-previous',
+        onDown: () => drawableCanvasRef.current?.stepFlag(-1),
       },
       {
-        action: 'canvas:bookmark-next',
-        onDown: () => drawableCanvasRef.current?.stepBookmark(1),
+        action: 'canvas:flag-next',
+        onDown: () => drawableCanvasRef.current?.stepFlag(1),
       },
       ...toolBindings,
     ],

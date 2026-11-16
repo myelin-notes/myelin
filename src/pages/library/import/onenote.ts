@@ -31,12 +31,19 @@ export function oneNoteRootName(path: string): string {
 export interface OneNotePreview {
   pages: number;
   sections: number;
+  /** Why each skipped section failed, with its name removed. */
+  failedSections: string[];
 }
 
 export type { OneNoteImportResult } from '@/lib/sync/repo/native-operations';
 
 export function scanOneNoteFile(path: string): Promise<OneNotePreview> {
   return invoke<OneNotePreview>('scan_onenote', { path });
+}
+
+/** Frees the notebook `scanOneNoteFile` kept for the import. */
+export function discardOneNoteScan(): void {
+  void invoke('discard_onenote_scan');
 }
 
 export async function importOneNote({

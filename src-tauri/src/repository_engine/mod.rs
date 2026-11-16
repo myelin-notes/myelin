@@ -1,9 +1,12 @@
 mod document;
+mod flags;
+mod media;
+mod media_cleanup;
 mod onenote;
 mod references;
 mod remote;
-pub(crate) mod telemetry;
 pub(crate) mod store;
+pub(crate) mod telemetry;
 #[cfg(test)]
 mod tests;
 mod transfer;
@@ -11,6 +14,7 @@ mod version_history;
 
 use crate::import_files::FileImportSource;
 use crate::repository_bootstrap::{download::RepositorySource, CachePaths};
+use crate::repository_metadata::Node;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -55,6 +59,9 @@ pub(crate) struct RepositoryEngine {
     // Millis of the last sync that confirmed the remote, including no-op checks; 0 = none yet.
     last_checked_at: AtomicU64,
     error: Mutex<Option<String>>,
+    media_migration: Mutex<Option<MediaMigration>>,
+    // Last error reported per background task, so a retry loop reports each failure once.
+    reported_errors: Mutex<HashMap<&'static str, String>>,
     cache_dir: PathBuf,
 }
 
@@ -69,7 +76,7 @@ pub struct MetadataPatch {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct NodeMetadata {
-    node: Value,
+    node: Node,
     links: Vec<Value>,
 }
 
@@ -79,6 +86,20 @@ struct RepositoryPreferences {
     colors: Value,
     tag_registry: Vec<String>,
     pen_presets: Vec<Value>,
+    flag_types: Vec<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    live_secret: Option<String>,
+}
+
+fn stored_path(state: &Store, node_id: &str) -> Result<Value, String> {
+    let Some(node) = state.manifest.file(node_id) else {
+        return Ok(Value::Null);
+    };
+    Ok(json!(state
+        .root
+        .join("files")
+        .join(file_name(node)?)
+        .to_string_lossy()))
 }
 
 #[derive(Deserialize)]
@@ -87,6 +108,20 @@ pub struct OpenRepositoryRequest {
     storage_root: String,
     credential_id: String,
     source: Option<RepositorySource>,
+}
+
+// How much one sync may have to hold in memory while existing documents migrate.
+const MEDIA_BATCH_BYTES: usize = if cfg!(test) {
+    8 * 1024
+} else {
+    64 * 1024 * 1024
+};
+
+// A `total` of 0 means the documents to migrate are still being counted.
+#[derive(Clone, Serialize)]
+struct MediaMigration {
+    completed: usize,
+    total: usize,
 }
 
 #[derive(Clone, Serialize)]
@@ -99,6 +134,7 @@ struct NativeStatus {
     last_error: Option<String>,
     data_version: u64,
     syncing: bool,
+    media_migration: Option<MediaMigration>,
 }
 
 #[derive(Deserialize)]
@@ -117,7 +153,7 @@ pub enum RepositoryOperation {
         node_id: String,
     },
     WriteFile {
-        node: Value,
+        node: Node,
         bytes_base64: String,
         replace: bool,
         overwrite_remote: bool,
@@ -138,12 +174,12 @@ pub enum RepositoryOperation {
         progress: tauri::ipc::Channel<Value>,
     },
     ImportFile {
-        node: Value,
+        node: Node,
         source: FileImportSource,
     },
     #[serde(skip)]
     ImportedFile {
-        node: Value,
+        node: Node,
         bytes: Vec<u8>,
     },
     RenameReferences {
@@ -151,6 +187,11 @@ pub enum RepositoryOperation {
         target_id: String,
         new_name: String,
         reference_kind: references::ReferenceKind,
+    },
+    EditFlags {
+        /// Flag ids by canvas node id.
+        flag_ids: HashMap<String, HashSet<String>>,
+        edit: flags::FlagEdit,
     },
     StageBytes {
         transfer_id: String,
@@ -200,6 +241,9 @@ pub enum RepositoryOperation {
     },
     Path {
         node_id: String,
+    },
+    Paths {
+        node_ids: Vec<String>,
     },
 }
 
@@ -332,6 +376,7 @@ impl RepositoryEngine {
             last_error: recovery.or_else(|| self.error.lock().unwrap().clone()),
             data_version: version,
             syncing: self.syncing.load(Ordering::Relaxed),
+            media_migration: self.media_migration.lock().unwrap().clone(),
         }
     }
 
@@ -394,6 +439,137 @@ impl RepositoryEngine {
         }
     }
 
+    fn report_background_error<T, R: tauri::Runtime>(
+        &self,
+        app: &AppHandle<R>,
+        message: &'static str,
+        result: &Result<T, String>,
+    ) {
+        let mut reported = self.reported_errors.lock().unwrap();
+        match result {
+            Err(error) if reported.get(message) != Some(error) => {
+                crate::error_report::report_error(app, "RepositoryEngine", message, error);
+                reported.insert(message, error.clone());
+            }
+            Err(_) => {}
+            Ok(_) => {
+                reported.remove(message);
+            }
+        }
+    }
+
+    async fn set_media_migration(&self, app: Option<&AppHandle>, progress: Option<MediaMigration>) {
+        *self.media_migration.lock().unwrap() = progress;
+        if let Some(app) = app {
+            let _ = app.emit("repository-status", self.status().await);
+        }
+    }
+
+    // Documents written before media storage keep their bytes until something rewrites them. A sync
+    // holds every queued document in memory with its media restored, so this uploads what it has
+    // rewritten before rewriting more. That also keeps a device that cannot sync from queueing the
+    // whole repository. Taking the store once per document keeps it available in between.
+    async fn migrate_media(
+        engine: std::sync::Weak<Self>,
+        app: Option<AppHandle>,
+    ) -> Result<(), String> {
+        let result = Self::migrate_media_documents(&engine, app.as_ref()).await;
+        if let Some(owner) = engine.upgrade() {
+            owner.set_media_migration(app.as_ref(), None).await;
+        }
+        result
+    }
+
+    async fn migrate_media_documents(
+        engine: &std::sync::Weak<Self>,
+        app: Option<&AppHandle>,
+    ) -> Result<(), String> {
+        let Some(owner) = engine.upgrade() else {
+            return Ok(());
+        };
+        let candidates = owner
+            .with_store(|state| state.documents_large_enough_for_media())
+            .await?;
+        drop(owner);
+        let mut documents = Vec::new();
+        for (id, path) in candidates {
+            let holds_media = tauri::async_runtime::spawn_blocking(move || {
+                std::fs::read(path).is_ok_and(|stored| media::has_inline_media(&stored))
+            })
+            .await
+            .map_err(|error| error.to_string())?;
+            if !holds_media {
+                continue;
+            }
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            // Shown as soon as there is work, before the total is known.
+            if documents.is_empty() {
+                let progress = MediaMigration {
+                    completed: 0,
+                    total: 0,
+                };
+                owner.set_media_migration(app, Some(progress)).await;
+            }
+            documents.push(id);
+        }
+        if documents.is_empty() {
+            return Ok(());
+        }
+        let total = documents.len();
+        let mut queued = 0;
+        for (index, id) in documents.into_iter().enumerate() {
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            let progress = MediaMigration {
+                completed: index,
+                total,
+            };
+            owner.set_media_migration(app, Some(progress)).await;
+            queued += owner
+                .with_store(move |state| state.extract_document_media(&id))
+                .await?;
+            drop(owner);
+            if queued >= MEDIA_BATCH_BYTES {
+                Self::wait_for_upload(engine).await?;
+                queued = 0;
+            }
+        }
+        if let Some(owner) = engine.upgrade() {
+            let progress = MediaMigration {
+                completed: total,
+                total,
+            };
+            owner.set_media_migration(app, Some(progress)).await;
+        }
+        Self::wait_for_upload(engine).await
+    }
+
+    // Retries are the scheduler's: it syncs every 30 seconds whatever this is waiting for.
+    async fn wait_for_upload(engine: &std::sync::Weak<Self>) -> Result<(), String> {
+        let mut woken = false;
+        loop {
+            let Some(owner) = engine.upgrade() else {
+                return Ok(());
+            };
+            if owner.references.load(Ordering::SeqCst) == 0
+                || owner
+                    .with_store(|state| Ok(state.outbox.is_empty()))
+                    .await?
+            {
+                return Ok(());
+            }
+            if !woken {
+                owner.wake.notify_one();
+                woken = true;
+            }
+            drop(owner);
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        }
+    }
+
     fn schedule(engine: &Arc<Self>, app: &AppHandle) {
         let weak = Arc::downgrade(engine);
         let app = app.clone();
@@ -414,6 +590,11 @@ impl RepositoryEngine {
                         return;
                     }
                     let checkpoint = engine.checkpoint_pending().await;
+                    engine.report_background_error(
+                        &checkpoint_app,
+                        "Checkpointing pending documents failed",
+                        &checkpoint,
+                    );
                     if let Ok(changes) = checkpoint {
                         if !changes.changed.is_empty() {
                             engine.emit_changes(&checkpoint_app, changes).await;
@@ -442,7 +623,8 @@ impl RepositoryEngine {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(30)) => {}
                 }
                 if engine.references.load(Ordering::SeqCst) != 0 {
-                    let _ = engine.synchronize(&app, true).await;
+                    let result = engine.synchronize(&app, true).await;
+                    engine.report_background_error(&app, "Background sync failed", &result);
                 }
             }
         });
@@ -509,10 +691,8 @@ impl RepositoryOperation {
                 }
                 let mut ids = std::collections::HashSet::new();
                 for record in &patch.nodes {
-                    let id = record.node["id"]
-                        .as_str()
-                        .ok_or("Invalid repository node ID")?;
-                    crate::repository_metadata::validate_node(id, &record.node)?;
+                    let id = record.node.id.as_str();
+                    record.node.validate(id)?;
                     if !ids.insert(id) {
                         return Err("Duplicate metadata change".into());
                     }
@@ -525,51 +705,50 @@ impl RepositoryOperation {
                 state.transaction_active = true;
                 let mut files = Vec::new();
                 for record in patch.nodes {
-                    let id = record.node["id"].as_str().unwrap().to_owned();
-                    let previous = state.manifest["nodes"][&id].clone();
-                    let new_file = record.node["type"] == "file" && previous.is_null();
-                    if previous != record.node
-                        || state.manifest["linksBySource"][&id] != json!(record.links)
+                    let id = record.node.id.clone();
+                    let previous = state.manifest.node(&id);
+                    let new_file = record.node.is_file() && previous.is_none();
+                    let previous_links = state.manifest.links_by_source.get(&id);
+                    if previous != Some(&record.node)
+                        || previous_links
+                            .map_or(!record.links.is_empty(), |links| *links != record.links)
                     {
                         state.queue("upsert-manifest-node", Some(&id), json!({}));
                         changes.changed.push(id.clone());
                     }
-                    state.manifest["nodes"][&id] = record.node;
+                    let is_plain_canvas = record.node.is_canvas() && record.node.system.is_none();
+                    state.manifest.nodes.insert(id.clone(), record.node);
                     if record.links.is_empty() {
-                        state.manifest["linksBySource"]
-                            .as_object_mut()
-                            .unwrap()
-                            .remove(&id);
+                        state.manifest.links_by_source.remove(&id);
                     } else {
-                        state.manifest["linksBySource"][&id] = json!(record.links);
+                        state
+                            .manifest
+                            .links_by_source
+                            .insert(id.clone(), record.links);
                     }
                     if new_file {
-                        let node = &state.manifest["nodes"][&id];
-                        let name = file_name(node)?;
+                        let name = file_name(&state.manifest.nodes[&id])?;
                         if !state.root.join("files").join(&name).exists() {
                             files.push(FileWrite {
                                 name,
                                 bytes: Some(String::new()),
                             });
                         }
-                        if node["fileType"] == "mcanvas" && node["system"].is_null() {
+                        if is_plain_canvas {
                             let links = document::links(state.doc(&id)?);
                             if !links.is_empty() {
-                                state.manifest["linksBySource"][&id] = json!(links);
+                                state.manifest.links_by_source.insert(id.clone(), links);
                             }
                         }
                         state.queue("push-note", Some(&id), json!({"baseFileRevision":null}));
                     }
                 }
                 for id in patch.deleted_node_ids {
-                    let node = state.manifest["nodes"].as_object_mut().unwrap().remove(&id);
+                    let node = state.manifest.nodes.remove(&id);
                     if let Some(node) = node {
-                        state.manifest["linksBySource"]
-                            .as_object_mut()
-                            .unwrap()
-                            .remove(&id);
+                        state.manifest.remove_links(&id);
                         state.outbox.retain(|op| op["nodeId"] != id);
-                        let deleted_files = if node["type"] == "file" {
+                        let deleted_files = if node.is_file() {
                             vec![id.clone()]
                         } else {
                             vec![]
@@ -579,7 +758,7 @@ impl RepositoryOperation {
                             Some(&id),
                             json!({"deletedFileIds":deleted_files}),
                         );
-                        if node["type"] == "file" {
+                        if node.is_file() {
                             files.push(FileWrite {
                                 name: file_name(&node)?,
                                 bytes: None,
@@ -591,17 +770,42 @@ impl RepositoryOperation {
                     }
                 }
                 if let Some(settings) = patch.settings {
-                    let mut settings = serde_json::to_value(settings).map_err(|e| e.to_string())?;
-                    crate::repository_metadata::normalize(&mut settings);
-                    for (field, kind) in [
-                        ("colors", "sync-custom-colors"),
-                        ("tagRegistry", "sync-tag-registry"),
-                        ("penPresets", "sync-pen-presets"),
+                    let mut next = crate::repository_metadata::empty_manifest();
+                    next.colors = settings.colors;
+                    next.tag_registry = json!(settings.tag_registry);
+                    next.pen_presets = Value::Array(settings.pen_presets);
+                    next.flag_types = Value::Array(settings.flag_types);
+                    crate::repository_metadata::normalize(&mut next);
+                    let manifest = &mut state.manifest;
+                    let mut queued = Vec::new();
+                    for (field, next, kind) in [
+                        (&mut manifest.colors, next.colors, "sync-custom-colors"),
+                        (
+                            &mut manifest.tag_registry,
+                            next.tag_registry,
+                            "sync-tag-registry",
+                        ),
+                        (
+                            &mut manifest.pen_presets,
+                            next.pen_presets,
+                            "sync-pen-presets",
+                        ),
+                        (&mut manifest.flag_types, next.flag_types, "sync-flag-types"),
                     ] {
-                        if state.manifest[field] != settings[field] {
-                            state.manifest[field] = settings[field].clone();
-                            state.queue(kind, None, json!({}));
+                        if *field != next {
+                            *field = next;
+                            queued.push(kind);
                         }
+                    }
+                    // A client that predates `liveSecret` omits it; that must not erase the secret.
+                    if settings.live_secret.is_some()
+                        && manifest.live_secret != settings.live_secret
+                    {
+                        manifest.live_secret = settings.live_secret;
+                        queued.push("sync-live-secret");
+                    }
+                    for kind in queued {
+                        state.queue(kind, None, json!({}));
                     }
                 }
                 state.commit(files)?;
@@ -609,20 +813,23 @@ impl RepositoryOperation {
                 json!({"revision":state.metadata_revision()})
             }
             Self::ReadFile { node_id } => {
-                let bytes = state.read_file(&state.manifest["nodes"][&node_id])?;
+                let node = state
+                    .manifest
+                    .node(&node_id)
+                    .ok_or("Unknown repository node")?;
+                let bytes = state.read_file(node)?;
                 json!({"bytesBase64": STANDARD.encode(&bytes), "revision": if bytes.is_empty() { None } else { Some(revision(&bytes)) }})
             }
-            Self::Path { node_id } => {
-                let node = &state.manifest["nodes"][&node_id];
-                if node["type"] == "file" {
-                    json!(state
-                        .root
-                        .join("files")
-                        .join(file_name(node)?)
-                        .to_string_lossy())
-                } else {
-                    Value::Null
+            Self::Path { node_id } => stored_path(state, &node_id)?,
+            Self::Paths { node_ids } => {
+                let mut paths = serde_json::Map::new();
+                for id in node_ids {
+                    let path = stored_path(state, &id)?;
+                    if !path.is_null() {
+                        paths.insert(id, path);
+                    }
                 }
+                Value::Object(paths)
             }
             Self::WriteFile {
                 node,
@@ -665,6 +872,9 @@ impl RepositoryOperation {
             } => {
                 return references::rename(state, source_ids, target_id, new_name, reference_kind);
             }
+            Self::EditFlags { flag_ids, edit } => {
+                return flags::edit(state, flag_ids, edit);
+            }
             Self::StageBytes { .. } | Self::FinishTransfer { .. } | Self::CancelTransfer { .. } => {
                 return Err("Transfer requires a repository handle".into());
             }
@@ -678,18 +888,16 @@ impl RepositoryOperation {
                 return version_history::restore(state, &node_id, &version_id);
             }
             Self::DeleteFile { node_id, file_type } => {
-                let node = state.manifest["nodes"][&node_id].clone();
-                let node = if node["type"] == "file" {
-                    node
-                } else {
-                    json!({"id": node_id, "fileType": file_type.ok_or("Missing repository file type")?})
+                let name = match state.manifest.file(&node_id) {
+                    Some(node) => file_name(node)?,
+                    None => store::file_name_for(
+                        &node_id,
+                        &file_type.ok_or("Missing repository file type")?,
+                    )?,
                 };
                 state.transaction_active = true;
                 state.documents.remove(&node_id);
-                state.commit(vec![FileWrite {
-                    name: file_name(&node)?,
-                    bytes: None,
-                }])?;
+                state.commit(vec![FileWrite { name, bytes: None }])?;
                 Value::Null
             }
             Self::Document {
@@ -716,13 +924,16 @@ impl RepositoryOperation {
                         generation
                     }
                 };
-                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": revision(&document::bytes(state.doc(&node_id)?)), "generation": generation})
+                // Not a content hash: hashing the full encode cost a second whole-document encode
+                // per open, even for the state-vector pull whose diff is a few bytes.
+                json!({"updateBase64": STANDARD.encode(&update), "stateVectorBase64": STANDARD.encode(&vector), "revision": format!("native:{}", state.data_version), "generation": generation})
             }
             Self::CheckpointDocument { node_id } => {
                 if state.delta_counts.contains_key(&node_id) {
                     let bytes = document::bytes(state.doc(&node_id)?);
+                    let name = file_name(&state.manifest.nodes[&node_id])?;
                     state.commit(vec![FileWrite {
-                        name: file_name(&state.manifest["nodes"][&node_id])?,
+                        name,
                         bytes: Some(STANDARD.encode(bytes)),
                     }])?;
                     changes.changed.push(node_id);
@@ -786,22 +997,19 @@ impl RepositoryOperation {
 
 fn write_file(
     state: &mut Store,
-    node: Value,
+    node: Node,
     bytes: Vec<u8>,
     replace: bool,
     overwrite_remote: bool,
     mut files: Vec<FileWrite>,
 ) -> Result<(Value, Changes), String> {
     let mut changes = Changes::default();
-    let id = node["id"]
-        .as_str()
-        .ok_or("Invalid repository node ID")?
-        .to_owned();
+    let id = node.id.clone();
     let name = file_name(&node)?;
     state.transaction_active = true;
-    let known = state.manifest["nodes"][&id]["type"] == "file";
+    let known = state.manifest.file(&id).is_some();
     changes.wake_remote = known && state.remote;
-    let result = if node["fileType"] == "mcanvas" {
+    let result = if node.is_canvas() {
         let doc = if replace {
             document::decode(&bytes)?
         } else {
@@ -853,7 +1061,7 @@ fn write_file(
             } else {
                 Some(revision(&old))
             };
-            state.manifest["nodes"][&id]["modifiedAt"] = json!(store::now());
+            state.manifest.nodes.get_mut(&id).unwrap().modified_at = store::now().into();
             state.queue(
                 "push-note",
                 Some(&id),
@@ -921,6 +1129,8 @@ pub async fn repository_open(
             syncing: AtomicBool::new(false),
             last_checked_at: AtomicU64::new(0),
             error: Mutex::new(None),
+            media_migration: Mutex::new(None),
+            reported_errors: Mutex::new(HashMap::new()),
             cache_dir: app
                 .path()
                 .app_cache_dir()
@@ -930,7 +1140,7 @@ pub async fn repository_open(
         engines.insert(id, engine.clone());
         engine
     };
-    engine.references.fetch_add(1, Ordering::SeqCst);
+    let first_handle = engine.references.fetch_add(1, Ordering::SeqCst) == 0;
     drop(engines);
     let handle_id = uuid::Uuid::new_v4().to_string();
     manager.handles.lock().await.insert(
@@ -947,17 +1157,32 @@ pub async fn repository_open(
     }
     let has_local_state = engine
         .with_store(|state| {
-            Ok(!state.manifest["nodes"].as_object().unwrap().is_empty()
+            Ok(!state.manifest.nodes.is_empty()
                 || !state.outbox.is_empty()
                 || state.sync.last_remote_sync_at.is_some())
         })
         .await?;
     if !has_local_state {
-        let _ = engine.synchronize(&app, false).await;
+        let result = engine.synchronize(&app, false).await;
+        engine.report_background_error(&app, "Background sync failed", &result);
     }
     RepositoryEngine::schedule(&engine, &app);
     if has_local_state {
         engine.wake.notify_one();
+    }
+    if first_handle {
+        let weak = Arc::downgrade(&engine);
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = RepositoryEngine::migrate_media(weak, Some(app.clone())).await {
+                crate::error_report::report_error(
+                    &app,
+                    "RepositoryEngine",
+                    "Media migration failed",
+                    error,
+                );
+            }
+        });
     }
     Ok(json!({"handle": handle_id, "status": engine.status().await}))
 }

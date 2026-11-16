@@ -66,10 +66,25 @@ export function useExplorerItem({
   }
 
   useEffect(() => {
-    if (renaming) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+    const input = inputRef.current;
+    if (!renaming || !input) {
+      return;
     }
+    input.focus();
+    input.select();
+
+    // A press elsewhere on the row would blur the input, ending the rename before the row's
+    // click handler runs, so that click opens the item. Refocusing inside the tap also lets
+    // iOS raise the keyboard, which the focus above can't (it runs outside a user gesture).
+    const row = input.closest('button');
+    const keepFocus = (e: MouseEvent) => {
+      if (e.target !== input) {
+        e.preventDefault();
+        input.focus();
+      }
+    };
+    row?.addEventListener('mousedown', keepFocus);
+    return () => row?.removeEventListener('mousedown', keepFocus);
   }, [renaming]);
 
   const startRenaming = () => {

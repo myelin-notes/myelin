@@ -15,11 +15,7 @@ import { trackEvent } from '@/lib/analytics';
 import { useUserPref } from '@/lib/use-user-pref';
 
 /** Language dropdown, shared by the settings section and first-run onboarding. */
-export function LanguagePicker({
-  collisionPadding,
-}: {
-  collisionPadding?: { bottom: number };
-}) {
+export function LanguagePicker() {
   const { setLocale } = useI18n();
   const language = useUserPref('language');
   const languages = Object.entries(localeLabels).map(([code, label]) => ({
@@ -46,11 +42,7 @@ export function LanguagePicker({
         </div>
         <ChevronDown className="size-4 text-text-muted transition-transform duration-200 group-data-popup-open:rotate-180" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="w-72"
-        collisionPadding={collisionPadding}
-      >
+      <DropdownMenuContent align="start" className="w-72">
         <DropdownMenuRadioGroup value={language} onValueChange={handleLanguage}>
           {languages.map((lang) => (
             <DropdownMenuRadioItem key={lang.code} value={lang.code}>

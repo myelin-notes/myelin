@@ -4,6 +4,7 @@ import type {
   FileImportSource,
   FileType,
   FileVersion,
+  FlagEdit,
   RenameReferencesRequest,
   RenameReferencesResult,
   StoredNoteLink,
@@ -38,6 +39,8 @@ export interface RepositoryPreferences {
   colors: VFSManifest['colors'];
   tagRegistry: string[];
   penPresets: VFSManifest['penPresets'];
+  flagTypes: VFSManifest['flagTypes'];
+  liveSecret?: string;
 }
 
 export interface MetadataPatch {
@@ -104,6 +107,11 @@ export interface NativeOperationRequests {
   };
   'import-one-note': OneNoteImportRequest & { kind: 'import-one-note' };
   'rename-references': RenameReferencesRequest & { kind: 'rename-references' };
+  'edit-flags': {
+    kind: 'edit-flags';
+    flagIds: Record<string, string[]>;
+    edit: FlagEdit;
+  };
   'create-file-version': {
     kind: 'create-file-version';
     nodeId: string;
@@ -129,6 +137,7 @@ export interface NativeOperationRequests {
   subscribe: { kind: 'subscribe'; nodeId: string; sessionId: string };
   unsubscribe: { kind: 'unsubscribe'; nodeId: string; sessionId: string };
   path: { kind: 'path'; nodeId: string };
+  paths: { kind: 'paths'; nodeIds: string[] };
   'stage-bytes': {
     kind: 'stage-bytes';
     transferId: string;
@@ -151,6 +160,7 @@ export interface NativeOperationResults {
   'import-file': NativeRevision;
   'import-one-note': OneNoteImportResult;
   'rename-references': RenameReferencesResult;
+  'edit-flags': null;
   'create-file-version': FileVersion | null;
   'restore-file-version': null;
   'delete-file': null;
@@ -160,6 +170,7 @@ export interface NativeOperationResults {
   subscribe: null;
   unsubscribe: null;
   path: string | null;
+  paths: Record<string, string>;
   'stage-bytes': null;
   'cancel-transfer': null;
   'finish-transfer': NativeRevision | NativeDocumentWrite;

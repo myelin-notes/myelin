@@ -6,6 +6,7 @@
 
 import type { Mark, Node as PMNode, Schema } from 'prosemirror-model';
 import { parseCalloutMarker } from '../callouts';
+import { parseFigureSource } from '../pm/figure/parse';
 import { OPENING_FENCE_TOKEN_RE } from '../pm/markdown/parse-fences';
 import { parseInlineMarkdown } from '../pm/markdown/parse-inline';
 import {
@@ -43,7 +44,11 @@ type BlockToken = BaseToken &
     | { type: 'mathBlock' }
     | { type: 'table' }
     | { type: 'hr' }
+    | { type: 'pageBreak' }
+    | { type: 'figure'; src: string; alt: string | null; caption: string }
   );
+
+export const PAGE_BREAK_MARKDOWN = '<!-- pagebreak -->';
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const CHECK_RE = /^(\s*)[-*+]\s+\[([ xX])\](?:\s+(.*))?$/;
@@ -164,6 +169,19 @@ function parseBlocks(md: string): BlockToken[] {
     const trimmed = line.trim();
 
     if (trimmed === '') {
+      i++;
+      continue;
+    }
+
+    if (trimmed === PAGE_BREAK_MARKDOWN) {
+      out.push({ type: 'pageBreak' });
+      i++;
+      continue;
+    }
+
+    const figure = parseFigureSource(trimmed);
+    if (figure) {
+      out.push({ type: 'figure', ...figure });
       i++;
       continue;
     }
@@ -433,20 +451,29 @@ function scanInline(
       }
     }
 
-    // Inline code: `...`
+    // Inline code: a run of N backticks closes at the next run of exactly N (CommonMark).
     if (ch === '`') {
-      const end = text.indexOf('`', i + 1);
+      const fence = text.slice(i).match(/^`+/)![0];
+      const close = new RegExp(`(?<!\`)${fence}(?!\`)`, 'g');
+      close.lastIndex = i + fence.length;
+      const end = close.exec(text)?.index ?? -1;
       if (end !== -1) {
         pushText();
-        const codeText = text.slice(i + 1, end);
+        let codeText = text.slice(i + fence.length, end);
+        if (/^ .*[^ ].* $/s.test(codeText)) {
+          codeText = codeText.slice(1, -1);
+        }
         if (codeText.length > 0) {
           nodes.push(
             schema.text(codeText, [...baseMarks, schema.marks.code.create()]),
           );
         }
-        i = end + 1;
+        i = end + fence.length;
         continue;
       }
+      buf += fence;
+      i += fence.length;
+      continue;
     }
 
     // Inline math stays literal text, backslashes intact — the math preview plugin renders it.
@@ -542,6 +569,21 @@ function scanInline(
           nodes.push(child);
         }
         i = end + 2;
+        continue;
+      }
+    }
+
+    if (text.startsWith('<u>', i)) {
+      const end = text.indexOf('</u>', i + 3);
+      if (end !== -1) {
+        pushText();
+        for (const child of scanInline(text.slice(i + 3, end), schema, [
+          ...baseMarks,
+          schema.marks.underline.create(),
+        ])) {
+          nodes.push(child);
+        }
+        i = end + 4;
         continue;
       }
     }
@@ -642,6 +684,13 @@ function blockToNode(block: BlockToken, schema: Schema): PMNode | null {
     }
     case 'hr':
       return schema.nodes.horizontalRule.create();
+    case 'pageBreak':
+      return schema.nodes.pageBreak.create();
+    case 'figure':
+      return schema.nodes.figure.create(
+        { src: block.src, alt: block.alt },
+        parseInline(block.caption, schema),
+      );
     default:
       return null;
   }

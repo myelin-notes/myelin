@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as Y from 'yjs';
 import { YDocManager } from '../ydoc-manager';
 import { ElementType } from './element-type';
 import {
@@ -23,11 +24,11 @@ describe('PageFrameElement display name', () => {
   });
 
   it('uses the constructor page layout for new frames', () => {
-    const frame = new PageFrameElement('frame-uuid-5', undefined, 'horizontal');
+    const frame = new PageFrameElement('frame-uuid-5', undefined, 'continuous');
 
-    expect(frame.pageLayout).toBe('horizontal');
+    expect(frame.pageLayout).toBe('continuous');
     expect(frame.getYMapProps()).toMatchObject({
-      pageLayout: 'horizontal',
+      pageLayout: 'continuous',
     });
   });
 
@@ -41,13 +42,13 @@ describe('PageFrameElement display name', () => {
       displayName: 'Research Notes',
       pageWidth: PAGE_WIDTH,
       pageHeight: PAGE_HEIGHT,
-      pageLayout: 'horizontal',
+      pageLayout: 'continuous',
     });
     const frame = new PageFrameElement('frame-uuid-2');
 
     frame.bindToYMap(yMap);
     expect(frame.displayName).toBe('Research Notes');
-    expect(frame.pageLayout).toBe('horizontal');
+    expect(frame.pageLayout).toBe('continuous');
 
     frame.setDisplayName('  Source excerpts  ');
     expect(frame.displayName).toBe('Source excerpts');
@@ -82,17 +83,16 @@ describe('PageFrameElement display name', () => {
     expect(frame.displayName).toBe(DEFAULT_PAGE_FRAME_DISPLAY_NAME);
   });
 
-  it('switches page bounds between vertical and horizontal layouts', () => {
+  it('opens frames saved with the removed horizontal layout as pages', () => {
     const frame = new PageFrameElement('frame-uuid-4');
+    const yMap = new Y.Doc().getMap<unknown>('frame');
+    yMap.set('pageLayout', 'horizontal');
+
+    frame.bindToYMap(yMap);
     frame.numPages = 3;
 
     expect(frame.pageLayout).toBe('vertical');
     expect(frame.totalWidth).toBe(PAGE_WIDTH);
     expect(frame.totalHeight).toBe(PAGE_HEIGHT * 3 + PAGE_GAP * 2);
-
-    frame.setPageLayout('horizontal');
-
-    expect(frame.totalWidth).toBe(PAGE_WIDTH * 3 + PAGE_GAP * 2);
-    expect(frame.totalHeight).toBe(PAGE_HEIGHT);
   });
 });

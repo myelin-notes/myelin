@@ -90,7 +90,10 @@ export function OwnerField({
         {triggerBody}
         <ChevronDown className="ml-auto size-3.5 shrink-0 text-text-muted transition-transform duration-200 group-data-popup-open:rotate-180" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-80 min-w-52">
+      <DropdownMenuContent
+        align="start"
+        className="max-h-[min(20rem,var(--available-height))] min-w-52"
+      >
         {loading && !user ? (
           <MenuLoadingRow
             label={strings.settings.repository.fields.owner.loading}

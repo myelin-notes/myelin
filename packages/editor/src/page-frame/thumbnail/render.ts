@@ -1,4 +1,4 @@
-import type { Node as ProseMirrorNode } from 'prosemirror-model';
+import { Mark, type Node as ProseMirrorNode } from 'prosemirror-model';
 import type { CanvasPalette } from '../../canvas-theme';
 
 // Approximate visual metrics. They don't need to match the live editor — the result is shown at
@@ -83,10 +83,11 @@ function drawBlock(
     case 'heading': {
       const level = (block.attrs.level as number) || 1;
       const style = HEADING_STYLES[level] ?? HEADING_STYLES[3];
-      drawText(ctx, cursor, block.textContent, {
+      drawText(ctx, cursor, inlinePieces(block), {
         width,
         x: 0,
-        font: `bold ${style.size}px ${BODY_FONT}`,
+        size: style.size,
+        bold: true,
         color: TEXT_COLOR,
         lineHeight: style.lineHeight,
       });
@@ -98,7 +99,7 @@ function drawBlock(
       if (type === 'blockquote') {
         drawBlockquoteBar(ctx, cursor, block, width);
       }
-      drawParagraphText(ctx, cursor, block.textContent, width - indent, indent);
+      drawParagraphText(ctx, cursor, block, width - indent, indent);
       return;
     }
     case 'bulletListItem':
@@ -120,11 +121,23 @@ function drawBlock(
       drawPlaceholderRect(ctx, cursor, width, tableHeight(block));
       return;
     }
+    case 'pageBreak':
+      return;
+    case 'figure': {
+      const aspect = block.attrs.aspect as number | null;
+      const figureWidth = width * (block.attrs.width as number);
+      drawPlaceholderRect(
+        ctx,
+        cursor,
+        figureWidth,
+        aspect ? figureWidth / aspect : BODY_LINE_HEIGHT * 6,
+      );
+      return;
+    }
     default: {
       // Unknown block: render its text if any, otherwise a thin placeholder.
-      const text = block.textContent;
-      if (text) {
-        drawParagraphText(ctx, cursor, text, width, 0);
+      if (block.textContent) {
+        drawParagraphText(ctx, cursor, block, width, 0);
       } else {
         drawPlaceholderRect(ctx, cursor, width, BODY_LINE_HEIGHT * 3);
       }
@@ -136,19 +149,20 @@ function drawBlock(
 function drawParagraphText(
   ctx: CanvasRenderingContext2D,
   cursor: Cursor,
-  text: string,
+  block: ProseMirrorNode,
   width: number,
   x: number,
 ): void {
-  if (!text.trim()) {
+  if (!block.textContent.trim()) {
     // Empty paragraph still occupies a line of vertical space.
     cursor.y += BODY_LINE_HEIGHT;
     return;
   }
-  drawText(ctx, cursor, text, {
+  drawText(ctx, cursor, inlinePieces(block), {
     width,
     x,
-    font: `${BODY_SIZE}px ${BODY_FONT}`,
+    size: BODY_SIZE,
+    bold: false,
     color: TEXT_COLOR,
     lineHeight: BODY_LINE_HEIGHT,
   });
@@ -180,10 +194,11 @@ function drawListItem(
   ctx.fillText(marker, baseX, markerY);
 
   const textX = baseX + BULLET_GAP;
-  drawText(ctx, cursor, block.textContent, {
+  drawText(ctx, cursor, inlinePieces(block), {
     width: width - textX,
     x: textX,
-    font: `${BODY_SIZE}px ${BODY_FONT}`,
+    size: BODY_SIZE,
+    bold: false,
     color: TEXT_COLOR,
     lineHeight: BODY_LINE_HEIGHT,
   });
@@ -269,24 +284,133 @@ function tableHeight(block: ProseMirrorNode): number {
 interface DrawTextOptions {
   width: number;
   x: number;
-  font: string;
+  size: number;
+  bold: boolean;
   color: string;
   lineHeight: number;
+}
+
+interface Piece {
+  text: string;
+  marks: readonly Mark[];
+}
+
+function inlinePieces(block: ProseMirrorNode): Piece[] {
+  const pieces: Piece[] = [];
+  block.forEach((child) => {
+    pieces.push({
+      text: child.isText ? (child.text ?? '') : child.textContent,
+      marks: child.marks,
+    });
+  });
+  return pieces;
+}
+
+function hasMark(piece: Piece, name: string): boolean {
+  return piece.marks.some((mark) => mark.type.name === name);
+}
+
+function pieceFont(piece: Piece, opts: DrawTextOptions): string {
+  const italic = hasMark(piece, 'italic') ? 'italic ' : '';
+  const bold = opts.bold || hasMark(piece, 'bold') ? 'bold ' : '';
+  const family = hasMark(piece, 'code') ? MONO_FONT : BODY_FONT;
+  return `${italic}${bold}${opts.size}px ${family}`;
+}
+
+function measurePiece(
+  ctx: CanvasRenderingContext2D,
+  piece: Piece,
+  opts: DrawTextOptions,
+): number {
+  ctx.font = pieceFont(piece, opts);
+  return ctx.measureText(piece.text).width;
+}
+
+// Greedy word wrap over marked runs; a word may span runs (`**bo**ld`), so wrapping only breaks at
+// whitespace and adjacent same-mark runs are merged back into one fillText per line.
+function wrapPieces(
+  ctx: CanvasRenderingContext2D,
+  pieces: readonly Piece[],
+  opts: DrawTextOptions,
+): Piece[][] {
+  const words: Piece[][] = [];
+  let word: Piece[] = [];
+  for (const piece of pieces) {
+    for (const part of piece.text.split(/(\s+)/)) {
+      if (/^\s/.test(part) && word.length > 0) {
+        words.push(word);
+        word = [];
+      } else if (part && !/^\s/.test(part)) {
+        word.push({ text: part, marks: piece.marks });
+      }
+    }
+  }
+  if (word.length > 0) {
+    words.push(word);
+  }
+
+  const lines: Piece[][] = [];
+  let line: Piece[] = [];
+  let lineWidth = 0;
+  for (const next of words) {
+    const wordWidth = next.reduce((w, p) => w + measurePiece(ctx, p, opts), 0);
+    const prev = line[line.length - 1];
+    const sameMarks =
+      prev !== undefined && Mark.sameSet(prev.marks, next[0].marks);
+    const space: Piece = { text: ' ', marks: sameMarks ? prev.marks : [] };
+    const spaceWidth = prev ? measurePiece(ctx, space, opts) : 0;
+    if (prev && lineWidth + spaceWidth + wordWidth > opts.width) {
+      lines.push(line);
+      line = [...next];
+      lineWidth = wordWidth;
+      continue;
+    }
+    line.push(...(prev ? [space] : []), ...next);
+    lineWidth += spaceWidth + wordWidth;
+  }
+  if (line.length > 0) {
+    lines.push(line);
+  }
+
+  return lines.map((pieces) =>
+    pieces.reduce<Piece[]>((merged, piece) => {
+      const last = merged[merged.length - 1];
+      if (last && Mark.sameSet(last.marks, piece.marks)) {
+        merged[merged.length - 1] = { ...last, text: last.text + piece.text };
+      } else {
+        merged.push(piece);
+      }
+      return merged;
+    }, []),
+  );
 }
 
 function drawText(
   ctx: CanvasRenderingContext2D,
   cursor: Cursor,
-  text: string,
+  pieces: readonly Piece[],
   opts: DrawTextOptions,
 ): void {
-  ctx.font = opts.font;
-  ctx.fillStyle = opts.color;
   ctx.textBaseline = 'top';
 
-  const lines = wrapText(ctx, text, opts.width);
-  for (const line of lines) {
-    ctx.fillText(line, opts.x, cursor.y);
+  for (const line of wrapPieces(ctx, pieces, opts)) {
+    let x = opts.x;
+    for (const piece of line) {
+      const w = measurePiece(ctx, piece, opts);
+      if (hasMark(piece, 'code')) {
+        ctx.fillStyle = SHADE_COLOR;
+        ctx.fillRect(x, cursor.y - 2, w, opts.size + 4);
+      }
+      ctx.fillStyle = opts.color;
+      ctx.fillText(piece.text, x, cursor.y);
+      if (hasMark(piece, 'underline')) {
+        ctx.fillRect(x, cursor.y + opts.size, w, 1);
+      }
+      if (hasMark(piece, 'strikethrough')) {
+        ctx.fillRect(x, cursor.y + opts.size * 0.55, w, 1);
+      }
+      x += w;
+    }
     cursor.y += opts.lineHeight;
   }
   cursor.y += PARAGRAPH_GAP;

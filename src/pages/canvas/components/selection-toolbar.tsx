@@ -19,8 +19,16 @@ import {
   ArrowUp as MoveForwardIcon,
   LockOpen as UnlockIcon,
 } from 'lucide-react';
+import { FontSizeField } from '@myelin/editor/components/font-size-field';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import type { SelectionToolbarItem } from '@myelin/editor/elements/drawable-element';
+import { FlagElement } from '@myelin/editor/elements/flag-element';
+import {
+  applyInkStyle,
+  type InkStyle,
+  type InkStyleUpdate,
+  readInkStyle,
+} from '@myelin/editor/elements/ink-style';
 import { LatexElement } from '@myelin/editor/elements/latex/element';
 import { PdfElement } from '@myelin/editor/elements/pdf';
 import {
@@ -34,18 +42,18 @@ import {
   TEXT_FONT_SIZE_MIN,
   TEXT_FONT_SIZE_STEP,
 } from '@myelin/editor/tools/text-tool';
-import { FontSizeField } from '@/components/font-size-field';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@myelin/ui';
 import {
   findCurrentPdfPage,
   getPdfPageJumpOffset,
 } from './pdf-page-navigator-utils';
 import { getSelectionToolbarPosition } from './selection-toolbar-position';
+import { StrokeStyleControls } from './stroke-style-controls';
 import { TextStyleControls } from './text-style-controls';
 
 interface SelectionToolbarProps {
@@ -65,8 +73,11 @@ interface ToolbarState {
   /** Set when exactly one LaTeX block is selected, so its scale is editable as text size. */
   latexElement: LatexElement | null;
   latexFontSize: number | null;
+  /** Set when the selection holds ink, however many strokes: a written word is many of them. */
+  inkStyle: InkStyle | null;
   pdfElement: PdfElement | null;
   pdfCurrentPage: number | null;
+  flagElement: FlagElement | null;
 }
 
 const HIDDEN_STATE: ToolbarState = {
@@ -78,13 +89,16 @@ const HIDDEN_STATE: ToolbarState = {
   textStyle: null,
   latexElement: null,
   latexFontSize: null,
+  inkStyle: null,
   pdfElement: null,
   pdfCurrentPage: null,
+  flagElement: null,
 };
 
 const VIEWPORT_MARGIN = 12;
 const SELECTION_GAP = 10;
 const PDF_PAGE_VIEWPORT_MARGIN = 48;
+const STROKE_MENU_ROOM = 240;
 
 function sameElementItems(
   a: SelectionToolbarItem[],
@@ -122,6 +136,17 @@ function sameTextStyle(a: TextStyle | null, b: TextStyle | null): boolean {
   );
 }
 
+function sameInkStyle(a: InkStyle | null, b: InkStyle | null): boolean {
+  if (!(a && b)) {
+    return a === b;
+  }
+  return (
+    a.color === b.color &&
+    a.thickness === b.thickness &&
+    a.highlighter === b.highlighter
+  );
+}
+
 function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
   return (
     a.visible === b.visible &&
@@ -132,8 +157,10 @@ function sameToolbarState(a: ToolbarState, b: ToolbarState): boolean {
     sameTextStyle(a.textStyle, b.textStyle) &&
     a.latexElement === b.latexElement &&
     a.latexFontSize === b.latexFontSize &&
+    sameInkStyle(a.inkStyle, b.inkStyle) &&
     a.pdfElement === b.pdfElement &&
-    a.pdfCurrentPage === b.pdfCurrentPage
+    a.pdfCurrentPage === b.pdfCurrentPage &&
+    a.flagElement === b.flagElement
   );
 }
 
@@ -153,6 +180,15 @@ function findLatexTarget(canvas: DrawableCanvas): LatexElement | null {
   }
   const [only] = selected;
   return only instanceof LatexElement ? only : null;
+}
+
+function findFlagTarget(canvas: DrawableCanvas): FlagElement | null {
+  const selected = canvas.getSelectedElements();
+  if (selected.length !== 1) {
+    return null;
+  }
+  const [only] = selected;
+  return only instanceof FlagElement ? only : null;
 }
 
 function findPdfPageState(canvas: DrawableCanvas): {
@@ -250,6 +286,11 @@ function positionToolbar(toolbar: HTMLDivElement, bounds: DOMRect): void {
   });
 
   toolbar.style.transform = `translate3d(${Math.round(left)}px, ${Math.round(top)}px, 0)`;
+  // Opens away from the selection when it fits, so the ink being restyled stays in view.
+  toolbar.dataset.menuSide =
+    top < bounds.top && top - visibleTop >= STROKE_MENU_ROOM
+      ? 'above'
+      : 'below';
 }
 
 export function SelectionToolbar({
@@ -303,8 +344,10 @@ export function SelectionToolbar({
               : null,
             latexElement,
             latexFontSize: latexElement ? latexElement.fontSize : null,
+            inkStyle: readInkStyle(canvas.getSelectedElements()),
             pdfElement: pdfPageState?.element ?? null,
             pdfCurrentPage: pdfPageState?.currentPage ?? null,
+            flagElement: findFlagTarget(canvas),
           };
         }
       }
@@ -389,6 +432,23 @@ export function SelectionToolbar({
     [drawableCanvasRef, state.pdfElement],
   );
 
+  const setInkStyle = useCallback(
+    (updates: InkStyleUpdate) => {
+      const canvas = drawableCanvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      const selected = canvas.getSelectedElements();
+      canvas.transact(() => applyInkStyle(selected, updates));
+      // In this event rather than the next frame's sync: a controlled slider would snap back mid-drag.
+      setState((current) => ({
+        ...current,
+        inkStyle: readInkStyle(selected),
+      }));
+    },
+    [drawableCanvasRef],
+  );
+
   const moveHigher = useCallback(() => {
     drawableCanvasRef.current?.reorderSelection('higher');
   }, [drawableCanvasRef]);
@@ -468,7 +528,7 @@ export function SelectionToolbar({
       <div
         ref={toolbarRef}
         data-selection-toolbar="true"
-        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex items-center gap-1 rounded-xl bg-popover/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
+        className={`pointer-events-auto absolute top-0 left-0 z-[110] flex max-w-[calc(var(--canvas-visible-width)-1.5rem)] flex-wrap items-center gap-1 rounded-xl bg-popover/85 px-1.5 py-1.5 text-text-secondary shadow-ambient ring-1 ring-border-ghost/70 backdrop-blur-[24px] transition-opacity duration-150 ${
           state.visible ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         role="toolbar"
@@ -493,6 +553,16 @@ export function SelectionToolbar({
             <Divider />
           </>
         )}
+        {state.flagElement && (
+          <>
+            <FlagLabelField
+              key={state.flagElement.uuid}
+              flag={state.flagElement}
+              strings={strings}
+            />
+            <Divider />
+          </>
+        )}
         {state.textElement && state.textStyle && (
           <>
             <TextStyleControls
@@ -512,6 +582,15 @@ export function SelectionToolbar({
               step={TEXT_FONT_SIZE_STEP}
               onChange={(fontSize) => state.latexElement?.setFontSize(fontSize)}
               preserveFocus
+            />
+            <Divider />
+          </>
+        )}
+        {state.inkStyle && (
+          <>
+            <StrokeStyleControls
+              style={state.inkStyle}
+              onChange={setInkStyle}
             />
             <Divider />
           </>
@@ -618,6 +697,60 @@ function PdfPageControls({
         <ChevronRight className="size-4" />
       </button>
     </>
+  );
+}
+
+// Reads `flag.label` at render: label writes don't fire `canvas.onChange`, so toolbar state can't carry it.
+function FlagLabelField({
+  flag,
+  strings,
+}: {
+  flag: FlagElement;
+  strings: Messages;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const untitled = strings.canvas.flags.untitled;
+
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        className="h-8 max-w-48 shrink-0 cursor-text truncate whitespace-nowrap rounded-lg border-none bg-transparent px-2 text-sm transition-colors hover:bg-hover-tint focus-visible:outline-none"
+        aria-label={strings.canvas.flags.rename}
+        onClick={() => setDraft(flag.label)}
+      >
+        {flag.label || untitled}
+      </button>
+    );
+  }
+
+  const commit = () => {
+    if (draft.trim() !== flag.label) {
+      flag.setLabel(draft.trim());
+    }
+    setDraft(null);
+  };
+  return (
+    <input
+      autoFocus
+      aria-label={strings.canvas.flags.rename}
+      className="h-8 w-48 shrink-0 rounded-lg border-none bg-hover-tint px-2 text-sm outline-none"
+      placeholder={untitled}
+      value={draft}
+      onFocus={(event) => event.currentTarget.select()}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          setDraft(null);
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          commit();
+        }
+      }}
+    />
   );
 }
 

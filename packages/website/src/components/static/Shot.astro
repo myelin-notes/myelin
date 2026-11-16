@@ -5,6 +5,11 @@ interface Props {
   eager?: boolean;
   /** CSS object-position for the phone crop, e.g. `50% 50%`. */
   objectPosition?: string;
+  /** False keeps the media's own aspect on phones instead of cropping to 4:5. */
+  phoneCrop?: boolean;
+  /** Intrinsic size of the media, which reserves its box before it loads. */
+  width?: number;
+  height?: number;
   class?: string;
 }
 
@@ -13,11 +18,16 @@ const {
   alt,
   eager = false,
   objectPosition = '50% 50%',
+  phoneCrop = true,
+  width = 1650,
+  height = 1020,
   class: className,
 } = Astro.props;
 const isVideo = src.endsWith('.mp4');
-const media =
-  'block h-auto w-full aspect-[4/5] object-cover object-[var(--pos)] sm:aspect-auto';
+const poster = src.replace(/\.mp4$/, '.jpg');
+const media = phoneCrop
+  ? 'block h-auto w-full aspect-[4/5] object-cover object-[var(--pos)] sm:aspect-auto'
+  : 'block h-auto w-full';
 ---
 
 <div
@@ -29,10 +39,11 @@ const media =
       <video
         data-shot-video
         src={src}
-        poster={src.replace(/\.mp4$/, '.jpg')}
+        poster={eager ? poster : undefined}
+        data-poster={poster}
         aria-label={alt}
-        width="1650"
-        height="1020"
+        width={width}
+        height={height}
         muted
         loop
         playsinline
@@ -53,21 +64,24 @@ const media =
 
 <script>
   // Videos play only while on screen, and never under reduced motion (the poster stays).
+  // Off-screen posters load on approach: browsers fetch `poster` eagerly even with preload="none".
   const videos = document.querySelectorAll<HTMLVideoElement>('[data-shot-video]');
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const { target, isIntersecting } of entries) {
-          const video = target as HTMLVideoElement;
-          if (isIntersecting) {
-            video.play().catch(() => {});
-          } else {
-            video.pause();
-          }
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const { target, isIntersecting } of entries) {
+        const video = target as HTMLVideoElement;
+        if (!isIntersecting) {
+          video.pause();
+          continue;
         }
-      },
-      { rootMargin: '200px' },
-    );
-    videos.forEach((video) => observer.observe(video));
-  }
+        video.poster ||= video.dataset.poster ?? '';
+        if (!reduceMotion) {
+          video.play().catch(() => {});
+        }
+      }
+    },
+    { rootMargin: '200px' },
+  );
+  videos.forEach((video) => observer.observe(video));
 </script>

@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, type Locale } from '@/lib/locale';
+import { DEFAULT_LOCALE, type Locale, localizePath } from '@/lib/locale';
 import en from './en';
 import es from './es';
 import fr from './fr';
@@ -30,25 +30,71 @@ export const SCENE_IDS = [
 export type SceneId = (typeof SCENE_IDS)[number];
 
 /** Every link the header or footer can point at. */
-export type LinkId = 'privacy' | 'support';
+export type LinkId = 'features' | 'pricing' | 'privacy' | 'support';
 
 /**
  * The header and footer carry the same links. The set itself is the same in
  * every language; only the labels translate.
  */
-export const navLinks: LinkId[] = ['support', 'privacy'];
+export const navLinks: LinkId[] = ['features', 'pricing', 'support', 'privacy'];
 
-/**
- * The privacy policy is published in English only, so its href carries no
- * locale prefix and every locale links to the same page.
- */
 const hrefs: Record<LinkId, string> = {
+  features: '/features',
+  pricing: '/pricing',
   privacy: '/privacy',
   support: '/support',
 };
 
-export function linkHref(id: LinkId): string {
-  return hrefs[id];
+/**
+ * Published in English only, so their href carries no locale prefix and every
+ * locale links to the same page.
+ */
+const englishOnly: LinkId[] = ['privacy', 'support'];
+
+export function linkHref(id: LinkId, locale: Locale): string {
+  return englishOnly.includes(id) ? hrefs[id] : localizePath(hrefs[id], locale);
+}
+
+/** Sections of the features page, in page order. */
+export const FEATURE_SECTION_IDS = [
+  'handwriting',
+  'pdfs',
+  'pages',
+  'canvas',
+  'sync',
+  'agents',
+  'connect',
+  'more',
+] as const;
+
+export type FeatureSectionId = (typeof FEATURE_SECTION_IDS)[number];
+
+/** Features-page cards that play a clip. */
+export type FeatureClipId =
+  | 'shapes'
+  | 'toolWheel'
+  | 'ruler'
+  | 'lasso'
+  | 'pdfQuote'
+  | 'pdfAnchor'
+  | 'slash'
+  | 'imageAnchor'
+  | 'canvasStyle'
+  | 'flags'
+  | 'liveCollab'
+  | 'agents';
+
+interface FeatureSection {
+  /** The kicker, and the section's jump link at the top of the page. */
+  label: string;
+  heading: string;
+  lede: string;
+  details?: string[];
+}
+
+interface FeatureNote {
+  title: string;
+  body: string;
 }
 
 interface SyncTier {
@@ -57,6 +103,17 @@ interface SyncTier {
   live?: boolean;
   title: string;
   body: string;
+}
+
+interface PricingPlan {
+  name: string;
+  price: string;
+  /** One line under the price saying who the plan is for. */
+  tagline: string;
+  /** Heads the checklist. */
+  includesLabel: string;
+  includes: string[];
+  cta: string;
 }
 
 /** Apps the site advertises importing from, keyed for icon lookup. */
@@ -84,7 +141,14 @@ interface ImportSource {
 export interface SiteCopy {
   meta: { title: string; description: string };
 
-  topbar: { nav: string; download: string; language: string };
+  topbar: {
+    nav: string;
+    download: string;
+    language: string;
+    beta: string;
+    /** Tooltip on the beta badge. */
+    betaNote: string;
+  };
 
   sceneLabels: Record<SceneId, string>;
   faqKicker: string;
@@ -160,6 +224,55 @@ export interface SiteCopy {
     faqTitle: string;
     /** `## ` headings become the FAQ entries; see `getFaqs`. */
     faqMarkdown: string;
+  };
+
+  /** The features page, which goes past what the landing page shows. */
+  features: {
+    meta: { title: string; description: string };
+    eyebrow: string;
+    headline: string;
+    subheadline: string;
+    /** Labels the row of jump links to each section. */
+    jumpNav: string;
+    sections: Record<FeatureSectionId, FeatureSection>;
+    clips: Record<FeatureClipId, FeatureNote & { alt: string }>;
+    /** Text-only cards in the `connect` section. */
+    notes: FeatureNote[];
+    closing: { heading: string; body: string };
+  };
+
+  pricing: {
+    meta: { title: string; description: string };
+    eyebrow: string;
+    headline: string;
+    subheadline: string;
+    free: PricingPlan;
+    pro: PricingPlan & {
+      /** Shown beside the price: what kind of payment it is. */
+      priceNote: string;
+      /** Fine print under the buy button. */
+      licenseNote: string;
+      /** Shown when the checkout could not be opened. */
+      checkoutFailed: string;
+    };
+    /** The school-email form that sends a student checkout link. */
+    student: {
+      name: string;
+      tagline: string;
+      price: string;
+      /** Follows `price`, explaining how to qualify. */
+      note: string;
+      emailLabel: string;
+      submit: string;
+      sending: string;
+      sent: string;
+      notAcademic: string;
+      failed: string;
+      /** Shown when an emailed checkout link is forged or past its 24 hours. */
+      linkExpired: string;
+    };
+    faqTitle: string;
+    faqs: Faq[];
   };
 
   linkLabels: Record<LinkId, string>;

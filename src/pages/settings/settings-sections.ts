@@ -10,6 +10,7 @@ import {
   PenLine,
   Pointer,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { isTouchDevice } from '@myelin/shared/os';
 import { IS_MOBILE_BUILD } from '@/lib/env';
@@ -24,6 +25,7 @@ export type SettingsSectionId =
   | 'privacy'
   | 'mcp'
   | 'keybinds'
+  | 'pro'
   | 'about';
 
 export interface SettingsSectionMeta {
@@ -38,6 +40,7 @@ export interface SettingsSectionMeta {
     | 'privacy'
     | 'mcp'
     | 'keybinds'
+    | 'pro'
     | 'about';
   icon: ComponentType<{ className?: string }>;
   /** Hidden on mobile — the feature is desktop-only (see {@link IS_MOBILE_BUILD}). */
@@ -60,6 +63,7 @@ const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'privacy', titleKey: 'privacy', icon: ShieldCheck },
   { id: 'mcp', titleKey: 'mcp', icon: Bot, desktopOnly: true },
   { id: 'keybinds', titleKey: 'keybinds', icon: Keyboard, desktopOnly: true },
+  { id: 'pro', titleKey: 'pro', icon: Sparkles },
   { id: 'about', titleKey: 'about', icon: Info },
 ] as const;
 

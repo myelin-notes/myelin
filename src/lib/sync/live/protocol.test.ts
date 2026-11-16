@@ -21,6 +21,17 @@ describe('peer presence messages', () => {
     expect(decodeMessage(encodeMessage(message))).toEqual(message);
   });
 
+  it('encodes repeated peer messages as distinct bytes', () => {
+    const message: SyncMessage = {
+      type: 'peer',
+      peerId: 'peer-a',
+      kind: 'heartbeat',
+      mode: 'owner-device',
+    };
+
+    expect(encodeMessage(message)).not.toEqual(encodeMessage(message));
+  });
+
   it('ignores unknown fields', () => {
     const decoded = decodeMessage(
       encodePeerJson({
@@ -39,9 +50,26 @@ describe('peer presence messages', () => {
     });
   });
 
+  it('accepts a legacy guest mode from older peers as an owner device', () => {
+    expect(
+      decodeMessage(
+        encodePeerJson({
+          peerId: 'peer-a',
+          kind: 'hello',
+          mode: 'guest-viewer',
+        }),
+      ),
+    ).toEqual({
+      type: 'peer',
+      peerId: 'peer-a',
+      kind: 'hello',
+      mode: 'owner-device',
+    });
+  });
+
   it('rejects messages missing required fields', () => {
     expect(
-      decodeMessage(encodePeerJson({ peerId: 'peer-a', kind: 'hello' })),
+      decodeMessage(encodePeerJson({ peerId: 'peer-a', mode: 'owner-device' })),
     ).toBeNull();
   });
 });

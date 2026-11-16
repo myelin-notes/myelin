@@ -5,7 +5,7 @@
  * this shape into the canvas; the package never talks to the transport.
  */
 
-export type PeerMode = 'owner-device' | 'guest-editor' | 'guest-viewer';
+export type PeerMode = 'owner-device';
 
 export interface LivePeer {
   peerId: string;

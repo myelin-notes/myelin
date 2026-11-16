@@ -1,6 +1,8 @@
 import type { NodeViewConstructor } from 'prosemirror-view';
 import type { EnsureCodeOutputCard } from '../../elements/code-output/bridge';
 import { CodeBlockNodeView } from './code-block/node-view';
+import type { ResolveMediaSrc } from './embed/renderer';
+import { FigureNodeView } from './figure/node-view';
 import { MathBlockNodeView } from './math/block-node-view';
 import { isMermaidBlock } from './mermaid/detect';
 import { MermaidBlockNodeView } from './mermaid/node-view';
@@ -8,6 +10,7 @@ import { PageFrameTableNodeView } from './table/node-view';
 
 export function buildNodeViews(
   ensureCodeOutputCard?: EnsureCodeOutputCard,
+  resolveMedia?: ResolveMediaSrc,
 ): Record<string, NodeViewConstructor> {
   return {
     mathBlock(node, view, getPos) {
@@ -39,6 +42,23 @@ export function buildNodeViews(
       return isMermaidBlock(node.textContent)
         ? new MermaidBlockNodeView(node, view, pos)
         : new CodeBlockNodeView(node, view, pos, ensureCodeOutputCard);
+    },
+    figure(node, view, getPos) {
+      if (typeof getPos !== 'function') {
+        throw new Error('figure node view requires a stable getPos');
+      }
+      return new FigureNodeView(
+        node,
+        view,
+        () => {
+          const pos = getPos();
+          if (typeof pos !== 'number') {
+            throw new Error('figure node view position is unavailable');
+          }
+          return pos;
+        },
+        resolveMedia,
+      );
     },
     table(node, view, getPos) {
       if (typeof getPos !== 'function') {

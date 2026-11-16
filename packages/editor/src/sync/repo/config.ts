@@ -19,13 +19,6 @@ export type RepositoryConfig =
       credentialId: string;
     };
 
-export interface RepositoryLifecycle {
-  initialize(): Promise<void>;
-  refresh(): Promise<void>;
-  flushPending(): Promise<void>;
-  dispose(): Promise<void>;
-}
-
 export interface RepositoryRuntimeStatus {
   online: boolean;
   pendingRemoteWrites: number;
@@ -34,6 +27,8 @@ export interface RepositoryRuntimeStatus {
   lastError: Error | null;
   /** True while a sync has been running for over a second; quick checks never set it. */
   syncing: boolean;
+  /** Set while existing documents move to media storage. A `total` of 0 means still counting. */
+  mediaMigration: { completed: number; total: number } | null;
   /**
    * Incremented on every local repository mutation — including ones made outside the current view,
    * such as the tab bar creating a file for a new tab. Unlike `lastRemoteSyncAt`, this advances for
@@ -42,19 +37,8 @@ export interface RepositoryRuntimeStatus {
   dataVersion: number;
 }
 
-export interface RepositoryStatusSource {
-  getRuntimeStatus(): RepositoryRuntimeStatus;
-  subscribeStatus(
-    listener: (status: RepositoryRuntimeStatus) => void,
-  ): () => void;
-}
-
 /** A repository that can be read and have its note documents loaded. */
 export type ReadableRepository = Repository & DocumentSource;
-
-export type ActiveRepository = ReadableRepository &
-  RepositoryLifecycle &
-  RepositoryStatusSource;
 
 export const DEFAULT_REPOSITORY_CONFIG: RepositoryConfig = { kind: 'local' };
 
@@ -62,4 +46,4 @@ export const DEFAULT_GOOGLE_DRIVE_FOLDER_NAME = 'Myelin';
 
 export const MAX_CUSTOM_COLORS = 8;
 
-export const MAX_PEN_PRESETS = 12;
+export const MAX_PEN_PRESETS = 16;

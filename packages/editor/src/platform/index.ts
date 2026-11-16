@@ -21,7 +21,7 @@ export function getPlatform(): Platform {
   return platform;
 }
 
-/** Whether {@link setPlatform} has run. For pre-bootstrap paths (the logger). */
+/** Whether {@link setPlatform} has run. */
 export function isPlatformSet(): boolean {
   return platform !== null;
 }

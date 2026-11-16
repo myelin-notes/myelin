@@ -34,6 +34,7 @@ import { redo, undo } from 'y-prosemirror';
 import { isApplePlatform } from '@myelin/shared/os';
 import { type Action, comboToPMKey, registry } from '../../keybinds';
 import { parseCalloutMarker } from '../callouts';
+import { exitFigureCaption, removeFigureAtCaptionStart } from './figure/plugin';
 import { exitFencedCodeBlock } from './markdown/fence-commands';
 import { expandMarkdownLinkCommand } from './markdown/links';
 import {
@@ -472,6 +473,7 @@ export function buildKeymap(s: Schema) {
     [`${mod}-a`]: chainCommands(selectAllInMathBlock, selectAllPageFrame),
 
     Enter: chainCommands(
+      exitFigureCaption,
       exitFencedCodeBlock,
       exitMathBlock,
       newlineInCode,
@@ -482,6 +484,7 @@ export function buildKeymap(s: Schema) {
       splitBlock,
     ),
     Backspace: chainCommands(
+      removeFigureAtCaptionStart,
       deleteSelection,
       undoInputRule,
       clearBlockFormatting,

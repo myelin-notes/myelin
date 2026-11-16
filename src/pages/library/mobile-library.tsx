@@ -116,15 +116,12 @@ export function MobileLibrary() {
     onChanged: refreshLibraryData,
   });
 
-  // `dataVersion` is the only change signal for local repos.
+  // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
+  // bump `dataVersion`.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
   useEffect(() => {
     void loadRecentFiles();
-  }, [
-    loadRecentFiles,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+  }, [loadRecentFiles, repositoryStatus.dataVersion]);
 
   const didMountMetaRefresh = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: the sync/version values are change triggers
@@ -134,11 +131,7 @@ export function MobileLibrary() {
       return;
     }
     refreshMeta();
-  }, [
-    refreshMeta,
-    repositoryStatus.lastRemoteSyncAt,
-    repositoryStatus.dataVersion,
-  ]);
+  }, [refreshMeta, repositoryStatus.dataVersion]);
 
   // Keep the breadcrumb trail in sync with the folder the explorer is showing.
   useEffect(() => {

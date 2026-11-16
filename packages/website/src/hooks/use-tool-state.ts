@@ -34,6 +34,7 @@ function bindToolOption(
         set: (value: string) => applyRef.current(tool, option, value),
       };
     case 'choice':
+    case 'flag':
       return {
         ...option,
         set: (value: string) => applyRef.current(tool, option, value),

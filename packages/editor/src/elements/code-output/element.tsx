@@ -371,10 +371,6 @@ export class CodeOutputElement extends AnchorableElement {
       clientX: frameClientRect.right,
       clientY: frameClientRect.bottom,
     });
-    if (editorDom.getAttribute('data-page-layout') === 'horizontal') {
-      // Pages step sideways, so the empty canvas band is below the frame.
-      return { x: tl.x, y: frameBr.y + ATTACH_GAP };
-    }
     return { x: frameBr.x + ATTACH_GAP, y: tl.y };
   }
 

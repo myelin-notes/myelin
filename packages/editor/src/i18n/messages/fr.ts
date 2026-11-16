@@ -4,6 +4,7 @@ const fr: typeof en = {
   common: {
     close: 'Fermer',
     cancel: 'Annuler',
+    done: 'Terminé',
     clear: 'Effacer',
     copy: 'Copier',
     copied: 'Copié',
@@ -11,6 +12,36 @@ const fr: typeof en = {
     none: 'Aucun',
     never: 'Jamais',
     or: 'ou',
+  },
+  plan: {
+    title: 'Passez à Myelin Notes Pro',
+    description:
+      'Un achat unique : soutenez le développement et débloquez des fonctionnalités sympas !',
+    haveLicense: 'J’ai une licence',
+    features: {
+      agents: {
+        title: 'Agents IA via MCP',
+        description:
+          'L’app d’IA que vous utilisez déjà lit vos notes et, si vous l’autorisez, y écrit.',
+      },
+      code: {
+        title: 'Exécutez les blocs de code',
+        description:
+          'Exécutez le code d’une page et voyez le résultat juste à côté.',
+      },
+      canvasImage: {
+        title: 'Votre propre fond de canevas',
+        description:
+          'Utilisez n’importe quelle image comme fond sous vos notes.',
+      },
+      limits: {
+        title: 'Des limites plus hautes',
+        description:
+          'Jusqu’à 8 types de drapeaux, des drapeaux illimités par note et 16 préréglages de stylo.',
+      },
+    },
+    upgrade: 'Passer à Pro',
+    purchaseFailed: 'L’achat n’a pas pu aboutir.',
   },
   tabBar: {
     library: 'Bibliothèque',
@@ -60,6 +91,10 @@ const fr: typeof en = {
         label: 'Ouvrir le graphe',
         description:
           'Cartographier les liens explicites entre les notes canevas',
+      },
+      openFlags: {
+        label: 'Ouvrir les drapeaux',
+        description: 'Parcourir et nettoyer les drapeaux de vos notes',
       },
       importMarkdown: {
         label: 'Importer du Markdown',
@@ -165,6 +200,8 @@ const fr: typeof en = {
           `${count} page${count > 1 ? 's' : ''} importée${count > 1 ? 's' : ''}`,
         skipped: (count: number) =>
           `${count} page${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être importée${count > 1 ? 's' : ''}`,
+        skippedSections: (count: number) =>
+          `${count} section${count > 1 ? 's' : ''} n’${count > 1 ? 'ont' : 'a'} pas pu être lue${count > 1 ? 's' : ''}`,
       },
       obsidian_vault: {
         label: 'Importer depuis Obsidian',
@@ -200,6 +237,7 @@ const fr: typeof en = {
       progress: {
         importing: (current: number, total: number) =>
           `Import de ${current} sur ${total}...`,
+        preparing: "Préparation de l'importation...",
         cancelling: 'Annulation...',
       },
       summary: {
@@ -269,7 +307,6 @@ const fr: typeof en = {
 
       rename: 'Renommer',
       manageTags: 'Gérer les étiquettes',
-      bookmarks: 'Signets',
       color: 'Couleur',
       versionHistory: 'Historique des versions',
       revealInFileManager: 'Afficher dans le gestionnaire de fichiers',
@@ -283,11 +320,6 @@ const fr: typeof en = {
       yes: 'Mettre à jour',
       no: 'Ignorer',
     },
-    bookmarksDialog: {
-      title: 'Signets',
-      empty: 'Aucun signet dans ce dossier pour le moment.',
-      loadFailed: 'Impossible de charger les signets',
-    },
     tagDialog: {
       title: 'Gérer les étiquettes',
       description: (name: string) => `Étiquettes de ${name}`,
@@ -297,6 +329,23 @@ const fr: typeof en = {
       createNew: 'Créer une étiquette',
       placeholder: 'Nom de l’étiquette...',
     },
+  },
+  flagsPage: {
+    title: 'Drapeaux',
+    searchPlaceholder: 'Rechercher drapeaux, notes, dossiers...',
+    empty: 'Aucun drapeau pour le moment.',
+    allTypes: 'Tous',
+    noMatches: 'Aucun drapeau ne correspond.',
+    loadFailed: 'Impossible de charger les drapeaux',
+    selectAll: 'Tout sélectionner',
+    selected: (count: number) =>
+      `${count} ${count === 1 ? 'sélectionné' : 'sélectionnés'}`,
+    changeType: 'Changer le type',
+    delete: 'Supprimer',
+    deleteTitle: (count: number) =>
+      `Supprimer ${count} ${count === 1 ? 'drapeau' : 'drapeaux'} ?`,
+    deleteDescription: 'Ils seront retirés de leurs notes.',
+    editFailed: 'Impossible de mettre à jour les drapeaux',
   },
   graph: {
     title: 'Graphe',
@@ -420,6 +469,15 @@ const fr: typeof en = {
         pressButton: 'Appuyez sur un bouton du stylet...',
         notPen: 'C’était une souris, pas un stylet',
       },
+      toolbarSide: {
+        label: 'Côté de la barre d’outils',
+        description:
+          'Le bord du canevas où se place la barre d’outils. Les gauchers préféreront peut-être la droite.',
+        options: {
+          left: 'Gauche',
+          right: 'Droite',
+        },
+      },
     },
     pageFrameEditing: {
       title: 'Édition des cadres de page',
@@ -427,7 +485,7 @@ const fr: typeof en = {
       defaultPageLayout: {
         label: 'Mise en page par défaut',
         description:
-          'Choisissez comment les nouveaux cadres de page disposent leur contenu. Les PDF n’utilisent que Pages ou Colonnes.',
+          'Choisissez la disposition des nouveaux documents. Colonnes ne s’applique qu’aux PDF, et Continu qu’aux cadres de page.',
         options: {
           vertical: 'Pages',
           horizontal: 'Colonnes',
@@ -712,17 +770,17 @@ const fr: typeof en = {
           label: 'Outil Texte',
           description: 'Créer un nouveau bloc de texte',
         },
-        'canvas:tool-bookmark': {
-          label: 'Outil Signet',
-          description: 'Placer un drapeau de signet',
+        'canvas:tool-flag': {
+          label: 'Outil Drapeau',
+          description: 'Placer un drapeau',
         },
-        'canvas:bookmark-previous': {
-          label: 'Signet précédent',
-          description: 'Aller au signet précédent de ce canevas',
+        'canvas:flag-previous': {
+          label: 'Drapeau précédent',
+          description: 'Aller au drapeau précédent de ce canevas',
         },
-        'canvas:bookmark-next': {
-          label: 'Signet suivant',
-          description: 'Aller au signet suivant de ce canevas',
+        'canvas:flag-next': {
+          label: 'Drapeau suivant',
+          description: 'Aller au drapeau suivant de ce canevas',
         },
         'canvas:insert-frame': {
           label: 'Insérer un cadre de page',
@@ -754,6 +812,65 @@ const fr: typeof en = {
         },
       },
     },
+    pro: {
+      title: 'Myelin Notes Pro',
+      eyebrow: 'Passer à Pro',
+      active: 'Actif',
+      thanks: {
+        label: 'Pro est activé',
+        description: 'Merci de soutenir Myelin. Bonne utilisation !',
+      },
+      key: {
+        label: 'Clé de licence',
+        description:
+          'Collez la clé reçue par e-mail après l’achat. Une clé fonctionne sur 3 appareils maximum.',
+        descriptionAndroid:
+          'Vous avez déjà une clé de licence ? Saisissez-la ici.',
+        action: 'Activer',
+      },
+      buy: {
+        label: 'Acheter Pro',
+        description: 'Un achat unique sur le site de Myelin.',
+        descriptionIos:
+          'Un achat unique qui débloque Pro sur vos appareils Apple.',
+        descriptionAndroid: 'Un achat unique via Google Play.',
+        action: 'Acheter Pro',
+      },
+      restore: {
+        label: 'Restaurer les achats',
+        description: 'Débloquez le Pro déjà acheté avec cet identifiant Apple.',
+        action: 'Restaurer',
+        none: 'Aucun achat App Store trouvé pour cet identifiant Apple.',
+      },
+      email: {
+        label: 'Vous avez déjà Pro ?',
+        description:
+          'Saisissez l’adresse e-mail utilisée pour l’achat et nous vous enverrons un code.',
+        codeSent: 'Saisissez le code à 8 chiffres reçu par e-mail.',
+        codeLabel: 'Code',
+        send: 'Envoyer le code',
+        verify: 'Vérifier',
+      },
+      desktop: {
+        label: 'Utilisez Pro sur votre ordinateur',
+        description:
+          'Saisissez votre adresse e-mail et nous vous enverrons une clé de licence pour Mac, Windows ou Linux. Elle fonctionne sur 1 ordinateur.',
+        send: 'Envoyer la clé',
+        sent: 'Consultez votre boîte de réception pour votre clé de licence.',
+      },
+      deactivate: {
+        label: 'Cet appareil',
+        description:
+          'Retirez Pro de cet appareil pour libérer une place pour un autre.',
+        action: 'Désactiver',
+      },
+      errors: {
+        invalid: 'Cette clé ou ce code n’est pas valide.',
+        limit:
+          'Cette clé est déjà active sur tous les appareils autorisés. Désactivez-la d’abord sur l’un d’eux.',
+        failed: 'Impossible de joindre le serveur de licences. Réessayez.',
+      },
+    },
     about: {
       title: 'À propos',
       eyebrow: 'Application',
@@ -775,6 +892,17 @@ const fr: typeof en = {
       pages: 'Pages',
       continuous: 'Continu',
       columns: 'Colonnes',
+      figureCaptionPlaceholder: 'Ajouter une légende',
+      letterSize: 'Lettre',
+      a4Size: 'A4',
+      customSize: 'Personnalisé',
+      customSizeHint:
+        'Faites glisser les bords latéraux de la page pour régler sa largeur.',
+      pageNumbers: 'Numéros de page',
+      pageSetup: 'Mise en page',
+      pageSize: 'Format',
+      pageMargins: 'Marges',
+      inchesUnit: 'po',
       export: 'Exporter',
     },
     export: {
@@ -798,6 +926,10 @@ const fr: typeof en = {
       fps: (fps: number) => `${fps} fps`,
     },
     slashInsert: {
+      pageBreak: {
+        title: 'Saut de page',
+        subtitle: 'Commencer une nouvelle page',
+      },
       heading1: {
         title: 'Titre 1',
         subtitle: 'Transformer ce bloc en titre principal',
@@ -893,14 +1025,29 @@ const fr: typeof en = {
       title: 'Liens entrants',
       linkedMentions: 'Mentions liées',
     },
-    bookmarks: {
-      title: 'Signets',
-      untitled: 'Signet',
+    flags: {
+      title: 'Drapeaux',
+      untitled: 'Drapeau',
       pdfPage: (fileName: string, page: number) => `${fileName} · p. ${page}`,
       rename: 'Renommer',
       remove: 'Supprimer',
-      previous: 'Signet précédent',
-      next: 'Signet suivant',
+      previous: 'Drapeau précédent',
+      next: 'Drapeau suivant',
+      changeType: 'Changer le type de drapeau',
+    },
+    flagTypes: {
+      todo: 'À faire',
+      review: 'À revoir',
+      newFlag: 'Nouveau drapeau',
+      edit: 'Modifier le drapeau',
+      remove: 'Supprimer le drapeau',
+      name: 'Nom du drapeau',
+      removeTitle: (name: string) => `Supprimer « ${name} » ?`,
+      removeDescription: (count: number) =>
+        count === 1
+          ? '1 drapeau utilise ce type. Il sera aussi supprimé de vos notes.'
+          : `${count} drapeaux utilisent ce type. Ils seront aussi supprimés de vos notes.`,
+      removeConfirm: 'Supprimer',
     },
     toolbar: {
       clickForOptions: 'cliquez pour les options',
@@ -1023,7 +1170,7 @@ const fr: typeof en = {
       highlighter: 'Surligneur',
       eraser: 'Gomme',
       text: 'Texte',
-      bookmark: 'Signet',
+      flag: 'Drapeau',
     },
     toolOptions: {
       color: 'Couleur',
@@ -1044,6 +1191,7 @@ const fr: typeof en = {
       deleteColor: 'Supprimer la couleur',
       decreaseFontSize: 'Réduire la taille de police',
       increaseFontSize: 'Augmenter la taille de police',
+      flagType: 'Drapeau',
     },
     embedComposer: {
       dropToEmbed: 'Déposez pour intégrer',
@@ -1088,8 +1236,6 @@ const fr: typeof en = {
       livePaused: 'Synchronisation en direct en pause',
       peerModes: {
         'owner-device': 'Appareil propriétaire',
-        'guest-editor': 'Invité éditeur',
-        'guest-viewer': 'Invité lecteur',
       },
       repositoryStatus: {
         localOnly: 'Local uniquement',
@@ -1124,12 +1270,12 @@ const fr: typeof en = {
     pdfAnchoring: {
       title: 'Ancrez vos notes aux pages d’un PDF',
       description:
-        'Ce que vous dessinez sur une page d’un PDF reste sur cette page, et Ancrer à la page y fixe images et formes. Elles suivent la page quand vous déplacez le PDF ou passez en Colonnes.',
+        'Ce que vous écrivez sur une page de PDF est attaché à cette page. Si vous déplacez le PDF ou changez sa disposition, vos notes restent au même endroit de la page. Ancrer à la page fixe aussi les images et les formes.',
     },
-    bookmarks: {
-      title: 'Placez des signets sur le canevas',
+    flags: {
+      title: 'Placez des drapeaux sur le canevas',
       description:
-        'Utilisez l’outil Signet (B) pour poser un drapeau. Ouvrez la liste des drapeaux en haut du canevas, ou appuyez sur [ et ] pour passer de l’un à l’autre.',
+        'Utilisez l’outil Drapeau (B) pour poser un drapeau, puis choisissez son type ou créez le vôtre. Passez de l’un à l’autre depuis la liste en haut du canevas ou avec [ et ], et ouvrez Drapeaux en haut à droite pour les voir dans toutes vos notes.',
     },
     canvasStyle: {
       title: 'Un style pour chaque canevas',
@@ -1256,6 +1402,18 @@ const fr: typeof en = {
           'Utilisez le bouton + en haut de la barre d’outils pour ajouter tout le reste.',
       },
     },
+  },
+  mediaMigration: {
+    title: 'Optimisation du stockage',
+    description:
+      'Gardez Myelin ouvert jusqu’à la fin. Mettez aussi à jour Myelin sur vos autres appareils, sinon les images, les PDF et l’audio risquent d’y apparaître vides.',
+    preparing: 'Préparation…',
+    progress: (completed: number, total: number) =>
+      `${completed} documents sur ${total}`,
+    finishing: 'Fin de l’envoi…',
+    unreachable:
+      'Votre dépôt est inaccessible pour le moment. L’opération se terminera d’elle-même dès qu’il sera de nouveau disponible.',
+    continueWithoutWaiting: 'Continuer sans attendre',
   },
   shutdown: {
     title: 'Enregistrement des modifications…',

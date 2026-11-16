@@ -75,6 +75,21 @@ describe('findActiveSlashInsertAutocomplete', () => {
     );
   });
 
+  it('disallows block actions in a figure caption, which would replace the figure', () => {
+    const doc = schema.node('doc', null, [
+      schema.node('figure', { src: '/a.png' }, schema.text('/head')),
+    ]);
+    const state = EditorState.create({
+      schema,
+      doc,
+      selection: TextSelection.create(doc, 6),
+    });
+
+    expect(findActiveSlashInsertAutocomplete(state)?.allowBlockActions).toBe(
+      false,
+    );
+  });
+
   it('does not trigger when the slash is mid-word with no preceding space', () => {
     const markdown = 'and/or';
     const head = 1 + markdown.length;
@@ -126,6 +141,8 @@ describe('searchSlashInsertAutocompleteItems', () => {
     expect(ids).not.toContain('slash-paragraph');
     expect(ids).not.toContain('slash-code-block');
     expect(ids).not.toContain('slash-math-block');
+    // It replaces the whole block, which mid-paragraph would delete the text before the slash.
+    expect(ids).not.toContain('slash-page-break');
     expect(ids).toContain('slash-link');
     expect(ids).toContain('slash-date-today');
   });
@@ -207,7 +224,7 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
     expect(selectedState.selection.to).toBe(9);
   });
 
-  it('inserts paired markdown delimiters and places the caret inside them', () => {
+  it('turns on a real mark for the text about to be typed', () => {
     const markdown = '/italic';
     const head = 1 + markdown.length;
     const state = createState(markdown, head);
@@ -226,17 +243,10 @@ describe('buildSelectSlashInsertAutocompleteTransaction', () => {
 
     const selectedState = state.apply(tr!);
 
-    expect(selectedState.doc.toJSON()).toEqual({
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: '**' }],
-        },
-      ],
-    });
-    expect(selectedState.selection.from).toBe(2);
-    expect(selectedState.selection.to).toBe(2);
+    expect(selectedState.doc.textContent).toBe('');
+    expect(selectedState.storedMarks?.map((mark) => mark.type.name)).toEqual([
+      'italic',
+    ]);
   });
 
   it('inserts link markdown and places the caret between the brackets', () => {

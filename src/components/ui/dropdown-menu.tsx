@@ -2,6 +2,7 @@ import type * as React from 'react';
 import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
 import { cn } from '@myelin/editor/utils';
+import { getSafeCollisionPadding } from '@myelin/shared/visible-viewport';
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
   return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
@@ -20,7 +21,7 @@ function DropdownMenuContent({
   alignOffset = 0,
   side = 'bottom',
   sideOffset = 6,
-  collisionPadding,
+  collisionPadding = getSafeCollisionPadding(),
   className,
   ...props
 }: MenuPrimitive.Popup.Props &

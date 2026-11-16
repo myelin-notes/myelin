@@ -12,6 +12,8 @@ export type CanvasPdfExportData =
 
 export interface PdfExportableElement {
   getCanvasPdfExportData(): CanvasPdfExportData;
+  /** Readies lazily loaded content before export data is read; call the result when done. */
+  loadContentForPdf?(): Promise<() => void>;
 }
 
 export function getCanvasPdfExportData(
@@ -19,4 +21,21 @@ export function getCanvasPdfExportData(
 ): CanvasPdfExportData | null {
   const exportable = element as DrawableElement & Partial<PdfExportableElement>;
   return exportable.getCanvasPdfExportData?.() ?? null;
+}
+
+export async function loadContentForPdf(
+  elements: readonly DrawableElement[],
+): Promise<() => void> {
+  const releases = await Promise.all(
+    elements.map((element) =>
+      (
+        element as DrawableElement & Partial<PdfExportableElement>
+      ).loadContentForPdf?.(),
+    ),
+  );
+  return () => {
+    for (const release of releases) {
+      release?.();
+    }
+  };
 }

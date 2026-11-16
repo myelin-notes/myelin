@@ -6,6 +6,7 @@ import { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ensureDisplayFont } from '@myelin/editor/google-fonts';
 import { type Messages, useMessages } from '@myelin/editor/i18n';
 import { getPenPresetLabel, usePenPresets } from '@myelin/editor/pen-presets';
+import { planLimit, promptUpgrade } from '@myelin/editor/plan';
 import {
   MAX_CUSTOM_COLORS,
   MAX_PEN_PRESETS,
@@ -83,6 +84,7 @@ function bindToolOption(
         set: (value: string) => applyRef.current(tool, option, value),
       };
     case 'choice':
+    case 'flag':
       return {
         ...option,
         set: (value: string) => applyRef.current(tool, option, value),
@@ -440,6 +442,10 @@ export function useToolState(
     if (!activePenTool || !settings || !canAddPreset) {
       return;
     }
+    if (presets.length >= planLimit('penPresets')) {
+      promptUpgrade('limits');
+      return;
+    }
     // An exact duplicate is a no-op in the repository, so this can't stack.
     void addPreset({ tool: activePenTool, ...settings }).then((next) => {
       const created = next.find(
@@ -476,7 +482,6 @@ export function useToolState(
       applyPreset(preset);
       setEditingPresetId(preset.id);
       setShelfOpen(false);
-      setOptionsVisible(true);
     },
     [applyPreset],
   );

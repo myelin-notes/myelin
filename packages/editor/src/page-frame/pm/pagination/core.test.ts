@@ -21,14 +21,14 @@ function tableRow(
   naturalTop: number,
   naturalBottom: number,
   getPos: () => number | null = () => null,
-  options: { isHeaderRow?: boolean; splitLines?: ParagraphLine[] } = {},
+  options: { isHeaderRow?: boolean; cellLines?: ParagraphLine[][] } = {},
 ): TableRowLine {
   return {
     naturalTop,
     naturalBottom,
     getPos,
     isHeaderRow: options.isHeaderRow,
-    splitLines: options.splitLines,
+    cellLines: options.cellLines,
   };
 }
 
@@ -40,6 +40,8 @@ function block({
   isBreakableTextBlock = false,
   isBreakableTableBlock = false,
   isPageHeightConstrained = false,
+  keepWithNext = false,
+  forcesPageBreak = false,
 }: {
   pos: number;
   measuredTop: number;
@@ -48,6 +50,8 @@ function block({
   isBreakableTextBlock?: boolean;
   isBreakableTableBlock?: boolean;
   isPageHeightConstrained?: boolean;
+  keepWithNext?: boolean;
+  forcesPageBreak?: boolean;
 }): PaginationBlock {
   return {
     pos,
@@ -57,6 +61,8 @@ function block({
     isBreakableTextBlock,
     isBreakableTableBlock,
     isPageHeightConstrained,
+    keepWithNext,
+    forcesPageBreak,
   };
 }
 
@@ -127,7 +133,6 @@ describe('calculateBreakLayout', () => {
 
     const result = calculateBreakLayout({
       blocks: [paragraph],
-      existingBreaks: [],
       measureParagraphLines: () => {
         measurementCount++;
         return [line(760, 772), line(780, 800, () => 15)];
@@ -144,7 +149,6 @@ describe('calculateBreakLayout', () => {
   it('moves truly atomic blocks such as images or rules onto the next page as a whole', () => {
     const result = calculateBreakLayout({
       blocks: [block({ pos: 20, measuredTop: 760, height: 80 })],
-      existingBreaks: [],
       measureParagraphLines: () => {
         throw new Error('atomic blocks should not be split into lines');
       },
@@ -167,7 +171,6 @@ describe('calculateBreakLayout', () => {
           isBreakableTableBlock: true,
         }),
       ],
-      existingBreaks: [],
       measureParagraphLines: () => [],
       measureTableRows: () => [
         line(680, 712, () => 21),
@@ -193,7 +196,6 @@ describe('calculateBreakLayout', () => {
           isBreakableTableBlock: true,
         }),
       ],
-      existingBreaks: [],
       measureParagraphLines: () => [],
       measureTableRows: () => [
         tableRow(720, 752, () => 21, { isHeaderRow: true }),
@@ -219,7 +221,6 @@ describe('calculateBreakLayout', () => {
         }),
         block({ pos: 30, measuredTop: 820, height: 20 }),
       ],
-      existingBreaks: [],
       measureParagraphLines: (currentBlock) =>
         currentBlock.pos === 10
           ? [line(760, 772), line(780, 800, () => 15)]
@@ -243,7 +244,6 @@ describe('calculateBreakLayout', () => {
             isBreakableTextBlock: true,
           }),
         ],
-        existingBreaks: [],
         measureParagraphLines: () => [line(760, 772), line(780, 800, () => 25)],
       });
 
@@ -264,13 +264,147 @@ describe('calculateBreakLayout', () => {
           isPageHeightConstrained: true,
         }),
       ],
-      existingBreaks: [],
       measureParagraphLines: () => [],
     });
 
     expect(result).toEqual({
       breaks: [],
       pageCount: 1,
+    });
+  });
+});
+
+describe('calculateBreakLayout document structure', () => {
+  const noLines = () => [];
+
+  it('sizes a block break to absorb the margin gap the spacer un-collapses', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 0, height: 740 }),
+        block({ pos: 10, measuredTop: 760, height: 40 }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    // 784 + 136 - 760 moves the block to the page top; the 20px margin gap no longer renders.
+    expect(result.breaks).toEqual([{ pos: 10, spacer: 180, kind: 'block' }]);
+  });
+
+  it('starts the block after a slightly oversized one on the next page, not in the gap', () => {
+    // A full-width portrait figure: 784px of image plus a caption runs 16px past one page.
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 0, height: 800 }),
+        block({ pos: 10, measuredTop: 818, height: 20 }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    // The next page starts at 784 + 136 = 920; the 18px margin gap no longer renders.
+    expect(result).toEqual({
+      breaks: [{ pos: 10, spacer: 920 - 818 + 18, kind: 'block' }],
+      pageCount: 2,
+    });
+  });
+
+  it('starts a new page after a manual page break even when content fits', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 0, height: 100 }),
+        block({ pos: 10, measuredTop: 100, height: 0, forcesPageBreak: true }),
+        block({ pos: 11, measuredTop: 100, height: 40 }),
+        block({ pos: 21, measuredTop: 140, height: 40 }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    expect(result).toEqual({
+      breaks: [{ pos: 11, spacer: 820, kind: 'block' }],
+      pageCount: 2,
+    });
+  });
+
+  it('moves a heading to the next page rather than strand it above its paragraph', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({
+          pos: 0,
+          measuredTop: 740,
+          height: 30,
+          isBreakableTextBlock: true,
+          keepWithNext: true,
+        }),
+        block({
+          pos: 10,
+          measuredTop: 775,
+          height: 60,
+          isBreakableTextBlock: true,
+        }),
+      ],
+      measureParagraphLines: (b) =>
+        b.pos === 10
+          ? [line(775, 795, () => 11), line(795, 835, () => 15)]
+          : [],
+    });
+
+    expect(result.breaks[0]).toEqual({ pos: 0, spacer: 180, kind: 'block' });
+    expect(result.pageCount).toBe(2);
+  });
+
+  it('keeps a heading in place when the block after it fills a whole page', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({ pos: 0, measuredTop: 700, height: 30, keepWithNext: true }),
+        block({
+          pos: 10,
+          measuredTop: 750,
+          height: 1500,
+          isPageHeightConstrained: true,
+        }),
+      ],
+      measureParagraphLines: noLines,
+    });
+
+    expect(result.breaks).toEqual([{ pos: 10, spacer: 190, kind: 'block' }]);
+    expect(result.pageCount).toBe(2);
+  });
+
+  it('keeps a heading in place when the first line of its paragraph fits', () => {
+    const result = calculateBreakLayout({
+      blocks: [
+        block({
+          pos: 0,
+          measuredTop: 700,
+          height: 30,
+          isBreakableTextBlock: true,
+          keepWithNext: true,
+        }),
+        block({
+          pos: 10,
+          measuredTop: 735,
+          height: 80,
+          isBreakableTextBlock: true,
+        }),
+      ],
+      measureParagraphLines: (b) =>
+        b.pos === 10
+          ? [line(735, 755, () => 11), line(795, 815, () => 15)]
+          : [],
+    });
+
+    expect(result.breaks).toEqual([{ pos: 15, spacer: 125, kind: 'inline' }]);
+  });
+
+  it('paginates against the frame geometry rather than the default page', () => {
+    const result = calculateBreakLayout({
+      blocks: [block({ pos: 0, measuredTop: 90, height: 40 })],
+      geometry: { contentHeight: 100, breakGap: 50 },
+      measureParagraphLines: noLines,
+    });
+
+    expect(result).toEqual({
+      breaks: [{ pos: 0, spacer: 60, kind: 'block' }],
+      pageCount: 2,
     });
   });
 });
@@ -333,10 +467,12 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(720, 860, () => 21, {
-          splitLines: [
-            line(720, 744, () => 101),
-            line(760, 784, () => 201),
-            line(800, 824, () => 301),
+          cellLines: [
+            [
+              line(720, 744, () => 101),
+              line(760, 784, () => 201),
+              line(800, 824, () => 301),
+            ],
           ],
         }),
       ],
@@ -355,7 +491,7 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(776, 860, () => 21, {
-          splitLines: [line(790, 814, () => 101), line(820, 844, () => 201)],
+          cellLines: [[line(790, 814, () => 101), line(820, 844, () => 201)]],
         }),
       ],
       20,
@@ -375,10 +511,12 @@ describe('paginateTableRows', () => {
     const result = paginateTableRows(
       [
         tableRow(0, 1000, () => 21, {
-          splitLines: [
-            line(0, 24, () => 101),
-            line(720, 744, () => 201),
-            line(780, 804, () => 301),
+          cellLines: [
+            [
+              line(0, 24, () => 101),
+              line(720, 744, () => 201),
+              line(780, 804, () => 301),
+            ],
           ],
         }),
       ],
@@ -393,14 +531,67 @@ describe('paginateTableRows', () => {
     expect(result.pageAdvances).toBe(1);
   });
 
+  it('breaks every cell of a split row so none straddles the page gap', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(700, 900, () => 21, {
+          cellLines: [
+            [line(700, 744, () => 101), line(760, 800, () => 102)],
+            [line(700, 724, () => 201), line(740, 764, () => 202)],
+            [line(700, 724, () => 301), line(770, 810, () => 302)],
+          ],
+        }),
+        tableRow(900, 940, () => 41),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    // Cell 2 fits, cells 1 and 3 each break at their own line; the next row shifts by the most any
+    // cell's content grew.
+    expect(result.breaks).toEqual([
+      { pos: 102, spacer: 160, kind: 'inline' },
+      { pos: 302, spacer: 150, kind: 'inline' },
+    ]);
+    expect(result.cumulativeShift).toBe(150);
+    expect(result.pageAdvances).toBe(1);
+  });
+
+  it('moves a multi-cell row when any cell has no line before the boundary', () => {
+    const result = paginateTableRows(
+      [
+        tableRow(740, 900, () => 21, {
+          cellLines: [
+            [line(740, 764, () => 101), line(780, 804, () => 102)],
+            [line(770, 810, () => 201)],
+          ],
+        }),
+      ],
+      20,
+      400,
+      0,
+      784,
+      0,
+    );
+
+    expect(result.breaks).toEqual([
+      { pos: 21, spacer: 180, kind: 'table-row' },
+    ]);
+  });
+
   it('continues splitting an oversized single-cell row across later pages', () => {
     const result = paginateTableRows(
       [
         tableRow(0, 1800, () => 21, {
-          splitLines: [
-            line(720, 744, () => 101),
-            line(780, 804, () => 201),
-            line(1540, 1580, () => 301),
+          cellLines: [
+            [
+              line(720, 744, () => 101),
+              line(780, 804, () => 201),
+              line(1540, 1580, () => 301),
+            ],
           ],
         }),
       ],

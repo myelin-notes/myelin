@@ -148,6 +148,11 @@ export class NoteContentIndex {
     this.publishStatus();
   }
 
+  /** `null` until indexing starts for `source`. */
+  repoIdFor(source: object): string | null {
+    return this.isSource(source) ? this.repoId : null;
+  }
+
   reconcile(source: object): void {
     if (this.repoId && this.loadItems && this.source === source) {
       this.start(this.repoId, source, this.loadItems, true);

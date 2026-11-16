@@ -13,134 +13,70 @@ function isTableRowBreakElement(element: Element): boolean {
   );
 }
 
-function measureBreakWidgetHeight(
-  element: HTMLElement,
-  invScale: number,
-): number {
-  const rect = element.getBoundingClientRect();
-  if (rect.height > 0) {
-    return rect.height * invScale;
-  }
-  return element.offsetHeight;
-}
-
-function measureCellBreakShift(
-  cell: HTMLTableCellElement,
-  invScale: number,
-): number {
-  let shift = 0;
-  for (const element of cell.querySelectorAll<HTMLElement>(
-    '[data-page-break="block"], [data-page-break="inline"]',
-  )) {
-    shift += measureBreakWidgetHeight(element, invScale);
-  }
-  return shift;
-}
-
-function measureRowInternalBreakShift(
-  row: HTMLTableRowElement,
-  invScale: number,
-): number {
-  let maxCellShift = 0;
-  for (const cell of Array.from(row.cells)) {
-    maxCellShift = Math.max(
-      maxCellShift,
-      measureCellBreakShift(cell, invScale),
-    );
-  }
-  return maxCellShift;
-}
-
-function measureCellBreakShiftBeforeBlock(
-  blockDom: HTMLElement,
-  invScale: number,
-): number {
-  const cell = blockDom.closest('td, th');
-  if (!(cell instanceof HTMLTableCellElement)) {
-    return 0;
-  }
-
-  const blockTop = blockDom.getBoundingClientRect().top;
-  let shift = 0;
-  for (const element of cell.querySelectorAll<HTMLElement>(
-    '[data-page-break="block"], [data-page-break="inline"]',
-  )) {
-    if (element.getBoundingClientRect().bottom <= blockTop + 0.5) {
-      shift += measureBreakWidgetHeight(element, invScale);
-    }
-  }
-  return shift;
-}
-
-function collectTableRowTextBlocks(
-  rowNode: PMNode,
-  rowPos: number,
+function collectCellTextBlocks(
+  cell: PMNode,
+  cellPos: number,
   view: EditorView,
 ): PaginationBlockInfo[] {
   const blocks: PaginationBlockInfo[] = [];
 
-  rowNode.forEach((cell, cellOffset) => {
-    const cellPos = rowPos + 1 + cellOffset;
-    cell.forEach((child, childOffset) => {
-      if (!child.isTextblock || child.type.name === 'codeBlock') {
-        return;
-      }
+  cell.forEach((child, childOffset) => {
+    if (!child.isTextblock || child.type.name === 'codeBlock') {
+      return;
+    }
 
-      const blockPos = cellPos + 1 + childOffset;
-      const dom = view.nodeDOM(blockPos);
-      if (!(dom instanceof HTMLElement) || dom.offsetHeight <= 0) {
-        return;
-      }
+    const blockPos = cellPos + 1 + childOffset;
+    const dom = view.nodeDOM(blockPos);
+    if (!(dom instanceof HTMLElement) || dom.offsetHeight <= 0) {
+      return;
+    }
 
-      blocks.push({
-        pos: blockPos,
-        dom,
-        height: dom.offsetHeight,
-        measuredTop: 0,
-        nodeSize: child.nodeSize,
-        isBreakableTextBlock: true,
-        isBreakableTableBlock: false,
-        isPageHeightConstrained: false,
-      });
+    blocks.push({
+      pos: blockPos,
+      dom,
+      height: dom.offsetHeight,
+      measuredTop: 0,
+      nodeSize: child.nodeSize,
+      isBreakableTextBlock: true,
+      isBreakableTableBlock: false,
+      isPageHeightConstrained: false,
     });
   });
 
   return blocks;
 }
 
-function measureTableRowSplitLines(
+function measureTableRowCellLines(
   rowNode: PMNode,
   rowPos: number,
   view: EditorView,
   editorScreenTop: number,
   invScale: number,
-  rowExternalShift: number,
   lineMeasurer: ParagraphLineMeasurer,
-): ParagraphLine[] {
-  const lines: ParagraphLine[] = [];
+): ParagraphLine[][] {
+  const cells: ParagraphLine[][] = [];
 
-  for (const block of collectTableRowTextBlocks(rowNode, rowPos, view)) {
-    const cellBreakShiftBeforeBlock = measureCellBreakShiftBeforeBlock(
-      block.dom,
-      invScale,
-    );
-    lines.push(
-      ...lineMeasurer.measure({
-        block,
-        view,
-        editorScreenTop,
-        invScale,
-        blockNaturalTop: null,
-        blockShift: rowExternalShift + cellBreakShiftBeforeBlock,
-        metrics: null,
-        measurementCacheGeneration: 0,
-      }),
-    );
-  }
+  rowNode.forEach((cell, cellOffset) => {
+    const lines: ParagraphLine[] = [];
+    for (const block of collectCellTextBlocks(
+      cell,
+      rowPos + 1 + cellOffset,
+      view,
+    )) {
+      lines.push(
+        ...lineMeasurer.measure({
+          block,
+          view,
+          editorScreenTop,
+          invScale,
+          metrics: null,
+        }),
+      );
+    }
+    cells.push(lines);
+  });
 
-  return lines.sort(
-    (a, b) => a.naturalTop - b.naturalTop || a.naturalBottom - b.naturalBottom,
-  );
+  return cells;
 }
 
 export function measureTableRows(
@@ -148,7 +84,6 @@ export function measureTableRows(
   view: EditorView,
   editorScreenTop: number,
   invScale: number,
-  blockShift: number,
   lineMeasurer: ParagraphLineMeasurer,
 ): TableRowLine[] {
   const tableNode = view.state.doc.nodeAt(block.pos);
@@ -181,14 +116,12 @@ export function measureTableRows(
 
   const rows: TableRowLine[] = [];
   let contentRowIndex = 0;
-  let innerShift = 0;
 
   for (const child of Array.from(tbody.children)) {
     if (!(child instanceof HTMLTableRowElement)) {
       continue;
     }
     if (isTableRowBreakElement(child)) {
-      innerShift += child.offsetHeight;
       continue;
     }
 
@@ -199,27 +132,19 @@ export function measureTableRows(
     }
 
     const rect = child.getBoundingClientRect();
-    const measuredTop = (rect.top - editorScreenTop) * invScale;
-    const measuredBottom = (rect.bottom - editorScreenTop) * invScale;
-    const totalExistingShift = blockShift + innerShift;
-    const rowInternalBreakShift = measureRowInternalBreakShift(child, invScale);
-    const naturalTop = measuredTop - totalExistingShift;
-    const naturalBottom =
-      measuredBottom - totalExistingShift - rowInternalBreakShift;
 
     rows.push({
-      naturalTop,
-      naturalBottom,
+      naturalTop: (rect.top - editorScreenTop) * invScale,
+      naturalBottom: (rect.bottom - editorScreenTop) * invScale,
       getPos: () => info.pos,
       isHeaderRow: info.isHeaderRow,
-      measureSplitLines: () =>
-        measureTableRowSplitLines(
+      measureCellLines: () =>
+        measureTableRowCellLines(
           info.node,
           info.pos,
           view,
           editorScreenTop,
           invScale,
-          totalExistingShift,
           lineMeasurer,
         ),
     });

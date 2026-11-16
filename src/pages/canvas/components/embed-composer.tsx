@@ -244,7 +244,7 @@ export function EmbedComposer({
       onDrop={handlePanelDrop}
     >
       <div
-        className={`relative w-[min(296px,calc(100vw-5rem))] overflow-hidden rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
+        className={`relative max-h-[var(--toolbar-panel-room)] w-[min(296px,calc(var(--canvas-visible-width)-5rem))] overflow-y-auto overscroll-contain rounded-2xl bg-popover/85 shadow-ambient backdrop-blur-[24px] transition-colors duration-200 ${
           isDragOver ? 'ring-2 ring-accent-dark/40' : ''
         }`}
       >
