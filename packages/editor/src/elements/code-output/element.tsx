@@ -11,13 +11,13 @@ import { AnchorableElement } from '../anchorable-element';
 import { type ResizeHandle, ResizeHandles } from '../drawable-element';
 import { ElementType } from '../element-type';
 import { getFrameChromeControlsLayer } from '../frame/chrome';
-import { CodeOutputCardView } from './card-view';
+import { type CardFitSize, CodeOutputCardView } from './card-view';
 
 export const CODE_OUTPUT_DEFAULT_WIDTH = 360;
 export const CODE_OUTPUT_DEFAULT_HEIGHT = 220;
-/** Size a default-sized card grows to when its first rich (display) output arrives. */
-const RICH_OUTPUT_WIDTH = 640;
-const RICH_OUTPUT_HEIGHT = 480;
+/** Largest size auto-fit picks; content beyond it scrolls. */
+const MAX_FIT_WIDTH = 720;
+const MAX_FIT_HEIGHT = 520;
 const MIN_WIDTH = 220;
 const MIN_HEIGHT = 96;
 /** World-px gap between the page frame's edge and an attached card. */
@@ -46,6 +46,8 @@ export class CodeOutputElement extends AnchorableElement {
   private _frameUuid: string;
   private _blockId: string;
   private _detached = false;
+  /** Size follows content until the user resizes. Fitted sizes stay in memory, like the derived offset. */
+  private _autoSize = true;
   private _width = CODE_OUTPUT_DEFAULT_WIDTH;
   private _height = CODE_OUTPUT_DEFAULT_HEIGHT;
 
@@ -71,6 +73,29 @@ export class CodeOutputElement extends AnchorableElement {
     this._viewport?.handleWheel(event);
   };
 
+  private readonly _handleFitSize = (size: CardFitSize): void => {
+    if (!this._autoSize) {
+      return;
+    }
+    let width = Math.min(
+      Math.max(size.width, CODE_OUTPUT_DEFAULT_WIDTH),
+      MAX_FIT_WIDTH,
+    );
+    let height = Math.min(Math.max(size.height, MIN_HEIGHT), MAX_FIT_HEIGHT);
+    // A re-run clears the output first; growing only until it finishes avoids a collapse-and-regrow.
+    if (codeRunStore.getSession(this._blockId)?.running) {
+      width = Math.max(width, this._width);
+      height = Math.max(height, this._height);
+    }
+    if (width === this._width && height === this._height) {
+      return;
+    }
+    this._width = width;
+    this._height = height;
+    this.updateBounds();
+    this.onRedrawNeeded?.();
+  };
+
   constructor(uuid: string, frameUuid = '', blockId = '') {
     super(uuid, ElementType.CODE_OUTPUT);
     this._frameUuid = frameUuid;
@@ -89,6 +114,7 @@ export class CodeOutputElement extends AnchorableElement {
       frameUuid: this._frameUuid,
       blockId: this._blockId,
       detached: this._detached,
+      autoSize: this._autoSize,
       width: this._width,
       height: this._height,
     };
@@ -109,6 +135,9 @@ export class CodeOutputElement extends AnchorableElement {
       },
       detached: (v) => {
         this._detached = v === true;
+      },
+      autoSize: (v) => {
+        this._autoSize = v !== false;
       },
       width: (v) => {
         this._width = typeof v === 'number' ? v : CODE_OUTPUT_DEFAULT_WIDTH;
@@ -149,7 +178,12 @@ export class CodeOutputElement extends AnchorableElement {
     if (h.scaleY) {
       this._height = Math.max(MIN_HEIGHT, this._resizeBaseHeight * ratioY);
     }
-    this.syncToYMap({ width: this._width, height: this._height });
+    this._autoSize = false;
+    this.syncToYMap({
+      width: this._width,
+      height: this._height,
+      autoSize: false,
+    });
     const newOffsetX = h.scaleX
       ? anchorWorld.x - h.anchorPad.x - this._width * h.anchorFx
       : originalOffset.x;
@@ -425,28 +459,10 @@ export class CodeOutputElement extends AnchorableElement {
       const version = codeRunStore.getVersion(this._blockId);
       if (version !== this._lastStoreVersion) {
         this._lastStoreVersion = version;
-        this.growForRichOutput();
         this.render();
       }
     });
     this.render();
-  }
-
-  // Plots and tables are cramped at the text-sized default; a size the user chose is kept.
-  private growForRichOutput(): void {
-    if (
-      this._width !== CODE_OUTPUT_DEFAULT_WIDTH ||
-      this._height !== CODE_OUTPUT_DEFAULT_HEIGHT ||
-      !codeRunStore
-        .getSession(this._blockId)
-        ?.items.some((item) => item.kind === 'display')
-    ) {
-      return;
-    }
-    this._width = RICH_OUTPUT_WIDTH;
-    this._height = RICH_OUTPUT_HEIGHT;
-    this.syncToYMap({ width: this._width, height: this._height });
-    this.updateBounds();
   }
 
   /** No-op until the React root is mounted lazily in syncDOM. */
@@ -459,6 +475,7 @@ export class CodeOutputElement extends AnchorableElement {
         <CodeOutputCardView
           session={codeRunStore.getSession(this._blockId)}
           onZoomWheel={this._handleZoomWheel}
+          onFitSize={this._handleFitSize}
         />,
       );
     });

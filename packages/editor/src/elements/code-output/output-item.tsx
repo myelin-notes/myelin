@@ -6,9 +6,26 @@ import { type DataResource, DataTable } from './data-table';
 /** Frame height before its content reports in, and the most it grows to before scrolling. */
 const FRAME_INITIAL_HEIGHT = 400;
 const FRAME_MAX_HEIGHT = 800;
+/** Card content width for HTML output, whose natural width the sandboxed frame can't report. */
+export const FRAME_FIT_WIDTH = 640;
 
 const TABLE_MIME = 'application/vnd.dataresource+json';
-const IMAGE_MIMES = ['image/png', 'image/jpeg'] as const;
+/** Richest first, like Jupyter; a bundle with none of these renders as its text/plain. */
+const RICH_MIMES = [
+  TABLE_MIME,
+  'text/html',
+  'image/png',
+  'image/jpeg',
+  'image/svg+xml',
+] as const;
+
+/** The MIME type an item renders as, or null when it renders as plain text. */
+function richMime(item: CodeRunItem): (typeof RICH_MIMES)[number] | null {
+  if (item.kind !== 'display') {
+    return null;
+  }
+  return RICH_MIMES.find((mime) => item.data[mime] != null) ?? null;
+}
 
 export function OutputItemView({ item }: { item: CodeRunItem }) {
   if (item.kind === 'line') {
@@ -26,7 +43,8 @@ export function OutputItemView({ item }: { item: CodeRunItem }) {
   }
 
   const { data, metadata } = item;
-  if (data[TABLE_MIME]) {
+  const mime = richMime(item);
+  if (mime === TABLE_MIME) {
     const totalRows = (metadata[TABLE_MIME] as { totalRows?: number })
       ?.totalRows;
     return (
@@ -36,28 +54,26 @@ export function OutputItemView({ item }: { item: CodeRunItem }) {
       />
     );
   }
-  if (typeof data['text/html'] === 'string') {
-    return <HtmlFrame html={data['text/html']} />;
+  if (mime === 'text/html') {
+    return <HtmlFrame html={String(data[mime])} />;
   }
-  for (const mime of IMAGE_MIMES) {
-    if (typeof data[mime] === 'string') {
-      const width = (metadata[mime] as { width?: number } | undefined)?.width;
-      return (
-        <img
-          className="canvas-code-output__image"
-          src={`data:${mime};base64,${data[mime]}`}
-          style={{ width }}
-          alt=""
-        />
-      );
-    }
+  if (mime === 'image/png' || mime === 'image/jpeg') {
+    const width = (metadata[mime] as { width?: number } | undefined)?.width;
+    return (
+      <img
+        className="canvas-code-output__image"
+        src={`data:${mime};base64,${data[mime]}`}
+        style={{ width }}
+        alt=""
+      />
+    );
   }
-  if (typeof data['image/svg+xml'] === 'string') {
+  if (mime === 'image/svg+xml') {
     // As an <img>, so any script inside the SVG never runs.
     return (
       <img
         className="canvas-code-output__image"
-        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(data['image/svg+xml'])}`}
+        src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(String(data[mime]))}`}
         alt=""
       />
     );
