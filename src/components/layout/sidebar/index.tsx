@@ -164,7 +164,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
               type="button"
               onClick={() => setSearchQuery('')}
               aria-label={strings.common.clear}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text-primary"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
             >
               <X className="size-3.5" />
             </button>

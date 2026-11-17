@@ -141,7 +141,7 @@ export function ChromeMenu({ anchor, items, onClose }: ChromeMenuProps) {
               className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-md border-none bg-transparent px-3 py-2 text-left text-sm outline-none transition-colors ${
                 danger
                   ? 'text-destructive hover:bg-destructive/10'
-                  : 'text-text-secondary hover:bg-surface hover:text-text-primary focus-visible:bg-surface focus-visible:text-text-primary'
+                  : 'text-text-secondary hover:bg-hover-tint hover:text-text-primary focus-visible:bg-hover-tint focus-visible:text-text-primary'
               }`}
             >
               {Icon && (

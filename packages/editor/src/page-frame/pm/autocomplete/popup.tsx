@@ -397,7 +397,7 @@ export function PageFrameAutocompletePopup({
               )}
             >
               {showItemIcons && (
-                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface/80 text-text-secondary">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-text-secondary">
                   <AutocompleteItemIcon item={item} />
                 </div>
               )}
@@ -412,7 +412,7 @@ export function PageFrameAutocompletePopup({
                 )}
               </div>
               {item.detail && (
-                <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[10px] text-text-muted">
+                <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-[10px] text-text-muted">
                   {item.detail}
                 </span>
               )}
@@ -450,7 +450,7 @@ function AutocompleteStatusRow({
 }) {
   return (
     <div className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-text-muted">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface/80 text-text-secondary">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted/80 text-text-secondary">
         {icon}
       </div>
       <span className="truncate">{label}</span>

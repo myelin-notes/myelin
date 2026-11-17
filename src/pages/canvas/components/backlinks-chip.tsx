@@ -132,7 +132,7 @@ export function BacklinksChip({ noteId, onOpenSource }: BacklinksChipProps) {
             <h2 className="m-0 flex-1 font-semibold text-[13px] text-text-primary">
               {strings.canvas.backlinks.linkedMentions}
             </h2>
-            <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
               {countLabel}
             </span>
             <button

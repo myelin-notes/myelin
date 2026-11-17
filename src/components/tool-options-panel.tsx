@@ -71,7 +71,7 @@ function FontPicker({
             preloadAllFonts(fonts);
           }
         }}
-        className="flex pointer-coarse:min-h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-card-active"
+        className="flex pointer-coarse:min-h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg border-none bg-muted px-2.5 py-1.5 font-medium text-text-primary text-xs transition-colors hover:bg-card-active"
         style={{ fontFamily: `"${value}", sans-serif` }}
       >
         <span className="flex-1 truncate text-left">{value}</span>
@@ -226,7 +226,7 @@ export function ToolOptionsPanel({
               <span className="select-none font-medium text-text-muted text-xs">
                 {option.label}
               </span>
-              <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-surface p-0.5">
+              <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-muted p-0.5">
                 {option.choices.map((choice) => {
                   const active = option.value === choice.value;
                   const Icon = choice.icon;
@@ -296,7 +296,7 @@ export function ToolOptionsPanel({
       {!editingPreset && savePresetDisabledReason === null && (
         <button
           onClick={onSavePreset}
-          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-normal rounded-lg border-none bg-surface px-2.5 py-1.5 text-center font-medium text-text-secondary text-xs leading-snug transition-colors hover:bg-card-active hover:text-text-primary"
+          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-normal rounded-lg border-none bg-muted px-2.5 py-1.5 text-center font-medium text-text-secondary text-xs leading-snug transition-colors hover:bg-card-active hover:text-text-primary"
         >
           <PlusIcon className="size-3.5 shrink-0" />
           {strings.canvas.toolPresets.saveShort}

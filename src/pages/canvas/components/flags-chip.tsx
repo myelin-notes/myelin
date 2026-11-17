@@ -144,7 +144,7 @@ export function FlagsChip({ canvas }: FlagsChipProps) {
                   <span className="min-w-0 flex-1 truncate">
                     {group.type.name}
                   </span>
-                  <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-[11px] text-text-secondary tabular-nums">
                     {formatNumber(group.flags.length, locale)}
                   </span>
                 </h3>
@@ -205,7 +205,7 @@ function FlagRow({
           }
         }}
         placeholder={labels.untitled}
-        className="w-full rounded-md bg-surface py-1.5 pr-2 pl-7.5 text-text-primary text-xs outline-none"
+        className="w-full rounded-md bg-muted py-1.5 pr-2 pl-7.5 text-text-primary text-xs outline-none"
       />
     );
   }
@@ -279,7 +279,7 @@ function FlagRow({
               }}
               className={cn(
                 'flex max-w-full cursor-pointer items-center gap-1 rounded-md px-1.5 py-1 text-[11px] text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary',
-                option === type && 'bg-surface text-text-primary',
+                option === type && 'bg-hover-tint text-text-primary',
               )}
             >
               <Flag

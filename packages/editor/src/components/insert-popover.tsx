@@ -218,7 +218,7 @@ export function InsertPopover({
                   : 'cursor-pointer hover:bg-hover-tint'
               }`}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface/70 text-text-primary transition-colors group-hover:bg-card-active">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted/70 text-text-primary transition-colors group-hover:bg-card-active">
                 <Icon className="size-4" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
@@ -230,7 +230,7 @@ export function InsertPopover({
                 </span>
               </div>
               {item.comingSoon ? (
-                <span className="rounded-md bg-surface px-1.5 py-0.5 font-medium text-[9.5px] text-text-muted uppercase tracking-[0.08em]">
+                <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-[9.5px] text-text-muted uppercase tracking-[0.08em]">
                   {strings.canvas.insert.soon}
                 </span>
               ) : (

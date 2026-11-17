@@ -82,7 +82,7 @@ export function CommandPaletteDialog({
             className="min-w-0 flex-1 bg-transparent py-2 font-normal text-lg text-text-primary outline-none placeholder:text-text-muted"
           />
           {!IS_MOBILE_BUILD && (
-            <kbd className="hidden rounded-md border border-border-divider bg-surface px-2 py-1 font-semibold text-[10px] text-text-muted uppercase tracking-[0.08em] sm:inline">
+            <kbd className="hidden rounded-md border border-border-divider bg-muted px-2 py-1 font-semibold text-[10px] text-text-muted uppercase tracking-[0.08em] sm:inline">
               Esc
             </kbd>
           )}
@@ -104,7 +104,7 @@ export function CommandPaletteDialog({
         </div>
 
         {!IS_MOBILE_BUILD && (
-          <div className="flex items-center justify-between border-border-divider border-t bg-surface/70 px-4 py-2 text-[11px] text-text-muted">
+          <div className="flex items-center justify-between border-border-divider border-t bg-muted/70 px-4 py-2 text-[11px] text-text-muted">
             <span>{strings.commandPalette.footer}</span>
             <span>{footerShortcut}</span>
           </div>
