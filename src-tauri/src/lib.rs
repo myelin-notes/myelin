@@ -82,6 +82,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_pencil::init())
+        .plugin(tauri_plugin_handwriting::init())
         .manage(iroh_transport::IrohState::new())
         .manage(repository_engine::RepositoryManager::default())
         .manage(mcp_server::McpServerState::new())

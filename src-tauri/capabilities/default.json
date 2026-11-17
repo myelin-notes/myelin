@@ -37,6 +37,7 @@
     "stronghold:allow-remove-store-record",
     "mcp-bridge:default",
     "pencil:default",
+    "handwriting:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text",
     {

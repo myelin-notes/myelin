@@ -4,7 +4,12 @@ import type { SearchableElement } from '@myelin/editor/elements/canvas-searchabl
 import { findPdfTextMatches } from '@myelin/editor/elements/pdf/text-layer';
 import { findTextMatches } from '@myelin/editor/page-frame/pm/search-highlight';
 
-export type CanvasSearchKind = 'text' | 'page-frame' | 'transcript' | 'pdf';
+export type CanvasSearchKind =
+  | 'text'
+  | 'page-frame'
+  | 'transcript'
+  | 'pdf'
+  | 'handwriting';
 
 export interface CanvasSearchRect {
   x: number;

@@ -21,6 +21,7 @@ import {
   type CanvasSearchSource,
   collectCanvasSearchSources,
 } from './collect';
+import { collectHandwritingSources } from './handwriting';
 
 /** Frames to keep retrying the highlight while a panned-to frame's view mounts. */
 const HIGHLIGHT_MOUNT_RETRY_FRAMES = 60;
@@ -64,6 +65,8 @@ export function useCanvasSearch(
   const [currentIndex, setCurrentIndex] = useState(0);
   /** The page frame or PDF currently showing a match highlight, if any. */
   const highlightedFrameRef = useRef<string | null>(null);
+  /** Bumped per open so a slow recognition can't append to a later session's sources. */
+  const searchSessionRef = useRef(0);
 
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const matches = useMemo(
@@ -220,6 +223,12 @@ export function useCanvasSearch(
     setQueryState('');
     setCurrentIndex(0);
     setSources(collectCanvasSearchSources(dc));
+    const session = ++searchSessionRef.current;
+    void collectHandwritingSources(dc).then((handwriting) => {
+      if (searchSessionRef.current === session && handwriting.length > 0) {
+        setSources((current) => [...current, ...handwriting]);
+      }
+    });
   }, [drawableCanvasRef, clearActiveHighlight]);
 
   const close = useCallback(() => {
