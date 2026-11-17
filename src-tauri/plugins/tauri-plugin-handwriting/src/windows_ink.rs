@@ -1,6 +1,8 @@
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock, PoisonError};
+use std::time::Duration;
 
 use windows::Foundation::Point;
+use windows::Win32::Foundation::E_ILLEGAL_METHOD_CALL;
 use windows::Win32::System::Com::CoIncrementMTAUsage;
 use windows::UI::Input::Inking::{
     InkPoint, InkRecognitionTarget, InkRecognizerContainer, InkStrokeBuilder, InkStrokeContainer,
@@ -20,6 +22,17 @@ pub fn recognize(strokes: &[Stroke]) -> Result<String, String> {
 
 fn recognize_strokes(strokes: &[Stroke]) -> windows::core::Result<String> {
     ensure_mta();
+    // Windows.UI.Input.Inking crashes (STATUS_ACCESS_VIOLATION) when strokes are built on two
+    // threads at once, or when a recognizer is released right after its completion handler fires,
+    // while its worker is still finishing. So every call holds this lock throughout, and one
+    // recognizer lives for the process; reuse also skips its ~100ms setup per call.
+    static RECOGNIZER: Mutex<Option<MtaRecognizer>> = Mutex::new(None);
+    let mut recognizer = RECOGNIZER.lock().unwrap_or_else(PoisonError::into_inner);
+    if recognizer.is_none() {
+        // Activation fails when no handwriting recognizer is installed for any language.
+        *recognizer = Some(MtaRecognizer(InkRecognizerContainer::new()?));
+    }
+    let recognizer = &recognizer.as_ref().unwrap().0;
     let builder = InkStrokeBuilder::new()?;
     let container = InkStrokeContainer::new()?;
     for stroke in strokes {
@@ -51,10 +64,19 @@ fn recognize_strokes(strokes: &[Stroke]) -> windows::core::Result<String> {
         return Ok(String::new());
     }
 
-    // Activation fails when no handwriting recognizer is installed for any language.
-    let results = InkRecognizerContainer::new()?
-        .RecognizeAsync(&container, InkRecognitionTarget::All)?
-        .join()?;
+    // A call while the recognizer finishes the previous one fails with E_ILLEGAL_METHOD_CALL; it
+    // clears within milliseconds.
+    let mut attempts = 0;
+    let operation = loop {
+        match recognizer.RecognizeAsync(&container, InkRecognitionTarget::All) {
+            Err(error) if error.code() == E_ILLEGAL_METHOD_CALL && attempts < 100 => {
+                attempts += 1;
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            result => break result?,
+        }
+    };
+    let results = operation.join()?;
     let mut words = Vec::new();
     for result in results {
         let candidates = result.GetTextCandidates()?;
@@ -64,6 +86,12 @@ fn recognize_strokes(strokes: &[Stroke]) -> windows::core::Result<String> {
     }
     Ok(words.join(" "))
 }
+
+struct MtaRecognizer(InkRecognizerContainer);
+
+// SAFETY: created and only used on threads in the process MTA (`ensure_mta`), where a COM object
+// needs no marshaling between threads.
+unsafe impl Send for MtaRecognizer {}
 
 // WinRT activation fails on a thread with no COM apartment, and `spawn_blocking` threads have none.
 // An implicit process MTA covers every such thread; the ink classes allow either apartment.
@@ -82,5 +110,21 @@ mod tests {
     #[test]
     fn reads_drawn_strokes() {
         assert_eq!(recognize(&hello()).unwrap().to_uppercase(), "HELLO");
+    }
+
+    #[test]
+    fn survives_concurrent_calls() {
+        let threads: Vec<_> = (0..8)
+            .map(|_| {
+                std::thread::spawn(|| {
+                    for _ in 0..20 {
+                        assert_eq!(recognize(&hello()).unwrap().to_uppercase(), "HELLO");
+                    }
+                })
+            })
+            .collect();
+        for thread in threads {
+            thread.join().unwrap();
+        }
     }
 }
