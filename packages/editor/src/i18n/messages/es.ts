@@ -1305,7 +1305,7 @@ const es: typeof en = {
       collected:
         'Recopilamos qué funciones usas, la versión de la app e informes de errores.',
       notCollected:
-        'Nunca recopilamos tus notas, los nombres de archivo ni tu escritura a mano.',
+        'Nunca recopilamos tus notas, los nombres de archivo ni tu escritura a mano. En Android, el reconocedor de escritura de Google envía a Google métricas de uso, nunca lo que escribes.',
       policy: 'Leer la política de privacidad',
     },
     sync: {
