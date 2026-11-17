@@ -161,7 +161,8 @@ export async function onRequestPost({
     }
     const found = await transferKey(
       polar,
-      env,
+      env.POLAR_ORGANIZATION_ID,
+      env.POLAR_APP_STORE_PRODUCT_ID,
       APPLE_METADATA_KEY,
       transaction.originalTransactionId,
       email,
