@@ -88,6 +88,7 @@ import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
+import { collectHandwritingSources } from './search/handwriting';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -197,6 +198,14 @@ function CanvasViewInner({
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
   }, [id]);
+  const onListRecognizedText = useCallback(async () => {
+    const dc = drawableCanvasRef.current;
+    return dc
+      ? (await collectHandwritingSources(dc)).flatMap(
+          (source) => source.text ?? [],
+        )
+      : [];
+  }, []);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({
@@ -730,6 +739,7 @@ function CanvasViewInner({
         onToggleZoomLock={onToggleZoomLock}
         onFitContent={onFitContent}
         onRegenerateThumbnail={onRegenerateThumbnail}
+        onListRecognizedText={onListRecognizedText}
       />
       {engine.ready && (
         <SelectionToolbar
