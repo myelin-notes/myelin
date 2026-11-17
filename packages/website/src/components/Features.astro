@@ -44,10 +44,10 @@ const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
   canvas: [
     ['canvasStyle', 'wn-canvas-style'],
     ['flags', 'wn-flags'],
+    ['handwritingSearch', 'handwriting-search'],
   ],
   sync: [['liveCollab', 'ft-live-collab']],
   agents: [['agents', 'ft-mcp-agent']],
-  connect: [['handwritingSearch', 'handwriting-search']],
 };
 // Lone-clip sections that put their details left of the clip, so back-to-back ones don't mirror each other.
 const detailsLeft: FeatureSectionId[] = ['sync'];
@@ -114,7 +114,7 @@ const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
             </div>
 
             {cards.length > 0 && (
-              <div class="mt-14 grid gap-6 md:grid-cols-2 lg:mt-16">
+              <div class:list={['mt-14 grid gap-6 lg:mt-16', cards.length === 3 ? 'lg:grid-cols-3' : 'md:grid-cols-2']}>
                 {cards.map(([clipId, file], j) => {
                   const clip = page.clips[clipId];
                   return (

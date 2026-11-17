@@ -190,7 +190,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, handwriting search, and higher limits. Your notes are never paywalled.
+Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, handwriting recognition, and higher limits. Your notes are never paywalled.
 
 ## Where are my notes stored?
 
@@ -405,8 +405,8 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         alt: 'A separate AI app reads handwritten notes in Myelin over MCP and adds a typed summary page beside them',
       },
       handwritingSearch: {
-        title: 'Search your handwriting',
-        body: 'With Pro, Find on the canvas matches the words you wrote by hand, and library search finds them too. Ink is recognized on your device.',
+        title: 'Handwriting recognition',
+        body: 'With Pro, Myelin recognizes your handwriting on your device, so Find on the canvas and library search match the words you wrote by hand.',
         alt: 'Typing “entropy” into Find jumps to each handwritten note that mentions it and selects it',
       },
     },
@@ -453,7 +453,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   pricing: {
     meta: {
       title: 'Pricing | Myelin Notes',
-      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, handwriting search, and higher limits.`,
+      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, handwriting recognition, and higher limits.`,
     },
     eyebrow: 'Pricing',
     headline: 'Free to use. Pro when you want more.',
@@ -469,8 +469,8 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         'Audio recording with on-device transcription',
         'GitHub sync and live collaboration',
         'Import, export, search, and links',
+        'Up to 2 flag types',
         'Up to 6 custom pen presets',
-        '2 flag types',
       ],
       cta: 'Download',
     },
@@ -483,11 +483,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       includes: [
         'AI agents over a local MCP server',
         'Run code blocks in your pages',
-        'Unlimited flag types',
-        'Unlimited custom pen presets',
+        'Up to 8 flag types',
+        'Up to 16 custom pen presets',
         'Your own images as canvas backgrounds',
         'More accurate transcription models',
-        'Search your handwriting',
+        'Handwriting recognition, so search finds what you wrote',
         'Support Myelin’s development',
       ],
       cta: 'Buy Pro',
