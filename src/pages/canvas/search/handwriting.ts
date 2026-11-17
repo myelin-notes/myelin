@@ -1,6 +1,7 @@
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
 import { Logger } from '@myelin/shared/logger';
+import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import {
   type HandwritingStroke,
   recognizeHandwriting,
@@ -12,11 +13,6 @@ const logger = new Logger('HandwritingSearch');
 // Strokes closer than one median stroke height share a block: joins letters, words and the lines
 // of a paragraph, while a blank line or separate note starts a new block.
 const BLOCK_GAP_RATIO = 1;
-
-// Recognized text by block key (member uuids + point counts, so edits re-recognize but moves don't).
-// shortcut: in memory only, so the first Find after launch re-reads every block; persist it if
-// that proves slow on dense notes.
-const recognizedText = new Map<string, string>();
 
 function groupNearbyStrokes(strokes: StrokeElement[]): StrokeElement[][] {
   const boxes = strokes.map((stroke) => stroke.boundingBox);
@@ -80,46 +76,87 @@ function unionRect(strokes: StrokeElement[]): CanvasSearchRect {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
-/** One source per block of ink with recognized text. Recognizes only blocks not seen before. */
-export async function collectHandwritingSources(
-  dc: DrawableCanvas,
-): Promise<CanvasSearchSource[]> {
-  const strokes = dc.elements.filter(
-    (element): element is StrokeElement => element instanceof StrokeElement,
-  );
-  const blocks = groupNearbyStrokes(strokes).map((members) => ({
-    members,
-    key: members
-      .map((stroke) => `${stroke.uuid}:${stroke.xyPoints.length}`)
-      .sort()
-      .join(','),
-  }));
+type HandwritingStore = Pick<
+  NativeRepository,
+  'loadHandwritingText' | 'saveHandwritingText'
+>;
 
-  const pending = blocks.filter((block) => !recognizedText.has(block.key));
-  if (pending.length > 0) {
-    try {
-      const texts = await recognizeHandwriting(
-        pending.map((block) => block.members.map(toWorldStroke)),
-      );
-      pending.forEach((block, index) => {
-        recognizedText.set(block.key, texts[index]);
-      });
-    } catch (error) {
-      logger.warn('Handwriting recognition failed', error);
+/** One canvas's recognized text, saved on this device so only new or edited blocks are recognized. */
+export class HandwritingIndex {
+  // By block key: member uuids + point counts, so edits re-recognize but moves don't.
+  private texts: Promise<Map<string, string>> | null = null;
+
+  constructor(
+    private readonly store: HandwritingStore,
+    private readonly noteId: VFSNodeId,
+  ) {}
+
+  /** One source per block of ink with recognized text. */
+  async collect(dc: DrawableCanvas): Promise<CanvasSearchSource[]> {
+    const texts = await this.load();
+    const strokes = dc.elements.filter(
+      (element): element is StrokeElement => element instanceof StrokeElement,
+    );
+    const blocks = groupNearbyStrokes(strokes).map((members) => ({
+      members,
+      key: members
+        .map((stroke) => `${stroke.uuid}:${stroke.xyPoints.length}`)
+        .sort()
+        .join(','),
+    }));
+
+    let changed = false;
+    const pending = blocks.filter((block) => !texts.has(block.key));
+    if (pending.length > 0) {
+      try {
+        const recognized = await recognizeHandwriting(
+          pending.map((block) => block.members.map(toWorldStroke)),
+        );
+        pending.forEach((block, index) => {
+          texts.set(block.key, recognized[index]);
+        });
+        changed = true;
+      } catch (error) {
+        logger.warn('Handwriting recognition failed', error);
+      }
     }
+    // Edited and erased blocks leave stale keys behind.
+    const live = new Set(blocks.map((block) => block.key));
+    for (const key of texts.keys()) {
+      if (!live.has(key)) {
+        texts.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) {
+      await this.store
+        .saveHandwritingText(this.noteId, Object.fromEntries(texts))
+        .catch((error) => logger.warn('Could not save handwriting', error));
+    }
+
+    return blocks.flatMap(({ members, key }) => {
+      const text = texts.get(key);
+      return text
+        ? [
+            {
+              kind: 'handwriting' as const,
+              rect: unionRect(members),
+              selectUuids: members.map((stroke) => stroke.uuid),
+              text,
+            },
+          ]
+        : [];
+    });
   }
 
-  return blocks.flatMap(({ members, key }) => {
-    const text = recognizedText.get(key);
-    return text
-      ? [
-          {
-            kind: 'handwriting' as const,
-            rect: unionRect(members),
-            selectUuids: members.map((stroke) => stroke.uuid),
-            text,
-          },
-        ]
-      : [];
-  });
+  private load(): Promise<Map<string, string>> {
+    this.texts ??= this.store.loadHandwritingText(this.noteId).then(
+      (saved) => new Map(Object.entries(saved)),
+      (error) => {
+        logger.warn('Could not load saved handwriting', error);
+        return new Map();
+      },
+    );
+    return this.texts;
+  }
 }

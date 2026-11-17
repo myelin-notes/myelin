@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
@@ -120,6 +121,18 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 fn flags_cache_path(text_cache: PathBuf) -> PathBuf {
     text_cache.with_extension("flags.json")
+}
+
+fn handwriting_cache_path(text_cache: PathBuf) -> PathBuf {
+    text_cache.with_extension("handwriting.json")
+}
+
+// Missing or unreadable reads as empty: it's a cache, and the canvas re-recognizes what's absent.
+fn read_handwriting(path: &Path) -> HashMap<String, String> {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
 }
 
 /// Without a `cache_file` (the index hasn't started yet) the note is decoded every call.
@@ -379,7 +392,11 @@ pub async fn remove_note_text_index(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = cache_path(&app, &repo_id, &node_id)?;
-        for path in [flags_cache_path(path.clone()), path] {
+        for path in [
+            flags_cache_path(path.clone()),
+            handwriting_cache_path(path.clone()),
+            path,
+        ] {
             match std::fs::remove_file(path) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -387,6 +404,41 @@ pub async fn remove_note_text_index(
             }
         }
         Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Recognized handwriting saved on this device by the canvas, keyed by its block key.
+#[tauri::command]
+pub async fn read_handwriting_text(
+    app: AppHandle,
+    repo_id: String,
+    node_id: String,
+) -> Result<HashMap<String, String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(read_handwriting(&handwriting_cache_path(cache_path(
+            &app, &repo_id, &node_id,
+        )?)))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Replaces the note's saved handwriting with `texts`.
+#[tauri::command]
+pub async fn write_handwriting_text(
+    app: AppHandle,
+    repo_id: String,
+    node_id: String,
+    texts: HashMap<String, String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = handwriting_cache_path(cache_path(&app, &repo_id, &node_id)?);
+        write_atomic(
+            &path,
+            &serde_json::to_vec(&texts).map_err(|error| error.to_string())?,
+        )
     })
     .await
     .map_err(|error| error.to_string())?

@@ -88,7 +88,7 @@ import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
-import { collectHandwritingSources } from './search/handwriting';
+import { HandwritingIndex } from './search/handwriting';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -158,7 +158,11 @@ function CanvasViewInner({
     selectedToolIndex: toolState.selectedToolIndex,
     toggleOptions: toolState.toggleOptions,
   });
-  const canvasSearch = useCanvasSearch(drawableCanvasRef);
+  const handwriting = useMemo(
+    () => new HandwritingIndex(repository, id),
+    [repository, id],
+  );
+  const canvasSearch = useCanvasSearch(drawableCanvasRef, handwriting);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -201,11 +205,9 @@ function CanvasViewInner({
   const onListRecognizedText = useCallback(async () => {
     const dc = drawableCanvasRef.current;
     return dc
-      ? (await collectHandwritingSources(dc)).flatMap(
-          (source) => source.text ?? [],
-        )
+      ? (await handwriting.collect(dc)).flatMap((source) => source.text ?? [])
       : [];
-  }, []);
+  }, [handwriting]);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({

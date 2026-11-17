@@ -21,7 +21,7 @@ import {
   type CanvasSearchSource,
   collectCanvasSearchSources,
 } from './collect';
-import { collectHandwritingSources } from './handwriting';
+import type { HandwritingIndex } from './handwriting';
 
 /** Frames to keep retrying the highlight while a panned-to frame's view mounts. */
 const HIGHLIGHT_MOUNT_RETRY_FRAMES = 60;
@@ -58,6 +58,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 export function useCanvasSearch(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
+  handwriting: HandwritingIndex,
 ): CanvasSearchController {
   const [open, setOpen] = useState(false);
   const [query, setQueryState] = useState('');
@@ -224,12 +225,12 @@ export function useCanvasSearch(
     setCurrentIndex(0);
     setSources(collectCanvasSearchSources(dc));
     const session = ++searchSessionRef.current;
-    void collectHandwritingSources(dc).then((handwriting) => {
+    void handwriting.collect(dc).then((handwriting) => {
       if (searchSessionRef.current === session && handwriting.length > 0) {
         setSources((current) => [...current, ...handwriting]);
       }
     });
-  }, [drawableCanvasRef, clearActiveHighlight]);
+  }, [drawableCanvasRef, handwriting, clearActiveHighlight]);
 
   const close = useCallback(() => {
     clearActiveHighlight();

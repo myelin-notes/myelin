@@ -975,6 +975,28 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
+  /** Recognized handwriting this device saved for a canvas, by block key; `{}` before indexing starts. */
+  async loadHandwritingText(id: VFSNodeId): Promise<Record<string, string>> {
+    const repoId = noteContentIndex.repoIdFor(this);
+    return repoId
+      ? invoke<Record<string, string>>('read_handwriting_text', {
+          repoId,
+          nodeId: id,
+        })
+      : {};
+  }
+
+  /** Replaces the canvas's saved handwriting; a no-op before indexing starts. */
+  async saveHandwritingText(
+    id: VFSNodeId,
+    texts: Record<string, string>,
+  ): Promise<void> {
+    const repoId = noteContentIndex.repoIdFor(this);
+    if (repoId) {
+      await invoke('write_handwriting_text', { repoId, nodeId: id, texts });
+    }
+  }
+
   /** Flags in every canvas, read from saved files. */
   async listFlags(): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
