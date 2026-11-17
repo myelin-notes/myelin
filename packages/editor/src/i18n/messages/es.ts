@@ -33,6 +33,11 @@ const es: typeof en = {
         title: 'Tu propio fondo de lienzo',
         description: 'Usa cualquier imagen como fondo detrás de tus notas.',
       },
+      transcription: {
+        title: 'Transcripción más precisa',
+        description:
+          'Descarga modelos más grandes, en el propio dispositivo, que transcriben con más precisión, sobre todo fuera del inglés.',
+      },
       limits: {
         title: 'Límites más altos',
         description:
@@ -646,6 +651,35 @@ const es: typeof en = {
         succeeded: (notes: number, media: number) =>
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
+    },
+    transcription: {
+      title: 'Transcripción',
+      eyebrow: 'En el dispositivo',
+      label: 'Modelo de voz a texto',
+      description:
+        'Convierte las grabaciones de audio en texto con búsqueda. Funciona por completo en este dispositivo, así que el audio nunca sale de él. Los modelos más grandes son más precisos pero más lentos.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Rápido en cualquier dispositivo. Sirve para voz clara pero comete más errores.',
+        },
+        small: {
+          label: 'Pequeño',
+          description:
+            'Más preciso que Base. Funciona bien en la mayoría de tabletas y ordenadores.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'El más preciso. Solo para ordenadores y mejor con GPU. La transcripción en vivo puede retrasarse en equipos antiguos.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Descargar',
+      included: 'Incluido',
+      delete: 'Eliminar modelo',
+      downloadFailed: 'Error al descargar el modelo',
     },
     privacy: {
       title: 'Privacidad',

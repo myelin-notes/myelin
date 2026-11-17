@@ -7,6 +7,7 @@ import {
   Info,
   Keyboard,
   Languages,
+  Mic,
   PenLine,
   Pointer,
   ShieldCheck,
@@ -20,6 +21,7 @@ export type SettingsSectionId =
   | 'language'
   | 'input'
   | 'editing'
+  | 'transcription'
   | 'sync'
   | 'data'
   | 'privacy'
@@ -35,6 +37,7 @@ export interface SettingsSectionMeta {
     | 'language'
     | 'input'
     | 'pageFrameEditing'
+    | 'transcription'
     | 'repository'
     | 'dataExport'
     | 'privacy'
@@ -54,6 +57,7 @@ const ALL_SETTINGS_SECTIONS: readonly SettingsSectionMeta[] = [
   { id: 'language', titleKey: 'language', icon: Languages },
   { id: 'input', titleKey: 'input', icon: Pointer },
   { id: 'editing', titleKey: 'pageFrameEditing', icon: PenLine },
+  { id: 'transcription', titleKey: 'transcription', icon: Mic },
   { id: 'sync', titleKey: 'repository', icon: Cloud },
   {
     id: 'data',

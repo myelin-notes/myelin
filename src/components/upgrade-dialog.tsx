@@ -8,6 +8,7 @@ import agentsDemo from '@/assets/upsell/agents.webp';
 import canvasImageDemo from '@/assets/upsell/canvas-image.webp';
 import codeDemo from '@/assets/upsell/code.webp';
 import limitsDemo from '@/assets/upsell/limits.webp';
+import transcriptionDemo from '@/assets/upsell/transcription.webp';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ const DEMOS: Record<ProFeature, string> = {
   agents: agentsDemo,
   code: codeDemo,
   canvasImage: canvasImageDemo,
+  transcription: transcriptionDemo,
   limits: limitsDemo,
 };
 const FEATURES = Object.keys(DEMOS) as ProFeature[];

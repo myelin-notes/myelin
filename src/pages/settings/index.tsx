@@ -12,6 +12,7 @@ import { McpSection } from './sections/mcp-section';
 import { PrivacySection } from './sections/privacy-section';
 import { ProSection } from './sections/pro-section';
 import { SyncSection } from './sections/sync-section';
+import { TranscriptionSection } from './sections/transcription-section';
 import { SettingsRail } from './settings-rail';
 import { SETTINGS_SECTIONS, type SettingsSectionId } from './settings-sections';
 import { useScrollSpy } from './use-scroll-spy';
@@ -69,6 +70,7 @@ export function SettingsPage() {
               <LanguageSection />
               <InputSection />
               <EditingSection />
+              <TranscriptionSection />
               <SyncSection />
               <DataSection />
               <PrivacySection />

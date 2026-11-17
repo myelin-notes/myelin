@@ -30,6 +30,10 @@ const zhHans: typeof en = {
         title: '自定义画布背景',
         description: '将任意图片用作笔记背后的背景。',
       },
+      transcription: {
+        title: '更准确的转写',
+        description: '下载更大的本地模型，转写更准确，尤其是英语以外的语言。',
+      },
       limits: {
         title: '更高的上限',
         description:
@@ -614,6 +618,33 @@ const zhHans: typeof en = {
         succeeded: (notes: number, media: number) =>
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
+    },
+    transcription: {
+      title: '转写',
+      eyebrow: '设备端',
+      label: '语音转文字模型',
+      description:
+        '将录音转为可搜索的文字。完全在本设备上运行，音频不会离开设备。模型越大越准确，但速度越慢。',
+      models: {
+        base: {
+          label: '基础',
+          description: '在任何设备上都很快。适合清晰的语音，但错误较多。',
+        },
+        small: {
+          label: '小型',
+          description: '比基础模型更准确。在大多数平板和电脑上运行良好。',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            '准确度最高。仅限电脑，配合 GPU 效果最佳。在较旧的电脑上实时转写可能会延迟。',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: '下载',
+      included: '内置',
+      delete: '删除模型',
+      downloadFailed: '模型下载失败',
     },
     privacy: {
       title: '隐私',
