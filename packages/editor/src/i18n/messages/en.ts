@@ -31,6 +31,11 @@ const en = {
         title: 'Your own canvas background',
         description: 'Use any image as the background behind your notes.',
       },
+      transcription: {
+        title: 'More accurate transcription',
+        description:
+          'Download larger on-device models that transcribe more accurately, especially outside English.',
+      },
       limits: {
         title: 'Higher limits',
         description:
@@ -637,6 +642,35 @@ const en = {
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
+    },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'On-device',
+      label: 'Speech-to-text model',
+      description:
+        'Turns audio recordings into searchable text. Runs entirely on this device, so audio never leaves it. Larger models are more accurate but slower.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Fast on any device. Fine for clear speech but makes more mistakes.',
+        },
+        small: {
+          label: 'Small',
+          description:
+            'More accurate than Base. Runs well on most tablets and computers.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'The most accurate. Computers only, and best with a GPU. Live transcripts may fall behind on older machines.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Download',
+      included: 'Included',
+      delete: 'Delete model',
+      downloadFailed: 'Model download failed',
     },
     privacy: {
       title: 'Privacy',

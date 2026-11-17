@@ -34,6 +34,11 @@ const fr: typeof en = {
         description:
           'Utilisez n’importe quelle image comme fond sous vos notes.',
       },
+      transcription: {
+        title: 'Transcription plus précise',
+        description:
+          'Téléchargez des modèles plus grands, sur l’appareil, qui transcrivent plus fidèlement, surtout hors anglais.',
+      },
       limits: {
         title: 'Des limites plus hautes',
         description:
@@ -653,6 +658,35 @@ const fr: typeof en = {
         succeeded: (notes: number, media: number) =>
           `${notes} note${notes > 1 ? 's' : ''} et ${media} fichier${media > 1 ? 's' : ''} multimédia exportés.`,
       },
+    },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'Sur l’appareil',
+      label: 'Modèle de reconnaissance vocale',
+      description:
+        'Transforme les enregistrements audio en texte consultable. Tout s’exécute sur cet appareil : l’audio ne le quitte jamais. Les modèles plus grands sont plus précis mais plus lents.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Rapide sur tout appareil. Convient à une voix claire mais fait plus d’erreurs.',
+        },
+        small: {
+          label: 'Petit',
+          description:
+            'Plus précis que Base. Fonctionne bien sur la plupart des tablettes et ordinateurs.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'Le plus précis. Ordinateurs uniquement, idéal avec un GPU. La transcription en direct peut prendre du retard sur les machines anciennes.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Télécharger',
+      included: 'Inclus',
+      delete: 'Supprimer le modèle',
+      downloadFailed: 'Échec du téléchargement du modèle',
     },
     privacy: {
       title: 'Confidentialité',

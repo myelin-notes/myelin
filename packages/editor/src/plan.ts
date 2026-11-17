@@ -15,7 +15,12 @@ export function planLimit(limit: PlanLimit): number {
   return PLAN_LIMITS[isPro() ? 'pro' : 'free'][limit];
 }
 
-export type ProFeature = 'agents' | 'code' | 'canvasImage' | 'limits';
+export type ProFeature =
+  | 'agents'
+  | 'code'
+  | 'canvasImage'
+  | 'transcription'
+  | 'limits';
 
 let upgradePrompt: ((feature: ProFeature) => void) | null = null;
 
