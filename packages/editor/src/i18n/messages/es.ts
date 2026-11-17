@@ -38,6 +38,11 @@ const es: typeof en = {
         description:
           'Descarga modelos más grandes, en el propio dispositivo, que transcriben con más precisión, sobre todo fuera del inglés.',
       },
+      handwriting: {
+        title: 'Busca en tu escritura a mano',
+        description:
+          'Encuentra con la búsqueda del lienzo las palabras que escribiste a mano. La tinta se reconoce en tu dispositivo.',
+      },
       limits: {
         title: 'Límites más altos',
         description:

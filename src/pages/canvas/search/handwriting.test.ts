@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
+import { UserPrefs } from '@myelin/editor/user-prefs';
 import type { HandwritingStroke } from '@/platform/tauri/handwriting';
 import { HandwritingIndex } from './handwriting';
 
@@ -38,6 +39,18 @@ function storeWith(saved: Record<string, string> = {}) {
 describe('HandwritingIndex', () => {
   beforeEach(() => {
     recognizeHandwriting.mockReset();
+    UserPrefs.set('plan', 'pro');
+  });
+
+  it('recognizes nothing without Pro', async () => {
+    UserPrefs.set('plan', 'free');
+
+    await expect(
+      new HandwritingIndex(storeWith(), 'note').collect(
+        canvasOf(letter('free', 0, 0)),
+      ),
+    ).resolves.toEqual([]);
+    expect(recognizeHandwriting).not.toHaveBeenCalled();
   });
 
   it('recognizes a paragraph as one block and only re-sends new ink', async () => {

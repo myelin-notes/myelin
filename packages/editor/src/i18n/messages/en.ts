@@ -36,6 +36,11 @@ const en = {
         description:
           'Download larger on-device models that transcribe more accurately, especially outside English.',
       },
+      handwriting: {
+        title: 'Search your handwriting',
+        description:
+          'Find words you wrote by hand with canvas search. Ink is recognized on your device.',
+      },
       limits: {
         title: 'Higher limits',
         description:

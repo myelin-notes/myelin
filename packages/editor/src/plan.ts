@@ -20,6 +20,7 @@ export type ProFeature =
   | 'code'
   | 'canvasImage'
   | 'transcription'
+  | 'handwriting'
   | 'limits';
 
 let upgradePrompt: ((feature: ProFeature) => void) | null = null;

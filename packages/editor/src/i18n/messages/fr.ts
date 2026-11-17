@@ -39,6 +39,11 @@ const fr: typeof en = {
         description:
           'Téléchargez des modèles plus grands, sur l’appareil, qui transcrivent plus fidèlement, surtout hors anglais.',
       },
+      handwriting: {
+        title: 'Recherchez dans votre écriture manuscrite',
+        description:
+          'Retrouvez avec la recherche du canevas les mots écrits à la main. L’encre est reconnue sur votre appareil.',
+      },
       limits: {
         title: 'Des limites plus hautes',
         description:

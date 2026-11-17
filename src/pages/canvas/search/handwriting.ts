@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
+import { isPro } from '@myelin/editor/plan';
 import { Logger } from '@myelin/shared/logger';
 import type { NativeRepository, VFSNodeId } from '@/lib/sync';
 import {
@@ -103,13 +104,16 @@ export class HandwritingIndex {
   ) {}
 
   /**
-   * One source per block of ink with recognized text. `onSources` gets the saved blocks at once,
+   * One source per block of ink with recognized text; none without Pro. `onSources` gets the saved blocks at once,
    * then each new block as it's recognized.
    */
   async collect(
     dc: DrawableCanvas,
     onSources: (sources: CanvasSearchSource[]) => void = () => {},
   ): Promise<CanvasSearchSource[]> {
+    if (!isPro()) {
+      return [];
+    }
     const texts = await this.load();
     const strokes = dc.elements.filter(
       (element): element is StrokeElement => element instanceof StrokeElement,

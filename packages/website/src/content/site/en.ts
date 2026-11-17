@@ -190,7 +190,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, and higher limits. Your notes are never paywalled.
+Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, handwriting search, and higher limits. Your notes are never paywalled.
 
 ## Where are my notes stored?
 
@@ -245,6 +245,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'A stroke eraser or a precise one that erases only what it touches',
           'Rectangle or lasso selection, then move, copy, lock, or reorder',
           'Custom colors you save once and reuse, and typed text in your choice of font',
+          'With Pro, find words you wrote by hand, recognized on your device (not yet on Linux)',
         ],
       },
       pdfs: {
@@ -447,7 +448,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   pricing: {
     meta: {
       title: 'Pricing | Myelin Notes',
-      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, and higher limits.`,
+      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, handwriting search, and higher limits.`,
     },
     eyebrow: 'Pricing',
     headline: 'Free to use. Pro when you want more.',
@@ -481,6 +482,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         'Unlimited custom pen presets',
         'Your own images as canvas backgrounds',
         'More accurate transcription models',
+        'Search your handwriting',
         'Support Myelin’s development',
       ],
       cta: 'Buy Pro',

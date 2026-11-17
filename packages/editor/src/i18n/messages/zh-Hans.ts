@@ -34,6 +34,10 @@ const zhHans: typeof en = {
         title: '更准确的转写',
         description: '下载更大的本地模型，转写更准确，尤其是英语以外的语言。',
       },
+      handwriting: {
+        title: '搜索手写内容',
+        description: '用画布搜索找到你手写的文字。笔迹在你的设备上识别。',
+      },
       limits: {
         title: '更高的上限',
         description:

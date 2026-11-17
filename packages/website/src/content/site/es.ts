@@ -193,7 +193,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
+Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, que añade agentes de IA por MCP, ejecución de código, búsqueda en la escritura a mano y límites más altos. Tus notas nunca quedan tras un muro de pago.
 
 ## ¿Dónde se guardan mis notas?
 
@@ -249,6 +249,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Una goma de trazos o una precisa que borra solo lo que toca',
           'Selección por rectángulo o lazo, para mover, copiar, bloquear o reordenar',
           'Colores personalizados que guardas una vez y reutilizas, y texto con la fuente que elijas',
+          'Con Pro, encuentra las palabras que escribiste a mano, reconocidas en tu dispositivo (aún no en Linux)',
         ],
       },
       pdfs: {
@@ -451,7 +452,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   pricing: {
     meta: {
       title: 'Precios | Myelin Notes',
-      description: `Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.`,
+      description: `Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, con agentes de IA por MCP, ejecución de código, búsqueda en la escritura a mano y límites más altos.`,
     },
     eyebrow: 'Precios',
     headline: 'Gratis para usar. Pro cuando quieras más.',
@@ -485,6 +486,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         'Ajustes de lápiz personalizados ilimitados',
         'Tus propias imágenes como fondo del lienzo',
         'Modelos de transcripción más precisos',
+        'Búsqueda en tu escritura a mano',
         'Apoya el desarrollo de Myelin',
       ],
       cta: 'Comprar Pro',

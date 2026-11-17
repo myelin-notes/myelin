@@ -185,7 +185,7 @@ const fr: SiteCopy = {
 
 ## Est-ce vraiment gratuit ?
 
-Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
+Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code, la recherche dans l’écriture manuscrite et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
 
 ## Où sont stockées mes notes ?
 
@@ -241,6 +241,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Une gomme par trait, ou une gomme précise qui n’efface que ce qu’elle touche',
           'Sélection au rectangle ou au lasso, pour déplacer, copier, verrouiller ou réordonner',
           'Des couleurs personnalisées enregistrées une fois pour toutes, et du texte dans la police de votre choix',
+          'Avec Pro, retrouvez les mots écrits à la main, reconnus sur votre appareil (pas encore sous Linux)',
         ],
       },
       pdfs: {
@@ -444,7 +445,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
   pricing: {
     meta: {
       title: 'Tarifs | Myelin Notes',
-      description: `Myelin Notes est gratuit pour un usage personnel. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, pour les agents IA via MCP, l’exécution de code et des limites plus élevées.`,
+      description: `Myelin Notes est gratuit pour un usage personnel. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, pour les agents IA via MCP, l’exécution de code, la recherche dans l’écriture manuscrite et des limites plus élevées.`,
     },
     eyebrow: 'Tarifs',
     headline: 'Gratuit à l’usage. Pro quand vous voulez plus.',
@@ -478,6 +479,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         'Préréglages de stylo personnalisés illimités',
         'Vos propres images en fond de canevas',
         'Modèles de transcription plus précis',
+        'Recherche dans votre écriture manuscrite',
         'Soutenir le développement de Myelin',
       ],
       cta: 'Acheter Pro',

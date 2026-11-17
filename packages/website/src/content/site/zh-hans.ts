@@ -182,7 +182,7 @@ const zhHans: SiteCopy = {
 
 ## 真的免费吗？
 
-是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
+是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，增加通过 MCP 连接的 AI 智能体、代码运行、手写搜索和更高的上限。你的笔记永不被付费墙锁住。
 
 ## 我的笔记保存在哪里？
 
@@ -237,6 +237,7 @@ const zhHans: SiteCopy = {
           '整笔擦除的橡皮擦，或只擦触碰部分的精细橡皮擦',
           '矩形或套索选择，然后移动、复制、锁定或调整层级',
           '自定义颜色保存一次即可反复使用，文字可选用你喜欢的字体',
+          'Pro 可搜索你手写的文字，笔迹在设备上识别（暂不支持 Linux）',
         ],
       },
       pdfs: {
@@ -439,7 +440,7 @@ const zhHans: SiteCopy = {
   pricing: {
     meta: {
       title: '价格 | Myelin Notes',
-      description: `Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。`,
+      description: `Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，提供通过 MCP 连接的 AI 智能体、代码运行、手写搜索和更高的上限。`,
     },
     eyebrow: '价格',
     headline: '免费使用，需要更多时再升级 Pro',
@@ -473,6 +474,7 @@ const zhHans: SiteCopy = {
         '不限数量的自定义笔预设',
         '使用你自己的图片作为画布背景',
         '更准确的转写模型',
+        '搜索手写内容',
         '支持 Myelin 的开发',
       ],
       cta: '购买 Pro',
