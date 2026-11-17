@@ -32,6 +32,7 @@ export function TranscriptionSection() {
   const strings = useMessages();
   const sectionStrings = strings.settings.transcription;
   const selectedModel = useUserPref('transcriptionModel');
+  const pro = useUserPref('plan') === 'pro';
   const [models, setModels] = useState<TranscriptionModelInfo[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
 
@@ -65,7 +66,6 @@ export function TranscriptionSection() {
     };
   }, [refresh]);
 
-  // A model downloaded before the user lost Pro stays selectable; only new downloads are gated.
   const handleDownload = async (id: string) => {
     if (!isPro()) {
       promptUpgrade('transcription');
@@ -108,9 +108,10 @@ export function TranscriptionSection() {
     await refresh();
   };
 
-  // A selected model that is no longer on disk transcribes with the bundled one; show that.
+  // Without Pro, or once the selected model is off disk, transcription uses the bundled one; show that.
   const activeModel =
-    models.find((m) => m.id === selectedModel && m.downloaded)?.id ?? 'base';
+    (pro && models.find((m) => m.id === selectedModel && m.downloaded)?.id) ||
+    'base';
 
   return (
     <section id="transcription" className="scroll-mt-12">
@@ -154,6 +155,10 @@ export function TranscriptionSection() {
                   aria-checked={active}
                   disabled={!model.downloaded}
                   onClick={() => {
+                    if (model.downloadable && !pro) {
+                      promptUpgrade('transcription');
+                      return;
+                    }
                     UserPrefs.set('transcriptionModel', model.id);
                     trackEvent('transcription_model_selected', {
                       model: model.id,

@@ -1,3 +1,4 @@
+import { isPro } from '@myelin/editor/plan';
 import type {
   AudioTranscriptionSession,
   TranscriptionCapability,
@@ -85,7 +86,7 @@ async function openSession(
     await session.startListening();
     await invoke('start_audio_transcription', {
       sessionId: session.sessionId,
-      modelId: UserPrefs.get('transcriptionModel'),
+      modelId: isPro() ? UserPrefs.get('transcriptionModel') : 'base',
     });
     if (stream) {
       await session.startCapture(stream);
