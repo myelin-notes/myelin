@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Download, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMessages } from '@myelin/editor/i18n';
+import { isPro, promptUpgrade } from '@myelin/editor/plan';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
@@ -64,7 +65,12 @@ export function TranscriptionSection() {
     };
   }, [refresh]);
 
+  // A model downloaded before the user lost Pro stays selectable; only new downloads are gated.
   const handleDownload = async (id: string) => {
+    if (!isPro()) {
+      promptUpgrade('transcription');
+      return;
+    }
     setModels((current) =>
       current.map((m) => (m.id === id ? { ...m, downloading: true } : m)),
     );

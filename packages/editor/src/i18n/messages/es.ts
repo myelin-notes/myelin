@@ -33,6 +33,11 @@ const es: typeof en = {
         title: 'Tu propio fondo de lienzo',
         description: 'Usa cualquier imagen como fondo detrás de tus notas.',
       },
+      transcription: {
+        title: 'Transcripción más precisa',
+        description:
+          'Descarga modelos más grandes, en el propio dispositivo, que transcriben con más precisión, sobre todo fuera del inglés.',
+      },
       limits: {
         title: 'Límites más altos',
         description:

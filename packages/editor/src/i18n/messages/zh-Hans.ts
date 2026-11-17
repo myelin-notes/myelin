@@ -30,6 +30,10 @@ const zhHans: typeof en = {
         title: '自定义画布背景',
         description: '将任意图片用作笔记背后的背景。',
       },
+      transcription: {
+        title: '更准确的转写',
+        description: '下载更大的本地模型，转写更准确，尤其是英语以外的语言。',
+      },
       limits: {
         title: '更高的上限',
         description:

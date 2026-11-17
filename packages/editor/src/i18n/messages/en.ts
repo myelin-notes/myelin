@@ -31,6 +31,11 @@ const en = {
         title: 'Your own canvas background',
         description: 'Use any image as the background behind your notes.',
       },
+      transcription: {
+        title: 'More accurate transcription',
+        description:
+          'Download larger on-device models that transcribe more accurately, especially outside English.',
+      },
       limits: {
         title: 'Higher limits',
         description:

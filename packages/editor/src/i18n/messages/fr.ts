@@ -34,6 +34,11 @@ const fr: typeof en = {
         description:
           'Utilisez n’importe quelle image comme fond sous vos notes.',
       },
+      transcription: {
+        title: 'Transcription plus précise',
+        description:
+          'Téléchargez des modèles plus grands, sur l’appareil, qui transcrivent plus fidèlement, surtout hors anglais.',
+      },
       limits: {
         title: 'Des limites plus hautes',
         description:
