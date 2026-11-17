@@ -88,7 +88,10 @@ import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
-import { HandwritingIndex } from './search/handwriting';
+import {
+  HandwritingIndex,
+  useBackgroundHandwriting,
+} from './search/handwriting';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -252,6 +255,8 @@ function CanvasViewInner({
     canvas.setRulerVisible(!rulerVisible);
     setRulerCanvas(rulerVisible ? null : canvas);
   }, [engine.drawableCanvas, rulerVisible]);
+
+  useBackgroundHandwriting(engine.drawableCanvas, handwriting);
 
   useEffect(() => {
     engine.drawableCanvas?.setFlagTypes(flagTypes);

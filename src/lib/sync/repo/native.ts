@@ -986,14 +986,19 @@ export class NativeRepository implements Repository {
       : {};
   }
 
-  /** Replaces the canvas's saved handwriting; a no-op before indexing starts. */
+  /** Replaces the canvas's saved handwriting and reindexes it; a no-op before indexing starts. */
   async saveHandwritingText(
     id: VFSNodeId,
     texts: Record<string, string>,
   ): Promise<void> {
     const repoId = noteContentIndex.repoIdFor(this);
-    if (repoId) {
-      await invoke('write_handwriting_text', { repoId, nodeId: id, texts });
+    if (!repoId) {
+      return;
+    }
+    await invoke('write_handwriting_text', { repoId, nodeId: id, texts });
+    const path = await this.getStoredAbsolutePath(id);
+    if (path) {
+      noteContentIndex.queueSaved(this, id, path);
     }
   }
 

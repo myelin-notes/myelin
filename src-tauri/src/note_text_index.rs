@@ -74,6 +74,22 @@ fn read_all(mut file: std::fs::File) -> Result<Vec<u8>, String> {
 }
 
 fn index_file_at(cache_file: &Path, source: &Path, force: bool) -> Result<String, String> {
+    let text = note_text_at(cache_file, source, force)?;
+    // Read on every index, not cached with the note's text: the canvas saves it after recognizing,
+    // independently of note saves.
+    let handwriting = read_handwriting(&handwriting_cache_path(cache_file.to_path_buf()));
+    Ok(std::iter::once(text)
+        .chain(
+            handwriting
+                .into_values()
+                .map(|block| block.split_whitespace().collect::<Vec<_>>().join(" ")),
+        )
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n"))
+}
+
+fn note_text_at(cache_file: &Path, source: &Path, force: bool) -> Result<String, String> {
     let (file, stamp) = open_source(source)?;
     let old = std::fs::read(&cache_file)
         .ok()
@@ -585,6 +601,27 @@ mod tests {
         std::fs::write(&source, bytes).unwrap();
         assert_eq!(index_file_at(&cache, &source, true).unwrap(), "new fox");
         assert_ne!(std::fs::read(&cache).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn includes_handwriting_saved_after_the_note_was_indexed() {
+        let dir = std::env::temp_dir().join(format!(
+            "myelin-note-index-handwriting-test-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("note.mcanvas");
+        let cache = dir.join("note.json");
+        std::fs::write(&source, []).unwrap();
+        assert_eq!(index_file_at(&cache, &source, false).unwrap(), "");
+
+        std::fs::write(
+            dir.join("note.handwriting.json"),
+            r#"{"a:2":"Hello\nJosh","b:2":""}"#,
+        )
+        .unwrap();
+        assert_eq!(index_file_at(&cache, &source, false).unwrap(), "Hello Josh");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

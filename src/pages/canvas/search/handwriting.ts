@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { StrokeElement } from '@myelin/editor/elements/stroke-element';
 import { Logger } from '@myelin/shared/logger';
@@ -9,6 +10,9 @@ import {
 import type { CanvasSearchRect, CanvasSearchSource } from './collect';
 
 const logger = new Logger('HandwritingSearch');
+
+// A pause mid-line only costs one extra recognition: the next stroke changes the block's key.
+const BACKGROUND_IDLE_MS = 3_000;
 
 // Strokes closer than these multiples of the median stroke height share a block: joins letters,
 // words and the lines of a paragraph, while a blank line or separate note starts a new block. Word
@@ -95,6 +99,7 @@ export class HandwritingIndex {
   // By block key: member uuids + point counts, so edits re-recognize but moves don't.
   private texts: Promise<Map<string, string>> | null = null;
   private readonly recognizing = new Map<string, Promise<void>>();
+  private warned = false;
 
   constructor(
     private readonly store: HandwritingStore,
@@ -149,7 +154,11 @@ export class HandwritingIndex {
       try {
         await this.recognize(texts, block);
       } catch (error) {
-        logger.warn('Handwriting recognition failed', error);
+        // Once per canvas: platforms without a recognizer fail every background pass.
+        if (!this.warned) {
+          this.warned = true;
+          logger.warn('Handwriting recognition failed', error);
+        }
         break;
       }
       changed = true;
@@ -201,4 +210,30 @@ export class HandwritingIndex {
     );
     return this.texts;
   }
+}
+
+/** Recognizes new ink once the canvas has been still a while, so library search can find it. */
+export function useBackgroundHandwriting(
+  dc: DrawableCanvas | null,
+  handwriting: HandwritingIndex,
+): void {
+  useEffect(() => {
+    if (!dc) {
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(
+        () => void handwriting.collect(dc),
+        BACKGROUND_IDLE_MS,
+      );
+    };
+    schedule();
+    dc.ydoc.elements.observeDeep(schedule);
+    return () => {
+      clearTimeout(timer);
+      dc.ydoc.elements.unobserveDeep(schedule);
+    };
+  }, [dc, handwriting]);
 }
