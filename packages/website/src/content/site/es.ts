@@ -408,6 +408,11 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         body: 'La ventana de chat representa la app de IA que uses: no forma parte de Myelin. A través de MCP en tu equipo, lee tu escritura a mano y añade al lienzo una página con un resumen escrito.',
         alt: 'Una app de IA independiente lee por MCP notas escritas a mano en Myelin y añade a su lado una página con un resumen escrito',
       },
+      handwritingSearch: {
+        title: 'Busca en tu escritura a mano',
+        body: 'Con Pro, Buscar en el lienzo encuentra las palabras que escribiste a mano, y la búsqueda de la biblioteca también. La tinta se reconoce en tu dispositivo.',
+        alt: 'Al escribir «entropy» en Buscar, salta a cada nota manuscrita que la menciona y la selecciona',
+      },
     },
     notes: [
       {

@@ -404,6 +404,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         body: 'The chat window here stands in for whichever AI app you use: it is not part of Myelin. Over MCP on your machine, it reads your handwriting and adds a typed summary page to the canvas.',
         alt: 'A separate AI app reads handwritten notes in Myelin over MCP and adds a typed summary page beside them',
       },
+      handwritingSearch: {
+        title: 'Search your handwriting',
+        body: 'With Pro, Find on the canvas matches the words you wrote by hand, and library search finds them too. Ink is recognized on your device.',
+        alt: 'Typing “entropy” into Find jumps to each handwritten note that mentions it and selects it',
+      },
     },
     notes: [
       {

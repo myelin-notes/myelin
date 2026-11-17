@@ -7,6 +7,7 @@ import { Button } from '@myelin/ui/button';
 import agentsDemo from '@/assets/upsell/agents.webp';
 import canvasImageDemo from '@/assets/upsell/canvas-image.webp';
 import codeDemo from '@/assets/upsell/code.webp';
+import handwritingDemo from '@/assets/upsell/handwriting.webp';
 import limitsDemo from '@/assets/upsell/limits.webp';
 import transcriptionDemo from '@/assets/upsell/transcription.webp';
 import {
@@ -20,13 +21,12 @@ import { buyPro } from '@/lib/license';
 import { useTabController } from '@/lib/tabs/context';
 
 // Same encoding as the What's New demos (see WhatsNewPage.image).
-const DEMOS: Record<ProFeature, string | null> = {
+const DEMOS: Record<ProFeature, string> = {
   agents: agentsDemo,
   code: codeDemo,
   canvasImage: canvasImageDemo,
   transcription: transcriptionDemo,
-  // shortcut: no demo recorded yet, add handwriting.webp when there is one.
-  handwriting: null,
+  handwriting: handwritingDemo,
   limits: limitsDemo,
 };
 const FEATURES = Object.keys(DEMOS) as ProFeature[];
@@ -81,13 +81,11 @@ export function UpgradeDialog() {
         </DialogHeader>
 
         <div className="flex min-h-32 flex-col gap-2">
-          {DEMOS[feature] && (
-            <img
-              src={DEMOS[feature]}
-              alt=""
-              className="mb-3 w-full rounded-lg border border-border-subtle"
-            />
-          )}
+          <img
+            src={DEMOS[feature]}
+            alt=""
+            className="mb-3 w-full rounded-lg border border-border-subtle"
+          />
           <p className="font-semibold text-base text-text-primary">
             {page.title}
           </p>

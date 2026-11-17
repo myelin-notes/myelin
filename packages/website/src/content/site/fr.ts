@@ -401,6 +401,11 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         body: 'La fenêtre de discussion représente l’app d’IA que vous utilisez : elle ne fait pas partie de Myelin. Via MCP sur votre machine, elle lit votre écriture manuscrite et ajoute au canevas une page de résumé tapé.',
         alt: 'Une app d’IA distincte lit des notes manuscrites dans Myelin via MCP et ajoute à côté une page de résumé tapé',
       },
+      handwritingSearch: {
+        title: 'Recherchez dans votre écriture',
+        body: 'Avec Pro, la recherche du canevas trouve les mots écrits à la main, et la recherche de la bibliothèque aussi. L’encre est reconnue sur votre appareil.',
+        alt: 'Taper « entropy » dans Rechercher mène à chaque note manuscrite qui le contient et la sélectionne',
+      },
     },
     notes: [
       {
