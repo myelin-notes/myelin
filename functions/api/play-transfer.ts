@@ -149,7 +149,8 @@ export async function onRequestPost({
     }
     const found = await transferKey(
       polar,
-      env,
+      env.POLAR_ORGANIZATION_ID,
+      env.POLAR_APP_STORE_PRODUCT_ID,
       PLAY_METADATA_KEY,
       body.transactionId,
       email,

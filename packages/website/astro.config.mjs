@@ -19,6 +19,7 @@ export default defineConfig({
     // Groups each page with its translations in the sitemap, so a crawler that
     // finds one language is told about the others.
     sitemap({
+      filter: (page) => !page.includes('/admin'),
       i18n: {
         defaultLocale: 'en',
         locales: { en: 'en', es: 'es', fr: 'fr', 'zh-hans': 'zh-Hans' },

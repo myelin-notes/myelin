@@ -53,7 +53,7 @@ if (isDevBuild && !env.VITE_WEBSITE_URL) {
     .toString()
     .trim();
   // Only preview-* branches get a Pages preview deployment.
-  if (branch.startsWith('preview-')) {
+  if (branch === 'main' || branch.startsWith('preview-')) {
     // Cloudflare's branch alias rule: lowercase, non-alphanumerics to '-', max 28 chars.
     const alias = branch
       .toLowerCase()
