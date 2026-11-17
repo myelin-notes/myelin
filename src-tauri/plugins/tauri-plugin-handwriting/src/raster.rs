@@ -26,7 +26,7 @@ fn render(strokes: &[Stroke]) -> Option<(Vec<u8>, u32, u32)> {
     let (mut min_x, mut min_y) = (f32::INFINITY, f32::INFINITY);
     let (mut max_x, mut max_y) = (f32::NEG_INFINITY, f32::NEG_INFINITY);
     for stroke in strokes {
-        for point in stroke.points.chunks_exact(2) {
+        for point in stroke.points.as_chunks::<2>().0 {
             min_x = min_x.min(point[0]);
             min_y = min_y.min(point[1]);
             max_x = max_x.max(point[0]);
@@ -52,7 +52,9 @@ fn render(strokes: &[Stroke]) -> Option<(Vec<u8>, u32, u32)> {
         let radius = (stroke.width * scale).max(MIN_LINE_WIDTH_PX) / 2.0;
         let points: Vec<(f32, f32)> = stroke
             .points
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|point| to_px(point[0], point[1]))
             .collect();
         match points.as_slice() {

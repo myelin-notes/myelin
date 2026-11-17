@@ -1,8 +1,8 @@
 //! On-device handwriting recognition as a Tauri plugin.
 //!
 //! Callers send ink as strokes on every platform; each backend decides whether it reads them as
-//! strokes or as a rendered image. Apple platforms render the strokes and run Vision. Other
-//! platforms reject `recognize` until they get a backend.
+//! strokes or as a rendered image. Apple platforms render the strokes and run Vision; Windows
+//! feeds them to Windows Ink. Other platforms reject `recognize` until they get a backend.
 
 use serde::Deserialize;
 use tauri::{
@@ -12,8 +12,12 @@ use tauri::{
 
 #[cfg(target_vendor = "apple")]
 mod apple;
-#[cfg(any(target_vendor = "apple", test))]
+#[cfg(target_vendor = "apple")]
 mod raster;
+#[cfg(all(test, any(target_vendor = "apple", windows)))]
+mod test_ink;
+#[cfg(windows)]
+mod windows_ink;
 
 #[derive(Deserialize)]
 pub struct Stroke {
@@ -23,7 +27,7 @@ pub struct Stroke {
     pub width: f32,
 }
 
-/// One string per block, in input order. Lines within a block are joined with `\n`.
+/// One string per block, in input order; lines or words within a block are whitespace-separated.
 #[tauri::command]
 async fn recognize(blocks: Vec<Vec<Stroke>>) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -44,7 +48,12 @@ fn recognize_block(strokes: &[Stroke]) -> Result<String, String> {
     }
 }
 
-#[cfg(not(target_vendor = "apple"))]
+#[cfg(windows)]
+fn recognize_block(strokes: &[Stroke]) -> Result<String, String> {
+    windows_ink::recognize(strokes)
+}
+
+#[cfg(not(any(target_vendor = "apple", windows)))]
 fn recognize_block(_strokes: &[Stroke]) -> Result<String, String> {
     Err("handwriting recognition is not available on this platform".into())
 }
