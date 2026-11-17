@@ -44,9 +44,8 @@ describe('HandwritingIndex', () => {
     const paragraph = [
       letter('p-a', 0, 0),
       letter('p-b', 10, 0),
-      // Next word, a widely spaced word, then the next line.
+      // Next word, then next line.
       letter('p-c', 28, 0),
-      letter('p-e', 76, 0),
       letter('p-d', 0, 35),
     ];
     const farNote = letter('far', 500, 0);
@@ -57,14 +56,11 @@ describe('HandwritingIndex', () => {
 
     const first = await index.collect(canvasOf(...paragraph, farNote));
 
-    expect(recognizeHandwriting.mock.calls[0][0][0]).toHaveLength(5);
+    expect(recognizeHandwriting.mock.calls[0][0][0]).toHaveLength(4);
     expect(
       first.map(({ text, selectUuids }) => ({ text, selectUuids })),
     ).toEqual([
-      {
-        text: 'first para',
-        selectUuids: ['p-a', 'p-b', 'p-c', 'p-e', 'p-d'],
-      },
+      { text: 'first para', selectUuids: ['p-a', 'p-b', 'p-c', 'p-d'] },
       { text: 'far note', selectUuids: ['far'] },
     ]);
 

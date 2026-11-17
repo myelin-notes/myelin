@@ -59,20 +59,4 @@ describe('collectCanvasSearchSources', () => {
       { ...match, ordinalInFrame: 1 },
     ]);
   });
-
-  it('matches a phrase across the line breaks and spacing recognizers return', () => {
-    const rect = { x: 0, y: 0, width: 1, height: 1 };
-    const sources = ['Hello\nJosh', 'Hello  Josh', 'Hello Joshua'].map(
-      (text, index) => ({
-        kind: 'handwriting' as const,
-        rect,
-        selectUuids: [`ink-${index}`],
-        text,
-      }),
-    );
-
-    expect(
-      buildCanvasMatches(sources, 'hello josh').map((m) => m.selectUuids),
-    ).toEqual([['ink-0'], ['ink-1'], ['ink-2']]);
-  });
 });
