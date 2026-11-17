@@ -44,8 +44,9 @@ describe('HandwritingIndex', () => {
     const paragraph = [
       letter('p-a', 0, 0),
       letter('p-b', 10, 0),
-      // Next word, then next line.
+      // Next word, a widely spaced word, then the next line.
       letter('p-c', 28, 0),
+      letter('p-e', 76, 0),
       letter('p-d', 0, 35),
     ];
     const farNote = letter('far', 500, 0);
@@ -58,7 +59,10 @@ describe('HandwritingIndex', () => {
     expect(
       first.map(({ text, selectUuids }) => ({ text, selectUuids })),
     ).toEqual([
-      { text: 'first para', selectUuids: ['p-a', 'p-b', 'p-c', 'p-d'] },
+      {
+        text: 'first para',
+        selectUuids: ['p-a', 'p-b', 'p-c', 'p-e', 'p-d'],
+      },
       { text: 'far note', selectUuids: ['far'] },
     ]);
 

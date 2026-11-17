@@ -92,8 +92,11 @@ export function collectCanvasSearchSources(
   return sources;
 }
 
+const collapseSpaces = (text: string) => text.replace(/\s+/g, ' ');
+
 // Literal, case-insensitive. Page frames and PDF pages contribute one match per occurrence; other
-// sources contribute one match when their text contains the query.
+// sources contribute one match when their text contains the query, any run of whitespace matching
+// any other (recognizers join handwritten lines with `\n`, words with one or more spaces).
 export function buildCanvasMatches(
   sources: CanvasSearchSource[],
   query: string,
@@ -103,6 +106,7 @@ export function buildCanvasMatches(
     return [];
   }
 
+  const spacedNeedle = collapseSpaces(needle);
   const matches: CanvasMatch[] = [];
   for (const source of sources) {
     if (source.kind === 'page-frame' && source.doc) {
@@ -128,7 +132,10 @@ export function buildCanvasMatches(
           ordinalInFrame: index,
         });
       }
-    } else if (source.text?.toLowerCase().includes(needle)) {
+    } else if (
+      source.text &&
+      collapseSpaces(source.text.toLowerCase()).includes(spacedNeedle)
+    ) {
       matches.push({
         kind: source.kind,
         rect: source.rect,

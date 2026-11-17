@@ -10,14 +10,18 @@ import type { CanvasSearchRect, CanvasSearchSource } from './collect';
 
 const logger = new Logger('HandwritingSearch');
 
-// Strokes closer than one median stroke height share a block: joins letters, words and the lines
-// of a paragraph, while a blank line or separate note starts a new block.
-const BLOCK_GAP_RATIO = 1;
+// Strokes closer than these multiples of the median stroke height share a block: joins letters,
+// words and the lines of a paragraph, while a blank line or separate note starts a new block. Word
+// gaps can exceed a letter's height (finger-written "Hello Josh" split in two at 1x), hence wider.
+const WORD_GAP_RATIO = 3;
+const LINE_GAP_RATIO = 1;
 
 function groupNearbyStrokes(strokes: StrokeElement[]): StrokeElement[][] {
   const boxes = strokes.map((stroke) => stroke.boundingBox);
   const heights = boxes.map((box) => box.height).sort((a, b) => a - b);
-  const reach = (heights[heights.length >> 1] ?? 0) * BLOCK_GAP_RATIO;
+  const median = heights[heights.length >> 1] ?? 0;
+  const across = median * WORD_GAP_RATIO;
+  const down = median * LINE_GAP_RATIO;
 
   const parent = strokes.map((_, index) => index);
   const root = (start: number): number => {
@@ -35,10 +39,10 @@ function groupNearbyStrokes(strokes: StrokeElement[]): StrokeElement[][] {
     const a = boxes[byLeft[i]];
     for (let j = i + 1; j < byLeft.length; j++) {
       const b = boxes[byLeft[j]];
-      if (b.left > a.right + reach) {
+      if (b.left > a.right + across) {
         break;
       }
-      if (b.top <= a.bottom + reach && a.top <= b.bottom + reach) {
+      if (b.top <= a.bottom + down && a.top <= b.bottom + down) {
         parent[root(byLeft[i])] = root(byLeft[j]);
       }
     }
