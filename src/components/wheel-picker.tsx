@@ -40,6 +40,8 @@ export interface WheelPickerHandle {
     pointerId?: number;
   }) => void;
   hide: () => void;
+  /** Runs the focused slice's commands and hides; a no-op while hidden. */
+  commit: () => void;
   isVisible: () => boolean;
 }
 
@@ -184,11 +186,33 @@ export const WheelPicker = memo(function WheelPicker({
     setFocusPath([]);
   }, []);
 
-  useImperativeHandle(ref, () => ({ show, hide, isVisible: () => visible }), [
-    show,
-    hide,
-    visible,
-  ]);
+  const commit = useCallback(() => {
+    // Collect commands along the focus path
+    const commands: (() => void)[] = [];
+    let current: WheelItem[] | undefined = itemsRef.current;
+    for (const idx of focusPathRef.current) {
+      if (!current?.[idx]) {
+        break;
+      }
+      if (current[idx].command) {
+        commands.push(current[idx].command!);
+      }
+      current = current[idx].children;
+    }
+
+    // Execute leaf-to-root (options before tool switch)
+    for (let i = commands.length - 1; i >= 0; i--) {
+      commands[i]();
+    }
+
+    hide();
+  }, [hide]);
+
+  useImperativeHandle(
+    ref,
+    () => ({ show, hide, commit, isVisible: () => visible }),
+    [show, hide, commit, visible],
+  );
 
   /* ── Pointer tracking ────────────────────────────── */
 
@@ -285,32 +309,7 @@ export const WheelPicker = memo(function WheelPicker({
       if (evt.pointerId !== openedByRef.current) {
         return;
       }
-
-      const its = itemsRef.current;
-      const fp = focusPathRef.current;
-
-      // Collect commands along the focus path
-      const commands: (() => void)[] = [];
-      let current: WheelItem[] | undefined = its;
-      for (const idx of fp) {
-        if (!current?.[idx]) {
-          break;
-        }
-        if (current[idx].command) {
-          commands.push(current[idx].command!);
-        }
-        current = current[idx].children;
-      }
-
-      // Execute leaf-to-root (options before tool switch)
-      for (let i = commands.length - 1; i >= 0; i--) {
-        commands[i]();
-      }
-
-      setVisible(false);
-      openedByRef.current = null;
-      focusPathRef.current = [];
-      setFocusPath([]);
+      commit();
     }
 
     // A wheel opened without a pointer (Apple Pencil squeeze) has no owner yet: the next pointer
@@ -338,7 +337,7 @@ export const WheelPicker = memo(function WheelPicker({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [visible, radius]);
+  }, [visible, radius, commit]);
 
   /* ── Derived rendering data ──────────────────────── */
 

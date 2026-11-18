@@ -363,7 +363,8 @@ export class CanvasInteractionController {
           this.state.update(event);
           return;
         }
-        if (event.button === 2) {
+        // Right and side buttons are left free for keybindings.
+        if (event.button !== 0) {
           return;
         }
     }

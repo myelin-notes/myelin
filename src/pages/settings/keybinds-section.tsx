@@ -1,8 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from 'react';
 import { Keyboard, RotateCcw } from 'lucide-react';
 import { KEYBINDS_RESET_EVENT } from '@myelin/editor/events';
 import { useMessages } from '@myelin/editor/i18n';
-import { type Action, type KeyCombo, registry } from '@myelin/editor/keybinds';
+import {
+  type Action,
+  formatKeyName,
+  type KeyCombo,
+  mouseButtonKey,
+  registry,
+} from '@myelin/editor/keybinds';
 import {
   getActionCategory,
   getActionCopy,
@@ -22,20 +34,30 @@ function keyParts(combo: KeyCombo): string[] {
   if (combo.alt) {
     parts.push(isApplePlatform ? '⌥' : 'Alt');
   }
-  const key =
-    combo.key === ' '
-      ? 'Space'
-      : combo.key.length === 1
-        ? combo.key.toUpperCase()
-        : combo.key;
-  parts.push(key);
+  parts.push(formatKeyName(combo.key));
   return parts;
 }
 
+function comboModifiers(e: KeyboardEvent | MouseEvent | React.KeyboardEvent) {
+  const combo: Omit<KeyCombo, 'key'> = {};
+  if (isApplePlatform ? e.metaKey : e.ctrlKey) {
+    combo.mod = true;
+  }
+  if (e.shiftKey) {
+    combo.shift = true;
+  }
+  if (e.altKey) {
+    combo.alt = true;
+  }
+  return combo;
+}
+
 function KeyCapture({
+  allowMouse,
   onCapture,
   onCancel,
 }: {
+  allowMouse: boolean;
   onCapture: (combo: KeyCombo) => void;
   onCancel: () => void;
 }) {
@@ -45,6 +67,30 @@ function KeyCapture({
   useEffect(() => {
     ref.current?.focus();
   }, []);
+
+  const captureMouse = useEffectEvent((e: MouseEvent) => {
+    e.preventDefault();
+    onCapture({ key: mouseButtonKey(e.button), ...comboModifiers(e) });
+  });
+
+  useEffect(() => {
+    if (!allowMouse) {
+      return;
+    }
+    // Left click stays unbindable: it cancels capture by blurring the button.
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) {
+        captureMouse(e);
+      }
+    };
+    const preventContextMenu = (e: MouseEvent) => e.preventDefault();
+    window.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener('contextmenu', preventContextMenu, true);
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener('contextmenu', preventContextMenu, true);
+    };
+  }, [allowMouse]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -61,18 +107,7 @@ function KeyCapture({
         return;
       }
 
-      const mod = isApplePlatform ? e.metaKey : e.ctrlKey;
-      const combo: KeyCombo = { key: e.key };
-      if (mod) {
-        combo.mod = true;
-      }
-      if (e.shiftKey) {
-        combo.shift = true;
-      }
-      if (e.altKey) {
-        combo.alt = true;
-      }
-      onCapture(combo);
+      onCapture({ key: e.key, ...comboModifiers(e) });
     },
     [onCapture, onCancel],
   );
@@ -85,7 +120,9 @@ function KeyCapture({
       onBlur={onCancel}
       className="fade-in-0 zoom-in-95 flex h-8 min-w-20 animate-in items-center justify-center rounded-lg bg-accent-navy px-4 font-semibold text-[10px] text-text-on-dark uppercase tracking-widest outline-none duration-100"
     >
-      {strings.settings.keybinds.pressKey}
+      {allowMouse
+        ? strings.settings.keybinds.pressKeyOrButton
+        : strings.settings.keybinds.pressKey}
     </button>
   );
 }
@@ -133,6 +170,8 @@ function KeybindRow({
 
       {capturing ? (
         <KeyCapture
+          // editor:* actions are ProseMirror keymaps, which never see mouse buttons.
+          allowMouse={!action.startsWith('editor:')}
           onCapture={handleCapture}
           onCancel={() => setCapturing(false)}
         />

@@ -723,6 +723,7 @@ const en = {
       title: 'Keybinds',
       resetAll: 'Reset all',
       pressKey: 'Press a key...',
+      pressKeyOrButton: 'Press a key or button...',
       unbound: 'Unbound',
       empty:
         'No keybindings registered yet. They appear once you open a canvas.',
@@ -783,6 +784,10 @@ const en = {
         'canvas:tool-flag': {
           label: 'Flag Tool',
           description: 'Place a flag',
+        },
+        'canvas:tool-wheel': {
+          label: 'Tool Wheel',
+          description: 'Open the tool wheel at the cursor',
         },
         'canvas:flag-previous': {
           label: 'Previous Flag',

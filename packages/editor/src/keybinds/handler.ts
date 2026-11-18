@@ -9,8 +9,9 @@ export interface ActionBinding {
   action: Action;
   /** Opt in for app-level shortcuts that should still work while typing. */
   allowEditable?: boolean;
-  onDown?: (e: KeyboardEvent) => void;
-  onUp?: (e: KeyboardEvent) => void;
+  /** Receives a `PointerEvent` when the action is bound to a mouse button. */
+  onDown?: (e: KeyboardEvent | PointerEvent) => void;
+  onUp?: (e: KeyboardEvent | PointerEvent) => void;
 }
 
 // Command palette items should only mirror bindings that behave like a single
@@ -22,7 +23,7 @@ function isCommandAction(binding: ActionBinding): binding is ActionBinding & {
 }
 
 /** Returns true if the event should be ignored (input fields, contenteditable). */
-function isEditableTarget(e: KeyboardEvent): boolean {
+function isEditableTarget(e: Event): boolean {
   const tag = (e.target as HTMLElement)?.tagName;
   return (
     tag === 'INPUT' ||
@@ -38,7 +39,7 @@ export class KeybindingHandler {
 
   constructor(
     private registry: KeybindingRegistry,
-    private filter: (e: KeyboardEvent) => boolean = (e) => !isEditableTarget(e),
+    private filter: (e: Event) => boolean = (e) => !isEditableTarget(e),
   ) {}
 
   register(bindings: ActionBinding[]): () => void {
@@ -110,6 +111,8 @@ export class KeybindingHandler {
     }
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointerup', this.onPointerUp);
     this.listening = true;
   }
 
@@ -119,6 +122,8 @@ export class KeybindingHandler {
     }
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('pointerdown', this.onPointerDown);
+    window.removeEventListener('pointerup', this.onPointerUp);
     this.listening = false;
   }
 
@@ -128,7 +133,7 @@ export class KeybindingHandler {
     }
   }
 
-  private onKeyDown = (e: KeyboardEvent) => {
+  private onKeyDown = (e: KeyboardEvent | PointerEvent) => {
     for (const b of this.bindings) {
       if (!b.allowEditable && isEditableTarget(e)) {
         continue;
@@ -142,7 +147,7 @@ export class KeybindingHandler {
     }
   };
 
-  private onKeyUp = (e: KeyboardEvent) => {
+  private onKeyUp = (e: KeyboardEvent | PointerEvent) => {
     for (const b of this.bindings) {
       if (!b.allowEditable && !this.filter(e)) {
         continue;
@@ -153,6 +158,19 @@ export class KeybindingHandler {
       if (matches) {
         b.onUp?.(e);
       }
+    }
+  };
+
+  // Pen barrel buttons report as mouse buttons too, but the canvas owns those.
+  private onPointerDown = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') {
+      this.onKeyDown(e);
+    }
+  };
+
+  private onPointerUp = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') {
+      this.onKeyUp(e);
     }
   };
 }

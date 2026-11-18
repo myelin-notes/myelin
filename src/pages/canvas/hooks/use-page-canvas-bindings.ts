@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent } from 'react';
 import type { DrawableCanvas } from '@myelin/editor/drawable-canvas';
 import { ElementType } from '@myelin/editor/elements/element-type';
+import { keybindings } from '@myelin/editor/keybinds';
 import type { WheelPickerHandle } from '@/components/wheel-picker';
 import type { EmbedFilesFn } from './use-embed-files';
 
@@ -48,18 +49,54 @@ export function usePageCanvasBindings({
     if (event.shiftKey) {
       return;
     }
+    // Runs before the window-level keybinding handler, so a bound mouse button reopens it after.
     if (event.pointerType === 'mouse') {
-      if (event.button === 2) {
-        wheelRef.current?.show(event);
-      } else {
-        wheelRef.current?.hide();
-      }
+      wheelRef.current?.hide();
       return;
     }
     if (event.pointerType === 'pen' && event.buttons & PEN_WHEEL_BUTTONS) {
       openToolWheel(event);
     }
   });
+
+  const handleToolWheelBinding = useEffectEvent(
+    (event: KeyboardEvent | PointerEvent, lastPointer: PointerEvent | null) => {
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        return;
+      }
+      if (event instanceof PointerEvent) {
+        if (event.target === canvas) {
+          openToolWheel(event);
+        }
+        return;
+      }
+      if (event.repeat) {
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      // A mouse keeps its pointerId, so hovering highlights and the next click commits; pen and
+      // touch get a new id per contact, so the wheel waits for one to land on it instead.
+      wheelRef.current?.show({
+        clientX: lastPointer?.clientX ?? rect.left + rect.width / 2,
+        clientY: lastPointer?.clientY ?? rect.top + rect.height / 2,
+        pointerId:
+          lastPointer?.pointerType === 'mouse'
+            ? lastPointer.pointerId
+            : undefined,
+      });
+    },
+  );
+
+  // A held key behaves like a held mouse button: release commits the hovered slice. A mouse
+  // button's own release is already handled by the wheel.
+  const handleToolWheelRelease = useEffectEvent(
+    (event: KeyboardEvent | PointerEvent) => {
+      if (!(event instanceof PointerEvent)) {
+        wheelRef.current?.commit();
+      }
+    },
+  );
 
   const penIsErasing = useEffectEvent(
     () => drawableCanvasRef.current?.penIsErasing ?? false,
@@ -129,6 +166,15 @@ export function usePageCanvasBindings({
     };
     document.addEventListener('keydown', handleKeyDown);
 
+    let lastPointer: PointerEvent | null = null;
+    const unregisterToolWheel = keybindings.register([
+      {
+        action: 'canvas:tool-wheel',
+        onDown: (event) => handleToolWheelBinding(event, lastPointer),
+        onUp: (event) => handleToolWheelRelease(event),
+      },
+    ]);
+
     // Tracked by pointer id: a palm resting on the screen emits its own moves, and those must not
     // cancel the hold.
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
@@ -179,6 +225,7 @@ export function usePageCanvasBindings({
     canvas.addEventListener('pointerdown', handlePointerDown);
 
     const handlePointerMove = (event: PointerEvent) => {
+      lastPointer = event;
       if (!hold || event.pointerId !== hold.id) {
         return;
       }
@@ -209,6 +256,7 @@ export function usePageCanvasBindings({
       cancelHold();
       canvas.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('keydown', handleKeyDown);
+      unregisterToolWheel();
       canvas.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);

@@ -117,7 +117,7 @@ function useCloseDeletedTabs(controller: TabStateController) {
 
 function useTabCloseShortcut(controller: TabStateController) {
   const handleClose = useCallback(
-    (e: KeyboardEvent) => {
+    (e: KeyboardEvent | PointerEvent) => {
       const pane = controller.getFocusedPane();
       if (!pane) {
         return;
