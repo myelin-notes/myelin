@@ -193,7 +193,7 @@ const es: SiteCopy = {
 
 ## ¿De verdad es gratis?
 
-Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, que añade agentes de IA por MCP, ejecución de código y límites más altos. Tus notas nunca quedan tras un muro de pago.
+Sí. La versión gratuita es gratis para uso personal, sin límite de tiempo y con casi todas las funciones. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, que añade agentes de IA por MCP, ejecución de código, reconocimiento de escritura a mano y límites más altos. Tus notas nunca quedan tras un muro de pago.
 
 ## ¿Dónde se guardan mis notas?
 
@@ -249,6 +249,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
           'Una goma de trazos o una precisa que borra solo lo que toca',
           'Selección por rectángulo o lazo, para mover, copiar, bloquear o reordenar',
           'Colores personalizados que guardas una vez y reutilizas, y texto con la fuente que elijas',
+          'Con Pro, encuentra las palabras que escribiste a mano, reconocidas en tu dispositivo (aún no en Linux)',
         ],
       },
       pdfs: {
@@ -279,7 +280,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       code: {
         label: 'Código',
         heading: 'Notebooks junto a tus notas.',
-        lede: 'Ejecuta bloques de código dentro de una página y ve el resultado en el lienzo, desde texto hasta tablas y gráficos. Trae contigo tus notebooks de Jupyter. Ejecutar código forma parte de Myelin Notes Pro.',
+        lede: 'Ejecuta bloques de código dentro de una página y ve el resultado en el lienzo, desde texto hasta tablas y gráficos. Trae contigo tus notebooks de Jupyter.',
         details: [
           'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C y C++',
           'Se ejecuta en tu equipo, con las herramientas que ya tienes instaladas',
@@ -313,7 +314,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       agents: {
         label: 'Agentes de IA',
         heading: 'Trae tu propia IA, en tu propio equipo.',
-        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas. Los agentes de IA forman parte de Myelin Notes Pro.',
+        lede: 'Myelin no tiene un chatbot integrado. En su lugar ejecuta un servidor MCP local, para que la app de IA que ya usas pueda leer tus notas y, si lo permites, escribir en ellas.',
         details: [
           'El servidor solo escucha en 127.0.0.1, en el puerto que elijas',
           'Copia la instrucción de instalación desde Ajustes para conectar tu agente',
@@ -407,6 +408,11 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         body: 'La ventana de chat representa la app de IA que uses: no forma parte de Myelin. A través de MCP en tu equipo, lee tu escritura a mano y añade al lienzo una página con un resumen escrito.',
         alt: 'Una app de IA independiente lee por MCP notas escritas a mano en Myelin y añade a su lado una página con un resumen escrito',
       },
+      handwritingSearch: {
+        title: 'Reconocimiento de escritura a mano',
+        body: 'Con Pro, Myelin reconoce tu escritura a mano en tu dispositivo, así que Buscar en el lienzo y la búsqueda de la biblioteca encuentran las palabras que escribiste a mano.',
+        alt: 'Al escribir «entropy» en Buscar, salta a cada nota manuscrita que la menciona y la selecciona',
+      },
     },
     notes: [
       {
@@ -451,7 +457,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   pricing: {
     meta: {
       title: 'Precios | Myelin Notes',
-      description: `Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, con agentes de IA por MCP, ejecución de código y límites más altos.`,
+      description: `Myelin Notes es gratis para uso personal. Myelin Notes Pro es un pago único de ${formatPrice('es', 'pro')}, o ${formatPrice('es', 'student')} para estudiantes, con agentes de IA por MCP, ejecución de código, reconocimiento de escritura a mano y límites más altos.`,
     },
     eyebrow: 'Precios',
     headline: 'Gratis para usar. Pro cuando quieras más.',
@@ -467,8 +473,9 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
         'Grabación de audio con transcripción en el dispositivo',
         'Sincronización con GitHub y colaboración en directo',
         'Importación, exportación, búsqueda y enlaces',
+        'Hasta 2 tipos de bandera',
+        'Hasta 25 banderas por nota',
         'Hasta 6 ajustes de lápiz personalizados',
-        '2 tipos de bandera',
       ],
       cta: 'Descargar',
     },
@@ -481,10 +488,12 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
       includes: [
         'Agentes de IA a través de un servidor MCP local',
         'Ejecuta bloques de código en tus páginas',
-        'Tipos de bandera ilimitados',
-        'Ajustes de lápiz personalizados ilimitados',
+        'Hasta 8 tipos de bandera',
+        'Banderas ilimitadas por nota',
+        'Hasta 16 ajustes de lápiz personalizados',
         'Tus propias imágenes como fondo del lienzo',
         'Modelos de transcripción más precisos',
+        'Reconocimiento de escritura a mano, para que la búsqueda encuentre lo que escribiste',
         'Apoya el desarrollo de Myelin',
       ],
       cta: 'Comprar Pro',

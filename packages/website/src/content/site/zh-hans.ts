@@ -182,7 +182,7 @@ const zhHans: SiteCopy = {
 
 ## 真的免费吗？
 
-是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，增加通过 MCP 连接的 AI 智能体、代码运行和更高的上限。你的笔记永不被付费墙锁住。
+是的。免费版供个人使用，没有时间限制，几乎包含所有功能。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，增加通过 MCP 连接的 AI 智能体、代码运行、手写识别和更高的上限。你的笔记永不被付费墙锁住。
 
 ## 我的笔记保存在哪里？
 
@@ -237,6 +237,7 @@ const zhHans: SiteCopy = {
           '整笔擦除的橡皮擦，或只擦触碰部分的精细橡皮擦',
           '矩形或套索选择，然后移动、复制、锁定或调整层级',
           '自定义颜色保存一次即可反复使用，文字可选用你喜欢的字体',
+          'Pro 可搜索你手写的文字，笔迹在设备上识别（暂不支持 Linux）',
         ],
       },
       pdfs: {
@@ -267,7 +268,7 @@ const zhHans: SiteCopy = {
       code: {
         label: '代码',
         heading: '笔记旁边就是你的 Notebook。',
-        lede: '在页面里直接运行代码块，结果显示在画布上，从文本到表格和图表。也能把 Jupyter Notebook 一起带进来。运行代码属于 Myelin Notes Pro。',
+        lede: '在页面里直接运行代码块，结果显示在画布上，从文本到表格和图表。也能把 Jupyter Notebook 一起带进来。',
         details: [
           'Python、JavaScript、TypeScript、Ruby、Bash、Go、Rust、C 和 C++',
           '在你的电脑上运行，使用你已安装的工具链',
@@ -301,7 +302,7 @@ const zhHans: SiteCopy = {
       agents: {
         label: 'AI 智能体',
         heading: '用你自己的 AI，在你自己的电脑上',
-        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。AI 智能体属于 Myelin Notes Pro 功能。',
+        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。',
         details: [
           '服务器只监听 127.0.0.1，端口由你选择',
           '从设置中复制安装提示，即可连接你的智能体',
@@ -395,6 +396,11 @@ const zhHans: SiteCopy = {
         body: '画面中的聊天窗口代表你使用的任意 AI 应用，它不属于 Myelin。它通过你电脑上的 MCP 读取你的手写笔记，并在画布上添加一页打字整理的摘要。',
         alt: '一个独立的 AI 应用通过 MCP 读取 Myelin 中的手写笔记，并在旁边添加一页打字摘要',
       },
+      handwritingSearch: {
+        title: '手写识别',
+        body: '使用 Pro，Myelin 会在你的设备上识别手写内容，画布查找和资料库搜索都能找到你手写的文字。',
+        alt: '在查找中输入“entropy”，会跳到每段提到它的手写笔记并将其选中',
+      },
     },
     notes: [
       {
@@ -439,7 +445,7 @@ const zhHans: SiteCopy = {
   pricing: {
     meta: {
       title: '价格 | Myelin Notes',
-      description: `Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，提供通过 MCP 连接的 AI 智能体、代码运行和更高的上限。`,
+      description: `Myelin Notes 个人使用免费。Myelin Notes Pro 为一次性购买，价格 ${formatPrice('zh-hans', 'pro')}，学生 ${formatPrice('zh-hans', 'student')}，提供通过 MCP 连接的 AI 智能体、代码运行、手写识别和更高的上限。`,
     },
     eyebrow: '价格',
     headline: '免费使用，需要更多时再升级 Pro',
@@ -455,8 +461,9 @@ const zhHans: SiteCopy = {
         '录音及设备端转写',
         'GitHub 同步与实时协作',
         '导入、导出、搜索与链接',
+        '最多 2 种旗标类型',
+        '每条笔记最多 25 个旗标',
         '最多 6 个自定义笔预设',
-        '2 种旗标类型',
       ],
       cta: '下载',
     },
@@ -469,10 +476,12 @@ const zhHans: SiteCopy = {
       includes: [
         '通过本地 MCP 服务器连接 AI 智能体',
         '在页面中运行代码块',
-        '不限数量的旗标类型',
-        '不限数量的自定义笔预设',
+        '最多 8 种旗标类型',
+        '每条笔记的旗标数量不限',
+        '最多 16 个自定义笔预设',
         '使用你自己的图片作为画布背景',
         '更准确的转写模型',
+        '手写识别，搜索能找到你写下的内容',
         '支持 Myelin 的开发',
       ],
       cta: '购买 Pro',

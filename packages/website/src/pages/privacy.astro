@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 
-const updated = '29 October 2026';
+const updated = '17 November 2026';
 
 const wrap = 'mx-auto max-w-3xl px-6 lg:px-10';
 const h2 =
@@ -160,8 +160,8 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
       </ul>
       <p class={p}>Every app analytics event and error report includes the app version.</p>
       <p class={p}>
-        This switch starts on. Turning it off stops product events and error
-        reports at once, and nothing is sent while it is off.
+        Turning the switch off stops product events and error reports at once,
+        and nothing is sent while it is off.
       </p>
       <p class={p}>
         So that repeated events from one installation can be grouped, the app
@@ -179,6 +179,20 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
         platform and version you are running, the same as any software download.
         It happens whether or not analytics are on, because it is how security
         fixes reach you.
+      </p>
+    </section>
+
+    <section class="pt-14">
+      <h2 class={h2}>Handwriting recognition on Android</h2>
+      <p class={p}>
+        On Android, handwriting is recognized on your device using Google's ML
+        Kit. Your ink is never sent anywhere. The first time you use it, ML Kit
+        downloads a recognition model for your language from Google. ML Kit also
+        sends Google your device's manufacturer, model, OS version, and ML
+        hardware, the recognition language, and performance and usage metrics,
+        which Google uses to maintain and improve ML Kit. This happens whether
+        or not analytics are on. On other platforms, handwriting is recognized
+        by your operating system on your device.
       </p>
     </section>
 
@@ -224,6 +238,10 @@ const link = 'underline underline-offset-4 hover:text-text-primary';
           <span class={term}>GitHub</span> hosts our releases, so it handles the update
           check every copy of the app makes. It also receives your notes, but only
           if you set up GitHub sync.
+        </li>
+        <li>
+          <span class={term}>Google</span> provides the handwriting recognition model
+          on Android and receives the ML Kit device and usage metrics described above.
         </li>
         <li>
           <span class={term}>The iroh project</span> runs the relay servers that carry

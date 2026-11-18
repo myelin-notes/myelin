@@ -36,6 +36,11 @@ const en = {
         description:
           'Download larger on-device models that transcribe more accurately, especially outside English.',
       },
+      handwriting: {
+        title: 'Search your handwriting',
+        description:
+          'Find words you wrote by hand with canvas search. Ink is recognized on your device.',
+      },
       limits: {
         title: 'Higher limits',
         description:
@@ -1323,7 +1328,8 @@ const en = {
         'Analytics are off by default. Turn them on to help improve Myelin Notes.',
       collected:
         'We collect which features you use, the app version, and crash reports.',
-      notCollected: 'We never collect your notes, file names, or handwriting.',
+      notCollected:
+        'We never collect your notes, file names, or handwriting. On Android, Google’s handwriting recognizer sends Google usage metrics, never your writing.',
       policy: 'Read the privacy policy',
     },
     sync: {

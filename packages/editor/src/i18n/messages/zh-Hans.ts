@@ -34,6 +34,10 @@ const zhHans: typeof en = {
         title: '更准确的转写',
         description: '下载更大的本地模型，转写更准确，尤其是英语以外的语言。',
       },
+      handwriting: {
+        title: '搜索手写内容',
+        description: '用画布搜索找到你手写的文字。笔迹在你的设备上识别。',
+      },
       limits: {
         title: '更高的上限',
         description:
@@ -1281,7 +1285,8 @@ const zhHans: typeof en = {
       title: '帮助改进 Myelin Notes',
       description: '分析功能默认关闭。打开它可以帮助改进 Myelin Notes。',
       collected: '我们会收集你使用了哪些功能、应用版本以及崩溃报告。',
-      notCollected: '我们绝不会收集你的笔记、文件名或手写内容。',
+      notCollected:
+        '我们绝不会收集你的笔记、文件名或手写内容。在 Android 上，Google 的手写识别会向 Google 发送使用统计数据，但绝不会发送你书写的内容。',
       policy: '阅读隐私政策',
     },
     sync: {

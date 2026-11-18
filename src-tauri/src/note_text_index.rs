@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::UNIX_EPOCH;
@@ -73,6 +74,22 @@ fn read_all(mut file: std::fs::File) -> Result<Vec<u8>, String> {
 }
 
 fn index_file_at(cache_file: &Path, source: &Path, force: bool) -> Result<String, String> {
+    let text = note_text_at(cache_file, source, force)?;
+    // Read on every index, not cached with the note's text: the canvas saves it after recognizing,
+    // independently of note saves.
+    let handwriting = read_handwriting(&handwriting_cache_path(cache_file.to_path_buf()));
+    Ok(std::iter::once(text)
+        .chain(
+            handwriting
+                .into_values()
+                .map(|block| block.split_whitespace().collect::<Vec<_>>().join(" ")),
+        )
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n"))
+}
+
+fn note_text_at(cache_file: &Path, source: &Path, force: bool) -> Result<String, String> {
     let (file, stamp) = open_source(source)?;
     let old = std::fs::read(&cache_file)
         .ok()
@@ -120,6 +137,18 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
 
 fn flags_cache_path(text_cache: PathBuf) -> PathBuf {
     text_cache.with_extension("flags.json")
+}
+
+fn handwriting_cache_path(text_cache: PathBuf) -> PathBuf {
+    text_cache.with_extension("handwriting.json")
+}
+
+// Missing or unreadable reads as empty: it's a cache, and the canvas re-recognizes what's absent.
+fn read_handwriting(path: &Path) -> HashMap<String, String> {
+    std::fs::read(path)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
 }
 
 /// Without a `cache_file` (the index hasn't started yet) the note is decoded every call.
@@ -379,7 +408,11 @@ pub async fn remove_note_text_index(
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let path = cache_path(&app, &repo_id, &node_id)?;
-        for path in [flags_cache_path(path.clone()), path] {
+        for path in [
+            flags_cache_path(path.clone()),
+            handwriting_cache_path(path.clone()),
+            path,
+        ] {
             match std::fs::remove_file(path) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -387,6 +420,41 @@ pub async fn remove_note_text_index(
             }
         }
         Ok(())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Recognized handwriting saved on this device by the canvas, keyed by its block key.
+#[tauri::command]
+pub async fn read_handwriting_text(
+    app: AppHandle,
+    repo_id: String,
+    node_id: String,
+) -> Result<HashMap<String, String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(read_handwriting(&handwriting_cache_path(cache_path(
+            &app, &repo_id, &node_id,
+        )?)))
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+/// Replaces the note's saved handwriting with `texts`.
+#[tauri::command]
+pub async fn write_handwriting_text(
+    app: AppHandle,
+    repo_id: String,
+    node_id: String,
+    texts: HashMap<String, String>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = handwriting_cache_path(cache_path(&app, &repo_id, &node_id)?);
+        write_atomic(
+            &path,
+            &serde_json::to_vec(&texts).map_err(|error| error.to_string())?,
+        )
     })
     .await
     .map_err(|error| error.to_string())?
@@ -533,6 +601,27 @@ mod tests {
         std::fs::write(&source, bytes).unwrap();
         assert_eq!(index_file_at(&cache, &source, true).unwrap(), "new fox");
         assert_ne!(std::fs::read(&cache).unwrap(), before);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn includes_handwriting_saved_after_the_note_was_indexed() {
+        let dir = std::env::temp_dir().join(format!(
+            "myelin-note-index-handwriting-test-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = dir.join("note.mcanvas");
+        let cache = dir.join("note.json");
+        std::fs::write(&source, []).unwrap();
+        assert_eq!(index_file_at(&cache, &source, false).unwrap(), "");
+
+        std::fs::write(
+            dir.join("note.handwriting.json"),
+            r#"{"a:2":"Hello\nJosh","b:2":""}"#,
+        )
+        .unwrap();
+        assert_eq!(index_file_at(&cache, &source, false).unwrap(), "Hello Josh");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

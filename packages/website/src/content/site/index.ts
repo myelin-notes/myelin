@@ -84,7 +84,8 @@ export type FeatureClipId =
   | 'canvasStyle'
   | 'flags'
   | 'liveCollab'
-  | 'agents';
+  | 'agents'
+  | 'handwritingSearch';
 
 interface FeatureSection {
   /** The kicker, and the section's jump link at the top of the page. */

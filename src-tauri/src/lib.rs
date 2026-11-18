@@ -83,6 +83,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_pencil::init())
+        .plugin(tauri_plugin_handwriting::init())
         .manage(iroh_transport::IrohState::new())
         .manage(repository_engine::RepositoryManager::default())
         .manage(mcp_server::McpServerState::new())
@@ -106,6 +107,8 @@ pub fn run() {
             note_text_index::index_note_text,
             note_text_index::list_note_flags,
             note_text_index::remove_note_text_index,
+            note_text_index::read_handwriting_text,
+            note_text_index::write_handwriting_text,
             pdf_export::export_pdf,
             pdf_export::export_pdf_ios,
             pdf_export::export_file_ios,

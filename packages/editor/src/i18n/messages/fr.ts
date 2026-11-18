@@ -39,6 +39,11 @@ const fr: typeof en = {
         description:
           'Téléchargez des modèles plus grands, sur l’appareil, qui transcrivent plus fidèlement, surtout hors anglais.',
       },
+      handwriting: {
+        title: 'Recherchez dans votre écriture manuscrite',
+        description:
+          'Retrouvez avec la recherche du canevas les mots écrits à la main. L’encre est reconnue sur votre appareil.',
+      },
       limits: {
         title: 'Des limites plus hautes',
         description:
@@ -1349,7 +1354,7 @@ const fr: typeof en = {
       collected:
         'Nous collectons les fonctionnalités que vous utilisez, la version de l’application et les rapports de plantage.',
       notCollected:
-        'Nous ne collectons jamais vos notes, vos noms de fichiers ni votre écriture manuscrite.',
+        'Nous ne collectons jamais vos notes, vos noms de fichiers ni votre écriture manuscrite. Sur Android, la reconnaissance d’écriture de Google envoie à Google des statistiques d’utilisation, jamais ce que vous écrivez.',
       policy: 'Lire la politique de confidentialité',
     },
     sync: {
