@@ -137,6 +137,40 @@ describe('KeybindingHandler', () => {
     dispose();
   });
 
+  it('suppresses the native context menu only for a bound right click', () => {
+    const listeners = new Map<string, (event: MouseEvent) => void>();
+    vi.stubGlobal('window', {
+      addEventListener: (type: string, listener: (event: MouseEvent) => void) =>
+        listeners.set(type, listener),
+      removeEventListener: (type: string) => listeners.delete(type),
+    });
+
+    const registry = new KeybindingRegistry();
+    registry.defineDefaults({ 'canvas:undo': { key: 'Mouse2' } });
+    const handler = new KeybindingHandler(registry);
+    const dispose = handler.register([
+      { action: 'canvas:undo', onDown: vi.fn() },
+    ]);
+    const contextMenu = (shiftKey: boolean) => {
+      const event = {
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey,
+        target: null,
+        button: 2,
+        preventDefault: vi.fn(),
+      };
+      listeners.get('contextmenu')?.(event as unknown as MouseEvent);
+      return event.preventDefault;
+    };
+
+    expect(contextMenu(false)).toHaveBeenCalled();
+    expect(contextMenu(true)).not.toHaveBeenCalled();
+
+    dispose();
+  });
+
   it('notifies subscribers when bindings change', () => {
     const handler = createHandler();
     const onChange = vi.fn();

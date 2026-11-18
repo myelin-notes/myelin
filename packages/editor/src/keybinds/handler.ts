@@ -113,6 +113,7 @@ export class KeybindingHandler {
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('contextmenu', this.onContextMenu);
     this.listening = true;
   }
 
@@ -124,6 +125,7 @@ export class KeybindingHandler {
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('contextmenu', this.onContextMenu);
     this.listening = false;
   }
 
@@ -171,6 +173,21 @@ export class KeybindingHandler {
   private onPointerUp = (e: PointerEvent) => {
     if (e.pointerType === 'mouse') {
       this.onKeyUp(e);
+    }
+  };
+
+  // A bound right click must not also open the webview's native menu (Reload, Inspect). Listening
+  // on window runs after React's root listener, so in-app context menus still open first.
+  private onContextMenu = (e: MouseEvent) => {
+    const bound = this.bindings.some(
+      (b) =>
+        (b.allowEditable || !isEditableTarget(e)) &&
+        this.registry
+          .getCombos(b.action)
+          .some((combo) => comboMatches(e, combo)),
+    );
+    if (bound) {
+      e.preventDefault();
     }
   };
 }

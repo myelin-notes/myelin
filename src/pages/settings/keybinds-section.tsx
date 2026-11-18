@@ -70,6 +70,17 @@ function KeyCapture({
 
   const captureMouse = useEffectEvent((e: MouseEvent) => {
     e.preventDefault();
+    // Capturing unmounts this before the click's contextmenu fires, so the block must outlive it.
+    if (e.button === 2) {
+      window.addEventListener(
+        'contextmenu',
+        (event) => event.preventDefault(),
+        {
+          capture: true,
+          once: true,
+        },
+      );
+    }
     onCapture({ key: mouseButtonKey(e.button), ...comboModifiers(e) });
   });
 
@@ -83,13 +94,8 @@ function KeyCapture({
         captureMouse(e);
       }
     };
-    const preventContextMenu = (e: MouseEvent) => e.preventDefault();
     window.addEventListener('mousedown', handleMouseDown, true);
-    window.addEventListener('contextmenu', preventContextMenu, true);
-    return () => {
-      window.removeEventListener('mousedown', handleMouseDown, true);
-      window.removeEventListener('contextmenu', preventContextMenu, true);
-    };
+    return () => window.removeEventListener('mousedown', handleMouseDown, true);
   }, [allowMouse]);
 
   const handleKeyDown = useCallback(
