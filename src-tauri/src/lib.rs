@@ -17,6 +17,8 @@ mod pdf_export;
 mod repository_bootstrap;
 mod repository_engine;
 mod repository_metadata;
+#[cfg(target_os = "macos")]
+mod tablet_probe;
 mod transcription;
 mod transcription_models;
 mod webview_crash;
@@ -30,6 +32,8 @@ pub fn run() {
                 eprintln!("could not initialize crash reporting: {error}");
             }
             webview_crash::setup(app.handle());
+            #[cfg(target_os = "macos")]
+            tablet_probe::install(app.handle());
             #[cfg(desktop)]
             {
                 app.handle()
