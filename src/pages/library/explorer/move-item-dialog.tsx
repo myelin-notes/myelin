@@ -120,7 +120,7 @@ function MoveItemContent({
                 key={folder.id}
                 type="button"
                 disabled={moving}
-                className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-surface"
+                className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-md px-3 py-2 text-left hover:bg-surface"
                 onClick={() => setPath([...path, folder])}
               >
                 <Folder className="size-4 shrink-0" />

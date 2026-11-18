@@ -92,7 +92,7 @@ export function PageSetupDialog({ frame, onClose }: PageSetupDialogProps) {
                   aria-pressed={preset === p.id}
                   onClick={() => setPreset(p.id)}
                   className={cn(
-                    'rounded-md px-3 py-1.5 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                    'cursor-pointer rounded-md px-3 py-1.5 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     preset === p.id
                       ? 'bg-card text-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground',

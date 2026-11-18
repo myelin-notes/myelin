@@ -88,7 +88,7 @@ function InlineForm({
       <button
         type="submit"
         disabled={disabled}
-        className="group flex shrink-0 items-center gap-1.5 font-medium text-text-muted text-xs uppercase tracking-[0.08em] transition-colors duration-200 hover:text-text-brand disabled:opacity-60"
+        className="group flex shrink-0 cursor-pointer items-center gap-1.5 font-medium text-text-muted text-xs uppercase tracking-[0.08em] transition-colors duration-200 hover:text-text-brand disabled:cursor-default disabled:opacity-60"
       >
         {loading ? (
           <Loader2 className="size-3.5 animate-spin" />

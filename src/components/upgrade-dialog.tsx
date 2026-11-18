@@ -101,7 +101,7 @@ export function UpgradeDialog() {
                 aria-label={planStrings.features[f].title}
                 aria-current={f === feature}
                 onClick={() => setFeature(f)}
-                className="p-1"
+                className="cursor-pointer p-1"
               >
                 <span
                   className={cn(

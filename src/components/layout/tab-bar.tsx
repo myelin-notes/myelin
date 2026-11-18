@@ -627,7 +627,7 @@ const TabItem = memo(function TabItem({
             onClick={handleClose}
             aria-label={`Close ${title}`}
             className={cn(
-              'flex size-4 shrink-0 items-center justify-center rounded transition-colors duration-150',
+              'flex size-4 shrink-0 cursor-pointer items-center justify-center rounded transition-colors duration-150',
               isActive
                 ? 'text-text-muted hover:bg-hover-tint hover:text-text-primary'
                 : 'text-transparent group-hover:text-text-muted group-hover:hover:text-text-primary',
