@@ -62,12 +62,24 @@ const en = {
       `Version ${version} is available. Install it and restart.`,
     failed: 'Update failed',
   },
+  windowControls: {
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    restore: 'Restore',
+  },
+  colorPicker: {
+    customColor: 'Custom color',
+    addColor: 'Add color',
+  },
   sidebar: {
     searchPlaceholder: 'Search your library...',
     explorer: 'Explorer',
     tags: 'Tags',
     collapse: 'Collapse sidebar',
     expand: 'Expand sidebar',
+    close: 'Close sidebar',
+    resize: 'Resize sidebar',
+    resizeTags: 'Resize tags',
     graph: 'Open graph',
   },
   commandPalette: {
@@ -890,10 +902,20 @@ const en = {
     },
   },
   canvas: {
+    openNoteLinkFailed: 'Failed to open note link',
+    openBacklinkFailed: 'Failed to open backlink',
+    autocomplete: {
+      suggestions: 'Autocomplete suggestions',
+      searching: 'Searching...',
+      noMatches: 'No matches.',
+      loadFailed: 'Could not load suggestions.',
+    },
     kind: 'Canvas',
     frame: {
       noteKind: 'Note',
       pdfKind: 'PDF',
+      addBlankPage: 'Add blank page',
+      deletePage: 'Delete page',
       displayNameLabel: 'Page frame display name',
       menu: 'Menu',
       openMenu: 'Open frame menu',
@@ -930,8 +952,34 @@ const en = {
       next: 'Next match',
       previous: 'Previous match',
     },
+    codeOutput: {
+      title: 'Code output',
+      running: 'Running',
+      stop: 'Stop',
+      stopped: 'Stopped',
+      failed: 'Failed',
+      exitCode: (code: number | null) => `Exit ${code}`,
+      doneIn: (duration: string) => `Done in ${duration}`,
+      empty: 'No output',
+      droppedLines: (count: number) => `… ${count} earlier lines dropped`,
+    },
+    textFormatting: {
+      bold: 'Bold',
+      italic: 'Italic',
+      underline: 'Underline',
+      strikethrough: 'Strikethrough',
+      font: 'Font',
+      color: 'Color',
+      sans: 'Sans',
+      serif: 'Serif',
+      mono: 'Mono',
+      custom: 'Custom',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+      fitContent: 'Fit content in viewport',
+      lockZoom: 'Lock zoom',
+      unlockZoom: 'Unlock zoom',
     },
     slashInsert: {
       pageBreak: {
@@ -1060,6 +1108,7 @@ const en = {
       customizeWheel: 'Tools & presets',
       insert: 'Insert',
       ruler: 'Ruler',
+      canvasTools: 'Canvas tools',
     },
     selectionToolbar: {
       anchor: 'Anchor to page',
@@ -1167,6 +1216,7 @@ const en = {
       updateToCurrent: 'Update to current',
       showInWheel: 'Show in wheel',
       removeFromWheel: 'Remove from wheel',
+      toolbarLabel: 'Pen presets',
       delete: 'Delete preset',
     },
     tools: {

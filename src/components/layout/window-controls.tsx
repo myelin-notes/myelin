@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Minus, X } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -12,6 +13,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 export function WindowControls() {
   const appWindow = useMemo(() => getCurrentWindow(), []);
   const [isMaximized, setIsMaximized] = useState(false);
+  const strings = useMessages();
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -39,16 +41,23 @@ export function WindowControls() {
 
   return (
     <div className="flex shrink-0 select-none self-stretch">
-      <ControlButton onClick={handleMinimize} label="Minimize">
+      <ControlButton
+        onClick={handleMinimize}
+        label={strings.windowControls.minimize}
+      >
         <Minus className="size-3.5" />
       </ControlButton>
       <ControlButton
         onClick={handleToggleMaximize}
-        label={isMaximized ? 'Restore' : 'Maximize'}
+        label={
+          isMaximized
+            ? strings.windowControls.restore
+            : strings.windowControls.maximize
+        }
       >
         {isMaximized ? <RestoreIcon /> : <MaximizeIcon />}
       </ControlButton>
-      <ControlButton onClick={handleClose} label="Close" danger>
+      <ControlButton onClick={handleClose} label={strings.common.close} danger>
         <X className="size-3.5" />
       </ControlButton>
     </div>

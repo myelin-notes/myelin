@@ -148,7 +148,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
               : 'fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] flex max-h-[calc(100%-2rem)] -translate-y-1/2 animate-in flex-col duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [--toolbar-panel-room:calc(var(--canvas-visible-height)-2rem)]'
         }
         role="toolbar"
-        aria-label="Canvas tools"
+        aria-label={strings.canvas.toolbar.canvasTools}
       >
         <div
           className={

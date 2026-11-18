@@ -65,12 +65,24 @@ const fr: typeof en = {
       `La version ${version} est disponible. Installez-la et redémarrez.`,
     failed: 'Échec de la mise à jour',
   },
+  windowControls: {
+    minimize: 'Réduire',
+    maximize: 'Agrandir',
+    restore: 'Restaurer',
+  },
+  colorPicker: {
+    customColor: 'Couleur personnalisée',
+    addColor: 'Ajouter la couleur',
+  },
   sidebar: {
     searchPlaceholder: 'Rechercher dans votre bibliothèque...',
     explorer: 'Explorateur',
     tags: 'Étiquettes',
     collapse: 'Réduire la barre latérale',
     expand: 'Développer la barre latérale',
+    close: 'Fermer la barre latérale',
+    resize: 'Redimensionner la barre latérale',
+    resizeTags: 'Redimensionner les étiquettes',
     graph: 'Ouvrir le graphe',
   },
   commandPalette: {
@@ -910,10 +922,20 @@ const fr: typeof en = {
     },
   },
   canvas: {
+    openNoteLinkFailed: 'Impossible d’ouvrir le lien vers la note',
+    openBacklinkFailed: 'Impossible d’ouvrir le lien entrant',
+    autocomplete: {
+      suggestions: 'Suggestions de saisie semi-automatique',
+      searching: 'Recherche...',
+      noMatches: 'Aucun résultat.',
+      loadFailed: 'Impossible de charger les suggestions.',
+    },
     kind: 'Canevas',
     frame: {
       noteKind: 'Note',
       pdfKind: 'PDF',
+      addBlankPage: 'Ajouter une page vierge',
+      deletePage: 'Supprimer la page',
       displayNameLabel: 'Nom d’affichage du cadre de page',
       menu: 'Menu',
       openMenu: 'Ouvrir le menu du cadre',
@@ -951,8 +973,34 @@ const fr: typeof en = {
       next: 'Résultat suivant',
       previous: 'Résultat précédent',
     },
+    codeOutput: {
+      title: 'Sortie du code',
+      running: 'En cours',
+      stop: 'Arrêter',
+      stopped: 'Arrêté',
+      failed: 'Échec',
+      exitCode: (code: number | null) => `Code de sortie ${code}`,
+      doneIn: (duration: string) => `Terminé en ${duration}`,
+      empty: 'Aucune sortie',
+      droppedLines: (count: number) => `… ${count} lignes précédentes masquées`,
+    },
+    textFormatting: {
+      bold: 'Gras',
+      italic: 'Italique',
+      underline: 'Souligné',
+      strikethrough: 'Barré',
+      font: 'Police',
+      color: 'Couleur',
+      sans: 'Sans',
+      serif: 'Serif',
+      mono: 'Mono',
+      custom: 'Personnalisée',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+      fitContent: 'Ajuster le contenu à la vue',
+      lockZoom: 'Verrouiller le zoom',
+      unlockZoom: 'Déverrouiller le zoom',
     },
     slashInsert: {
       pageBreak: {
@@ -1083,6 +1131,7 @@ const fr: typeof en = {
       customizeWheel: 'Outils et préréglages',
       insert: 'Insérer',
       ruler: 'Règle',
+      canvasTools: 'Outils du canevas',
     },
     selectionToolbar: {
       anchor: 'Ancrer à la page',
@@ -1191,6 +1240,7 @@ const fr: typeof en = {
       updateToCurrent: 'Mettre à jour avec les réglages actuels',
       showInWheel: 'Afficher dans la roue',
       removeFromWheel: 'Retirer de la roue',
+      toolbarLabel: 'Préréglages de stylo',
       delete: 'Supprimer le préréglage',
     },
     tools: {

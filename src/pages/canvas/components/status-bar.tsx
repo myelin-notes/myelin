@@ -25,6 +25,9 @@ export const StatusBar = memo(function StatusBar({
   onListRecognizedText,
 }: StatusBarProps) {
   const strings = useMessages();
+  const zoomLockLabel = zoomLocked
+    ? strings.canvas.statusBar.unlockZoom
+    : strings.canvas.statusBar.lockZoom;
   const locale = useLocale();
   const [recognizedText, setRecognizedText] = useState<string[] | null>(null);
 
@@ -42,8 +45,8 @@ export const StatusBar = memo(function StatusBar({
       <button
         type="button"
         onClick={onFitContent}
-        aria-label="Fit content in viewport"
-        title="Fit content in viewport"
+        aria-label={strings.canvas.statusBar.fitContent}
+        title={strings.canvas.statusBar.fitContent}
         className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
       >
         <Crosshair className="h-3.5 w-3.5" />
@@ -51,9 +54,9 @@ export const StatusBar = memo(function StatusBar({
       <button
         type="button"
         onClick={onToggleZoomLock}
-        aria-label={zoomLocked ? 'Unlock zoom' : 'Lock zoom'}
+        aria-label={zoomLockLabel}
         aria-pressed={zoomLocked}
-        title={zoomLocked ? 'Unlock zoom' : 'Lock zoom'}
+        title={zoomLockLabel}
         className={
           zoomLocked
             ? 'cursor-pointer rounded-md border-none bg-hover-tint p-1 text-text-primary transition-colors hover:bg-hover-tint'

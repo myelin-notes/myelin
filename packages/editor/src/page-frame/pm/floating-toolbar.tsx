@@ -26,6 +26,7 @@ import { FontSizeField } from '../../components/font-size-field';
 import { useKeepPopoverOnScreen } from '../../components/use-keep-popover-on-screen';
 import { useCustomColors } from '../../custom-colors';
 import { PM_UPDATE_EVENT } from '../../events';
+import { type Messages, useMessages } from '../../i18n';
 import {
   selectionHasMark,
   uniformSelectionMarkAttrs,
@@ -38,35 +39,30 @@ interface FloatingToolbarProps {
   view: EditorView;
 }
 
+type TextFormattingStrings = Messages['canvas']['textFormatting'];
+
 type ToggleMark = {
-  key: string;
+  key: 'bold' | 'italic' | 'underline' | 'strikethrough';
   icon: React.FC<{ className?: string }>;
   mark: MarkType;
-  label: string;
 };
 
 const TOGGLE_MARKS: ToggleMark[] = [
-  { key: 'bold', icon: Bold, mark: schema.marks.bold, label: 'Bold' },
-  { key: 'italic', icon: Italic, mark: schema.marks.italic, label: 'Italic' },
-  {
-    key: 'underline',
-    icon: Underline,
-    mark: schema.marks.underline,
-    label: 'Underline',
-  },
+  { key: 'bold', icon: Bold, mark: schema.marks.bold },
+  { key: 'italic', icon: Italic, mark: schema.marks.italic },
+  { key: 'underline', icon: Underline, mark: schema.marks.underline },
   {
     key: 'strikethrough',
     icon: Strikethrough,
     mark: schema.marks.strikethrough,
-    label: 'Strikethrough',
   },
 ];
 
-const FONTS: { label: string; value: string | null }[] = [
-  { label: 'Sans', value: null },
-  { label: 'Serif', value: 'ui-serif, Georgia, "Times New Roman", serif' },
+const FONTS: { key: 'sans' | 'serif' | 'mono'; value: string | null }[] = [
+  { key: 'sans', value: null },
+  { key: 'serif', value: 'ui-serif, Georgia, "Times New Roman", serif' },
   {
-    label: 'Mono',
+    key: 'mono',
     value: 'ui-monospace, SFMono-Regular, Menlo, "JetBrains Mono", monospace',
   },
 ];
@@ -158,6 +154,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
     removeColor,
     pickerOpen,
   } = useCustomColors('text');
+  const strings = useMessages().canvas.textFormatting;
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [style, setStyle] = useState<CSSProperties>({});
@@ -395,10 +392,10 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
         }
       }}
     >
-      {TOGGLE_MARKS.map(({ key, icon: Icon, mark, label }) => (
+      {TOGGLE_MARKS.map(({ key, icon: Icon, mark }) => (
         <ToolbarButton
           key={key}
-          label={label}
+          label={strings[key]}
           active={active.has(key)}
           onClick={() => onToggle(mark)}
         >
@@ -410,14 +407,14 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
 
       <div className="relative">
         <ToolbarButton
-          label="Font"
+          label={strings.font}
           active={openMenu === 'font' || !!currentFont}
           onClick={() => setOpenMenu(openMenu === 'font' ? null : 'font')}
           wide
         >
           <Type className="size-4" />
           <span className="max-w-[64px] truncate text-xs">
-            {fontLabelFor(currentFont)}
+            {fontLabelFor(currentFont, strings)}
           </span>
           <ChevronDown className="size-3 opacity-60" />
         </ToolbarButton>
@@ -425,7 +422,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
           <Popover>
             {FONTS.map((f) => (
               <button
-                key={f.label}
+                key={f.key}
                 type="button"
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => onPickFont(f.value)}
@@ -436,7 +433,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
                 }`}
                 style={{ fontFamily: f.value ?? undefined }}
               >
-                {f.label}
+                {strings[f.key]}
               </button>
             ))}
           </Popover>
@@ -457,7 +454,7 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
 
       <div className="relative">
         <ToolbarButton
-          label="Color"
+          label={strings.color}
           onClick={() => setOpenMenu(openMenu === 'color' ? null : 'color')}
         >
           <div className="flex size-4 flex-col items-center justify-center">
@@ -514,12 +511,15 @@ export function FloatingToolbar({ view }: FloatingToolbarProps) {
   );
 }
 
-function fontLabelFor(family: string | undefined): string {
+function fontLabelFor(
+  family: string | undefined,
+  strings: TextFormattingStrings,
+): string {
   if (!family) {
-    return 'Sans';
+    return strings.sans;
   }
   const match = FONTS.find((f) => f.value === family);
-  return match ? match.label : 'Custom';
+  return match ? strings[match.key] : strings.custom;
 }
 
 interface ToolbarButtonProps {

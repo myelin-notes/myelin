@@ -64,12 +64,24 @@ const es: typeof en = {
       `La versión ${version} está disponible. Instálala y reinicia.`,
     failed: 'La actualización falló',
   },
+  windowControls: {
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+    restore: 'Restaurar',
+  },
+  colorPicker: {
+    customColor: 'Color personalizado',
+    addColor: 'Añadir color',
+  },
   sidebar: {
     searchPlaceholder: 'Busca en tu biblioteca...',
     explorer: 'Explorador',
     tags: 'Etiquetas',
     collapse: 'Contraer barra lateral',
     expand: 'Expandir barra lateral',
+    close: 'Cerrar barra lateral',
+    resize: 'Cambiar tamaño de la barra lateral',
+    resizeTags: 'Cambiar tamaño de las etiquetas',
     graph: 'Abrir grafo',
   },
   commandPalette: {
@@ -901,10 +913,20 @@ const es: typeof en = {
     },
   },
   canvas: {
+    openNoteLinkFailed: 'No se pudo abrir el enlace a la nota',
+    openBacklinkFailed: 'No se pudo abrir el backlink',
+    autocomplete: {
+      suggestions: 'Sugerencias de autocompletado',
+      searching: 'Buscando...',
+      noMatches: 'Sin coincidencias.',
+      loadFailed: 'No se pudieron cargar las sugerencias.',
+    },
     kind: 'Lienzo',
     frame: {
       noteKind: 'Nota',
       pdfKind: 'PDF',
+      addBlankPage: 'Añadir página en blanco',
+      deletePage: 'Eliminar página',
       displayNameLabel: 'Nombre del marco de página',
       menu: 'Menú',
       openMenu: 'Abrir menú del marco',
@@ -942,8 +964,34 @@ const es: typeof en = {
       next: 'Coincidencia siguiente',
       previous: 'Coincidencia anterior',
     },
+    codeOutput: {
+      title: 'Salida del código',
+      running: 'Ejecutando',
+      stop: 'Detener',
+      stopped: 'Detenido',
+      failed: 'Error',
+      exitCode: (code: number | null) => `Código de salida ${code}`,
+      doneIn: (duration: string) => `Listo en ${duration}`,
+      empty: 'Sin salida',
+      droppedLines: (count: number) => `… ${count} líneas anteriores omitidas`,
+    },
+    textFormatting: {
+      bold: 'Negrita',
+      italic: 'Cursiva',
+      underline: 'Subrayado',
+      strikethrough: 'Tachado',
+      font: 'Fuente',
+      color: 'Color',
+      sans: 'Sans',
+      serif: 'Serif',
+      mono: 'Mono',
+      custom: 'Personalizada',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+      fitContent: 'Ajustar el contenido a la vista',
+      lockZoom: 'Bloquear zoom',
+      unlockZoom: 'Desbloquear zoom',
     },
     slashInsert: {
       pageBreak: {
@@ -1073,6 +1121,7 @@ const es: typeof en = {
       customizeWheel: 'Herramientas y ajustes',
       insert: 'Insertar',
       ruler: 'Regla',
+      canvasTools: 'Herramientas del lienzo',
     },
     selectionToolbar: {
       anchor: 'Anclar a la página',
@@ -1180,6 +1229,7 @@ const es: typeof en = {
       updateToCurrent: 'Actualizar al actual',
       showInWheel: 'Mostrar en la rueda',
       removeFromWheel: 'Quitar de la rueda',
+      toolbarLabel: 'Ajustes de lápiz',
       delete: 'Eliminar ajuste',
     },
     tools: {

@@ -355,7 +355,7 @@ export const PresetToolbar = memo(function PresetToolbar({
       <div
         ref={barRef}
         role="toolbar"
-        aria-label="Pen presets"
+        aria-label={strings.canvas.toolPresets.toolbarLabel}
         aria-orientation={vertical ? 'vertical' : 'horizontal'}
         className={`fade-in-0 absolute z-[100] flex animate-in items-center gap-1 overflow-auto rounded-xl bg-card p-2 ring-1 ring-border-subtle/70 transition-none duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
           vertical

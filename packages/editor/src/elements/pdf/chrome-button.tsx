@@ -1,5 +1,6 @@
 import { Plus as PlusIcon, Trash2 as TrashIcon } from 'lucide-react';
 import { createRoot } from 'react-dom/client';
+import { getMessages } from '../../i18n';
 
 type PdfChromeButtonKind = 'add' | 'delete';
 
@@ -55,7 +56,8 @@ function PdfChromeButton({
 }) {
   const isAdd = kind === 'add';
   const Icon = isAdd ? PlusIcon : TrashIcon;
-  const label = isAdd ? 'Add blank page' : 'Delete page';
+  const strings = getMessages().canvas.frame;
+  const label = isAdd ? strings.addBlankPage : strings.deletePage;
 
   return (
     <button

@@ -32,7 +32,7 @@ import {
 } from '@myelin/editor/events';
 import type { ExportTarget } from '@myelin/editor/export/export-controller';
 import { useFlagTypes } from '@myelin/editor/flag-types';
-import { useMessages } from '@myelin/editor/i18n';
+import { getMessages, useMessages } from '@myelin/editor/i18n';
 import { markdownImportHandler } from '@myelin/editor/media/markdown';
 import { PageFrameDomLayer } from '@myelin/editor/page-frame/dom-layer';
 import {
@@ -397,7 +397,7 @@ function CanvasViewInner({
       const { detail } = event as CustomEvent<NoteLinkOpenRequestDetail>;
       void openPageFrameNoteLink(detail).catch((error) => {
         logger.error('Failed to open note link', error);
-        toast.error('Failed to open note link', {
+        toast.error(getMessages().canvas.openNoteLinkFailed, {
           description: error instanceof Error ? error.message : String(error),
         });
       });
@@ -469,7 +469,7 @@ function CanvasViewInner({
       logger.error('Failed to open backlink source', error, {
         sourceId,
       });
-      toast.error('Failed to open backlink', {
+      toast.error(getMessages().canvas.openBacklinkFailed, {
         description: error instanceof Error ? error.message : String(error),
       });
     });
