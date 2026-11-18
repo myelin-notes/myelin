@@ -16,9 +16,23 @@ import type { ITool, SvgIcon, ToolId, ToolOption } from './tool';
 
 type EraserStyle = 'stroke' | 'precise';
 
+// Scrubbing faster than this (screen px/ms) grows the eraser; slower movement shrinks it back.
+const SCRUB_SPEED = 1;
+const SCRUB_GROWTH_PER_PX = 1 / 1000;
+const SCRUB_MAX_BOOST = 3;
+const SCRUB_SHRINK_MS = 250;
+
+interface ScrubSample {
+  x: number;
+  y: number;
+  time: number;
+}
+
 export class EraserTool implements ITool {
   private radius = 20;
   private eraserStyle: EraserStyle = 'stroke';
+  private boost = 1;
+  private lastSample: ScrubSample | null = null;
 
   public constructor(private readonly getStrings: MessageGetter) {}
 
@@ -26,17 +40,63 @@ export class EraserTool implements ITool {
     return 'eraser';
   }
 
-  public start(_canvas: DrawableCanvas, _event: PointerEvent): void {}
+  public start(_canvas: DrawableCanvas, event: PointerEvent): void {
+    this.boost = 1;
+    this.lastSample = {
+      x: event.clientX,
+      y: event.clientY,
+      time: event.timeStamp,
+    };
+  }
 
-  public finish(_canvas: DrawableCanvas, _event: PointerEvent): void {}
+  public finish(_canvas: DrawableCanvas, _event: PointerEvent): void {
+    this.resetScrub();
+  }
 
-  public interrupt(_canvas: DrawableCanvas): void {}
+  public interrupt(_canvas: DrawableCanvas): void {
+    this.resetScrub();
+  }
+
+  private resetScrub(): void {
+    this.boost = 1;
+    this.lastSample = null;
+  }
+
+  private get effectiveRadius(): number {
+    return this.radius * this.boost;
+  }
+
+  // Screen px, not world, so the scrub feel doesn't change with zoom.
+  private trackScrub(event: PointerEvent): void {
+    const last = this.lastSample;
+    if (!last) {
+      return;
+    }
+    const sample = {
+      x: event.clientX,
+      y: event.clientY,
+      time: event.timeStamp,
+    };
+    const dt = Math.max(sample.time - last.time, 1);
+    const distance = Math.hypot(sample.x - last.x, sample.y - last.y);
+    this.lastSample = sample;
+    if (distance / dt > SCRUB_SPEED) {
+      this.boost = Math.min(
+        SCRUB_MAX_BOOST,
+        this.boost + distance * SCRUB_GROWTH_PER_PX,
+      );
+    } else {
+      this.boost = 1 + (this.boost - 1) * Math.exp(-dt / SCRUB_SHRINK_MS);
+    }
+  }
 
   public update(
     canvas: DrawableCanvas,
-    _event: PointerEvent,
+    event: PointerEvent,
     position: Vector2,
   ): void {
+    this.trackScrub(event);
+    const radius = this.effectiveRadius;
     for (const element of [...canvas.elements]) {
       if (
         element.type !== ElementType.STROKE &&
@@ -46,17 +106,17 @@ export class EraserTool implements ITool {
       }
       if (this.eraserStyle === 'precise') {
         if (element instanceof StrokeElement) {
-          this.eraseStrokePoints(canvas, element, position);
+          this.eraseStrokePoints(canvas, element, position, radius);
           continue;
         }
         if (element instanceof ShapeElement) {
-          if (element.isOver(position.x, position.y, this.radius, canvas.ctx)) {
-            this.eraseShape(canvas, element, position);
+          if (element.isOver(position.x, position.y, radius, canvas.ctx)) {
+            this.eraseShape(canvas, element, position, radius);
           }
           continue;
         }
       }
-      if (element.isOver(position.x, position.y, this.radius, canvas.ctx)) {
+      if (element.isOver(position.x, position.y, radius, canvas.ctx)) {
         canvas.removeElement(element);
       }
     }
@@ -66,6 +126,7 @@ export class EraserTool implements ITool {
     canvas: DrawableCanvas,
     shape: ShapeElement,
     position: Vector2,
+    radius: number,
   ): void {
     const originalIndex = canvas.elements.indexOf(shape);
     const style = {
@@ -95,7 +156,7 @@ export class EraserTool implements ITool {
         strokes.push(stroke);
       }
       for (const stroke of strokes) {
-        this.eraseStrokePoints(canvas, stroke, position);
+        this.eraseStrokePoints(canvas, stroke, position, radius);
       }
     });
   }
@@ -104,11 +165,12 @@ export class EraserTool implements ITool {
     canvas: DrawableCanvas,
     stroke: StrokeElement,
     position: Vector2,
+    radius: number,
   ): void {
     const runs = stroke.getPointRunsOutsideCircle(
       position.x,
       position.y,
-      this.radius,
+      radius,
     );
     if (!runs) {
       return;
@@ -178,13 +240,13 @@ export class EraserTool implements ITool {
     const palette = getCanvasPalette();
     ctx.fillStyle = palette.selectionFill;
     ctx.beginPath();
-    ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);
+    ctx.arc(position.x, position.y, this.effectiveRadius, 0, 2 * Math.PI);
     ctx.fill();
 
     ctx.strokeStyle = withCanvasAlpha(palette.selectionStroke, 0.5);
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(position.x, position.y, this.radius, 0, 2 * Math.PI);
+    ctx.arc(position.x, position.y, this.effectiveRadius, 0, 2 * Math.PI);
     ctx.stroke();
   }
 
