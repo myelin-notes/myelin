@@ -268,7 +268,7 @@ const zhHans: SiteCopy = {
       code: {
         label: '代码',
         heading: '笔记旁边就是你的 Notebook。',
-        lede: '在页面里直接运行代码块，结果显示在画布上，从文本到表格和图表。也能把 Jupyter Notebook 一起带进来。运行代码属于 Myelin Notes Pro。',
+        lede: '在页面里直接运行代码块，结果显示在画布上，从文本到表格和图表。也能把 Jupyter Notebook 一起带进来。',
         details: [
           'Python、JavaScript、TypeScript、Ruby、Bash、Go、Rust、C 和 C++',
           '在你的电脑上运行，使用你已安装的工具链',
@@ -302,7 +302,7 @@ const zhHans: SiteCopy = {
       agents: {
         label: 'AI 智能体',
         heading: '用你自己的 AI，在你自己的电脑上',
-        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。AI 智能体属于 Myelin Notes Pro 功能。',
+        lede: 'Myelin 没有内置聊天机器人，而是运行一个本地 MCP 服务器，让你已经在用的 AI 应用读取你的笔记，并在你允许时写入。',
         details: [
           '服务器只监听 127.0.0.1，端口由你选择',
           '从设置中复制安装提示，即可连接你的智能体',

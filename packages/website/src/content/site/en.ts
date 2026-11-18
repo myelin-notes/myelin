@@ -276,7 +276,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       code: {
         label: 'Code',
         heading: 'Notebooks that sit next to your notes.',
-        lede: 'Run code blocks right in a page and see the output on the canvas, from plain text to tables and charts. Bring your Jupyter notebooks with you. Running code is part of Myelin Notes Pro.',
+        lede: 'Run code blocks right in a page and see the output on the canvas, from plain text to tables and charts. Bring your Jupyter notebooks with you.',
         details: [
           'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C, and C++',
           'Runs on your machine, with the toolchains you already have installed',
@@ -310,7 +310,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       agents: {
         label: 'AI agents',
         heading: 'Bring your own AI, on your own machine.',
-        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them. AI agents are part of Myelin Notes Pro.',
+        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them.',
         details: [
           'The server listens only on 127.0.0.1, on a port you choose',
           'Copy the install prompt from Settings to connect your agent',

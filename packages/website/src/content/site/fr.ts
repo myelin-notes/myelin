@@ -273,7 +273,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       code: {
         label: 'Code',
         heading: 'Des notebooks à côté de vos notes.',
-        lede: 'Exécutez des blocs de code dans une page et voyez le résultat sur le canevas, du texte aux tableaux et graphiques. Emportez vos notebooks Jupyter avec vous. L’exécution de code fait partie de Myelin Notes Pro.',
+        lede: 'Exécutez des blocs de code dans une page et voyez le résultat sur le canevas, du texte aux tableaux et graphiques. Emportez vos notebooks Jupyter avec vous.',
         details: [
           'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C et C++',
           'S’exécute sur votre machine, avec les outils déjà installés',
@@ -307,7 +307,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       agents: {
         label: 'Agents IA',
         heading: 'Votre propre IA, sur votre propre machine.',
-        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire. Les agents IA font partie de Myelin Notes Pro.',
+        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire.',
         details: [
           'Le serveur n’écoute que sur 127.0.0.1, sur le port de votre choix',
           'Copiez l’invite d’installation depuis les Réglages pour connecter votre agent',
