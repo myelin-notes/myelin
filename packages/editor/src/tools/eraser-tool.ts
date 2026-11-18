@@ -31,6 +31,7 @@ interface ScrubSample {
 export class EraserTool implements ITool {
   private radius = 20;
   private eraserStyle: EraserStyle = 'stroke';
+  private growWhenScrubbing = true;
   private boost = 1;
   private lastSample: ScrubSample | null = null;
 
@@ -69,7 +70,7 @@ export class EraserTool implements ITool {
   // Screen px, not world, so the scrub feel doesn't change with zoom.
   private trackScrub(event: PointerEvent): void {
     const last = this.lastSample;
-    if (!last) {
+    if (!last || !this.growWhenScrubbing) {
       return;
     }
     const sample = {
@@ -281,6 +282,15 @@ export class EraserTool implements ITool {
             icon: PreciseEraserIcon,
           },
         ],
+      },
+      {
+        type: 'toggle',
+        key: 'growWhenScrubbing',
+        label: strings.toolOptions.growWhenScrubbing,
+        value: this.growWhenScrubbing,
+        set: (growWhenScrubbing) => {
+          this.growWhenScrubbing = growWhenScrubbing;
+        },
       },
       {
         type: 'size',

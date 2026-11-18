@@ -1254,6 +1254,7 @@ const es: typeof en = {
       medium: (value: number) => `Medio (${value})`,
       bold: (value: number) => `Grueso (${value})`,
       pressure: 'Presión',
+      growWhenScrubbing: 'Agrandar al frotar',
       stabilization: 'Estabilización',
       lineStyle: 'Línea',
       solid: 'Continua',
