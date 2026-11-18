@@ -31,11 +31,15 @@ interface RowProps {
   /** Returns true when a modifier key handled the click, so the row skips its default action. */
   onSelect: (e: React.MouseEvent) => boolean;
   onChanged: () => void;
+  /** Reports a drag entering or leaving this row; the tree highlights the folder it drops into. */
+  onDropHover: (over: boolean) => void;
 }
 
 interface FolderRowProps extends RowProps {
   node: VFSFolderNode;
   expanded: boolean;
+  /** A drag is over this folder or one of its direct children. */
+  dropHighlighted: boolean;
   onToggle: () => void;
   onNewFolder: () => void;
   onNewFile: (title: string, type: FileType) => void;
@@ -47,6 +51,7 @@ export function SidebarFolderRow({
   node,
   depth,
   expanded,
+  dropHighlighted,
   autoRename,
   onRenameEnd,
   selected,
@@ -58,6 +63,7 @@ export function SidebarFolderRow({
   onImport,
   importDisabled,
   onChanged,
+  onDropHover,
 }: FolderRowProps) {
   const {
     contextMenuProps,
@@ -81,9 +87,10 @@ export function SidebarFolderRow({
       />
     ),
   });
-  const { dragOver, dropTargetProps } = useDropTarget({
+  const { dropTargetProps } = useDropTarget({
     targetFolderId: node.id,
     onMoved: onChanged,
+    onDragOverChange: onDropHover,
   });
 
   return (
@@ -112,7 +119,7 @@ export function SidebarFolderRow({
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
                 selected && 'bg-hover-tint',
-                dragOver
+                dropHighlighted
                   ? 'bg-accent/15 ring-1 ring-accent/40'
                   : 'hover:bg-hover-tint',
                 dragging && 'opacity-40',
@@ -165,6 +172,7 @@ export function SidebarFileRow({
   selectionIds,
   onSelect,
   onChanged,
+  onDropHover,
 }: FileRowProps) {
   const tabController = useTabController();
   const {
@@ -179,6 +187,11 @@ export function SidebarFileRow({
     initialRenaming: autoRename,
     onRenameEnd,
     nodeIds: selected ? selectionIds : undefined,
+  });
+  const { dropTargetProps } = useDropTarget({
+    targetFolderId: node.parentId,
+    onMoved: onChanged,
+    onDragOverChange: onDropHover,
   });
   const FileIcon = getFileTypeIcon(node.fileType);
 
@@ -197,6 +210,8 @@ export function SidebarFileRow({
               }}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
+              // Root-level files let the drop bubble to the tree's root target.
+              {...(node.parentId === null ? {} : dropTargetProps)}
               style={{ paddingLeft: treeRowPadding(depth) }}
               aria-label={
                 renaming

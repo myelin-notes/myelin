@@ -238,18 +238,29 @@ describe('workspace JSON round-trip', () => {
     await source.setTags(folderId, ['work']);
     await source.setTags(photoId, ['img']);
     await source.addCustomColor('#123456', 'pen');
-    await source.addPenPreset({ tool: 'pen', color: '#123456', size: 3 });
+    await source.addPenPreset({
+      tool: 'pen',
+      color: '#123456',
+      size: 3,
+      lineStyle: 'dashed',
+    });
     await source.addPenPreset({
       tool: 'highlighter',
       color: '#ffee00',
       size: 9,
+      lineStyle: 'solid',
     });
     await source.addRegistryTags(['archive']);
 
     const destination = new TestRepository('repositories/import-destination');
     await destination.addCustomColor('#abcdef', 'pen');
     for (let size = 1; size < MAX_PEN_PRESETS; size++) {
-      await destination.addPenPreset({ tool: 'pen', color: '#000000', size });
+      await destination.addPenPreset({
+        tool: 'pen',
+        color: '#000000',
+        size,
+        lineStyle: 'solid',
+      });
     }
 
     const { vaultPath } = await exportWorkspaceJson({
@@ -285,6 +296,7 @@ describe('workspace JSON round-trip', () => {
       tool: 'pen',
       color: '#123456',
       size: 3,
+      lineStyle: 'dashed',
     });
     expect(await destination.getRegistryTags()).toContain('archive');
   });

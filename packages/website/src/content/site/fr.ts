@@ -60,7 +60,7 @@ const fr: SiteCopy = {
 
   pages: {
     heading: 'De vrais documents, directement sur le canevas.',
-    body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code, exécutables avec Pro.',
+    body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code, exécutables avec Pro. Les notebooks Jupyter s’y importent directement.',
   },
 
   audioSearch: {
@@ -185,7 +185,7 @@ const fr: SiteCopy = {
 
 ## Est-ce vraiment gratuit ?
 
-Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
+Oui. La version gratuite est gratuite pour un usage personnel, sans limite de durée et avec presque toutes les fonctionnalités. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, qui ajoute les agents IA via MCP, l’exécution de code, la reconnaissance de l’écriture manuscrite et des limites plus élevées. Vos notes ne sont jamais derrière un paywall.
 
 ## Où sont stockées mes notes ?
 
@@ -205,7 +205,7 @@ Oui, en direct et de pair à pair, dès aujourd’hui. Il n’y a pas de compte 
 
 ## Puis-je importer depuis une autre app ?
 
-Oui. Myelin importe un coffre Obsidian, un bloc-notes OneNote .onepkg ou une section .one, un dossier Goodnotes exporté en PDF, des fichiers Markdown, PDF, images et vidéos isolés, et un dossier d’espace de travail exporté depuis Myelin lui-même. Notion passe par son propre export Markdown et CSV, que l’importeur de fichiers lit ; un importeur Notion dédié qui conserve la hiérarchie des pages est sur la feuille de route.
+Oui. Myelin importe un coffre Obsidian, un bloc-notes OneNote .onepkg ou une section .one, un dossier Goodnotes exporté en PDF, des fichiers Markdown, PDF, notebooks Jupyter, images et vidéos isolés, et un dossier d’espace de travail exporté depuis Myelin lui-même. Notion passe par son propre export Markdown et CSV, que l’importeur de fichiers lit ; un importeur Notion dédié qui conserve la hiérarchie des pages est sur la feuille de route.
 
 ## Fonctionne-t-il hors ligne ?
 
@@ -241,6 +241,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Une gomme par trait, ou une gomme précise qui n’efface que ce qu’elle touche',
           'Sélection au rectangle ou au lasso, pour déplacer, copier, verrouiller ou réordonner',
           'Des couleurs personnalisées enregistrées une fois pour toutes, et du texte dans la police de votre choix',
+          'Avec Pro, retrouvez les mots écrits à la main, reconnus sur votre appareil (pas encore sous Linux)',
         ],
       },
       pdfs: {
@@ -269,6 +270,17 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Mise en page Pages, Colonnes ou Continu',
         ],
       },
+      code: {
+        label: 'Code',
+        heading: 'Des notebooks à côté de vos notes.',
+        lede: 'Exécutez des blocs de code dans une page et voyez le résultat sur le canevas, du texte aux tableaux et graphiques. Emportez vos notebooks Jupyter avec vous.',
+        details: [
+          'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C et C++',
+          'S’exécute sur votre machine, avec les outils déjà installés',
+          'Les DataFrames pandas s’affichent en tableaux, les figures matplotlib en images',
+          'Importez des notebooks .ipynb avec leurs cellules Markdown et de code',
+        ],
+      },
       canvas: {
         label: 'Canevas',
         heading: 'Un canevas infini où l’on ne se perd pas.',
@@ -295,7 +307,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       agents: {
         label: 'Agents IA',
         heading: 'Votre propre IA, sur votre propre machine.',
-        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire. Les agents IA font partie de Myelin Notes Pro.',
+        lede: 'Myelin n’a pas de chatbot intégré. Il fait tourner un serveur MCP local, pour que l’app d’IA que vous utilisez déjà puisse lire vos notes et, si vous l’autorisez, y écrire.',
         details: [
           'Le serveur n’écoute que sur 127.0.0.1, sur le port de votre choix',
           'Copiez l’invite d’installation depuis les Réglages pour connecter votre agent',
@@ -317,7 +329,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
           'Vos notes sont des fichiers ordinaires sur votre disque, dans un format ouvert (Yjs)',
           'Fonctionne entièrement hors ligne, sans compte',
           'Synchronisation entre appareils via un dépôt GitHub que vous contrôlez',
-          'Import depuis Goodnotes, OneNote, Obsidian, Notion, Markdown et PDF',
+          'Import depuis Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown et PDF',
           'Export en PDF, en Markdown, en coffre Obsidian ou en JSON de l’espace de travail',
           'En anglais, espagnol, français et chinois simplifié',
         ],
@@ -352,7 +364,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       pdfAnchor: {
         title: 'Des notes qui restent sur la page',
         body: 'Ce que vous écrivez sur une page de PDF est attaché à cette page. Si vous déplacez le PDF ou changez sa disposition, vos notes restent au même endroit de la page. Ancrer à la page fixe aussi les images et les formes.',
-        alt: 'Une formule de la page 2 d’un PDF est entourée et annotée, puis le PDF passe en Colonnes et l’encre suit sa page',
+        alt: 'Une formule de la page 2 d’un PDF est entourée et annotée, puis une page vierge est ajoutée avant elle et l’encre descend avec sa page',
       },
       slash: {
         title: 'Insérez tout avec /',
@@ -363,6 +375,11 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         title: 'Des images qui suivent le texte',
         body: 'Ancrez une image à une page et le texte lui fait de la place. Écrivez au-dessus et l’image descend avec les mots.',
         alt: 'Une photo est ancrée dans une page, le texte lui fait de la place, puis la saisie au-dessus la fait descendre',
+      },
+      jupyter: {
+        title: 'Notebooks Jupyter, importés',
+        body: 'Importez un .ipynb et ses cellules Markdown et de code deviennent une page. Exécutez une cellule pour retrouver son tableau ou son graphique, puis écrivez vos notes à côté au stylet.',
+        alt: 'Un notebook Jupyter est importé en page, une cellule pandas produit un tableau, une cellule matplotlib une courbe, et le stylet écrit « launch week » avec une flèche vers le pic',
       },
       canvasStyle: {
         title: 'Un style pour chaque canevas',
@@ -383,6 +400,11 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         title: 'Votre app d’IA, en dialogue avec Myelin',
         body: 'La fenêtre de discussion représente l’app d’IA que vous utilisez : elle ne fait pas partie de Myelin. Via MCP sur votre machine, elle lit votre écriture manuscrite et ajoute au canevas une page de résumé tapé.',
         alt: 'Une app d’IA distincte lit des notes manuscrites dans Myelin via MCP et ajoute à côté une page de résumé tapé',
+      },
+      handwritingSearch: {
+        title: 'Reconnaissance de l’écriture manuscrite',
+        body: 'Avec Pro, Myelin reconnaît votre écriture manuscrite sur votre appareil : la recherche du canevas et celle de la bibliothèque trouvent les mots écrits à la main.',
+        alt: 'Taper « entropy » dans Rechercher mène à chaque note manuscrite qui le contient et la sélectionne',
       },
     },
     notes: [
@@ -428,7 +450,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
   pricing: {
     meta: {
       title: 'Tarifs | Myelin Notes',
-      description: `Myelin Notes est gratuit pour un usage personnel. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, pour les agents IA via MCP, l’exécution de code et des limites plus élevées.`,
+      description: `Myelin Notes est gratuit pour un usage personnel. Myelin Notes Pro est un achat unique de ${formatPrice('fr', 'pro')}, ou ${formatPrice('fr', 'student')} pour les étudiants, pour les agents IA via MCP, l’exécution de code, la reconnaissance de l’écriture manuscrite et des limites plus élevées.`,
     },
     eyebrow: 'Tarifs',
     headline: 'Gratuit à l’usage. Pro quand vous voulez plus.',
@@ -444,8 +466,9 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
         'Enregistrement audio avec transcription sur l’appareil',
         'Synchronisation GitHub et collaboration en direct',
         'Import, export, recherche et liens',
+        'Jusqu’à 2 types de drapeau',
+        'Jusqu’à 25 drapeaux par note',
         'Jusqu’à 6 préréglages de stylo personnalisés',
-        '2 types de drapeau',
       ],
       cta: 'Télécharger',
     },
@@ -458,10 +481,12 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
       includes: [
         'Agents IA via un serveur MCP local',
         'Exécution des blocs de code dans vos pages',
-        'Types de drapeau illimités',
-        'Préréglages de stylo personnalisés illimités',
+        'Jusqu’à 8 types de drapeau',
+        'Drapeaux illimités par note',
+        'Jusqu’à 16 préréglages de stylo personnalisés',
         'Vos propres images en fond de canevas',
         'Modèles de transcription plus précis',
+        'Reconnaissance de l’écriture manuscrite, pour que la recherche trouve ce que vous avez écrit',
         'Soutenir le développement de Myelin',
       ],
       cta: 'Acheter Pro',

@@ -21,6 +21,7 @@ import {
   type CanvasSearchSource,
   collectCanvasSearchSources,
 } from './collect';
+import type { HandwritingIndex } from './handwriting';
 
 /** Frames to keep retrying the highlight while a panned-to frame's view mounts. */
 const HIGHLIGHT_MOUNT_RETRY_FRAMES = 60;
@@ -57,6 +58,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 export function useCanvasSearch(
   drawableCanvasRef: RefObject<DrawableCanvas | null>,
+  handwriting: HandwritingIndex,
 ): CanvasSearchController {
   const [open, setOpen] = useState(false);
   const [query, setQueryState] = useState('');
@@ -64,6 +66,9 @@ export function useCanvasSearch(
   const [currentIndex, setCurrentIndex] = useState(0);
   /** The page frame or PDF currently showing a match highlight, if any. */
   const highlightedFrameRef = useRef<string | null>(null);
+  const navigatedKeyRef = useRef<string | null>(null);
+  /** Bumped per open so a slow recognition can't append to a later session's sources. */
+  const searchSessionRef = useRef(0);
 
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const matches = useMemo(
@@ -191,10 +196,17 @@ export function useCanvasSearch(
       return;
     }
     const match = matches[currentIndex];
-    if (match) {
-      navigateToMatch(match, debouncedQuery);
-    } else {
+    if (!match) {
+      navigatedKeyRef.current = null;
       clearActiveHighlight();
+      return;
+    }
+    // Handwriting results arriving rebuild `matches`; the current one is unchanged, so leave the
+    // camera alone rather than restart its animation.
+    const key = JSON.stringify([match, debouncedQuery]);
+    if (key !== navigatedKeyRef.current) {
+      navigatedKeyRef.current = key;
+      navigateToMatch(match, debouncedQuery);
     }
   }, [
     open,
@@ -216,11 +228,18 @@ export function useCanvasSearch(
       return;
     }
     clearActiveHighlight();
+    navigatedKeyRef.current = null;
     setOpen(true);
     setQueryState('');
     setCurrentIndex(0);
     setSources(collectCanvasSearchSources(dc));
-  }, [drawableCanvasRef, clearActiveHighlight]);
+    const session = ++searchSessionRef.current;
+    void handwriting.collect(dc, (found) => {
+      if (searchSessionRef.current === session) {
+        setSources((current) => [...current, ...found]);
+      }
+    });
+  }, [drawableCanvasRef, handwriting, clearActiveHighlight]);
 
   const close = useCallback(() => {
     clearActiveHighlight();

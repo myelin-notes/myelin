@@ -12,6 +12,8 @@ use serde::Serialize;
 use tauri::ipc::{InvokeBody, Request};
 use tauri::{path::BaseDirectory, AppHandle, Emitter, Manager, State};
 
+use crate::transcription_models::downloaded_model_path;
+
 const MODEL_DIR: &str = "scribble-models";
 const DEFAULT_MODEL_FILE: &str = "ggml-base-q5_1.bin";
 const VAD_STUB_FILE: &str = "scribble-vad-stub.bin";
@@ -25,7 +27,7 @@ const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 type SampleSender = mpsc::SyncSender<TranscriptionMessage>;
 type Sessions = Arc<Mutex<HashMap<String, SessionHandle>>>;
 type SharedScribble = Arc<Scribble<WhisperBackend>>;
-type ScribbleEngine = Arc<Mutex<Option<SharedScribble>>>;
+type ScribbleEngine = Arc<Mutex<Option<(PathBuf, SharedScribble)>>>;
 
 enum TranscriptionMessage {
     Samples { samples: Vec<f32>, sample_rate: u32 },
@@ -81,8 +83,9 @@ pub fn start_audio_transcription(
     app: AppHandle,
     state: State<'_, TranscriptionState>,
     session_id: String,
+    model_id: Option<String>,
 ) -> Result<(), String> {
-    let paths = resolve_model_paths(&app)?;
+    let paths = resolve_model_paths(&app, model_id.as_deref())?;
     let (tx, rx) = mpsc::sync_channel::<TranscriptionMessage>(64);
     let cancelled = Arc::new(AtomicBool::new(false));
 
@@ -321,8 +324,10 @@ fn get_or_init_scribble(
     let mut guard = engine
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some(scribble) = guard.as_ref() {
-        return Ok(scribble.clone());
+    if let Some((path, scribble)) = guard.as_ref() {
+        if *path == paths.model_path {
+            return Ok(scribble.clone());
+        }
     }
 
     let scribble = Scribble::new(
@@ -331,7 +336,7 @@ fn get_or_init_scribble(
     )
     .map_err(|e| format!("initialize scribble: {e}"))?;
     let scribble = Arc::new(scribble);
-    *guard = Some(scribble.clone());
+    *guard = Some((paths.model_path, scribble.clone()));
     Ok(scribble)
 }
 
@@ -341,8 +346,12 @@ struct ModelPaths {
     vad_model_path: PathBuf,
 }
 
-fn resolve_model_paths(app: &AppHandle) -> Result<ModelPaths, String> {
-    let model_path = bundled_model_path(app, DEFAULT_MODEL_FILE)?;
+fn resolve_model_paths(app: &AppHandle, model_id: Option<&str>) -> Result<ModelPaths, String> {
+    // A missing or deleted download falls back to the bundled model rather than failing the session.
+    let model_path = match model_id.and_then(|id| downloaded_model_path(app, id)) {
+        Some(path) => path,
+        None => bundled_model_path(app, DEFAULT_MODEL_FILE)?,
+    };
 
     if !model_path.is_file() {
         return Err(format!(

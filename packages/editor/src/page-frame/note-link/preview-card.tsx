@@ -43,7 +43,7 @@ function ThumbnailRegion({
 }) {
   return (
     <div
-      className="relative aspect-[16/10] w-full overflow-hidden bg-surface/80"
+      className="relative aspect-[16/10] w-full overflow-hidden bg-muted/80"
       style={{ maskImage: FADE_MASK, WebkitMaskImage: FADE_MASK }}
     >
       <div

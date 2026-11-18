@@ -975,6 +975,33 @@ export class NativeRepository implements Repository {
     return getBacklinks(manifest, noteId);
   }
 
+  /** Recognized handwriting this device saved for a canvas, by block key; `{}` before indexing starts. */
+  async loadHandwritingText(id: VFSNodeId): Promise<Record<string, string>> {
+    const repoId = noteContentIndex.repoIdFor(this);
+    return repoId
+      ? invoke<Record<string, string>>('read_handwriting_text', {
+          repoId,
+          nodeId: id,
+        })
+      : {};
+  }
+
+  /** Replaces the canvas's saved handwriting and reindexes it; a no-op before indexing starts. */
+  async saveHandwritingText(
+    id: VFSNodeId,
+    texts: Record<string, string>,
+  ): Promise<void> {
+    const repoId = noteContentIndex.repoIdFor(this);
+    if (!repoId) {
+      return;
+    }
+    await invoke('write_handwriting_text', { repoId, nodeId: id, texts });
+    const path = await this.getStoredAbsolutePath(id);
+    if (path) {
+      noteContentIndex.queueSaved(this, id, path);
+    }
+  }
+
   /** Flags in every canvas, read from saved files. */
   async listFlags(): Promise<NoteFlag[]> {
     const { manifest } = await this.loadMetadata();
@@ -1299,7 +1326,8 @@ export class NativeRepository implements Repository {
           (existing) =>
             existing.tool === preset.tool &&
             existing.color === normalized &&
-            existing.size === preset.size,
+            existing.size === preset.size &&
+            existing.lineStyle === preset.lineStyle,
         );
         if (!duplicate) {
           if (presets.length >= MAX_PEN_PRESETS) {
@@ -1336,6 +1364,9 @@ export class NativeRepository implements Repository {
                 ...preset,
                 ...(normalized ? { color: normalized } : {}),
                 ...(changes.size !== undefined ? { size: changes.size } : {}),
+                ...(changes.lineStyle !== undefined
+                  ? { lineStyle: changes.lineStyle }
+                  : {}),
               }
             : preset,
         );

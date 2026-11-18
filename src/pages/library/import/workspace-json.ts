@@ -309,7 +309,10 @@ function parseWorkspace(raw: string, sourcePath: string): WorkspaceJson {
       (preset) =>
         (preset.tool === 'pen' || preset.tool === 'highlighter') &&
         isColor(preset.color) &&
-        Number.isFinite(preset.size),
+        Number.isFinite(preset.size) &&
+        (preset.lineStyle === undefined ||
+          preset.lineStyle === 'solid' ||
+          preset.lineStyle === 'dashed'),
     ) &&
     isStringArray(workspace.tagRegistry);
   if (!valid) {
@@ -343,11 +346,16 @@ async function mergeWorkspaceSettings(
   }
   await repository.addRegistryTags(workspace.tagRegistry);
   let presets = await repository.getPenPresets();
-  for (const { tool, color, size } of workspace.penPresets) {
+  for (const { tool, color, size, lineStyle } of workspace.penPresets) {
     if (presets.length >= MAX_PEN_PRESETS) {
       break;
     }
-    presets = await repository.addPenPreset({ tool, color, size });
+    presets = await repository.addPenPreset({
+      tool,
+      color,
+      size,
+      lineStyle: lineStyle ?? 'solid',
+    });
   }
 }
 

@@ -30,6 +30,14 @@ const zhHans: typeof en = {
         title: '自定义画布背景',
         description: '将任意图片用作笔记背后的背景。',
       },
+      transcription: {
+        title: '更准确的转写',
+        description: '下载更大的本地模型，转写更准确，尤其是英语以外的语言。',
+      },
+      handwriting: {
+        title: '搜索手写内容',
+        description: '用画布搜索找到你手写的文字。笔迹在你的设备上识别。',
+      },
       limits: {
         title: '更高的上限',
         description:
@@ -163,6 +171,14 @@ const zhHans: typeof en = {
         nativeFile:
           '暂不支持原生 .goodnotes 文件。请先在 Goodnotes 中将文件夹导出为 PDF，再导入该 ZIP。',
         summary: (count: number) => `已导入 ${count} 个文件`,
+      },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          '包含 Markdown 和代码单元的 .ipynb 笔记本。需为 v4 或更高格式。',
+        title: '导入 Jupyter 笔记本',
+        scanning: '正在读取笔记本...',
+        empty: '所选文件中没有笔记本',
       },
       goodnotes_zip: {
         label: '从 Goodnotes 导入',
@@ -624,6 +640,33 @@ const zhHans: typeof en = {
         succeeded: (notes: number, media: number) =>
           `已导出 ${notes} 个笔记和 ${media} 个媒体文件`,
       },
+    },
+    transcription: {
+      title: '转写',
+      eyebrow: '设备端',
+      label: '语音转文字模型',
+      description:
+        '将录音转为可搜索的文字。完全在本设备上运行，音频不会离开设备。模型越大越准确，但速度越慢。',
+      models: {
+        base: {
+          label: '基础',
+          description: '在任何设备上都很快。适合清晰的语音，但错误较多。',
+        },
+        small: {
+          label: '小型',
+          description: '比基础模型更准确。在大多数平板和电脑上运行良好。',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            '准确度最高。仅限电脑，配合 GPU 效果最佳。在较旧的电脑上实时转写可能会延迟。',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: '下载',
+      included: '内置',
+      delete: '删除模型',
+      downloadFailed: '模型下载失败',
     },
     privacy: {
       title: '隐私',
@@ -1128,6 +1171,9 @@ const zhHans: typeof en = {
       bold: (value: number) => `粗（${value}）`,
       pressure: '压感',
       stabilization: '防抖',
+      lineStyle: '线条',
+      solid: '实线',
+      dashed: '虚线',
       addCustomColor: '添加自定义颜色',
       deleteColor: '删除颜色',
       decreaseFontSize: '减小字号',
@@ -1257,7 +1303,8 @@ const zhHans: typeof en = {
       title: '帮助改进 Myelin Notes',
       description: '分析功能默认关闭。打开它可以帮助改进 Myelin Notes。',
       collected: '我们会收集你使用了哪些功能、应用版本以及崩溃报告。',
-      notCollected: '我们绝不会收集你的笔记、文件名或手写内容。',
+      notCollected:
+        '我们绝不会收集你的笔记、文件名或手写内容。在 Android 上，Google 的手写识别会向 Google 发送使用统计数据，但绝不会发送你书写的内容。',
       policy: '阅读隐私政策',
     },
     sync: {

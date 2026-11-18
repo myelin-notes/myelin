@@ -1,5 +1,6 @@
 import type { RunPollResponse } from '@myelin/editor/code-runner/contract';
 import type { CodeRunnerCapability } from '@myelin/editor/platform/types';
+import { isWindows } from '@myelin/shared/os';
 import { invoke } from '@tauri-apps/api/core';
 
 export const codeRunner: CodeRunnerCapability = {
@@ -23,4 +24,9 @@ export const codeRunner: CodeRunnerCapability = {
   releaseRun(executionId) {
     return invoke('release_run', { executionId });
   },
+
+  // Tauri serves custom schemes as http://<scheme>.localhost on Windows.
+  outputFrameUrl: isWindows
+    ? 'http://myelin-output.localhost/'
+    : 'myelin-output://localhost/',
 };

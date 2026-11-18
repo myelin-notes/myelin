@@ -84,6 +84,8 @@ const PREFS = {
   // `activationId` is this device's slot on the key; Polar allows 3 per key.
   license: pref<{ key: string; activationId: string } | null>('license', null),
   analyticsEnabled: pref<boolean>('analytics-enabled', false),
+  // Model id from list_transcription_models; the backend falls back to 'base' when it is missing.
+  transcriptionModel: pref<string>('transcription-model', 'base'),
   onboardingCompleted: pref<boolean>('onboarding-completed', false),
   whatsNewSeen: pref<string>('whats-new-seen', ''),
   language: pref<string>('language', 'en'),

@@ -1,5 +1,5 @@
-import { memo } from 'react';
-import { Crosshair, ImageDown, Lock, Unlock } from 'lucide-react';
+import { memo, useState } from 'react';
+import { Crosshair, ImageDown, Lock, ScanText, Unlock } from 'lucide-react';
 import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { formatNumber } from '@myelin/editor/i18n/format';
 import { IS_DEV } from '@/lib/env';
@@ -12,6 +12,7 @@ interface StatusBarProps {
   onToggleZoomLock: () => void;
   onFitContent: () => void;
   onRegenerateThumbnail: () => void;
+  onListRecognizedText: () => Promise<string[]>;
 }
 
 export const StatusBar = memo(function StatusBar({
@@ -21,9 +22,11 @@ export const StatusBar = memo(function StatusBar({
   onToggleZoomLock,
   onFitContent,
   onRegenerateThumbnail,
+  onListRecognizedText,
 }: StatusBarProps) {
   const strings = useMessages();
   const locale = useLocale();
+  const [recognizedText, setRecognizedText] = useState<string[] | null>(null);
 
   // Compact takes the top-right corner the title bar vacates: the bottom-right
   // is where the tool bar now runs, and this is a passive readout that belongs
@@ -87,6 +90,37 @@ export const StatusBar = memo(function StatusBar({
           >
             <ImageDown className="h-3.5 w-3.5" />
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (recognizedText) {
+                setRecognizedText(null);
+              } else {
+                void onListRecognizedText().then(setRecognizedText);
+              }
+            }}
+            aria-label="Show recognized handwriting"
+            aria-pressed={recognizedText !== null}
+            title="Show recognized handwriting (debug)"
+            className="cursor-pointer rounded-md border-none bg-transparent p-1 text-text-muted transition-colors hover:bg-hover-tint hover:text-text-secondary"
+          >
+            <ScanText className="h-3.5 w-3.5" />
+          </button>
+          {recognizedText && (
+            <ol className="absolute right-0 bottom-full mb-2 max-h-80 w-72 select-text list-decimal overflow-y-auto rounded-xl bg-card py-2 pr-3 pl-8 text-text-secondary text-xs ring-1 ring-border-subtle/70">
+              {recognizedText.length === 0 ? (
+                <li className="list-none text-text-muted">
+                  No recognized text
+                </li>
+              ) : (
+                recognizedText.map((text, index) => (
+                  <li key={index} className="whitespace-pre-wrap py-0.5">
+                    {text}
+                  </li>
+                ))
+              )}
+            </ol>
+          )}
         </>
       )}
     </div>

@@ -68,7 +68,7 @@ export function PageSetupDialog({ frame, onClose }: PageSetupDialogProps) {
         }
       }}
     >
-      <DialogContent className="z-[110] sm:max-w-sm" overlayClassName="z-[110]">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{strings.pageSetup}</DialogTitle>
         </DialogHeader>

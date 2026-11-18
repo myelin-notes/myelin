@@ -164,17 +164,22 @@ function getPenPresetTool(tool: ITool | undefined): PenPresetTool | null {
   }
 }
 
-/** A pen or highlighter's live colour and stroke — the triple a preset is cut from. */
+/** A pen or highlighter's live colour, stroke and line style — what a preset is cut from. */
 function readPenSettings(
   tool: ITool | undefined,
-): { color: string; size: number } | null {
+): Omit<PenPreset, 'id' | 'tool'> | null {
   const options = tool?.getOptions?.() ?? [];
   const color = options.find((o) => o.type === 'color')?.value;
   const size = options.find((o) => o.type === 'size')?.value;
+  // The highlighter has no line style option.
+  const lineStyle =
+    options.find((o) => o.key === 'lineStyle')?.value === 'dashed'
+      ? 'dashed'
+      : 'solid';
   if (typeof color !== 'string' || typeof size !== 'number') {
     return null;
   }
-  return { color, size };
+  return { color, size, lineStyle };
 }
 
 function getCustomColorTool(tool: ITool): CustomColorTool | null {
@@ -291,6 +296,11 @@ export function useToolState(
       changes = { color: value };
     } else if (option.key === 'size' && typeof value === 'number') {
       changes = { size: value };
+    } else if (
+      option.key === 'lineStyle' &&
+      (value === 'solid' || value === 'dashed')
+    ) {
+      changes = { lineStyle: value };
     }
     if (changes) {
       void updatePreset(preset.id, changes);
@@ -327,12 +337,16 @@ export function useToolState(
       const options = target.getOptions?.() ?? [];
       const sizeOpt = options.find((o) => o.type === 'size');
       const colorOpt = options.find((o) => o.type === 'color');
+      const lineStyleOpt = options.find((o) => o.key === 'lineStyle');
       // Options before the switch, the order the wheel commits its own path in.
       if (sizeOpt) {
         applyOptionRef.current(target, sizeOpt, preset.size);
       }
       if (colorOpt) {
         applyOptionRef.current(target, colorOpt, preset.color);
+      }
+      if (lineStyleOpt) {
+        applyOptionRef.current(target, lineStyleOpt, preset.lineStyle);
       }
       drawableCanvasRef.current?.switchTool(index);
     },
@@ -412,7 +426,7 @@ export function useToolState(
 
   const activePenTool = getPenPresetTool(canvasTools[selectedToolIndex]);
 
-  // A preset is highlighted while the live tool still holds its exact triple, so applying one shows
+  // A preset is highlighted while the live tool still holds its exact settings, so applying one shows
   // immediately and any later drift drops the highlight on its own. Nothing is stored.
   // biome-ignore lint/correctness/useExhaustiveDependencies: optionsTick forces recompute when a tool option mutates in place
   const matchedPresetId = useMemo(() => {
@@ -425,6 +439,7 @@ export function useToolState(
         (preset) =>
           preset.tool === activePenTool &&
           preset.size === settings.size &&
+          preset.lineStyle === settings.lineStyle &&
           preset.color.toLowerCase() === settings.color.toLowerCase(),
       )?.id ?? null
     );

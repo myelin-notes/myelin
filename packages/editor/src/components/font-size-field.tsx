@@ -53,7 +53,7 @@ export function FontSizeField({
   const stepperClass = `flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md border-none bg-transparent text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-text-secondary ${touchTargets ? 'pointer-coarse:size-9' : ''}`;
 
   return (
-    <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-surface p-0.5">
+    <div className="flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5">
       <button
         type="button"
         aria-label={

@@ -60,6 +60,7 @@ export const FEATURE_SECTION_IDS = [
   'handwriting',
   'pdfs',
   'pages',
+  'code',
   'canvas',
   'sync',
   'agents',
@@ -79,10 +80,12 @@ export type FeatureClipId =
   | 'pdfAnchor'
   | 'slash'
   | 'imageAnchor'
+  | 'jupyter'
   | 'canvasStyle'
   | 'flags'
   | 'liveCollab'
-  | 'agents';
+  | 'agents'
+  | 'handwritingSearch';
 
 interface FeatureSection {
   /** The kicker, and the section's jump link at the top of the page. */

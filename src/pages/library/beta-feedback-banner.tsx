@@ -19,7 +19,7 @@ export function BetaFeedbackBanner() {
       onClick={() => void getPlatform().openExternal(FEEDBACK_FORM_URL)}
       className="flex w-full cursor-pointer items-center gap-3 rounded-2xl bg-card/75 px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-colors duration-150 hover:bg-card"
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface text-text-muted">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-text-muted">
         <MessageSquarePlus className="size-4" />
       </span>
       <span className="min-w-0 flex-1">

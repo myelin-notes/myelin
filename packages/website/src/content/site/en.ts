@@ -64,7 +64,7 @@ const en: SiteCopy = {
 
   pages: {
     heading: 'Real documents, right on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run.',
+    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run. Jupyter notebooks import straight into one.',
   },
 
   audioSearch: {
@@ -190,7 +190,7 @@ const en: SiteCopy = {
 
 ## Is it really free?
 
-Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, and higher limits. Your notes are never paywalled.
+Yes. The free version is free for personal use, with no time limit and nearly every feature. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, that adds AI agents over MCP, runnable code, handwriting recognition, and higher limits. Your notes are never paywalled.
 
 ## Where are my notes stored?
 
@@ -210,7 +210,7 @@ Yes, live and peer to peer, today. There is no Myelin account and nothing sittin
 
 ## Can I import from another app?
 
-Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
+Yes. Myelin imports an Obsidian vault, a OneNote .onepkg notebook or .one section, a Goodnotes folder exported as PDFs, loose Markdown, PDFs, Jupyter notebooks, images, and video, and a workspace folder exported from Myelin itself. Notion comes across through its own Markdown and CSV export, which the file importer reads; a dedicated Notion importer that keeps the page hierarchy is on the roadmap.
 
 ## Does it work offline?
 
@@ -245,6 +245,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'A stroke eraser or a precise one that erases only what it touches',
           'Rectangle or lasso selection, then move, copy, lock, or reorder',
           'Custom colors you save once and reuse, and typed text in your choice of font',
+          'With Pro, find words you wrote by hand, recognized on your device (not yet on Linux)',
         ],
       },
       pdfs: {
@@ -270,6 +271,17 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           '[[Note links]] with hover previews, updated when you rename a note',
           'Embedded images, videos, YouTube, and link cards',
           'Pages, Columns, or Continuous layout',
+        ],
+      },
+      code: {
+        label: 'Code',
+        heading: 'Notebooks that sit next to your notes.',
+        lede: 'Run code blocks right in a page and see the output on the canvas, from plain text to tables and charts. Bring your Jupyter notebooks with you.',
+        details: [
+          'Python, JavaScript, TypeScript, Ruby, Bash, Go, Rust, C, and C++',
+          'Runs on your machine, with the toolchains you already have installed',
+          'pandas DataFrames show as tables, matplotlib figures as images',
+          'Import .ipynb notebooks with their Markdown and code cells',
         ],
       },
       canvas: {
@@ -298,7 +310,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       agents: {
         label: 'AI agents',
         heading: 'Bring your own AI, on your own machine.',
-        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them. AI agents are part of Myelin Notes Pro.',
+        lede: 'Myelin has no built-in chatbot. It runs a local MCP server instead, so the AI app you already use can read your notes and, when you allow it, write to them.',
         details: [
           'The server listens only on 127.0.0.1, on a port you choose',
           'Copy the install prompt from Settings to connect your agent',
@@ -320,7 +332,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
           'Notes are plain files on your disk, in an open format (Yjs)',
           'Works fully offline, with no account',
           'Sync across devices through a GitHub repo you control',
-          'Import from Goodnotes, OneNote, Obsidian, Notion, Markdown, and PDFs',
+          'Import from Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown, and PDFs',
           'Export to PDF, Markdown, an Obsidian vault, or workspace JSON',
           'In English, Spanish, French, and Simplified Chinese',
         ],
@@ -355,7 +367,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       pdfAnchor: {
         title: 'Notes that stay on the page',
         body: 'What you write on a PDF page is attached to that page. Move the PDF or change its layout, and your notes stay in the same spot on the page. Anchor to page pins images and shapes the same way.',
-        alt: 'A formula on page 2 of a PDF is circled and annotated, then the PDF switches to Columns and the ink moves with its page',
+        alt: 'A formula on page 2 of a PDF is circled and annotated, then a blank page is added above it and the ink moves down with its page',
       },
       slash: {
         title: 'Insert anything with /',
@@ -366,6 +378,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         title: 'Images that flow with your text',
         body: 'Anchor an image to a page and the text makes room for it. Type above it and the image moves down with the words.',
         alt: 'A photo on a page is anchored, the text makes room for it, and typing above carries it down',
+      },
+      jupyter: {
+        title: 'Jupyter notebooks, imported',
+        body: 'Import a .ipynb and its Markdown and code cells become a page. Run a cell to get its table or chart back, then write your notes beside it with the pen.',
+        alt: 'A Jupyter notebook is imported as a page, a pandas cell runs into a table, a matplotlib cell into a line chart, and the pen writes "launch week" with an arrow up at the peak',
       },
       canvasStyle: {
         title: 'A style for every canvas',
@@ -386,6 +403,11 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         title: 'Your AI app, talking to Myelin',
         body: 'The chat window here stands in for whichever AI app you use: it is not part of Myelin. Over MCP on your machine, it reads your handwriting and adds a typed summary page to the canvas.',
         alt: 'A separate AI app reads handwritten notes in Myelin over MCP and adds a typed summary page beside them',
+      },
+      handwritingSearch: {
+        title: 'Handwriting recognition',
+        body: 'With Pro, Myelin recognizes your handwriting on your device, so Find on the canvas and library search match the words you wrote by hand.',
+        alt: 'Typing “entropy” into Find jumps to each handwritten note that mentions it and selects it',
       },
     },
     notes: [
@@ -431,7 +453,7 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   pricing: {
     meta: {
       title: 'Pricing | Myelin Notes',
-      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, and higher limits.`,
+      description: `Myelin Notes is free for personal use. Myelin Notes Pro is a one-time purchase of ${formatPrice('en', 'pro')}, or ${formatPrice('en', 'student')} for students, for AI agents over MCP, runnable code, handwriting recognition, and higher limits.`,
     },
     eyebrow: 'Pricing',
     headline: 'Free to use. Pro when you want more.',
@@ -447,8 +469,9 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
         'Audio recording with on-device transcription',
         'GitHub sync and live collaboration',
         'Import, export, search, and links',
+        'Up to 2 flag types',
+        'Up to 25 flags per note',
         'Up to 6 custom pen presets',
-        '2 flag types',
       ],
       cta: 'Download',
     },
@@ -461,10 +484,12 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
       includes: [
         'AI agents over a local MCP server',
         'Run code blocks in your pages',
-        'Unlimited flag types',
-        'Unlimited custom pen presets',
+        'Up to 8 flag types',
+        'Unlimited flags per note',
+        'Up to 16 custom pen presets',
         'Your own images as canvas backgrounds',
         'More accurate transcription models',
+        'Handwriting recognition, so search finds what you wrote',
         'Support Myelin’s development',
       ],
       cta: 'Buy Pro',

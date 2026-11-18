@@ -93,7 +93,7 @@ export function PeerSyncPanel({ session, status }: PeerSyncPanelProps) {
       </div>
 
       {peerSnapshot && (
-        <div className="flex flex-col gap-2 rounded-lg bg-surface px-3 py-2">
+        <div className="flex flex-col gap-2 rounded-lg bg-muted px-3 py-2">
           <div className="flex items-center justify-between text-[10px] text-text-muted">
             <span>{strings.canvas.peerSync.sync}</span>
             <span className="font-medium text-text-secondary">

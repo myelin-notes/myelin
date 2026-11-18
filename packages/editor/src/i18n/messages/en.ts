@@ -31,6 +31,16 @@ const en = {
         title: 'Your own canvas background',
         description: 'Use any image as the background behind your notes.',
       },
+      transcription: {
+        title: 'More accurate transcription',
+        description:
+          'Download larger on-device models that transcribe more accurately, especially outside English.',
+      },
+      handwriting: {
+        title: 'Search your handwriting',
+        description:
+          'Find words you wrote by hand with canvas search. Ink is recognized on your device.',
+      },
       limits: {
         title: 'Higher limits',
         description:
@@ -168,6 +178,14 @@ const en = {
           'Native .goodnotes files are not supported yet. Export a Goodnotes folder as PDFs, then import the ZIP.',
         summary: (count: number) =>
           `Imported ${count} file${count === 1 ? '' : 's'}`,
+      },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'A .ipynb notebook, with its Markdown and code cells. Format v4 or newer.',
+        title: 'Import Jupyter Notebooks',
+        scanning: 'Reading notebooks...',
+        empty: 'None of the selected files are notebooks',
       },
       goodnotes_zip: {
         label: 'Import from Goodnotes',
@@ -647,6 +665,35 @@ const en = {
         succeeded: (notes: number, media: number) =>
           `Exported ${notes} note${notes === 1 ? '' : 's'} and ${media} media file${media === 1 ? '' : 's'}.`,
       },
+    },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'On-device',
+      label: 'Speech-to-text model',
+      description:
+        'Turns audio recordings into searchable text. Runs entirely on this device, so audio never leaves it. Larger models are more accurate but slower.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Fast on any device. Fine for clear speech but makes more mistakes.',
+        },
+        small: {
+          label: 'Small',
+          description:
+            'More accurate than Base. Runs well on most tablets and computers.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'The most accurate. Computers only, and best with a GPU. Live transcripts may fall behind on older machines.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Download',
+      included: 'Included',
+      delete: 'Delete model',
+      downloadFailed: 'Model download failed',
     },
     privacy: {
       title: 'Privacy',
@@ -1163,6 +1210,9 @@ const en = {
       bold: (value: number) => `Bold (${value})`,
       pressure: 'Pressure',
       stabilization: 'Stabilization',
+      lineStyle: 'Line',
+      solid: 'Solid',
+      dashed: 'Dashed',
       addCustomColor: 'Add custom color',
       deleteColor: 'Delete color',
       decreaseFontSize: 'Decrease font size',
@@ -1296,7 +1346,8 @@ const en = {
         'Analytics are off by default. Turn them on to help improve Myelin Notes.',
       collected:
         'We collect which features you use, the app version, and crash reports.',
-      notCollected: 'We never collect your notes, file names, or handwriting.',
+      notCollected:
+        'We never collect your notes, file names, or handwriting. On Android, Google’s handwriting recognizer sends Google usage metrics, never your writing.',
       policy: 'Read the privacy policy',
     },
     sync: {

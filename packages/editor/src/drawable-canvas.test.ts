@@ -642,6 +642,25 @@ describe('pen eraser override', () => {
     expect(canvas.selectedTool).toBe(pen);
   });
 
+  it('drops the native eraser when the pen leaves hover range', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+
+    canvas.syncEraserOverride(penEvent('pointerdown', 5, 32));
+    canvas.syncEraserOverride(penEvent('pointerup', 5, 0));
+    canvas.syncEraserOverride({
+      ...penEvent('pointerout', -1, 0),
+      relatedTarget: {},
+    } as PointerEvent);
+    expect(canvas.selectedTool).toBe(eraser);
+
+    canvas.syncEraserOverride({
+      ...penEvent('pointerout', -1, 0),
+      relatedTarget: null,
+    } as PointerEvent);
+    expect(canvas.eraserButtonsHeld).toBe(false);
+    expect(canvas.selectedTool).toBe(pen);
+  });
+
   it('clears both states when the pen interaction is cancelled', () => {
     const { canvas, pen } = makeCanvas();
 

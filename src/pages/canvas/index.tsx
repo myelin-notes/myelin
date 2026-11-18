@@ -88,6 +88,10 @@ import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
 import { useToolState } from './hooks/use-tool-state';
 import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
+import {
+  HandwritingIndex,
+  useBackgroundHandwriting,
+} from './search/handwriting';
 import { useCanvasSearch } from './search/use-canvas-search';
 
 const logger = new Logger('CanvasView');
@@ -157,7 +161,11 @@ function CanvasViewInner({
     selectedToolIndex: toolState.selectedToolIndex,
     toggleOptions: toolState.toggleOptions,
   });
-  const canvasSearch = useCanvasSearch(drawableCanvasRef);
+  const handwriting = useMemo(
+    () => new HandwritingIndex(repository, id),
+    [repository, id],
+  );
+  const canvasSearch = useCanvasSearch(drawableCanvasRef, handwriting);
 
   const [chromeMenu, setChromeMenu] = useState<{
     anchor: DOMRect;
@@ -197,6 +205,12 @@ function CanvasViewInner({
   const onRegenerateThumbnail = useCallback(() => {
     void regenerateThumbnailNow(id);
   }, [id]);
+  const onListRecognizedText = useCallback(async () => {
+    const dc = drawableCanvasRef.current;
+    return dc
+      ? (await handwriting.collect(dc)).flatMap((source) => source.text ?? [])
+      : [];
+  }, [handwriting]);
 
   const embedFiles = useEmbedFiles(drawableCanvasRef);
   const inserts = useCanvasInserts({
@@ -241,6 +255,8 @@ function CanvasViewInner({
     canvas.setRulerVisible(!rulerVisible);
     setRulerCanvas(rulerVisible ? null : canvas);
   }, [engine.drawableCanvas, rulerVisible]);
+
+  useBackgroundHandwriting(engine.drawableCanvas, handwriting);
 
   useEffect(() => {
     engine.drawableCanvas?.setFlagTypes(flagTypes);
@@ -730,6 +746,7 @@ function CanvasViewInner({
         onToggleZoomLock={onToggleZoomLock}
         onFitContent={onFitContent}
         onRegenerateThumbnail={onRegenerateThumbnail}
+        onListRecognizedText={onListRecognizedText}
       />
       {engine.ready && (
         <SelectionToolbar

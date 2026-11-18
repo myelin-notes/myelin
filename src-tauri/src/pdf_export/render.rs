@@ -8,7 +8,7 @@ use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::image::Image;
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
-use krilla::paint::{Fill, LineCap, LineJoin, Stroke};
+use krilla::paint::{Fill, LineCap, LineJoin, Stroke, StrokeDash};
 use krilla::pdf::{Pdf, PdfDocument};
 use krilla::surface::Surface;
 use krilla::text::TextDirection;
@@ -161,6 +161,7 @@ fn draw_item(
                     *fill_c,
                     *stroke_c,
                     *line_width,
+                    None,
                     *opacity,
                     false,
                 );
@@ -185,6 +186,7 @@ fn draw_item(
                     Some(*color),
                     Some(*width),
                     None,
+                    None,
                     false,
                 );
             }
@@ -195,6 +197,7 @@ fn draw_item(
             fill: fill_c,
             stroke: stroke_c,
             line_width,
+            dash,
             opacity,
         } => {
             if let Some(path) = build_path(pts, *closed) {
@@ -204,6 +207,7 @@ fn draw_item(
                     *fill_c,
                     *stroke_c,
                     *line_width,
+                    dash.as_deref(),
                     *opacity,
                     true,
                 );
@@ -256,6 +260,7 @@ fn paint_path(
     fill_c: Option<[u8; 3]>,
     stroke_c: Option<[u8; 3]>,
     line_width: Option<f32>,
+    dash: Option<&[f32]>,
     opacity: Option<f32>,
     round: bool,
 ) {
@@ -276,6 +281,10 @@ fn paint_path(
             } else {
                 LineJoin::Miter
             },
+            dash: dash.map(|array| StrokeDash {
+                array: array.to_vec(),
+                offset: 0.0,
+            }),
             ..Default::default()
         }));
         surface.draw_path(path);

@@ -3,6 +3,7 @@ import { trackEvent } from '@myelin/shared/analytics';
 import { Logger } from '@myelin/shared/logger';
 import type {
   RunnableLanguage,
+  RunOutputItem,
   RunPollResponse,
 } from '../../../code-runner/contract';
 import type { EnsureCodeOutputCard } from '../../../elements/code-output/bridge';
@@ -11,7 +12,7 @@ import { type CodeRunnerCapability, getPlatform } from '../../../platform';
 import { PM_EDITOR_CLASS } from '../constants';
 import { getPageFramePmScreenRectForElement } from '../screen-rect';
 import type { RunSource } from './concat';
-import { codeRunStore } from './run-store';
+import { type CodeRunItem, codeRunStore } from './run-store';
 
 const logger = new Logger('CodeBlockRun');
 
@@ -21,6 +22,22 @@ const POLL_INTERVAL_MS = 50;
 
 const delay = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function parseRunItem(item: RunOutputItem): CodeRunItem {
+  if (item.kind === 'line') {
+    return item;
+  }
+  try {
+    const { data, metadata } = JSON.parse(item.bundle);
+    return { kind: 'display', data, metadata: metadata ?? {} };
+  } catch {
+    return {
+      kind: 'line',
+      stream: 'stderr',
+      text: '[unreadable display output]',
+    };
+  }
+}
 
 interface CodeBlockRunViewOptions {
   view: EditorView;
@@ -183,16 +200,17 @@ export class CodeBlockRunView {
       }
 
       if (res.skipped > 0) {
-        codeRunStore.appendLine(blockId, {
+        codeRunStore.appendItem(blockId, {
+          kind: 'line',
           text: `… ${res.skipped} lines skipped`,
           stream: 'stderr',
         });
       }
-      codeRunStore.appendLines(blockId, res.lines);
+      codeRunStore.appendItems(blockId, res.items.map(parseRunItem));
       cursor = res.nextCursor;
 
       if (res.finished) {
-        if (res.lines.length === 0) {
+        if (res.items.length === 0) {
           void codeRunner.releaseRun(executionId).catch(() => {});
           this.onFinished(res.exitCode, res.error);
           return;
@@ -213,9 +231,14 @@ export class CodeBlockRunView {
     }
 
     if (error) {
-      codeRunStore.appendLine(blockId, { text: error, stream: 'stderr' });
+      codeRunStore.appendItem(blockId, {
+        kind: 'line',
+        text: error,
+        stream: 'stderr',
+      });
     } else if (exitCode !== 0) {
-      codeRunStore.appendLine(blockId, {
+      codeRunStore.appendItem(blockId, {
+        kind: 'line',
         text: `Process exited with code ${exitCode}`,
         stream: 'stderr',
       });

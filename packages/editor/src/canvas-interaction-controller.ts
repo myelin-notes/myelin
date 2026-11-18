@@ -76,6 +76,7 @@ export class CanvasInteractionController {
   private readonly handlePointerDown: (event: PointerEvent) => void;
   private readonly handlePointerMove: (event: PointerEvent) => void;
   private readonly handlePointerUp: (event: PointerEvent) => void;
+  private readonly handlePointerOut: (event: PointerEvent) => void;
   private readonly handleStylusTouch: (event: TouchEvent) => void;
   private readonly handleResize: () => void;
 
@@ -84,6 +85,7 @@ export class CanvasInteractionController {
     this.handlePointerMove = (event) => this.onPointerMove(event);
     this.handlePointerDown = (event) => this.onPointerDown(event);
     this.handlePointerUp = (event) => this.onPointerUp(event);
+    this.handlePointerOut = (event) => this.syncEraserOverride(event);
     this.handleStylusTouch = (event) => {
       if (event.cancelable && isStylusTouch(event)) {
         event.preventDefault();
@@ -96,6 +98,7 @@ export class CanvasInteractionController {
     this.host.canvas.addEventListener('pointerdown', this.handlePointerDown);
     window.addEventListener('pointerup', this.handlePointerUp);
     window.addEventListener('pointercancel', this.handlePointerUp);
+    window.addEventListener('pointerout', this.handlePointerOut);
     this.host.canvas.addEventListener('touchstart', this.handleStylusTouch, {
       passive: false,
     });
@@ -186,6 +189,7 @@ export class CanvasInteractionController {
     this.host.canvas.removeEventListener('pointerdown', this.handlePointerDown);
     window.removeEventListener('pointerup', this.handlePointerUp);
     window.removeEventListener('pointercancel', this.handlePointerUp);
+    window.removeEventListener('pointerout', this.handlePointerOut);
     this.host.canvas.removeEventListener('touchstart', this.handleStylusTouch);
     this.host.canvas.removeEventListener('touchend', this.handleStylusTouch);
     window.removeEventListener('resize', this.handleResize);
@@ -540,7 +544,13 @@ export class CanvasInteractionController {
       (event.buttons & (PEN_ERASER_END | buttonBit(eraserButton))) !== 0;
     const penContact = (event.buttons & PEN_CONTACT_BUTTONS) !== 0;
     const penLifted = this.penContactOpen && !penContact;
-    if (event.type === 'pointercancel') {
+    // Flipping the stylus leaves hover range (pointerout, null relatedTarget); without this the
+    // tip keeps the eraser end's override until its next contact.
+    const leftRange =
+      event.type === 'pointerout' &&
+      event.relatedTarget === null &&
+      !this.penContactOpen;
+    if (event.type === 'pointercancel' || leftRange) {
       this.eraserButtonsHeld = false;
       this.setEraserOverrideApplied(false, event);
       return;

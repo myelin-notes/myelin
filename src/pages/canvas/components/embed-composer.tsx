@@ -285,7 +285,7 @@ export function EmbedComposer({
           {urlState.kind === 'ready' ? (
             <div className="fade-in-0 animate-in duration-200">
               <div className="flex items-center gap-2.5 rounded-xl border border-border-divider bg-card p-2 pr-3">
-                <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface">
+                <div className="relative flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                   {urlState.mime === 'application/pdf' ? (
                     <FileTextIcon className="size-5 text-text-secondary" />
                   ) : (
@@ -381,7 +381,7 @@ export function EmbedComposer({
         <div className={`px-4 pb-3 ${rowEnter} delay-[100ms]`}>
           <button
             onClick={handleBrowse}
-            className="group relative flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border-divider border-dashed bg-surface/40 px-4 py-5 transition-colors duration-150 hover:border-accent-dark/40 hover:bg-surface/70"
+            className="group relative flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl border border-border-divider border-dashed bg-muted/40 px-4 py-5 transition-colors duration-150 hover:border-accent-dark/40 hover:bg-muted/70"
           >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,color-mix(in_srgb,var(--accent-green)_12%,transparent),transparent_70%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
             <div className="relative flex size-9 items-center justify-center rounded-full bg-card/80 shadow-[0_1px_3px_rgb(var(--shadow-rgb)/0.05)] transition-transform duration-200 group-hover:scale-110">

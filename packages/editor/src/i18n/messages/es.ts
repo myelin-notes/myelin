@@ -33,6 +33,16 @@ const es: typeof en = {
         title: 'Tu propio fondo de lienzo',
         description: 'Usa cualquier imagen como fondo detrás de tus notas.',
       },
+      transcription: {
+        title: 'Transcripción más precisa',
+        description:
+          'Descarga modelos más grandes, en el propio dispositivo, que transcriben con más precisión, sobre todo fuera del inglés.',
+      },
+      handwriting: {
+        title: 'Busca en tu escritura a mano',
+        description:
+          'Encuentra con la búsqueda del lienzo las palabras que escribiste a mano. La tinta se reconoce en tu dispositivo.',
+      },
       limits: {
         title: 'Límites más altos',
         description:
@@ -171,6 +181,14 @@ const es: typeof en = {
           'Los archivos .goodnotes nativos aún no son compatibles. Exporta una carpeta de Goodnotes como PDF y luego importa el ZIP.',
         summary: (count: number) =>
           `Se importaron ${count} archivo${count === 1 ? '' : 's'}`,
+      },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'Un cuaderno .ipynb, con sus celdas de Markdown y código. Formato v4 o posterior.',
+        title: 'Importar cuadernos de Jupyter',
+        scanning: 'Leyendo cuadernos...',
+        empty: 'Ninguno de los archivos seleccionados es un cuaderno',
       },
       goodnotes_zip: {
         label: 'Importar desde Goodnotes',
@@ -656,6 +674,35 @@ const es: typeof en = {
         succeeded: (notes: number, media: number) =>
           `Se exportaron ${notes} nota${notes === 1 ? '' : 's'} y ${media} archivo${media === 1 ? '' : 's'} multimedia.`,
       },
+    },
+    transcription: {
+      title: 'Transcripción',
+      eyebrow: 'En el dispositivo',
+      label: 'Modelo de voz a texto',
+      description:
+        'Convierte las grabaciones de audio en texto con búsqueda. Funciona por completo en este dispositivo, así que el audio nunca sale de él. Los modelos más grandes son más precisos pero más lentos.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Rápido en cualquier dispositivo. Sirve para voz clara pero comete más errores.',
+        },
+        small: {
+          label: 'Pequeño',
+          description:
+            'Más preciso que Base. Funciona bien en la mayoría de tabletas y ordenadores.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'El más preciso. Solo para ordenadores y mejor con GPU. La transcripción en vivo puede retrasarse en equipos antiguos.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Descargar',
+      included: 'Incluido',
+      delete: 'Eliminar modelo',
+      downloadFailed: 'Error al descargar el modelo',
     },
     privacy: {
       title: 'Privacidad',
@@ -1176,6 +1223,9 @@ const es: typeof en = {
       bold: (value: number) => `Grueso (${value})`,
       pressure: 'Presión',
       stabilization: 'Estabilización',
+      lineStyle: 'Línea',
+      solid: 'Continua',
+      dashed: 'Discontinua',
       addCustomColor: 'Añadir color personalizado',
       deleteColor: 'Eliminar color',
       decreaseFontSize: 'Reducir tamaño de fuente',
@@ -1312,7 +1362,7 @@ const es: typeof en = {
       collected:
         'Recopilamos qué funciones usas, la versión de la app e informes de errores.',
       notCollected:
-        'Nunca recopilamos tus notas, los nombres de archivo ni tu escritura a mano.',
+        'Nunca recopilamos tus notas, los nombres de archivo ni tu escritura a mano. En Android, el reconocedor de escritura de Google envía a Google métricas de uso, nunca lo que escribes.',
       policy: 'Leer la política de privacidad',
     },
     sync: {

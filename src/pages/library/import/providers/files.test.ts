@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import en from '@myelin/editor/i18n/messages/en';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
 import {
   getRepositoryTestStorage,
   resetRepositoryTestDoubles,
@@ -77,6 +79,49 @@ describe('files import provider', () => {
 
     const [, files] = await repository.listDirectory(null);
     expect(files.map((file) => file.name).sort()).toEqual(['First', 'Second']);
+  });
+
+  it('imports a Jupyter notebook as a page frame of its cells', async () => {
+    const storage = getRepositoryTestStorage();
+    const notebook = {
+      metadata: { kernelspec: { language: 'python' } },
+      cells: [
+        { cell_type: 'markdown', source: ['# Analysis\n', 'Some notes'] },
+        { cell_type: 'code', source: 'print("```")\n', outputs: [] },
+        { cell_type: 'code', source: [], outputs: [] },
+      ],
+    };
+    await storage.writeFile(
+      '/picked/Analysis.ipynb',
+      new TextEncoder().encode(JSON.stringify(notebook)),
+    );
+    const repository = new TestRepository('files-provider-jupyter');
+
+    const job = createJob(['/picked/Analysis.ipynb'], repository);
+    expect((await job.scan()).isEmpty).toBe(false);
+    await job.run({ conflictResolution: 'rename', onProgress: () => {} });
+
+    const [, files] = await repository.listDirectory(null);
+    expect(files.map((file) => file.name)).toEqual(['Analysis']);
+    const session = await repository.openSession(files[0].id);
+    try {
+      const uuid = session.ydoc.elements.get(0).get('uuid') as string;
+      const doc = yXmlFragmentToProseMirrorRootNode(
+        session.ydoc.getXmlFragment(uuid),
+        schema,
+      );
+      const blocks = doc.children.map((node) => [
+        node.type.name,
+        node.textContent,
+      ]);
+      expect(blocks).toEqual([
+        ['heading', 'Analysis'],
+        ['paragraph', 'Some notes'],
+        ['codeBlock', '```python\nprint("```")\n```'],
+      ]);
+    } finally {
+      await session.close();
+    }
   });
 
   it('reports an empty preview when nothing is importable', async () => {

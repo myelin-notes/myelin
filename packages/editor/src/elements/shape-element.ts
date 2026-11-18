@@ -15,7 +15,11 @@ import {
   type SelectionToolbarItem,
 } from './drawable-element';
 import { ElementType } from './element-type';
-import type { StrokeStyle, StrokeStyleUpdate } from './stroke-element';
+import {
+  dashPattern,
+  type StrokeStyle,
+  type StrokeStyleUpdate,
+} from './stroke-element';
 
 /** Number of segments used to approximate an ellipse outline in PDF export. */
 const ELLIPSE_PDF_SEGMENTS = 32;
@@ -50,6 +54,7 @@ export class ShapeElement extends AnchorableElement {
       shapeType: this.shapeType,
       color: this.style.color,
       size: this.style.size,
+      ...(this.style.dashed ? { dashed: true } : {}),
       // Flat geometry stored directly as one Y.Map value; the shape's geometry
       // is fully known at construction, so there is nothing to seed later.
       geom: [...this.geom],
@@ -137,6 +142,10 @@ export class ShapeElement extends AnchorableElement {
       size: (v) => {
         this.style.size = v as number;
         this.updateBounds();
+        this.onTransformChanged?.();
+      },
+      dashed: (v) => {
+        this.style.dashed = v as boolean;
         this.onTransformChanged?.();
       },
       geom: (v) => {
@@ -410,7 +419,14 @@ export class ShapeElement extends AnchorableElement {
         ctx.closePath();
         break;
     }
+    // drawThumbnail calls draw2D without save/restore, so the dash must not outlive this stroke.
+    if (this.style.dashed) {
+      ctx.setLineDash(dashPattern(this.style.size));
+    }
     ctx.stroke();
+    if (this.style.dashed) {
+      ctx.setLineDash([]);
+    }
   }
 
   protected isOverLocal(
@@ -471,12 +487,16 @@ export class ShapeElement extends AnchorableElement {
     }
     // One path, not per-segment lines: translucent segments would double up at the joints.
     const { rgb, opacity } = parseCssColor(this.style.color);
+    const ptPerLocal = ctx.ptPerWorldY * Math.abs(this.scale.y);
     ctx.push({
       t: 'path',
       pts,
       closed: this.shapeType !== 'line',
       stroke: rgb,
-      lineWidth: ctx.ptPerWorldY * this.style.size * Math.abs(this.scale.y),
+      lineWidth: ptPerLocal * this.style.size,
+      ...(this.style.dashed && {
+        dash: dashPattern(this.style.size).map((length) => length * ptPerLocal),
+      }),
       opacity,
     });
   }

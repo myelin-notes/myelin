@@ -115,7 +115,7 @@ export function CommandPaletteList({
                 item.disabled ? 'cursor-default opacity-50' : 'cursor-pointer',
               )}
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-text-secondary">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-text-secondary">
                 <Icon className="size-4" />
               </div>
               <div className="min-w-0 flex-1">

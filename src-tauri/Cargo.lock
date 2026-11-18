@@ -1438,7 +1438,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c54e03a951783e8b327515db3f2a2fd0e3bed362a96b066f341ce66ed49b4ead"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -4398,6 +4398,7 @@ dependencies = [
  "tauri-plugin-deep-link",
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
+ "tauri-plugin-handwriting",
  "tauri-plugin-http",
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-opener",
@@ -5262,6 +5263,16 @@ name = "objc2-user-notifications"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9df9128cbbfef73cda168416ccf7f837b62737d748333bfe9ab71c245d76613e"
+dependencies = [
+ "objc2 0.6.4",
+ "objc2-foundation 0.3.2",
+]
+
+[[package]]
+name = "objc2-vision"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfc194758a2d5d7540b1ad283bfb9ca318ec608991892326e95b428230b2689b"
 dependencies = [
  "objc2 0.6.4",
  "objc2-foundation 0.3.2",
@@ -8218,6 +8229,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tauri-plugin-handwriting"
+version = "0.1.0"
+dependencies = [
+ "objc2 0.6.4",
+ "objc2-foundation 0.3.2",
+ "objc2-vision",
+ "png 0.18.1",
+ "serde",
+ "tauri",
+ "tauri-plugin",
+ "windows 0.62.2",
+ "windows-collections 0.3.2",
+ "windows-numerics 0.3.1",
+]
+
+[[package]]
 name = "tauri-plugin-http"
 version = "2.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8492,7 +8519,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

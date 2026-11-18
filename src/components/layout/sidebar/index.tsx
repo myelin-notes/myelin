@@ -13,6 +13,11 @@ import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { TAB_BAR_HEIGHT_CLASS } from '@myelin/shared/os';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from '@myelin/ui/context-menu';
 import { errorDescription } from '@/components/command-palette/utils';
 import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
 import {
@@ -25,6 +30,7 @@ import { CreateNewDropdown } from '@/pages/library/create-new-dropdown';
 import { ImportHost } from '@/pages/library/import/import-host';
 import { useImports } from '@/pages/library/import/use-imports';
 import { useSidebar } from './context';
+import { CreateNewContextMenuItems } from './folder-create-submenu';
 import { SidebarTags } from './sidebar-tags';
 import {
   SidebarTree,
@@ -110,6 +116,11 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
     [refreshMeta, strings.commandPalette.errors.createNote],
   );
 
+  const handleImportAtRoot = () => {
+    setImportParentId(null);
+    imports.openPicker();
+  };
+
   const handleRefreshRepository = useCallback(() => {
     if (!refreshAvailable || repositoryStatus.initializing) {
       return;
@@ -164,7 +175,7 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
               type="button"
               onClick={() => setSearchQuery('')}
               aria-label={strings.common.clear}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text-primary"
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-hover-tint hover:text-text-primary"
             >
               <X className="size-3.5" />
             </button>
@@ -241,29 +252,41 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
           <CreateNewDropdown
             onNewFolder={handleNewFolder}
             onNewFile={handleNewFile}
-            onImport={() => {
-              setImportParentId(null);
-              imports.openPicker();
-            }}
+            onImport={handleImportAtRoot}
             importDisabled={imports.importDisabled}
           />
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
-        <SidebarTree
-          ref={treeRef}
-          sortMode={sortMode}
-          searchQuery={searchQuery}
-          filterTags={filterTags}
-          importDisabled={imports.importDisabled}
-          onImport={(parentId) => {
-            setImportParentId(parentId);
-            imports.openPicker();
-          }}
-          onChanged={refreshMeta}
-        />
-      </div>
+      {/* Rows open their own menus and stop propagation, so this only fires on empty space. */}
+      <ContextMenu>
+        <ContextMenuTrigger
+          render={
+            <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2" />
+          }
+        >
+          <SidebarTree
+            ref={treeRef}
+            sortMode={sortMode}
+            searchQuery={searchQuery}
+            filterTags={filterTags}
+            importDisabled={imports.importDisabled}
+            onImport={(parentId) => {
+              setImportParentId(parentId);
+              imports.openPicker();
+            }}
+            onChanged={refreshMeta}
+          />
+        </ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
+          <CreateNewContextMenuItems
+            onNewFolder={handleNewFolder}
+            onNewFile={handleNewFile}
+            onImport={handleImportAtRoot}
+            importDisabled={imports.importDisabled}
+          />
+        </ContextMenuContent>
+      </ContextMenu>
 
       <SidebarTags
         activeTags={activeTags}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <script>
+      // Injected ahead of the output so it catches failed CDN script loads and reports height.
+      var HELPER =
+        '<script>(function () {' +
+        // offsetHeight, not scrollHeight: scrollHeight is at least the viewport, so it can never shrink.
+        'var post = function () { parent.postMessage({ type: "height", height: document.documentElement.offsetHeight }, "*"); };' +
+        'new ResizeObserver(post).observe(document.documentElement);' +
+        'var warned = false;' +
+        'addEventListener("error", function (e) {' +
+        '  var t = e.target; if (warned || !t || t.tagName !== "SCRIPT" || !t.src) return; warned = true;' +
+        '  var note = document.createElement("div");' +
+        '  note.textContent = "Couldn\'t load " + t.src + " — this output may need an internet connection.";' +
+        '  note.style.cssText = "font: 12px system-ui, sans-serif; color: #b42318; padding: 6px 0;";' +
+        '  (document.body || document.documentElement).prepend(note);' +
+        '}, true);' +
+        '})();<\/script>';
+
+      addEventListener('message', function (event) {
+        if (event.source !== parent || !event.data || event.data.type !== 'render') {
+          return;
+        }
+        var html = String(event.data.html);
+        // Fragments (e.g. `<table>` from pandas) would render in quirks mode, where the root element
+        // is stretched to the viewport and so can't report its content height.
+        if (!/^\s*<!doctype/i.test(html)) {
+          html = '<!doctype html>' + html;
+        }
+        var head = /<head(\s[^>]*)?>/i.exec(html);
+        if (head) {
+          var end = head.index + head[0].length;
+          html = html.slice(0, end) + HELPER + html.slice(end);
+        } else {
+          var doctype = /^\s*<!doctype[^>]*>/i.exec(html)[0];
+          html = doctype + HELPER + html.slice(doctype.length);
+        }
+        document.open();
+        document.write(html);
+        document.close();
+      });
+      parent.postMessage({ type: 'ready' }, '*');
+    </script>
+  </body>
+</html>

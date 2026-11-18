@@ -40,13 +40,16 @@ const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
     ['slash', 'ft-slash'],
     ['imageAnchor', 'anchoring'],
   ],
+  code: [['jupyter', 'ft-jupyter']],
   canvas: [
     ['canvasStyle', 'wn-canvas-style'],
     ['flags', 'wn-flags'],
+    ['handwritingSearch', 'handwriting-search'],
   ],
   sync: [['liveCollab', 'ft-live-collab']],
   agents: [['agents', 'ft-mcp-agent']],
 };
+const proClips: FeatureClipId[] = ['jupyter', 'agents', 'handwritingSearch'];
 // Lone-clip sections that put their details left of the clip, so back-to-back ones don't mirror each other.
 const detailsLeft: FeatureSectionId[] = ['sync'];
 
@@ -112,7 +115,7 @@ const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
             </div>
 
             {cards.length > 0 && (
-              <div class="mt-14 grid gap-6 md:grid-cols-2 lg:mt-16">
+              <div class:list={['mt-14 grid gap-6 lg:mt-16', cards.length === 3 ? 'lg:grid-cols-3' : 'md:grid-cols-2']}>
                 {cards.map(([clipId, file], j) => {
                   const clip = page.clips[clipId];
                   return (
@@ -129,7 +132,12 @@ const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
                         class="rounded-none! border-b border-border-ghost shadow-none!"
                       />
                       <div class="p-6 lg:p-7">
-                        <h3 class={cardTitle}>{clip.title}</h3>
+                        <div class="flex items-center gap-3">
+                          <h3 class={cardTitle}>{clip.title}</h3>
+                          {proClips.includes(clipId) && (
+                            <span class="rounded-xl bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">Pro</span>
+                          )}
+                        </div>
                         <p class={cardBody}>{clip.body}</p>
                       </div>
                     </article>

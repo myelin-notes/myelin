@@ -349,6 +349,12 @@ export function SidebarTree({
     onChanged?.();
   }, [loadFlatResults, onChanged]);
 
+  // Keyed by row so a leave from the previous row can't clear the next row's enter.
+  const [dropHover, setDropHover] = useState<{
+    rowId: string;
+    folderId: string | null;
+  } | null>(null);
+
   const { dragOver: rootDragOver, dropTargetProps: rootDropProps } =
     useDropTarget({ targetFolderId: ROOT_KEY, onMoved: notifyNested });
 
@@ -462,6 +468,16 @@ export function SidebarTree({
       selectionIds,
       onSelect: (e: React.MouseEvent) => selectRow(node.id, e),
       onChanged: notify,
+      onDropHover: (over: boolean) => {
+        const folderId = node.type === 'folder' ? node.id : node.parentId;
+        setDropHover((prev) =>
+          over
+            ? { rowId: node.id, folderId }
+            : prev?.rowId === node.id
+              ? null
+              : prev,
+        );
+      },
     };
     if (node.type === 'folder') {
       return (
@@ -469,6 +485,7 @@ export function SidebarTree({
           key={node.id}
           node={node}
           expanded={isExpanded}
+          dropHighlighted={dropHover?.folderId === node.id}
           onNewFolder={() => {
             void startNewFolder(node.id).catch((error) => {
               logger.error('Failed to create folder', error);

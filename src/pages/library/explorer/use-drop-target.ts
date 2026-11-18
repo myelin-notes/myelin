@@ -7,11 +7,13 @@ const logger = new Logger('ExplorerDropTarget');
 interface UseDropTargetOptions {
   targetFolderId: string | null;
   onMoved: () => void;
+  onDragOverChange?: (over: boolean) => void;
 }
 
 export function useDropTarget({
   targetFolderId,
   onMoved,
+  onDragOverChange,
 }: UseDropTargetOptions) {
   const repository = useRepository();
   const [dragOver, setDragOver] = useState(false);
@@ -33,6 +35,7 @@ export function useDropTarget({
     e.stopPropagation();
     dragCountRef.current++;
     setDragOver(true);
+    onDragOverChange?.(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -40,6 +43,7 @@ export function useDropTarget({
     dragCountRef.current--;
     if (dragCountRef.current === 0) {
       setDragOver(false);
+      onDragOverChange?.(false);
     }
   };
 
@@ -48,6 +52,7 @@ export function useDropTarget({
     e.stopPropagation();
     dragCountRef.current = 0;
     setDragOver(false);
+    onDragOverChange?.(false);
 
     const raw = e.dataTransfer.getData('application/myelin-item');
     if (!raw) {

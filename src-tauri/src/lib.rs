@@ -18,6 +18,7 @@ mod repository_bootstrap;
 mod repository_engine;
 mod repository_metadata;
 mod transcription;
+mod transcription_models;
 mod webview_crash;
 mod workspace_export;
 
@@ -82,11 +83,16 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_pencil::init())
+        .plugin(tauri_plugin_handwriting::init())
         .manage(iroh_transport::IrohState::new())
         .manage(repository_engine::RepositoryManager::default())
         .manage(mcp_server::McpServerState::new())
         .manage(transcription::TranscriptionState::new())
+        .manage(transcription_models::ModelDownloads::default())
         .manage(code_runner::CodeRunnerState::new())
+        .register_uri_scheme_protocol("myelin-output", |_ctx, _request| {
+            code_runner::output_frame_response()
+        })
         .manage(oauth_loopback::OAuthLoopbackState::new())
         .invoke_handler(tauri::generate_handler![
             iroh_transport::iroh_host,
@@ -101,6 +107,8 @@ pub fn run() {
             note_text_index::index_note_text,
             note_text_index::list_note_flags,
             note_text_index::remove_note_text_index,
+            note_text_index::read_handwriting_text,
+            note_text_index::write_handwriting_text,
             pdf_export::export_pdf,
             pdf_export::export_pdf_ios,
             pdf_export::export_file_ios,
@@ -114,6 +122,10 @@ pub fn run() {
             transcription::push_audio_transcription_samples,
             transcription::finish_audio_transcription,
             transcription::cancel_audio_transcription,
+            transcription_models::list_transcription_models,
+            transcription_models::download_transcription_model,
+            transcription_models::cancel_transcription_model_download,
+            transcription_models::delete_transcription_model,
             code_runner::run_code,
             code_runner::cancel_run,
             code_runner::poll_output,

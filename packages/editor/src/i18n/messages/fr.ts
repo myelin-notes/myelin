@@ -34,6 +34,16 @@ const fr: typeof en = {
         description:
           'Utilisez n’importe quelle image comme fond sous vos notes.',
       },
+      transcription: {
+        title: 'Transcription plus précise',
+        description:
+          'Téléchargez des modèles plus grands, sur l’appareil, qui transcrivent plus fidèlement, surtout hors anglais.',
+      },
+      handwriting: {
+        title: 'Recherchez dans votre écriture manuscrite',
+        description:
+          'Retrouvez avec la recherche du canevas les mots écrits à la main. L’encre est reconnue sur votre appareil.',
+      },
       limits: {
         title: 'Des limites plus hautes',
         description:
@@ -176,6 +186,14 @@ const fr: typeof en = {
           'Les fichiers .goodnotes natifs ne sont pas encore pris en charge. Exportez un dossier Goodnotes en PDF, puis importez le ZIP.',
         summary: (count: number) =>
           `${count} fichier${count > 1 ? 's' : ''} importé${count > 1 ? 's' : ''}`,
+      },
+      jupyter_notebook: {
+        label: 'Jupyter Notebook',
+        description:
+          'Un notebook .ipynb, avec ses cellules Markdown et de code. Format v4 ou ultérieur.',
+        title: 'Importer des notebooks Jupyter',
+        scanning: 'Lecture des notebooks...',
+        empty: 'Aucun des fichiers sélectionnés n’est un notebook',
       },
       goodnotes_zip: {
         label: 'Importer depuis Goodnotes',
@@ -663,6 +681,35 @@ const fr: typeof en = {
         succeeded: (notes: number, media: number) =>
           `${notes} note${notes > 1 ? 's' : ''} et ${media} fichier${media > 1 ? 's' : ''} multimédia exportés.`,
       },
+    },
+    transcription: {
+      title: 'Transcription',
+      eyebrow: 'Sur l’appareil',
+      label: 'Modèle de reconnaissance vocale',
+      description:
+        'Transforme les enregistrements audio en texte consultable. Tout s’exécute sur cet appareil : l’audio ne le quitte jamais. Les modèles plus grands sont plus précis mais plus lents.',
+      models: {
+        base: {
+          label: 'Base',
+          description:
+            'Rapide sur tout appareil. Convient à une voix claire mais fait plus d’erreurs.',
+        },
+        small: {
+          label: 'Petit',
+          description:
+            'Plus précis que Base. Fonctionne bien sur la plupart des tablettes et ordinateurs.',
+        },
+        'large-v3-turbo': {
+          label: 'Large v3 Turbo',
+          description:
+            'Le plus précis. Ordinateurs uniquement, idéal avec un GPU. La transcription en direct peut prendre du retard sur les machines anciennes.',
+        },
+      },
+      size: (megabytes: number) => `${megabytes} MB`,
+      download: 'Télécharger',
+      included: 'Inclus',
+      delete: 'Supprimer le modèle',
+      downloadFailed: 'Échec du téléchargement du modèle',
     },
     privacy: {
       title: 'Confidentialité',
@@ -1187,6 +1234,9 @@ const fr: typeof en = {
       bold: (value: number) => `Épais (${value})`,
       pressure: 'Pression',
       stabilization: 'Stabilisation',
+      lineStyle: 'Trait',
+      solid: 'Plein',
+      dashed: 'Pointillé',
       addCustomColor: 'Ajouter une couleur personnalisée',
       deleteColor: 'Supprimer la couleur',
       decreaseFontSize: 'Réduire la taille de police',
@@ -1322,7 +1372,7 @@ const fr: typeof en = {
       collected:
         'Nous collectons les fonctionnalités que vous utilisez, la version de l’application et les rapports de plantage.',
       notCollected:
-        'Nous ne collectons jamais vos notes, vos noms de fichiers ni votre écriture manuscrite.',
+        'Nous ne collectons jamais vos notes, vos noms de fichiers ni votre écriture manuscrite. Sur Android, la reconnaissance d’écriture de Google envoie à Google des statistiques d’utilisation, jamais ce que vous écrivez.',
       policy: 'Lire la politique de confidentialité',
     },
     sync: {

@@ -109,7 +109,7 @@ export function FlagTypeOptions({
               key={type.id}
               className={cn(
                 'flex items-center gap-0.5 rounded-md transition-colors',
-                type === active ? 'bg-surface' : 'hover:bg-hover-tint',
+                type === active ? 'bg-hover-tint' : 'hover:bg-hover-tint',
               )}
             >
               <button
@@ -165,7 +165,7 @@ export function FlagTypeOptions({
             option.set(id);
             setEditingId(id);
           }}
-          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-surface px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
+          className="flex pointer-coarse:min-h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border-none bg-muted px-2.5 py-1.5 font-medium text-text-secondary text-xs transition-colors hover:bg-card-active hover:text-text-primary"
         >
           <Plus className="size-3.5 shrink-0" />
           {labels.newFlag}
@@ -222,7 +222,7 @@ function FlagTypeEditor({
   };
 
   return (
-    <div className="flex flex-col gap-2 rounded-md bg-surface p-2">
+    <div className="flex flex-col gap-2 rounded-md bg-muted p-2">
       <input
         autoFocus
         value={name}

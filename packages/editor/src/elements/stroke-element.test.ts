@@ -662,6 +662,29 @@ describe('StrokeElement outline simplification', () => {
     expect(paintedPath(stroke).segments).toBeLessThan(live / 2);
   });
 
+  it.each([
+    ['simulated', false],
+    ['sensor', true],
+  ])('bounds every point of the %s-pressure outline', (_, hasPressure) => {
+    const points = Array.from({ length: 60 }, (_, i) => [
+      i * 3,
+      Math.sin(i / 4) * 20,
+      i % 10 === 0 ? 1 : 0.2,
+    ]).flat();
+    const stroke = new StrokeElement('bounded', points, hasPressure, {
+      ...STYLE,
+      size: 12,
+    });
+    stroke.updateBounds();
+    const box = stroke.localBoundingBox;
+    for (const [x, y] of fullOutlineWorld(stroke)) {
+      expect(x).toBeGreaterThanOrEqual(box.left - 1e-9);
+      expect(x).toBeLessThanOrEqual(box.right + 1e-9);
+      expect(y).toBeGreaterThanOrEqual(box.top - 1e-9);
+      expect(y).toBeLessThanOrEqual(box.bottom + 1e-9);
+    }
+  });
+
   it('paints a stroke longer than the buffers start out, to its very end', () => {
     const points = Array.from({ length: 6000 }, (_, i) => [
       i * 0.2,
@@ -673,13 +696,19 @@ describe('StrokeElement outline simplification', () => {
       size: 1.3,
     });
     stroke.updateBounds();
-    expect(fullOutlineWorld(stroke).length).toBeGreaterThan(4096);
+    const outlineXs = fullOutlineWorld(stroke).map(([x]) => x);
+    expect(outlineXs.length).toBeGreaterThan(4096);
 
     const painted = paintedPath(stroke).points;
-    const box = stroke.localBoundingBox;
     expect(painted.flat().every(Number.isFinite)).toBe(true);
-    expect(Math.max(...painted.map(([x]) => x))).toBeCloseTo(box.right, 0);
-    expect(Math.min(...painted.map(([x]) => x))).toBeCloseTo(box.left, 0);
+    expect(Math.max(...painted.map(([x]) => x))).toBeCloseTo(
+      Math.max(...outlineXs),
+      0,
+    );
+    expect(Math.min(...painted.map(([x]) => x))).toBeCloseTo(
+      Math.min(...outlineXs),
+      0,
+    );
   });
 
   it('paints a stroke the same after a longer one has used the buffers', () => {
@@ -739,5 +768,65 @@ describe('StrokeElement outline simplification', () => {
     stroke.updateBounds();
 
     expect(paintedPath(stroke).segments).toBeGreaterThan(0);
+  });
+});
+
+describe('StrokeElement dashed', () => {
+  function dashExtents(points: number[], dashed: boolean): [number, number][] {
+    const stroke = new StrokeElement('dashed', points, false, {
+      ...STYLE,
+      size: 4,
+      dashed,
+    });
+    const extents: [number, number][] = [];
+    stroke.drawToPdf({
+      worldToPagePt: (x, y) => ({ x, y }),
+      ptPerWorldY: 1,
+      push: (item) => {
+        if (item.t === 'path') {
+          const xs = item.pts.filter((_, i) => i % 2 === 0);
+          extents.push([Math.min(...xs), Math.max(...xs)]);
+        }
+      },
+      addImageBase64: () => 0,
+      addFontBase64: () => 0,
+    });
+    return extents;
+  }
+
+  it('fills one outline when solid', () => {
+    expect(dashExtents([0, 0, 0.5, 100, 0, 0.5, 200, 0, 0.5], false)).toEqual([
+      [expect.any(Number), expect.any(Number)],
+    ]);
+  });
+
+  it('keeps the solid bounding box whatever the dash pattern', () => {
+    const points = [0, 0, 0.5, 100, 30, 0.5, 200, 0, 0.5];
+    for (const size of [1, 2, 3, 4, 5, 6]) {
+      const box = (dashed: boolean) => {
+        const stroke = new StrokeElement('box', points, false, {
+          ...STYLE,
+          size,
+          dashed,
+        });
+        stroke.updateBounds();
+        const { x, y, width, height } = stroke.localBoundingBox;
+        return { x, y, width, height };
+      };
+      expect(box(true)).toEqual(box(false));
+    }
+  });
+
+  it.each([
+    ['dense', Array.from({ length: 101 }, (_, i) => [i * 2, 0, 0.5]).flat()],
+    ['sparse', [0, 0, 0.5, 100, 0, 0.5, 200, 0, 0.5]],
+  ])('leaves visible gaps along a %s line', (_, points) => {
+    const dashes = dashExtents(points, true);
+    expect(dashes.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < dashes.length; i++) {
+      expect(dashes[i][0]).toBeGreaterThan(dashes[i - 1][1] + 1);
+    }
+    expect(dashes[0][0]).toBeLessThan(1);
+    expect(dashes[dashes.length - 1][1]).toBeGreaterThan(190);
   });
 });
