@@ -1,4 +1,3 @@
-import { Fragment } from 'react';
 import { Plus } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import {
@@ -13,9 +12,23 @@ import {
   useCreateNewOptions,
 } from '@/pages/library/create-new-options';
 
+export function CreateNewContextMenuItems(actions: CreateNewActions) {
+  const options = useCreateNewOptions(actions);
+  return options.map(({ id, label, icon: Icon, onClick, disabled }) => (
+    <ContextMenuItem
+      key={id}
+      className={createNewItemClass}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      <Icon className="size-4" />
+      {label}
+    </ContextMenuItem>
+  ));
+}
+
 export function FolderCreateSubmenu(actions: CreateNewActions) {
   const strings = useMessages();
-  const options = useCreateNewOptions(actions);
 
   return (
     <ContextMenuSub>
@@ -26,18 +39,7 @@ export function FolderCreateSubmenu(actions: CreateNewActions) {
         {strings.library.createNew.button}
       </ContextMenuSubTrigger>
       <ContextMenuSubContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
-        {options.map(({ id, label, icon: Icon, onClick, disabled }) => (
-          <Fragment key={id}>
-            <ContextMenuItem
-              className={createNewItemClass}
-              onClick={onClick}
-              disabled={disabled}
-            >
-              <Icon className="size-4" />
-              {label}
-            </ContextMenuItem>
-          </Fragment>
-        ))}
+        <CreateNewContextMenuItems {...actions} />
       </ContextMenuSubContent>
     </ContextMenuSub>
   );
