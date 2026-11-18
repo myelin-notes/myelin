@@ -138,4 +138,32 @@ describe('Logger', () => {
       },
     );
   });
+
+  it('strips the OS account name from paths in reported errors', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const reporter = vi.fn();
+    setLogErrorReporter(reporter);
+
+    const logger = new Logger('Explorer');
+    logger.error(
+      'Failed to delete node',
+      'failed to get metadata of path: C:\\Users\\Jane Doe\\AppData\\Local\\a.png (os error 2)',
+    );
+    logger.error(
+      'Background sync failed',
+      new Error('open /Users/jane/Library/x.json; open /home/jane/y.json'),
+    );
+    setLogErrorReporter(null);
+
+    const [windows, unix] = reporter.mock.calls.map(
+      ([error]) => error as Error,
+    );
+    expect(windows.message).toBe(
+      'failed to get metadata of path: C:\\Users\\~\\AppData\\Local\\a.png (os error 2)',
+    );
+    expect(unix.message).toBe(
+      'open /Users/~/Library/x.json; open /home/~/y.json',
+    );
+    expect(unix.stack).not.toContain('jane');
+  });
 });

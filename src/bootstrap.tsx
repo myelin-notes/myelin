@@ -46,6 +46,8 @@ try {
   });
   initRustErrorReporting();
   disableNativePinchZoom();
+  // The only usage signal from people who don't sync; active-user counts depend on it.
+  trackEvent('app_opened');
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
       <I18nProvider>

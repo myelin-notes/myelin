@@ -59,11 +59,17 @@ export const artifactCache: ArtifactCache = {
   },
 
   async remove(path) {
-    if (await exists(path, { baseDir: BaseDirectory.AppCache })) {
+    // A local delete removes its thumbnail from both deleteNode and the repository-data echo;
+    // the plugin rejects a missing path, so the loser of that race must not throw.
+    try {
       await removeFile(path, {
         baseDir: BaseDirectory.AppCache,
         recursive: true,
       });
+    } catch (error) {
+      if (await exists(path, { baseDir: BaseDirectory.AppCache })) {
+        throw error;
+      }
     }
   },
 };

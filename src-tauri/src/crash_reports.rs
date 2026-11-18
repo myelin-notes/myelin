@@ -28,6 +28,8 @@ pub struct CrashReport {
     #[serde(default)]
     panics: Option<String>,
     #[serde(default)]
+    backtrace: Option<String>,
+    #[serde(default)]
     pid: Option<u32>,
     #[serde(default, skip_deserializing)]
     exit: Option<ExitDetails>,
@@ -115,6 +117,7 @@ impl ReportStore {
                 report.address = format!("{:#x}", values[3]);
                 report.reason = native_reason(&report.platform, report.code);
                 report.panics = fs::read_to_string(path.with_extension("panics")).ok();
+                report.backtrace = format_backtrace(&bytes);
             }
             pending.push(report);
         }
@@ -131,6 +134,7 @@ impl ReportStore {
             detail: "0x0".to_string(),
             address: "0x0".to_string(),
             panics: None,
+            backtrace: None,
             pid: Some(std::process::id()),
             exit: None,
         };
@@ -286,6 +290,34 @@ fn install_panic_hook(path: PathBuf, enabled: Arc<AtomicBool>) {
     }));
 }
 
+// Same line shape as tombstone frames so `ndk-stack` can symbolize this library's frames against
+// the unstripped release libs. Other libraries' pcs stay absolute: their load addresses died with
+// the process.
+fn format_backtrace(journal: &[u8]) -> Option<String> {
+    let words: Vec<u64> = journal
+        .chunks_exact(8)
+        .take(native_crash::RECORD_WORDS)
+        .map(|word| u64::from_le_bytes(word.try_into().unwrap()))
+        .collect();
+    let (start, end) = (*words.get(4)?, *words.get(5)?);
+    let frames: Vec<String> = words[6..]
+        .iter()
+        .enumerate()
+        .map(|(index, &pc)| {
+            if (start..end).contains(&pc) {
+                format!(
+                    "#{index:02} pc {:016x}  lib{}.so",
+                    pc - start,
+                    env!("CARGO_CRATE_NAME")
+                )
+            } else {
+                format!("#{index:02} pc {pc:016x}  <unknown>")
+            }
+        })
+        .collect();
+    (!frames.is_empty()).then(|| frames.join("\n"))
+}
+
 fn native_reason(platform: &str, code: u64) -> String {
     let reason = match (platform, code) {
         ("macos", 1) => "Invalid memory access",
@@ -428,6 +460,7 @@ mod tests {
             detail: "0x0".into(),
             address: "0x0".into(),
             panics: None,
+            backtrace: None,
             pid,
             exit: None,
         }
@@ -466,6 +499,46 @@ mod tests {
         assert_eq!(sent["exit"]["abortMessage"], "fdsan: double close");
         assert!(reports[1].exit.is_none());
         assert!(reports[2].exit.is_none());
+    }
+
+    #[test]
+    fn recovers_the_crashing_threads_frames_from_the_journal() {
+        let directory =
+            std::env::temp_dir().join(format!("myelin-crash-test-{}", uuid::Uuid::new_v4()));
+        let crashes = directory.join("crash-reports");
+        fs::create_dir_all(&crashes).unwrap();
+        let report = saved_report(Some(10), "2026-11-03T00:04:54Z");
+        fs::write(
+            crashes.join(format!("{}.json", report.id)),
+            serde_json::to_vec(&report).unwrap(),
+        )
+        .unwrap();
+        let words: [u64; 8] = [
+            1_762_128_294,
+            6,
+            u64::MAX,
+            0,
+            0x7000_0000,
+            0x7010_0000,
+            0x7000_1234,
+            0x5555_0000,
+        ];
+        fs::write(
+            crashes.join(format!("{}.bin", report.id)),
+            words
+                .iter()
+                .flat_map(|word| word.to_le_bytes())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+
+        let store = ReportStore::new(&directory, "2.0.0").unwrap();
+        assert_eq!(
+            store.pending[0].backtrace.as_deref(),
+            Some("#00 pc 0000000000001234  libmyelin_lib.so\n#01 pc 0000000055550000  <unknown>"),
+        );
+        drop(store);
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
