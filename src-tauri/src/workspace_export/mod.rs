@@ -146,6 +146,9 @@ mod tests {
     fn safe_join_accepts_legitimate_names() {
         let root = Path::new("/vault/root");
         let joined = safe_join(root, "Notes/Daily/2026-06-18.md").expect("legit path rejected");
-        assert_eq!(joined, root.join("Notes").join("Daily").join("2026-06-18.md"));
+        assert_eq!(
+            joined,
+            root.join("Notes").join("Daily").join("2026-06-18.md")
+        );
     }
 }

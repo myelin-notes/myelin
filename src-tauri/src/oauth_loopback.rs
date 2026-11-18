@@ -262,8 +262,14 @@ mod tests {
 
     #[test]
     fn decoding_leaves_trailing_escapes_alone() {
-        assert_eq!(parse_callback_params("code=a%2").code.as_deref(), Some("a%2"));
-        assert_eq!(parse_callback_params("code=a%zz").code.as_deref(), Some("a%zz"));
+        assert_eq!(
+            parse_callback_params("code=a%2").code.as_deref(),
+            Some("a%2")
+        );
+        assert_eq!(
+            parse_callback_params("code=a%zz").code.as_deref(),
+            Some("a%zz")
+        );
         assert_eq!(
             parse_callback_params("code=a%20b").code.as_deref(),
             Some("a b")
