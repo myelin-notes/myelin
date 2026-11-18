@@ -121,12 +121,9 @@ async function loadTtf(family: string): Promise<Uint8Array | null> {
   const platform = getPlatform();
   const cachePath = `fonts/${fontCacheKey(family)}-400.ttf`;
 
-  const cachedUrl = await platform.artifactCache.getUrl(cachePath);
-  if (cachedUrl) {
-    const cached = await fetch(cachedUrl);
-    if (cached.ok) {
-      return new Uint8Array(await cached.arrayBuffer());
-    }
+  const cached = await platform.artifactCache.read(cachePath);
+  if (cached) {
+    return new Uint8Array(await cached.arrayBuffer());
   }
 
   const bytes = await fetchFromGoogle(family);
