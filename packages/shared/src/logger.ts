@@ -307,6 +307,25 @@ function clean(meta: unknown): Record<string, unknown> {
     : {};
 }
 
+// The account folder is often the user's real name (`C:\Users\Jane Doe`); the rest of the path
+// stays because it is what makes a filesystem error diagnosable.
+const HOME_ACCOUNT_PATTERN = /([\\/](?:Users|home)[\\/])[^\\/]+/g;
+
+function stripHomeAccount(text: string): string {
+  return text.replace(HOME_ACCOUNT_PATTERN, '$1~');
+}
+
+function scrubError(error: Error): Error {
+  const message = stripHomeAccount(error.message);
+  if (message === error.message) {
+    return error;
+  }
+  const scrubbed = new Error(message);
+  scrubbed.name = error.name;
+  scrubbed.stack = error.stack && stripHomeAccount(error.stack);
+  return scrubbed;
+}
+
 function reportError(
   subsystem: string,
   message: string,
@@ -319,7 +338,7 @@ function reportError(
 
   try {
     if (isErrorLike(errorOrMeta)) {
-      errorReporter(errorOrMeta, {
+      errorReporter(scrubError(errorOrMeta), {
         subsystem,
         message,
         ...clean(maybeMeta),
@@ -337,7 +356,7 @@ function reportError(
     }
 
     // Tauri commands reject with plain strings; report them as the error, not as dropped metadata.
-    errorReporter(new Error(String(errorOrMeta)), {
+    errorReporter(new Error(stripHomeAccount(String(errorOrMeta))), {
       subsystem,
       message,
       ...clean(maybeMeta),
