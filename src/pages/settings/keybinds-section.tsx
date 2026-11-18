@@ -159,7 +159,7 @@ function KeybindRow({
   };
 
   return (
-    <div className="group flex w-full items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-input sm:gap-4 sm:px-4">
+    <div className="group relative flex w-full items-center gap-3 rounded-xl bg-input/40 px-3 py-2.5 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-input sm:gap-4 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-text-secondary">
           <Icon className="size-4" />
@@ -185,7 +185,8 @@ function KeybindRow({
         <button
           type="button"
           onClick={() => setCapturing(true)}
-          className="fade-in-0 flex shrink-0 animate-in cursor-pointer flex-wrap items-center justify-end gap-1 duration-100"
+          // ::after stretches the hit area over the whole row.
+          className="fade-in-0 flex shrink-0 animate-in cursor-pointer flex-wrap items-center justify-end gap-1 duration-100 after:absolute after:inset-0 after:rounded-xl"
         >
           {currentCombo ? (
             keyParts(currentCombo).map((part, i) => (
