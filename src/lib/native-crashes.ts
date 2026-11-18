@@ -29,6 +29,7 @@ interface CrashReport {
   detail: string;
   address: string;
   panics: string | null;
+  backtrace: string | null;
   exit: ExitDetails | null;
 }
 
@@ -89,7 +90,8 @@ export function applyNativeCrashConsent(
           native_abort_message: report.exit?.abortMessage,
           native_cause: report.exit?.cause,
           native_thread: report.exit?.thread,
-          native_backtrace: report.exit?.backtrace,
+          // The tombstone's frames are symbolized; ours only exist when Android kept no tombstone.
+          native_backtrace: report.exit?.backtrace ?? report.backtrace,
           exit_reason: report.exit?.reason,
           exit_status: report.exit?.status,
           exit_importance: report.exit?.importance,
