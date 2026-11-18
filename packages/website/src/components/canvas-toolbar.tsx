@@ -76,7 +76,7 @@ export const CanvasToolbar = memo(function CanvasToolbar({
         ref={toolbarRef}
         className="fade-in-0 slide-in-from-left-3 absolute top-1/2 left-6 z-[100] max-h-[calc(100dvh-6rem)] -translate-y-1/2 animate-in duration-[400ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]"
         role="toolbar"
-        aria-label="Canvas tools"
+        aria-label={strings.canvas.toolbar.canvasTools}
       >
         <div
           ref={toolbarInnerRef}

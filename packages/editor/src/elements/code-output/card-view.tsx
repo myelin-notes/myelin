@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import { VirtualList } from '../../components/virtual-list';
+import { getMessages } from '../../i18n';
 import type {
   CodeRunResult,
   CodeRunSession,
@@ -45,16 +46,17 @@ function formatDuration(ms: number): string {
 }
 
 function statusText(result: CodeRunResult): string {
+  const strings = getMessages().canvas.codeOutput;
   if (result.cancelled) {
-    return 'Stopped';
+    return strings.stopped;
   }
   if (result.error) {
-    return 'Failed';
+    return strings.failed;
   }
   if (result.exitCode !== 0) {
-    return `Exit ${result.exitCode}`;
+    return strings.exitCode(result.exitCode);
   }
-  return `Done in ${formatDuration(result.durationMs)}`;
+  return strings.doneIn(formatDuration(result.durationMs));
 }
 
 interface CodeOutputCardViewProps {
@@ -83,6 +85,7 @@ export function CodeOutputCardView({
   const items = session?.items ?? [];
   const result = session?.result ?? null;
   const dropped = session?.dropped ?? 0;
+  const strings = getMessages().canvas.codeOutput;
 
   const cardRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -229,13 +232,13 @@ export function CodeOutputCardView({
               : 'canvas-code-output__status'
           }
         >
-          {running ? 'Running' : result ? statusText(result) : ''}
+          {running ? strings.running : result ? statusText(result) : ''}
         </span>
         {running && session ? (
           <button
             type="button"
             className="canvas-code-output__stop"
-            aria-label="Stop"
+            aria-label={strings.stop}
             onClick={() => session.stop()}
           >
             ■
@@ -257,11 +260,11 @@ export function CodeOutputCardView({
         <div ref={contentRef}>
           {dropped > 0 ? (
             <div className="canvas-code-output__line is-stderr">
-              … {dropped} earlier lines dropped
+              {strings.droppedLines(dropped)}
             </div>
           ) : null}
           {items.length === 0 && !running ? (
-            <div className="canvas-code-output__empty">No output</div>
+            <div className="canvas-code-output__empty">{strings.empty}</div>
           ) : (
             <VirtualList
               scrollRef={bodyRef}

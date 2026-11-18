@@ -316,7 +316,7 @@ export const SidebarTags = memo(function SidebarTags({
         <div
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Resize tags"
+          aria-label={strings.sidebar.resizeTags}
           aria-valuenow={height}
           aria-valuemin={TAGS_MIN_HEIGHT}
           aria-valuemax={TAGS_MAX_HEIGHT}

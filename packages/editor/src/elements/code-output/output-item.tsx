@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getMessages } from '../../i18n';
 import type { CodeRunItem } from '../../page-frame/pm/code-block/run-store';
 import { getPlatform } from '../../platform';
 import { type DataResource, DataTable } from './data-table';
@@ -120,7 +121,7 @@ function HtmlFrame({ html }: { html: string }) {
       className="canvas-code-output__frame"
       src={frameUrl}
       sandbox="allow-scripts"
-      title="Code output"
+      title={getMessages().canvas.codeOutput.title}
       style={{ height }}
     />
   );

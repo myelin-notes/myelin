@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { Logger } from '@myelin/shared/logger';
 import { ColorPickerDialog } from './components/color-picker-dialog';
+import { getMessages } from './i18n';
 import { MAX_CUSTOM_COLORS } from './sync/repo/config';
 import type { CustomColorTool } from './sync/repo/types';
 import { useRepository } from './sync/repo-context';
@@ -125,8 +126,8 @@ export function CustomColorsProvider({ children }: PropsWithChildren) {
       <ColorPickerDialog
         open={pickerOpen}
         initialColor={INITIAL_PICKER_COLOR}
-        title="Custom color"
-        confirmLabel="Add color"
+        title={getMessages().colorPicker.customColor}
+        confirmLabel={getMessages().colorPicker.addColor}
         onConfirm={onConfirm}
         onCancel={onCancel}
       />

@@ -58,12 +58,24 @@ const zhHans: typeof en = {
     available: (version: string) => `版本 ${version} 已发布，安装后将重启。`,
     failed: '更新失败',
   },
+  windowControls: {
+    minimize: '最小化',
+    maximize: '最大化',
+    restore: '还原',
+  },
+  colorPicker: {
+    customColor: '自定义颜色',
+    addColor: '添加颜色',
+  },
   sidebar: {
     searchPlaceholder: '搜索你的资料库…',
     explorer: '资源管理器',
     tags: '标签',
     collapse: '收起侧边栏',
     expand: '展开侧边栏',
+    close: '关闭侧边栏',
+    resize: '调整侧边栏大小',
+    resizeTags: '调整标签区大小',
     graph: '打开关系图谱',
   },
   commandPalette: {
@@ -853,10 +865,20 @@ const zhHans: typeof en = {
     },
   },
   canvas: {
+    openNoteLinkFailed: '无法打开笔记链接',
+    openBacklinkFailed: '无法打开反向链接',
+    autocomplete: {
+      suggestions: '自动补全建议',
+      searching: '正在搜索...',
+      noMatches: '无匹配项。',
+      loadFailed: '无法加载建议。',
+    },
     kind: '画布',
     frame: {
       noteKind: '笔记',
       pdfKind: 'PDF',
+      addBlankPage: '添加空白页',
+      deletePage: '删除页面',
       displayNameLabel: '页面框显示名称',
       menu: '菜单',
       openMenu: '打开页面框菜单',
@@ -893,8 +915,34 @@ const zhHans: typeof en = {
       next: '下一个匹配',
       previous: '上一个匹配',
     },
+    codeOutput: {
+      title: '代码输出',
+      running: '运行中',
+      stop: '停止',
+      stopped: '已停止',
+      failed: '失败',
+      exitCode: (code: number | null) => `退出码 ${code}`,
+      doneIn: (duration: string) => `完成，用时 ${duration}`,
+      empty: '无输出',
+      droppedLines: (count: number) => `… 已省略前 ${count} 行`,
+    },
+    textFormatting: {
+      bold: '粗体',
+      italic: '斜体',
+      underline: '下划线',
+      strikethrough: '删除线',
+      font: '字体',
+      color: '颜色',
+      sans: '无衬线',
+      serif: '衬线',
+      mono: '等宽',
+      custom: '自定义',
+    },
     statusBar: {
       fps: (fps: number) => `${fps} fps`,
+      fitContent: '使内容适应视图',
+      lockZoom: '锁定缩放',
+      unlockZoom: '解锁缩放',
     },
     slashInsert: {
       pageBreak: {
@@ -1022,6 +1070,7 @@ const zhHans: typeof en = {
       customizeWheel: '工具与预设',
       insert: '插入',
       ruler: '直尺',
+      canvasTools: '画布工具',
     },
     selectionToolbar: {
       anchor: '锚定到页面',
@@ -1128,6 +1177,7 @@ const zhHans: typeof en = {
       updateToCurrent: '更新为当前设置',
       showInWheel: '显示在轮盘',
       removeFromWheel: '从轮盘移除',
+      toolbarLabel: '笔预设',
       delete: '删除预设',
     },
     tools: {

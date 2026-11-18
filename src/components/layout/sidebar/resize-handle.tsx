@@ -1,3 +1,4 @@
+import { useMessages } from '@myelin/editor/i18n';
 import { SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, useSidebar } from './context';
 import { useResizeHandle } from './use-resize-handle';
 
@@ -9,6 +10,7 @@ import { useResizeHandle } from './use-resize-handle';
  */
 export function SidebarResizeHandle() {
   const { width, setWidth } = useSidebar();
+  const strings = useMessages();
   const handleProps = useResizeHandle({
     axis: 'x',
     value: width,
@@ -19,7 +21,7 @@ export function SidebarResizeHandle() {
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label="Resize sidebar"
+      aria-label={strings.sidebar.resize}
       aria-valuenow={width}
       aria-valuemin={SIDEBAR_MIN_WIDTH}
       aria-valuemax={SIDEBAR_MAX_WIDTH}

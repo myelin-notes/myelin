@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { ColorPickerDialog } from '@myelin/editor/components/color-picker-dialog';
 import { useCustomColors } from '@myelin/editor/custom-colors';
+import { useMessages } from '@myelin/editor/i18n';
 import { Logger } from '@myelin/shared/logger';
 import type { VFSFolderNode } from '@/lib/sync';
 import { useRepository } from '@/lib/sync';
@@ -31,6 +32,7 @@ export function useFolderItemContextMenu(
 ) {
   const repository = useRepository();
   const { addColor } = useCustomColors('folder');
+  const strings = useMessages();
   const [menuOpen, setMenuOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
@@ -104,8 +106,8 @@ export function useFolderItemContextMenu(
       <ColorPickerDialog
         open={pickerOpen}
         initialColor={node.color ?? DEFAULT_FOLDER_COLOR}
-        title="Custom color"
-        confirmLabel="Add color"
+        title={strings.colorPicker.customColor}
+        confirmLabel={strings.colorPicker.addColor}
         onConfirm={(hex) => {
           setPickerOpen(false);
           void addColor(hex)

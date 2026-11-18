@@ -16,6 +16,7 @@ import {
 import type { EditorView } from 'prosemirror-view';
 import { createPortal } from 'react-dom';
 import { getVisibleViewportBounds } from '@myelin/shared/visible-viewport';
+import { useMessages } from '../../../i18n';
 import { cn } from '../../../utils';
 import type {
   NoteLinkPreview,
@@ -33,9 +34,6 @@ interface PageFrameAutocompletePopupProps {
   controller: PageFrameAutocompleteController | null;
   view: EditorView;
   onSelectItem?: (item: PageFrameAutocompleteItem) => void;
-  loadingLabel?: string;
-  emptyLabel?: string;
-  errorLabel?: string;
   showItemIcons?: boolean;
   enablePreview?: boolean;
   loadPreview?: (
@@ -132,14 +130,12 @@ export function PageFrameAutocompletePopup({
   controller,
   view,
   onSelectItem,
-  loadingLabel = 'Searching...',
-  emptyLabel = 'No matches.',
-  errorLabel = 'Could not load suggestions.',
   showItemIcons = true,
   enablePreview = false,
   loadPreview,
 }: PageFrameAutocompletePopupProps) {
   const state = useAutocompleteState(controller);
+  const strings = useMessages().canvas.autocomplete;
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>({});
@@ -344,25 +340,25 @@ export function PageFrameAutocompletePopup({
       <div
         ref={listRef}
         role="listbox"
-        aria-label="Autocomplete suggestions"
+        aria-label={strings.suggestions}
         className="flex max-h-[280px] w-[320px] max-w-[calc(100vw-1.5rem)] flex-col gap-1 overflow-y-auto p-1.5"
       >
         {state.status === 'loading' && (
           <AutocompleteStatusRow
             icon={<LoaderCircle className="size-4 animate-spin" />}
-            label={loadingLabel}
+            label={strings.searching}
           />
         )}
         {state.status === 'empty' && (
           <AutocompleteStatusRow
             icon={<FileText className="size-4" />}
-            label={emptyLabel}
+            label={strings.noMatches}
           />
         )}
         {state.status === 'error' && (
           <AutocompleteStatusRow
             icon={<FileText className="size-4" />}
-            label={state.error?.message || errorLabel}
+            label={state.error?.message || strings.loadFailed}
           />
         )}
         {state.items.map((item, index) => {

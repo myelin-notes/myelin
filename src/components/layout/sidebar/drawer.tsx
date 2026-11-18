@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useMessages } from '@myelin/editor/i18n';
 import { usePresence } from '@myelin/ui';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { Sidebar } from '.';
@@ -13,6 +14,7 @@ import { useSidebar } from './context';
  */
 export function SidebarDrawer() {
   const { drawerOpen, close } = useSidebar();
+  const strings = useMessages();
   const controller = useTabController();
 
   // Subscribe to window state so the active document is read fresh each change.
@@ -49,7 +51,7 @@ export function SidebarDrawer() {
       <button
         {...presence.state}
         type="button"
-        aria-label="Close sidebar"
+        aria-label={strings.sidebar.close}
         className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-40 bg-black/40 fill-mode-forwards duration-150 data-closed:animate-out data-open:animate-in"
         onClick={close}
       />
