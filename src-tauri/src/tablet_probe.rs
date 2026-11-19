@@ -37,18 +37,21 @@ pub fn install(app: &AppHandle) {
     let handler = RcBlock::new(move |event: NonNull<NSEvent>| -> *mut NSEvent {
         let e = unsafe { event.as_ref() };
         let ty = e.r#type();
-        let subtype = e.subtype();
+        // `subtype` raises NSInternalInconsistencyException on native tablet events, and the
+        // exception aborts the app when it unwinds into tao's `extern "C"` sendEvent: override.
+        let subtype = (ty != NSEventType::TabletPoint && ty != NSEventType::TabletProximity)
+            .then(|| e.subtype());
         let proximity =
-            ty == NSEventType::TabletProximity || subtype == NSEventSubtype::TabletProximity;
-        let point = ty == NSEventType::TabletPoint || subtype == NSEventSubtype::TabletPoint;
+            ty == NSEventType::TabletProximity || subtype == Some(NSEventSubtype::TabletProximity);
+        let point = ty == NSEventType::TabletPoint || subtype == Some(NSEventSubtype::TabletPoint);
         if ty == NSEventType::MouseMoved && !proximity && !point {
             return event.as_ptr();
         }
         let mut line = format!(
-            "[tablet] t={:.3} type={} subtype={}",
+            "[tablet] t={:.3} type={} subtype={:?}",
             e.timestamp(),
             ty.0,
-            subtype.0
+            subtype.map(|s| s.0)
         );
         if proximity {
             line += &format!(
