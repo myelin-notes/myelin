@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Bold,
+  CircleDot,
   Code,
   Command,
   Eraser,
@@ -41,6 +42,7 @@ const ACTION_ICONS: Partial<Record<Action, LucideIcon>> = {
   'canvas:tool-eraser': Eraser,
   'canvas:tool-text': Type,
   'canvas:tool-flag': Flag,
+  'canvas:tool-wheel': CircleDot,
   'canvas:insert-frame': Square,
   'canvas:insert-embed': ImagePlus,
   'editor:bold': Bold,

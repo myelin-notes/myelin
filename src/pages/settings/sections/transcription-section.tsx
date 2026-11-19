@@ -148,7 +148,13 @@ export function TranscriptionSection() {
               ((progress[model.id] ?? 0) / model.bytes) * 100,
             );
             return (
-              <div key={model.id} className="flex items-center gap-3 px-4 py-3">
+              <div
+                key={model.id}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 transition-colors',
+                  model.downloaded && 'hover:bg-input',
+                )}
+              >
                 <button
                   type="button"
                   role="radio"

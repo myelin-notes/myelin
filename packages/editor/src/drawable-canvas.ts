@@ -535,6 +535,10 @@ export class DrawableCanvas {
     return this.interaction.penIsErasing;
   }
 
+  public setTabletEraser(active: boolean): void {
+    this.interaction.setTabletEraser(active);
+  }
+
   public abortInteraction(): void {
     this.interaction.abortInteraction();
   }

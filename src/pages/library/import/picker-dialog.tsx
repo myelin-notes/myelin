@@ -42,7 +42,7 @@ export const ImportPickerDialog = memo(function ImportPickerDialog({
                 onOpenChange(false);
                 onSelect(id);
               }}
-              className="group flex w-full items-center gap-3.5 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input"
+              className="group flex w-full cursor-pointer items-center gap-3.5 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input"
             >
               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hover-tint text-text-secondary transition-colors duration-200 group-hover:text-text-primary">
                 <Icon className="size-[18px]" />

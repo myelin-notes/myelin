@@ -113,7 +113,7 @@ export function ExportDialog({ target, onClose }: ExportDialogProps) {
                     aria-pressed={format === f}
                     onClick={() => setFormat(f)}
                     className={cn(
-                      'rounded-md px-3 py-1.5 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
+                      'cursor-pointer rounded-md px-3 py-1.5 font-medium text-sm outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50',
                       format === f
                         ? 'bg-card text-foreground shadow-2xs'
                         : 'text-muted-foreground hover:text-foreground',

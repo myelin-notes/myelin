@@ -16,8 +16,17 @@ export interface KeyCombo {
 
 type DefaultKeyCombo = KeyCombo | KeyCombo[];
 
-export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
-  if (e.key.toLowerCase() !== combo.key.toLowerCase()) {
+/** Mouse buttons bind as `Mouse<MouseEvent.button>`, e.g. `Mouse3` for the back button. */
+export function mouseButtonKey(button: number): string {
+  return `Mouse${button}`;
+}
+
+export function comboMatches(
+  e: KeyboardEvent | MouseEvent,
+  combo: KeyCombo,
+): boolean {
+  const key = 'button' in e ? mouseButtonKey(e.button) : e.key;
+  if (key.toLowerCase() !== combo.key.toLowerCase()) {
     return false;
   }
   const mod = isApplePlatform ? e.metaKey : e.ctrlKey;
@@ -33,6 +42,25 @@ export function comboMatches(e: KeyboardEvent, combo: KeyCombo): boolean {
   return true;
 }
 
+const MOUSE_BUTTON_NAMES: Record<string, string> = {
+  Mouse1: 'Middle Click',
+  Mouse2: 'Right Click',
+};
+
+export function formatKeyName(key: string): string {
+  if (key === ' ') {
+    return 'Space';
+  }
+  if (key.length === 1) {
+    return key.toUpperCase();
+  }
+  // Side buttons go by their 1-based names: button 3 is "Mouse 4".
+  return (
+    MOUSE_BUTTON_NAMES[key] ??
+    key.replace(/^Mouse(\d+)$/, (_, n) => `Mouse ${Number(n) + 1}`)
+  );
+}
+
 export function formatKeyCombo(combo: KeyCombo): string {
   const parts: string[] = [];
   if (combo.mod) {
@@ -44,13 +72,7 @@ export function formatKeyCombo(combo: KeyCombo): string {
   if (combo.alt) {
     parts.push(isApplePlatform ? '⌥' : 'Alt');
   }
-  const key =
-    combo.key === ' '
-      ? 'Space'
-      : combo.key.length === 1
-        ? combo.key.toUpperCase()
-        : combo.key;
-  parts.push(key);
+  parts.push(formatKeyName(combo.key));
   return isApplePlatform ? parts.join(' ') : parts.join('+');
 }
 

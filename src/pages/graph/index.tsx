@@ -253,7 +253,7 @@ export function GraphPage() {
                   controllerRef.current?.focusNode(node.id);
                   setQuery('');
                 }}
-                className="rounded-lg px-3 py-2 text-left text-sm text-text-secondary hover:bg-hover-tint hover:text-text-primary"
+                className="cursor-pointer rounded-lg px-3 py-2 text-left text-sm text-text-secondary hover:bg-hover-tint hover:text-text-primary"
               >
                 {node.name}
               </button>
@@ -359,7 +359,7 @@ export function GraphPage() {
 }
 
 const TOOLBAR_ICON_BUTTON =
-  'flex size-9 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary';
+  'flex size-9 cursor-pointer items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary';
 
 function GraphToolbar({
   strings,
@@ -394,7 +394,7 @@ function GraphToolbar({
       <button
         type="button"
         onClick={onRecenter}
-        className="flex h-9 items-center gap-2 rounded-xl px-3 font-medium text-sm text-text-secondary uppercase tracking-[0.06em] transition-colors hover:bg-hover-tint hover:text-text-primary"
+        className="flex h-9 cursor-pointer items-center gap-2 rounded-xl px-3 font-medium text-sm text-text-secondary uppercase tracking-[0.06em] transition-colors hover:bg-hover-tint hover:text-text-primary"
       >
         <Focus className="size-4" />
         {strings.graph.recenter}
@@ -456,7 +456,7 @@ function GraphInspector({
               type="button"
               aria-label={strings.common.close}
               onClick={onClose}
-              className="flex size-9 shrink-0 items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary lg:hidden"
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-text-secondary transition-colors hover:bg-hover-tint hover:text-text-primary lg:hidden"
             >
               <X className="size-5" />
             </button>
@@ -464,7 +464,7 @@ function GraphInspector({
           <button
             type="button"
             onClick={onOpen}
-            className="mx-5 mt-5 flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark-hover lg:mx-6"
+            className="mx-5 mt-5 flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent-dark px-3 text-sm text-text-on-dark transition-colors hover:bg-accent-dark-hover lg:mx-6"
           >
             <ExternalLink className="size-3.5" />
             {strings.graph.openNote}
@@ -528,7 +528,7 @@ function GraphEdgeList({
                 key={edge.id}
                 type="button"
                 onClick={() => onSelect(nodeId)}
-                className="rounded-lg bg-card px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary"
+                className="cursor-pointer rounded-lg bg-card px-3 py-2 text-left text-sm text-text-secondary transition-colors hover:bg-card-active hover:text-text-primary"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className="min-w-0 truncate">{label}</span>

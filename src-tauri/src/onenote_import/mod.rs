@@ -1,7 +1,6 @@
 use std::io;
 use std::sync::Mutex;
 
-use onenote_parser::Parser;
 use onenote_parser::contents::{
     Content, EmbeddedObject, Image, Ink, Outline, OutlineItem, RichText, Table,
 };
@@ -9,6 +8,7 @@ use onenote_parser::fs::FileSystem;
 use onenote_parser::page::{Page, PageContent};
 use onenote_parser::property::common::ColorRef;
 use onenote_parser::section::{Section, SectionEntry};
+use onenote_parser::Parser;
 use serde::Serialize;
 use tauri::AppHandle;
 use tauri_plugin_fs::FilePath;
@@ -309,7 +309,11 @@ impl FileSystem for BufferFs<'_> {
         Err(unsupported())
     }
 
-    fn stream_to_file(&self, _path: TypedPath, _reader: &mut dyn io::Read) -> Result<(), io::Error> {
+    fn stream_to_file(
+        &self,
+        _path: TypedPath,
+        _reader: &mut dyn io::Read,
+    ) -> Result<(), io::Error> {
         Err(unsupported())
     }
 

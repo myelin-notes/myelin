@@ -6,12 +6,14 @@ export {
   comboMatches,
   comboToPMKey,
   formatKeyCombo,
+  formatKeyName,
   KeybindingRegistry,
   type KeyCombo,
+  mouseButtonKey,
 } from './registry';
 
 import { KeybindingHandler } from './handler';
-import { KeybindingRegistry } from './registry';
+import { KeybindingRegistry, mouseButtonKey } from './registry';
 
 export const registry = new KeybindingRegistry();
 export const keybindings = new KeybindingHandler(registry);
@@ -32,6 +34,7 @@ declare module './registry' {
     'canvas:tool-eraser': true;
     'canvas:tool-text': true;
     'canvas:tool-flag': true;
+    'canvas:tool-wheel': true;
     'canvas:flag-previous': true;
     'canvas:flag-next': true;
     'canvas:insert-frame': true;
@@ -93,6 +96,9 @@ registry.defineDefaults({
   },
   'canvas:tool-flag': {
     key: 'b',
+  },
+  'canvas:tool-wheel': {
+    key: mouseButtonKey(2),
   },
   'canvas:flag-previous': {
     key: '[',

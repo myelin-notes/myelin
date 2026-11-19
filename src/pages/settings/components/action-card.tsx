@@ -24,7 +24,7 @@ export function ActionCard({
       onClick={onClick}
       disabled={disabled}
       aria-busy={loading}
-      className="group flex w-full items-center gap-4 rounded-xl bg-input/40 px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input disabled:pointer-events-none disabled:opacity-60"
+      className="group flex w-full cursor-pointer items-center gap-4 rounded-xl bg-input/40 px-4 py-3.5 text-left ring-1 ring-border-subtle/70 transition-colors duration-200 hover:bg-input disabled:pointer-events-none disabled:opacity-60"
     >
       <span
         className={cn(

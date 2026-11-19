@@ -751,6 +751,7 @@ const fr: typeof en = {
       title: 'Raccourcis clavier',
       resetAll: 'Tout réinitialiser',
       pressKey: 'Appuyez sur une touche...',
+      pressKeyOrButton: 'Appuyez sur une touche ou un bouton...',
       unbound: 'Non assigné',
       empty:
         'Aucun raccourci enregistré pour l’instant. Ils apparaissent dès que vous ouvrez un canevas.',
@@ -814,6 +815,10 @@ const fr: typeof en = {
         'canvas:tool-flag': {
           label: 'Outil Drapeau',
           description: 'Placer un drapeau',
+        },
+        'canvas:tool-wheel': {
+          label: 'Roue des outils',
+          description: 'Ouvrir la roue des outils au curseur',
         },
         'canvas:flag-previous': {
           label: 'Drapeau précédent',

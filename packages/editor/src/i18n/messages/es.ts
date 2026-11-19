@@ -744,6 +744,7 @@ const es: typeof en = {
       title: 'Atajos de teclado',
       resetAll: 'Restablecer todo',
       pressKey: 'Pulsa una tecla...',
+      pressKeyOrButton: 'Pulsa una tecla o botón...',
       unbound: 'Sin asignar',
       empty:
         'Aún no hay atajos registrados. Aparecerán cuando abras un lienzo.',
@@ -804,6 +805,10 @@ const es: typeof en = {
         'canvas:tool-flag': {
           label: 'Herramienta de bandera',
           description: 'Colocar una bandera',
+        },
+        'canvas:tool-wheel': {
+          label: 'Rueda de herramientas',
+          description: 'Abrir la rueda de herramientas en el cursor',
         },
         'canvas:flag-previous': {
           label: 'Bandera anterior',

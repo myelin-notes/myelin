@@ -178,7 +178,7 @@ export function VersionHistoryDialog({
                     type="button"
                     onClick={() => setSelectedVersionId(version.id)}
                     className={cn(
-                      'flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors',
+                      'flex w-full cursor-pointer items-start gap-2 rounded-lg px-3 py-2 text-left transition-colors',
                       selected
                         ? 'bg-primary/10 text-text-primary'
                         : 'text-text-secondary hover:bg-hover-tint',

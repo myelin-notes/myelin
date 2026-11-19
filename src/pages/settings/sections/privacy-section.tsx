@@ -44,7 +44,7 @@ export function PrivacySection() {
         <button
           type="button"
           onClick={handlePolicy}
-          className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-input"
+          className="group flex w-full cursor-pointer items-center justify-between gap-4 rounded-xl bg-input/40 px-4 py-3 text-left ring-1 ring-border-subtle/70 transition-colors hover:bg-input"
         >
           <span className="min-w-0">
             <span className="block font-medium text-sm text-text-primary">
@@ -54,7 +54,7 @@ export function PrivacySection() {
               {strings.settings.privacy.policy.description}
             </span>
           </span>
-          <ArrowUpRight className="size-4 shrink-0 text-text-muted" />
+          <ArrowUpRight className="size-4 shrink-0 text-text-muted transition-[color,translate] duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-text-brand" />
         </button>
       </div>
     </section>

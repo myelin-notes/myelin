@@ -100,7 +100,7 @@ export function CanvasSearch({
         onClick={prev}
         disabled={total === 0}
         aria-label={strings.canvas.search.previous}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary disabled:opacity-40"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-40"
       >
         <ChevronUp className="size-4" />
       </button>
@@ -109,7 +109,7 @@ export function CanvasSearch({
         onClick={next}
         disabled={total === 0}
         aria-label={strings.canvas.search.next}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary disabled:opacity-40"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary disabled:cursor-default disabled:opacity-40"
       >
         <ChevronDown className="size-4" />
       </button>
@@ -117,7 +117,7 @@ export function CanvasSearch({
         type="button"
         onClick={close}
         aria-label={strings.common.clear}
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
+        className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-text-muted transition-colors hover:bg-hover-tint hover:text-text-primary"
       >
         <X className="size-3.5" />
       </button>

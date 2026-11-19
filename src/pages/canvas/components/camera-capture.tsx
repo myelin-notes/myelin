@@ -128,7 +128,7 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
               closedRef.current = true;
               onClose();
             }}
-            className="rounded-lg p-1.5 text-text-secondary hover:bg-hover-tint"
+            className="cursor-pointer rounded-lg p-1.5 text-text-secondary hover:bg-hover-tint"
           >
             <XIcon className="size-4" />
           </button>
@@ -164,7 +164,7 @@ export function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
             type="button"
             disabled={!ready || capturing}
             onClick={() => void takePhoto()}
-            className="shrink-0 rounded-lg bg-text-primary px-4 py-2 font-medium text-page text-sm disabled:opacity-50"
+            className="shrink-0 cursor-pointer rounded-lg bg-text-primary px-4 py-2 font-medium text-page text-sm disabled:cursor-default disabled:opacity-50"
           >
             {strings.takePhoto}
           </button>

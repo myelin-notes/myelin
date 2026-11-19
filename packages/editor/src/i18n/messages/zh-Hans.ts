@@ -704,6 +704,7 @@ const zhHans: typeof en = {
       title: '快捷键',
       resetAll: '全部重置',
       pressKey: '按下按键…',
+      pressKeyOrButton: '按下按键或鼠标按钮…',
       unbound: '未绑定',
       empty: '还没有注册快捷键，打开画布后即可查看',
       categories: {
@@ -763,6 +764,10 @@ const zhHans: typeof en = {
         'canvas:tool-flag': {
           label: '旗标工具',
           description: '放置旗标',
+        },
+        'canvas:tool-wheel': {
+          label: '工具轮盘',
+          description: '在光标处打开工具轮盘',
         },
         'canvas:flag-previous': {
           label: '上一个旗标',

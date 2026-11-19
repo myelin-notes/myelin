@@ -86,6 +86,7 @@ import { useCanvasEngine } from './hooks/use-engine';
 import { useCanvasInserts } from './hooks/use-inserts';
 import { useLivePeerDiscovery } from './hooks/use-live-peer-discovery';
 import { usePencilGestures } from './hooks/use-pencil-gestures';
+import { useTabletEraser } from './hooks/use-tablet-eraser';
 import { useToolState } from './hooks/use-tool-state';
 import { useVisibleCanvasSize } from './hooks/use-visible-canvas-size';
 import {
@@ -161,6 +162,7 @@ function CanvasViewInner({
     selectedToolIndex: toolState.selectedToolIndex,
     toggleOptions: toolState.toggleOptions,
   });
+  useTabletEraser(drawableCanvasRef);
   const handwriting = useMemo(
     () => new HandwritingIndex(repository, id),
     [repository, id],

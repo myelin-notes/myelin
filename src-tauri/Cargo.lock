@@ -4361,6 +4361,7 @@ name = "myelin"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "block2 0.6.2",
  "bytes",
  "chrono",
  "crash-handler",
@@ -4382,6 +4383,7 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "n0-future",
+ "objc2-app-kit 0.3.2",
  "objc2-ui-kit 0.3.2",
  "onenote_parser",
  "openssl-sys",

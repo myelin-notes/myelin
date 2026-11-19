@@ -401,6 +401,7 @@ describe('pen eraser override', () => {
     eraserOverrideApplied: boolean;
     penContactOpen: boolean;
     syncEraserOverride(event: PointerEvent): void;
+    setTabletEraser(active: boolean): void;
     destroy(): void;
   };
 
@@ -445,6 +446,24 @@ describe('pen eraser override', () => {
     }
     vi.unstubAllGlobals();
     UserPrefs.set('penBarrelButtonImmediate', false);
+  });
+
+  it('follows the native tablet eraser for pens the webview reports as a mouse', () => {
+    const { canvas, pen, eraser } = makeCanvas();
+    const mouseMove = {
+      type: 'pointermove',
+      button: -1,
+      buttons: 0,
+      pointerType: 'mouse',
+    } as PointerEvent;
+
+    canvas.setTabletEraser(true);
+    canvas.syncEraserOverride(mouseMove);
+    expect(canvas.selectedTool).toBe(eraser);
+
+    canvas.setTabletEraser(false);
+    canvas.syncEraserOverride(mouseMove);
+    expect(canvas.selectedTool).toBe(pen);
   });
 
   it('defaults to queued mode', () => {
