@@ -6,7 +6,7 @@ const fr: SiteCopy = {
     title:
       'Myelin Notes : une app de prise de notes locale pour l’écriture manuscrite, le texte et les PDF',
     description:
-      'Myelin Notes est une app de prise de notes native et locale pour Mac, Windows et Linux, bientôt sur iPhone, iPad et Android : un seul canevas où écriture manuscrite, texte, PDF, images et audio vivent dans la même note, sur votre propre appareil. Entièrement gratuite pour un usage personnel.',
+      'Myelin Notes est une app de prise de notes native et locale pour Mac, Windows et Linux, en bêta fermée sur iPhone, iPad et Android : un seul canevas où écriture manuscrite, texte, PDF, images et audio vivent dans la même note, sur votre propre appareil. Entièrement gratuite pour un usage personnel.',
   },
 
   topbar: {
@@ -177,9 +177,9 @@ const fr: SiteCopy = {
         sub: 'Téléphone et tablette',
       },
     ],
-    comingSoon: 'Bientôt disponible',
+    comingSoon: 'Bêta fermée',
     mobileBadge:
-      'iPhone, iPad et Android arrivent : les mêmes notes, pas une visionneuse au rabais',
+      'iPhone, iPad et Android sont en bêta fermée : les mêmes notes, pas une visionneuse au rabais',
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 
@@ -213,7 +213,7 @@ Entièrement. L’édition, la recherche plein texte et sémantique, la reconnai
 
 ## Et pour iPhone, iPad et Android ?
 
-Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps mobiles sont en développement, et ce sont des versions natives plutôt qu’une visionneuse au rabais : les mêmes notes, le même canevas et la même synchronisation que sur ordinateur, avec l’Apple Pencil sur iPad et le S Pen ou un stylet actif sur Android.
+En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, Windows et Linux. Les apps mobiles sont en bêta fermée, et ce sont des versions natives plutôt qu’une visionneuse au rabais : les mêmes notes, le même canevas et la même synchronisation que sur ordinateur, avec l’Apple Pencil sur iPad et le S Pen ou un stylet actif sur Android.
 `,
   },
 
@@ -555,7 +555,7 @@ Bientôt. Aujourd’hui Myelin Notes tourne sur Mac, Windows et Linux. Les apps 
   footer: {
     nav: 'Pied de page',
     tagline: 'Écriture manuscrite, texte et PDF. Une seule note.',
-    platforms: 'Mac · Windows · Linux · iPhone, iPad et Android bientôt',
+    platforms: 'Mac · Windows · Linux · iPhone, iPad et Android en bêta fermée',
   },
 
   shots: {

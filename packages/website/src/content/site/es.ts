@@ -14,7 +14,7 @@ const es: SiteCopy = {
     title:
       'Myelin Notes: una app de notas local para escritura a mano, texto y PDFs',
     description:
-      'Myelin Notes es una app de notas nativa y local para Mac, Windows y Linux, con iPhone, iPad y Android en camino: un lienzo donde la escritura a mano, el texto, los PDFs, las imágenes y el audio conviven en la misma nota, en tu propio dispositivo. Totalmente gratis para uso personal.',
+      'Myelin Notes es una app de notas nativa y local para Mac, Windows y Linux, con iPhone, iPad y Android en beta cerrada: un lienzo donde la escritura a mano, el texto, los PDFs, las imágenes y el audio conviven en la misma nota, en tu propio dispositivo. Totalmente gratis para uso personal.',
   },
 
   topbar: {
@@ -185,9 +185,9 @@ const es: SiteCopy = {
         sub: 'Móvil y tablet',
       },
     ],
-    comingSoon: 'Muy pronto',
+    comingSoon: 'Beta cerrada',
     mobileBadge:
-      'iPhone, iPad y Android están en camino: las mismas notas, no un visor recortado',
+      'iPhone, iPad y Android están en beta cerrada: las mismas notas, no un visor recortado',
     faqTitle: 'Preguntas frecuentes',
     faqMarkdown: `# Preguntas frecuentes
 
@@ -221,7 +221,7 @@ Del todo. La edición, la búsqueda por texto y semántica, el reconocimiento de
 
 ## ¿Y en iPhone, iPad y Android?
 
-Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles están en desarrollo, y serán nativas en lugar de un visor recortado: las mismas notas, el mismo lienzo y la misma sincronización que las apps de escritorio, con Apple Pencil en iPad y S Pen o lápiz activo en Android.
+En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y Linux. Las apps móviles están en beta cerrada, y son nativas en lugar de un visor recortado: las mismas notas, el mismo lienzo y la misma sincronización que las apps de escritorio, con Apple Pencil en iPad y S Pen o lápiz activo en Android.
 `,
   },
 
@@ -560,7 +560,7 @@ Muy pronto. Hoy Myelin Notes funciona en Mac, Windows y Linux. Las apps móviles
   footer: {
     nav: 'Pie de página',
     tagline: 'Escritura a mano, texto y PDFs. Una sola nota.',
-    platforms: 'Mac · Windows · Linux · iPhone, iPad y Android muy pronto',
+    platforms: 'Mac · Windows · Linux · iPhone, iPad y Android en beta cerrada',
   },
 
   shots: {

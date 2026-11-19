@@ -182,9 +182,9 @@ const en: SiteCopy = {
         sub: 'Phone and tablet',
       },
     ],
-    comingSoon: 'Coming soon',
+    comingSoon: 'Closed beta',
     mobileBadge:
-      'iPhone, iPad, and Android are on the way: the same notes, not a cut-down viewer',
+      'iPhone, iPad, and Android are in closed beta: the same notes, not a cut-down viewer',
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 
@@ -218,7 +218,7 @@ Fully. Editing, audio transcription, PDF annotation, and export all run on your 
 
 ## What about iPhone, iPad, and Android?
 
-Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps are in development, and they are native builds rather than a cut-down viewer: the same notes, the same canvas, and the same sync as the desktop apps, with Apple Pencil on iPad and an S Pen or active stylus on Android.
+In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Linux. The mobile apps are in closed beta, and they are native builds rather than a cut-down viewer: the same notes, the same canvas, and the same sync as the desktop apps, with Apple Pencil on iPad and an S Pen or active stylus on Android.
 `,
   },
 
@@ -555,7 +555,8 @@ Coming soon. Today Myelin Notes runs on Mac, Windows, and Linux. The mobile apps
   footer: {
     nav: 'Footer',
     tagline: 'Handwriting, typing, and PDFs. One note.',
-    platforms: 'Mac · Windows · Linux · iPhone, iPad, and Android coming soon',
+    platforms:
+      'Mac · Windows · Linux · iPhone, iPad, and Android in closed beta',
   },
 
   /** Alt text for the static page's screenshots. */
