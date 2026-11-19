@@ -50,7 +50,16 @@ try {
   disableNativePinchZoom();
   // The only usage signal from people who don't sync; active-user counts depend on it.
   trackEvent('app_opened');
-  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement, {
+    // React unmounts the whole tree on an uncaught error, and the first render runs after
+    // markBootComplete(), so without this a render crash is a silent blank window.
+    onUncaughtError: (error) => {
+      if (isErrorTrackingEnabled()) {
+        posthog.captureException(error);
+      }
+      void reportFatalError('render', error, true);
+    },
+  }).render(
     <React.StrictMode>
       <I18nProvider>
         <RepositoryProvider>

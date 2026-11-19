@@ -20,12 +20,13 @@ export function markBootComplete(): void {
 }
 
 // Renders a visible panel and appends to the Logger's log file (logs/app.log). Only the first
-// pre-boot failure is acted on; once mounted, this does nothing.
+// failure is acted on, and after boot only when `uiLost` says the UI is already gone.
 export async function reportFatalError(
   source: string,
   error: unknown,
+  uiLost = false,
 ): Promise<void> {
-  if (booted || reported) {
+  if ((booted && !uiLost) || reported) {
     return;
   }
   reported = true;

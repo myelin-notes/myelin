@@ -1,6 +1,6 @@
-// Polyfill structuredClone before anything else loads; older WKWebView builds
-// lack it and would crash the app during module evaluation.
-import '@/lib/structured-clone-polyfill';
+// Polyfill before anything else loads; older WKWebView builds lack some Web APIs
+// and would crash the app during module evaluation or first render.
+import '@/lib/polyfills';
 
 import { reportFatalError } from '@/lib/fatal-error';
 import { applyMobileViewportScale } from '@/lib/viewport-scale';
