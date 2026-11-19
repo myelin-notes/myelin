@@ -18,7 +18,7 @@ mod repository_bootstrap;
 mod repository_engine;
 mod repository_metadata;
 #[cfg(target_os = "macos")]
-mod tablet_probe;
+mod tablet_eraser;
 mod transcription;
 mod transcription_models;
 mod webview_crash;
@@ -33,7 +33,7 @@ pub fn run() {
             }
             webview_crash::setup(app.handle());
             #[cfg(target_os = "macos")]
-            tablet_probe::install(app.handle());
+            tablet_eraser::install(app.handle());
             #[cfg(desktop)]
             {
                 app.handle()

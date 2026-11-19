@@ -64,6 +64,7 @@ export class CanvasInteractionController {
   private eraserOverride: ITool | null = null;
   private eraserButtonsHeld = false;
   private eraserOverrideApplied = false;
+  private tabletEraser = false;
   private penContactOpen = false;
   private interactionPointer: { id: number; pen: boolean } | null = null;
   private lastToolSampleTime = 0;
@@ -120,6 +121,11 @@ export class CanvasInteractionController {
 
   public get penIsErasing(): boolean {
     return this.eraserButtonsHeld;
+  }
+
+  /** Native eraser state for platforms whose webview reports a tablet pen as a mouse (macOS). */
+  public setTabletEraser(active: boolean): void {
+    this.tabletEraser = active;
   }
 
   public setOnToolSwitched(callback: (index: number) => void): void {
@@ -358,6 +364,7 @@ export class CanvasInteractionController {
         this.state.update(event);
         return;
       case 'mouse':
+        this.syncEraserOverride(event);
         if (this.spaceDown || event.button === 1) {
           this.state.change(InteractState.Moving, event);
           this.state.update(event);
@@ -532,6 +539,10 @@ export class CanvasInteractionController {
   }
 
   private syncEraserOverride(event: PointerEvent): void {
+    if (event.pointerType === 'mouse') {
+      this.syncTabletEraser(event);
+      return;
+    }
     if (event.pointerType !== 'pen') {
       return;
     }
@@ -559,6 +570,20 @@ export class CanvasInteractionController {
     ) {
       this.setEraserOverrideApplied(this.eraserButtonsHeld, event);
     }
+  }
+
+  private syncTabletEraser(event: PointerEvent): void {
+    if (this.tabletEraser === this.eraserButtonsHeld) {
+      return;
+    }
+    if (
+      this.state.current === InteractState.UsingTool &&
+      !UserPrefs.get('penBarrelButtonImmediate')
+    ) {
+      return;
+    }
+    this.eraserButtonsHeld = this.tabletEraser;
+    this.setEraserOverrideApplied(this.tabletEraser, event);
   }
 
   private setEraserOverrideApplied(
