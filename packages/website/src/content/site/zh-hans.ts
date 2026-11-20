@@ -140,7 +140,7 @@ const zhHans: SiteCopy = {
   },
 
   download: {
-    body: '提供简体中文、英文、西班牙文与法文版本。',
+    body: '提供简体中文、英文、西班牙文、法文与土耳其文版本。',
     cta: '下载 Myelin Notes',
     platforms: [
       {
@@ -326,7 +326,7 @@ const zhHans: SiteCopy = {
           '通过你掌控的 GitHub 仓库在设备间同步',
           '从 Goodnotes、OneNote、Obsidian、Notion、Jupyter、Markdown 和 PDF 导入',
           '导出为 PDF、Markdown、Obsidian 仓库或工作区 JSON',
-          '支持英语、西班牙语、法语和简体中文',
+          '支持英语、西班牙语、法语、土耳其语和简体中文',
         ],
       },
     },
