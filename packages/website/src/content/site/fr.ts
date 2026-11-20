@@ -143,7 +143,7 @@ const fr: SiteCopy = {
   },
 
   download: {
-    body: 'Disponible en français, anglais, espagnol et chinois simplifié.',
+    body: 'Disponible en français, anglais, espagnol, turc et chinois simplifié.',
     cta: 'Télécharger Myelin Notes',
     platforms: [
       {
@@ -331,7 +331,7 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
           'Synchronisation entre appareils via un dépôt GitHub que vous contrôlez',
           'Import depuis Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown et PDF',
           'Export en PDF, en Markdown, en coffre Obsidian ou en JSON de l’espace de travail',
-          'En anglais, espagnol, français et chinois simplifié',
+          'En anglais, espagnol, français, turc et chinois simplifié',
         ],
       },
     },

@@ -6,7 +6,7 @@ import type { SupportedLocale } from '@myelin/editor/i18n/messages';
  * not just an app catalog. The `Extract` keeps the two from drifting apart in
  * naming: a typo here stops compiling.
  */
-export const LOCALES = ['en', 'es', 'fr', 'zh-hans'] as const;
+export const LOCALES = ['en', 'es', 'fr', 'tr', 'zh-hans'] as const;
 
 export type Locale = Extract<SupportedLocale, (typeof LOCALES)[number]>;
 
@@ -17,6 +17,7 @@ export const localeNames: Record<Locale, string> = {
   en: 'English',
   es: 'Español',
   fr: 'Français',
+  tr: 'Türkçe',
   'zh-hans': '简体中文',
 };
 
@@ -28,6 +29,7 @@ export const localeTags: Record<Locale, string> = {
   en: 'en',
   es: 'es',
   fr: 'fr',
+  tr: 'tr',
   'zh-hans': 'zh-Hans',
 };
 

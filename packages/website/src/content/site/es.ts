@@ -151,7 +151,7 @@ const es: SiteCopy = {
   },
 
   download: {
-    body: 'Disponible en español, inglés, francés y chino simplificado.',
+    body: 'Disponible en español, inglés, francés, turco y chino simplificado.',
     cta: 'Descargar Myelin Notes',
     platforms: [
       {
@@ -338,7 +338,7 @@ En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y 
           'Sincroniza entre dispositivos a través de un repositorio de GitHub que tú controlas',
           'Importa desde Goodnotes, OneNote, Obsidian, Notion, Jupyter, Markdown y PDF',
           'Exporta a PDF, Markdown, una bóveda de Obsidian o JSON del espacio de trabajo',
-          'En inglés, español, francés y chino simplificado',
+          'En inglés, español, francés, turco y chino simplificado',
         ],
       },
     },
