@@ -105,6 +105,20 @@ describe('SelectionController', () => {
     );
   });
 
+  it('leaves a finger on an unselected element to pan', () => {
+    const element = createElement('stroke', new DOMRect(0, 0, 100, 100));
+    Object.defineProperty(element, 'grabsFromBody', { value: true });
+    const controller = new SelectionController(() => [element]);
+
+    expect(controller.shouldUseSelectToolForTouch({ x: 50, y: 50 }, 1)).toBe(
+      false,
+    );
+    controller.selectAll();
+    expect(controller.shouldUseSelectToolForTouch({ x: 50, y: 50 }, 1)).toBe(
+      true,
+    );
+  });
+
   it('uses one corner-handle set for a multi-selection', () => {
     const first = createElement('first', new DOMRect(0, 0, 20, 20));
     const second = createElement('second', new DOMRect(80, 40, 20, 20));

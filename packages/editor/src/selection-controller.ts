@@ -267,16 +267,12 @@ export class SelectionController {
     );
   }
 
+  // Unselected elements don't claim the finger: on a page of notes nearly every point is inside
+  // some stroke's bounds, so one-finger panning kept grabbing ink. A tap still selects them.
   public shouldUseSelectToolForTouch(point: Vector2, zoom: number): boolean {
-    if (
+    return (
       this.containsInteractionPoint(point, zoom, 'touch') ||
-      this.hitHandle(point, zoom, 'touch')
-    ) {
-      return true;
-    }
-    return this.getElements().some(
-      (element) =>
-        element.grabsFromBody && rectContainsPoint(element.boundingBox, point),
+      this.hitHandle(point, zoom, 'touch') !== null
     );
   }
 
