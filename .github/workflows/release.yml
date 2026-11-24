@@ -29,6 +29,7 @@ env:
   # vars to CMake, so this is the only knob that reaches GGML_NATIVE. Value just
   # needs to be a valid post-1980 epoch (2024-01-01 here).
   SOURCE_DATE_EPOCH: "1704067200"
+  VITE_WEBSITE_URL: ${{ contains(github.event.release.tag_name, 'prerelease') && 'https://main.myelin-3lc.pages.dev' || 'https://trymyelin.app' }}
 
 jobs:
   test:
