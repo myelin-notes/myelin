@@ -339,8 +339,10 @@ export class CanvasViewport {
     this._panSamples = [{ x: 0, y: 0, timeStamp }];
   }
 
+  // One-finger touch pan only; two-finger pan in the touch handlers stays free while zoom-locked.
   public panGestureBy(dx: number, dy: number, timeStamp: number): void {
-    this.applyScreenPan(dx * this._zoom, dy * this._zoom, timeStamp);
+    const panX = this._zoomLocked ? 0 : dx * this._zoom;
+    this.applyScreenPan(panX, dy * this._zoom, timeStamp);
     this.notifyViewChange();
   }
 
