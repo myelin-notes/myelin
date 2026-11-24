@@ -226,6 +226,20 @@ describe('CanvasViewport pan inertia', () => {
     vi.unstubAllGlobals();
   });
 
+  it('keeps one-finger pan vertical while zoom-locked', () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn());
+    const { viewport } = createViewport();
+    viewport.setZoomLocked(true);
+
+    viewport.beginPanGesture(0);
+    viewport.panGestureBy(5, 1, 16);
+    viewport.endPanGesture(200);
+
+    expect(viewport.offset).toEqual({ x: 0, y: 1 });
+
+    vi.unstubAllGlobals();
+  });
+
   it('stops precisely after a slow touch pan', () => {
     const requestAnimationFrame = vi.fn();
     vi.stubGlobal('requestAnimationFrame', requestAnimationFrame);
