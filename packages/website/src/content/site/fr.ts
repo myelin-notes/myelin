@@ -560,7 +560,7 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
 
   shots: {
     hero: 'Un PDF et un cadre de page saisi sur un même canevas : le stylet entoure une équation, trace une flèche vers la note, une ligne est tapée et « key result! » est écrit à la main',
-    pdf: 'Un PDF dont une phrase est surlignée, une ligne soulignée et « E = mc² ! » écrit dans la marge, puis le PDF annoté est exporté',
+    pdf: "Le PDF d'une diapositive de cours sur le théorème de Bayes : une puce surlignée, la formule entourée à l'encre rouge et « flip it! » écrit à côté, puis le PDF annoté est exporté",
     pageFrame:
       'Un cadre de page avec une liste de tâches et un bloc de code TypeScript qui s’exécute et affiche sa sortie à côté',
     audio:

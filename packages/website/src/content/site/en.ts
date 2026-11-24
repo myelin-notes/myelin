@@ -562,7 +562,7 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
   /** Alt text for the static page's screenshots. */
   shots: {
     hero: 'A PDF and a typed page frame on one canvas, as a pen circles an equation, draws an arrow to the note, a line is typed in and "key result!" is handwritten',
-    pdf: 'A PDF where a sentence is highlighted, a line underlined and "E = mc²!" written in the margin, then the annotated PDF is exported',
+    pdf: 'A lecture slide PDF on Bayes\' theorem where a bullet is highlighted, the formula circled in red ink and "flip it!" written beside it, then the annotated PDF is exported',
     pageFrame:
       'A page frame with a checklist and a TypeScript code block that runs and shows its output beside it',
     audio:

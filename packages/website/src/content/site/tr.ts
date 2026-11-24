@@ -555,7 +555,7 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
 
   shots: {
     hero: 'Tek bir tuvalde bir PDF ve yazılı bir sayfa çerçevesi; bir kalem bir denklemi daire içine alıyor, nota bir ok çiziyor, bir satır yazılıyor ve elle "key result!" yazılıyor',
-    pdf: 'Bir cümlesi vurgulanmış, bir satırının altı çizilmiş ve kenarına "E = mc²!" yazılmış bir PDF; ardından açıklamalı PDF dışa aktarılıyor',
+    pdf: 'Bayes teoremi üzerine bir ders slaydı PDF\'i; bir madde vurgulanıyor, formül kırmızı mürekkeple daire içine alınıyor ve yanına "flip it!" yazılıyor, ardından açıklamalı PDF dışa aktarılıyor',
     pageFrame:
       'Bir kontrol listesi ve çalışıp çıktısını yanında gösteren bir TypeScript kod bloğu içeren bir sayfa çerçevesi',
     audio:
