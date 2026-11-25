@@ -726,6 +726,32 @@ describe('SelectTool rotation', () => {
     expect(stillPinned.y).toBeCloseTo(pinned.y);
   });
 
+  it('scales proportionally from a corner, and freely with shift held', () => {
+    const dragCorner = (shiftKey: boolean) => {
+      const { image } = makeImageElement();
+      image.select();
+      const handle = image
+        .getHandles()
+        .find((h) => h.anchorFx === 0 && h.anchorFy === 0)!;
+      const { canvas } = makeCanvas([image], handle.position);
+      const tool = new SelectTool(() => catalogs.en);
+      tool.start(canvas, event);
+      tool.update(canvas, { ...event, shiftKey } as PointerEvent, {
+        x: handle.position.x + 100,
+        y: handle.position.y + 8,
+      });
+      tool.finish(canvas, event);
+      return image.scale;
+    };
+
+    const locked = dragCorner(false);
+    expect(locked.x).toBeGreaterThan(1.5);
+    expect(locked.y).toBeCloseTo(locked.x);
+    const free = dragCorner(true);
+    expect(free.x).toBeCloseTo(locked.x);
+    expect(free.y).toBeLessThan(1.2);
+  });
+
   describe('of a group', () => {
     // Bounds x 0..300, y 0..180, so the pivot is (150, 90) and the knob sits above it at y = -24.
     function makeGroup() {
