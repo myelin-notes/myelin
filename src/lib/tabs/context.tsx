@@ -11,12 +11,14 @@ import {
   NODES_DELETED_EVENT,
   type NodesDeletedDetail,
 } from '@myelin/editor/events';
+import { onBackButtonPress } from '@tauri-apps/api/app';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import {
   prepareCanvasTabClose,
   registerAudioRecordingShutdownTask,
 } from '@/lib/audio-recording-lifecycle';
+import { MOBILE_PLATFORM } from '@/lib/env';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
 import { createWindowStateWithTab, TabStateController } from './controller';
 import { listenForTabDrops } from './multi-window';
@@ -69,6 +71,7 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
   }, [beforeCloseTab]);
 
   useTabCloseShortcut(controller);
+  useAndroidBackButton(controller);
   useAdoptDroppedTabs(controller);
   useCloseDeletedTabs(controller);
 
@@ -77,6 +80,36 @@ export function TabStateProvider({ children }: { children: ReactNode }) {
       {children}
     </TabControllerContext.Provider>
   );
+}
+
+// Tabs never touch webview history, so Android's back gesture finishes the activity unless a JS
+// listener is registered. Listen only away from home so back from home still leaves the app.
+function useAndroidBackButton(controller: TabStateController) {
+  const isAtHome = () => {
+    const pane = controller.getFocusedPane();
+    return !pane || (pane.activeTabId === '' && !pane.activePage);
+  };
+  const atHome = useSyncExternalStore(controller.subscribe, isAtHome, isAtHome);
+
+  useEffect(() => {
+    if (MOBILE_PLATFORM !== 'android' || atHome) {
+      return;
+    }
+    const listener = onBackButtonPress(() => {
+      const pane = controller.getFocusedPane();
+      if (!pane) {
+        return;
+      }
+      if (pane.activePage) {
+        controller.showPanePage(undefined, pane.id);
+      } else {
+        controller.showHome(pane.id);
+      }
+    });
+    return () => {
+      void listener.then((l) => l.unregister());
+    };
+  }, [controller, atHome]);
 }
 
 // Adopt tabs dropped onto this window from another window (reverse tear-off).
