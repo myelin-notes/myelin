@@ -330,6 +330,7 @@ const fr: typeof en = {
     templates: {
       title: 'Modèles',
       blankCanvas: 'Canevas vierge',
+      fromTemplate: 'À partir d’un modèle',
       saveAsTemplate: 'Enregistrer comme modèle',
       exportTemplate: 'Exporter le modèle',
       savedAsTemplate: (name: string) => `« ${name} » enregistré comme modèle`,

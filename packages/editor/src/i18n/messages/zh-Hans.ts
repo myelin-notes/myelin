@@ -301,6 +301,7 @@ const zhHans: typeof en = {
     templates: {
       title: '模板',
       blankCanvas: '空白画布',
+      fromTemplate: '从模板',
       saveAsTemplate: '存为模板',
       exportTemplate: '导出模板',
       savedAsTemplate: (name: string) => `已将“${name}”存为模板`,

@@ -313,6 +313,7 @@ const tr: typeof en = {
     templates: {
       title: 'Şablonlar',
       blankCanvas: 'Boş tuval',
+      fromTemplate: 'Şablondan',
       saveAsTemplate: 'Şablon olarak kaydet',
       exportTemplate: 'Şablonu dışa aktar',
       savedAsTemplate: (name: string) => `“${name}” şablon olarak kaydedildi`,

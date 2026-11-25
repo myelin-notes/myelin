@@ -318,6 +318,7 @@ const en = {
     templates: {
       title: 'Templates',
       blankCanvas: 'Blank canvas',
+      fromTemplate: 'From template',
       saveAsTemplate: 'Save as template',
       exportTemplate: 'Export template',
       savedAsTemplate: (name: string) => `Saved “${name}” as a template`,

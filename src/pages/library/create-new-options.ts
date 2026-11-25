@@ -1,4 +1,4 @@
-import { FolderPlus, Import, LayoutGrid } from 'lucide-react';
+import { FolderPlus, Import, LayoutGrid, LayoutTemplate } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import { useTemplates } from '@/lib/note/use-templates';
 import { type FileType, useRepositoryStatus, type VFSNodeId } from '@/lib/sync';
@@ -48,10 +48,18 @@ export function useCreateNewOptions({
       label: strings.library.createNew.canvas,
       icon: LayoutGrid,
       onClick: () => newCanvas(),
-      /** Present when templates exist: a blank canvas first, then one entry per template. */
-      choices:
-        templates.length > 0
-          ? [
+      choices: undefined,
+      disabled: setupRequired,
+    },
+    ...(templates.length > 0
+      ? [
+          {
+            id: 'from-template',
+            label: strings.library.templates.fromTemplate,
+            icon: LayoutTemplate,
+            onClick: undefined,
+            /** A blank canvas first, then one entry per template. */
+            choices: [
               {
                 id: 'blank',
                 label: strings.library.templates.blankCanvas,
@@ -64,10 +72,11 @@ export function useCreateNewOptions({
                   onClick: () => newCanvas(template.id),
                 }),
               ),
-            ]
-          : undefined,
-      disabled: setupRequired,
-    },
+            ],
+            disabled: setupRequired,
+          },
+        ]
+      : []),
     {
       id: 'folder',
       label: strings.library.createNew.folder,

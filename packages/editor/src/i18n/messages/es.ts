@@ -324,6 +324,7 @@ const es: typeof en = {
     templates: {
       title: 'Plantillas',
       blankCanvas: 'Lienzo en blanco',
+      fromTemplate: 'Desde plantilla',
       saveAsTemplate: 'Guardar como plantilla',
       exportTemplate: 'Exportar plantilla',
       savedAsTemplate: (name: string) => `“${name}” guardado como plantilla`,
