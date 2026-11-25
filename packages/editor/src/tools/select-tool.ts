@@ -460,7 +460,7 @@ export class SelectTool implements ITool {
         let ratioY = h.scaleY && origDist.y !== 0 ? curDist.y / origDist.y : 1;
 
         const uniformScale =
-          h.scaleX && h.scaleY && (_event.shiftKey || e.maintainAspectRatio);
+          h.scaleX && h.scaleY && (!_event.shiftKey || e.maintainAspectRatio);
         if (uniformScale) {
           const uniform = Math.abs(ratioX) > Math.abs(ratioY) ? ratioX : ratioY;
           ratioX = uniform;

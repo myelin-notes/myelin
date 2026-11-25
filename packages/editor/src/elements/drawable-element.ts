@@ -742,7 +742,7 @@ export abstract class DrawableElement {
     return false;
   }
 
-  /** Force uniform scaling on corner drags (shift-key behavior, always on). */
+  /** Keep corner drags uniform even with shift held (shift normally frees them). */
   public get maintainAspectRatio(): boolean {
     return false;
   }
