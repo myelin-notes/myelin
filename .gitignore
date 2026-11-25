@@ -27,3 +27,4 @@ dist-ssr
 .claude/**local**
 .claude/worktrees/
 .vscode
+**/.gradle
