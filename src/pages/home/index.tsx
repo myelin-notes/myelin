@@ -29,7 +29,8 @@ export function HomePage() {
   const setupState = useExplorerSetupState(repositoryStatus.config);
   const tabController = useTabController();
   const scrollRef = useRef<HTMLElement | null>(null);
-  const [recentFiles, setRecentFiles] = useState<VFSFileNode[]>([]);
+  // `null` until the first load, so the empty state doesn't flash before the repository opens.
+  const [recentFiles, setRecentFiles] = useState<VFSFileNode[] | null>(null);
   const recentFilesRequestRef = useRef(0);
 
   const loadRecentFiles = useCallback(async () => {
@@ -43,6 +44,7 @@ export function HomePage() {
       }
     } catch (error) {
       if (requestId === recentFilesRequestRef.current) {
+        setRecentFiles((current) => current ?? []);
         logger.error('Failed to load recent files', error);
       }
     }
@@ -91,7 +93,7 @@ export function HomePage() {
           <BetaFeedbackBanner />
         </div>
 
-        {recentFiles.length === 0 ? (
+        {recentFiles === null ? null : recentFiles.length === 0 ? (
           <div className="fade-in-0 slide-in-from-bottom-2 flex flex-1 animate-in flex-col items-center justify-center text-center duration-[250ms] ease-[cubic-bezier(0.25,0.1,0.25,1)]">
             <div className="flex size-16 items-center justify-center rounded-2xl bg-surface ring-1 ring-border-subtle/70">
               <LayoutGrid className="size-7 text-text-muted" />

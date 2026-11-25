@@ -421,9 +421,7 @@ it('refreshes Drive authentication only for its repository and credential', asyn
   });
   const token = vi.mocked(getGoogleDriveToken);
   token.mockClear();
-  token
-    .mockResolvedValueOnce('initial-token')
-    .mockResolvedValueOnce('refreshed-token');
+  token.mockResolvedValueOnce('refreshed-token');
   const repository = createRepository({
     kind: 'google-drive',
     folderName: 'Notes',
@@ -438,7 +436,7 @@ it('refreshes Drive authentication only for its repository and credential', asyn
       source: {
         kind: 'google-drive',
         folderId: 'drive-folder',
-        token: 'initial-token',
+        token: '',
       },
     },
   });
@@ -451,7 +449,8 @@ it('refreshes Drive authentication only for its repository and credential', asyn
   };
   authenticate({ payload: { ...request, repositoryId: 'another-repository' } });
   authenticate({ payload: { ...request, credentialId: 'another-account' } });
-  expect(token).toHaveBeenCalledTimes(1);
+  // Opening must not wait on the keychain; the engine requests the token at first sync.
+  expect(token).not.toHaveBeenCalled();
   authenticate({ payload: request });
   await vi.waitFor(() =>
     expect(invoke).toHaveBeenCalledWith('repository_auth_response', {

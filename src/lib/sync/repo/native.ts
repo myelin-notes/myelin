@@ -281,10 +281,9 @@ export class NativeRepository implements Repository {
           );
         }),
       );
-      const token =
-        (await this.backend.getToken?.(false).catch(() => '')) ?? '';
       const source = this.backend.source
-        ? { ...this.backend.source, token }
+        ? // Empty token: the keychain read takes ~1s, so the engine requests it at first sync.
+          { ...this.backend.source, token: '' }
         : null;
       const opened = await invoke<{ handle: string; status: NativeStatus }>(
         'repository_open',

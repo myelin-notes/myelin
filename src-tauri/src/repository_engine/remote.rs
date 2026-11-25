@@ -1042,7 +1042,7 @@ impl RepositoryEngine {
             },
         );
         let result = async {
-            if refresh_auth {
+            if refresh_auth || source_token(&source).is_empty() {
                 let _auth = trace.phase("auth");
                 let token = app
                     .state::<RepositoryManager>()
@@ -1294,6 +1294,14 @@ impl RepositoryEngine {
         let _ = tokio::fs::remove_dir_all(stage).await;
         let _ = self.clean_bases().await;
         result
+    }
+}
+
+fn source_token(source: &RepositorySource) -> &str {
+    match source {
+        RepositorySource::Github { token, .. } | RepositorySource::GoogleDrive { token, .. } => {
+            token
+        }
     }
 }
 

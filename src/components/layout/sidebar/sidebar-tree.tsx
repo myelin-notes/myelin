@@ -159,7 +159,9 @@ export function SidebarTree({
   const isSearching = trimmedQuery.length > 0;
   const isFiltering = filterTags.length > 0;
   const isFlat = isSearching || isFiltering;
-  const ready = setupState === 'ready';
+  // Not `=== 'ready'`: the credential check reads the keychain (~1s), and listing the local copy
+  // doesn't need credentials.
+  const ready = setupState !== 'setup-required';
 
   // Result folders start expanded; collapsing is remembered only for as long as
   // the query and tag filter stay put.
