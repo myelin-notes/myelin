@@ -1,13 +1,18 @@
-import { ChevronRight, Folder } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
-import type { FileType, VFSFileNode, VFSFolderNode } from '@/lib/sync';
+import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
+import type { CreateNewActions } from '@/pages/library/create-new-options';
 import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
-import { folderIconStyle } from '@/pages/library/explorer/folder-colors';
 import { TagList } from '@/pages/library/explorer/tag-list';
+import {
+  FolderGlyph,
+  useFolderLabel,
+} from '@/pages/library/explorer/templates-folder';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { useFileItemContextMenu } from '@/pages/library/explorer/use-file-item-context-menu';
 import { useFolderItemContextMenu } from '@/pages/library/explorer/use-folder-item-context-menu';
@@ -24,6 +29,10 @@ const tagListProps = {
 interface RowProps {
   depth: number;
   autoRename: boolean;
+  /** Text the new-item rename starts with, from a folder name rule. */
+  renamePrefill?: string;
+  /** Row sits directly in the templates folder. */
+  isTemplate?: boolean;
   onRenameEnd: (nodeId: string) => void;
   selected: boolean;
   /** Every selected row id; drag and Remove act on all of them when this row is selected. */
@@ -42,7 +51,7 @@ interface FolderRowProps extends RowProps {
   dropHighlighted: boolean;
   onToggle: () => void;
   onNewFolder: () => void;
-  onNewFile: (title: string, type: FileType) => void;
+  onNewFile: NonNullable<CreateNewActions['onNewFile']>;
   onImport: () => void;
   importDisabled: boolean;
 }
@@ -53,6 +62,7 @@ export function SidebarFolderRow({
   expanded,
   dropHighlighted,
   autoRename,
+  renamePrefill,
   onRenameEnd,
   selected,
   selectionIds,
@@ -77,6 +87,7 @@ export function SidebarFolderRow({
   } = useFolderItemContextMenu(node, onChanged, {
     nodeIds: selected ? selectionIds : undefined,
     initialRenaming: autoRename,
+    initialRenameValue: renamePrefill,
     onRenameEnd,
     createSubmenu: (
       <FolderCreateSubmenu
@@ -87,6 +98,8 @@ export function SidebarFolderRow({
       />
     ),
   });
+  const label = useFolderLabel(node);
+  const templatesRoot = isTemplatesRoot(node);
   const { dropTargetProps } = useDropTarget({
     targetFolderId: node.id,
     onMoved: onChanged,
@@ -100,7 +113,7 @@ export function SidebarFolderRow({
           render={
             <button
               type="button"
-              draggable={!renaming}
+              draggable={!renaming && !templatesRoot}
               onClick={(e) => {
                 if (!renaming && !onSelect(e)) {
                   onToggle();
@@ -114,7 +127,7 @@ export function SidebarFolderRow({
               aria-label={
                 renaming
                   ? undefined
-                  : formatExplorerItemAccessibleName(node.name, node.tags)
+                  : formatExplorerItemAccessibleName(label, node.tags)
               }
               className={cn(
                 'group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150',
@@ -134,10 +147,7 @@ export function SidebarFolderRow({
               expanded && 'rotate-90',
             )}
           />
-          <Folder
-            className="size-4 shrink-0"
-            style={folderIconStyle(node.color)}
-          />
+          <FolderGlyph folder={node} className="size-4 shrink-0" />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -146,13 +156,13 @@ export function SidebarFolderRow({
           ) : (
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
               <span className="truncate font-medium text-[13px] text-text-primary">
-                {node.name}
+                {label}
               </span>
               <TagList tags={node.tags} {...tagListProps} />
             </div>
           )}
         </ContextMenuTrigger>
-        {menu}
+        {!templatesRoot && menu}
       </ContextMenu>
       {dialogs}
     </>
@@ -167,6 +177,8 @@ export function SidebarFileRow({
   node,
   depth,
   autoRename,
+  renamePrefill,
+  isTemplate,
   onRenameEnd,
   selected,
   selectionIds,
@@ -185,6 +197,8 @@ export function SidebarFileRow({
     dialogs,
   } = useFileItemContextMenu(node, onChanged, {
     initialRenaming: autoRename,
+    initialRenameValue: renamePrefill,
+    isTemplate,
     onRenameEnd,
     nodeIds: selected ? selectionIds : undefined,
   });

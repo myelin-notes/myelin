@@ -27,6 +27,7 @@ import {
   useRepositoryStatus,
   type VFSFileNode,
   type VFSFolderNode,
+  type VFSNodeId,
 } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
@@ -184,13 +185,15 @@ export function MobileLibrary() {
   }, []);
 
   const handleNewFile = useCallback(
-    (title: string, type: FileType) => {
-      void explorerRef.current?.startNewFile(title, type).catch((error) => {
-        logger.error('Failed to create file', error, { fileType: type });
-        toast.error(strings.commandPalette.errors.createNote, {
-          description: errorDescription(error),
+    (title: string, type: FileType, templateId?: VFSNodeId | null) => {
+      void explorerRef.current
+        ?.startNewFile(title, type, templateId)
+        .catch((error) => {
+          logger.error('Failed to create file', error, { fileType: type });
+          toast.error(strings.commandPalette.errors.createNote, {
+            description: errorDescription(error),
+          });
         });
-      });
     },
     [strings.commandPalette.errors.createNote],
   );

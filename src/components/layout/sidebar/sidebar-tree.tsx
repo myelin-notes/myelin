@@ -6,18 +6,20 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMessages } from '@myelin/editor/i18n';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { isApplePlatform } from '@myelin/shared/os';
-import { createBlankCanvasFile } from '@/lib/note/create';
+import { createCanvasFromTemplate } from '@/lib/note/templates';
 import {
   type FileType,
   useRepository,
   useRepositoryStatus,
   type VFSFolderNode,
   type VFSNode,
+  type VFSNodeId,
 } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import {
   compareExplorerNodes,
@@ -40,7 +42,11 @@ export type SortMode = ExplorerSortMode;
 export interface SidebarTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
-  startNewFile: (title: string, type: FileType) => Promise<void>;
+  startNewFile: (
+    title: string,
+    type: FileType,
+    templateId?: VFSNodeId | null,
+  ) => Promise<void>;
 }
 
 interface FlatResults {
@@ -133,13 +139,14 @@ export function SidebarTree({
   onChanged,
 }: SidebarTreeProps) {
   const strings = useMessages();
+  const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
-      new ExplorerModel(repository, (name, parentId) =>
-        createBlankCanvasFile(repository, name, parentId),
+      new ExplorerModel(repository, (name, parentId, templateId) =>
+        createCanvasFromTemplate(repository, name, parentId, templateId),
       ),
     [repository],
   );
@@ -148,7 +155,10 @@ export function SidebarTree({
     () => new Map(),
   );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{
+    id: string;
+    prefill: string | null;
+  } | null>(null);
   const [searchResults, setSearchResults] =
     useState<FlatResults>(EMPTY_RESULTS);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
@@ -310,7 +320,7 @@ export function SidebarTree({
         parentId,
         strings.library.createNew.unnamedFolder,
       );
-      setRenamingId(node.id);
+      setRenaming({ id: node.id, prefill: null });
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
@@ -324,22 +334,33 @@ export function SidebarTree({
       title: string,
       type: FileType,
       parentId: string | null = ROOT_KEY,
+      templateId?: VFSNodeId | null,
     ) => {
-      const node = await explorer.createFile(parentId, title, type);
-      setRenamingId(node.id);
+      const { node, renameValue } = await explorer.createFile(
+        parentId,
+        title,
+        type,
+        { templateId, locale },
+      );
+      setRenaming({ id: node.id, prefill: renameValue });
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
       await loadFolder(parentId);
     },
-    [explorer, loadFolder],
+    [explorer, loadFolder, locale],
   );
 
-  useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
-    reload,
-    startNewFolder,
-    startNewFile,
-  ]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      reload,
+      startNewFolder,
+      startNewFile: (title, type, templateId) =>
+        startNewFile(title, type, ROOT_KEY, templateId),
+    }),
+    [reload, startNewFolder, startNewFile],
+  );
 
   const notifyNested = useCallback(() => {
     void reload();
@@ -404,7 +425,7 @@ export function SidebarTree({
   );
 
   const finishNewRename = useCallback((nodeId: string) => {
-    setRenamingId((current) => (current === nodeId ? null : current));
+    setRenaming((current) => (current?.id === nodeId ? null : current));
   }, []);
 
   // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
@@ -461,14 +482,20 @@ export function SidebarTree({
   }
 
   const notify = isFlat ? notifyFlat : notifyNested;
+  const templatesRootId =
+    childrenMap.get(ROOT_KEY)?.find(isTemplatesRoot)?.id ?? null;
   const rows = visibleRows.map(({ node, depth, expanded: isExpanded }) => {
     const rowProps = {
       depth,
-      autoRename: !isFlat && node.id === renamingId,
+      isTemplate: node.parentId !== null && node.parentId === templatesRootId,
+      autoRename: !isFlat && node.id === renaming?.id,
+      renamePrefill: renaming?.prefill ?? undefined,
       onRenameEnd: finishNewRename,
       selected: selection.ids.has(node.id),
       selectionIds,
-      onSelect: (e: React.MouseEvent) => selectRow(node.id, e),
+      // Not selectable: a multi-select must never carry the templates folder into Remove or Move.
+      onSelect: (e: React.MouseEvent) =>
+        !isTemplatesRoot(node) && selectRow(node.id, e),
       onChanged: notify,
       onDropHover: (over: boolean) => {
         const folderId = node.type === 'folder' ? node.id : node.parentId;
@@ -493,10 +520,12 @@ export function SidebarTree({
               logger.error('Failed to create folder', error);
             });
           }}
-          onNewFile={(title, type) => {
-            void startNewFile(title, type, node.id).catch((error) => {
-              logger.error('Failed to create canvas', error);
-            });
+          onNewFile={(title, type, templateId) => {
+            void startNewFile(title, type, node.id, templateId).catch(
+              (error) => {
+                logger.error('Failed to create canvas', error);
+              },
+            );
           }}
           importDisabled={importDisabled}
           onImport={() => {

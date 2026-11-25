@@ -6,6 +6,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -58,9 +62,33 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
         sideOffset={8}
         className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient"
       >
-        {options.map(({ id, label, icon: Icon, onClick, disabled }) => (
-          <Fragment key={id}>
+        {options.map(({ id, label, icon: Icon, onClick, choices, disabled }) =>
+          choices ? (
+            <DropdownMenuSub key={id}>
+              <DropdownMenuSubTrigger
+                className={createNewItemClass}
+                disabled={disabled}
+              >
+                <Icon className="size-4" />
+                {label}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-80 min-w-[180px] overflow-y-auto rounded-xl bg-page p-1.5 shadow-ambient">
+                {choices.map((choice, index) => (
+                  <Fragment key={choice.id}>
+                    <DropdownMenuItem
+                      className={createNewItemClass}
+                      onClick={choice.onClick}
+                    >
+                      {choice.label}
+                    </DropdownMenuItem>
+                    {index === 0 && <DropdownMenuSeparator />}
+                  </Fragment>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : (
             <DropdownMenuItem
+              key={id}
               className={createNewItemClass}
               onClick={onClick}
               disabled={disabled}
@@ -68,8 +96,8 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
               <Icon className="size-4" />
               {label}
             </DropdownMenuItem>
-          </Fragment>
-        ))}
+          ),
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

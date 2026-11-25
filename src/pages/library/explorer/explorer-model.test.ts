@@ -111,6 +111,15 @@ class TestExplorerRepository implements ExplorerRepository {
     return chain;
   }
 
+  async getTemplatesRoot(): Promise<VFSFolderNode | null> {
+    for (const node of this.nodes.values()) {
+      if (node.type === 'folder' && node.system?.kind === 'templates-root') {
+        return node;
+      }
+    }
+    return null;
+  }
+
   async searchNodes(query: string): Promise<NodeSearchResult[]> {
     return [...this.nodes.values()]
       .filter((node) => node.name.toLowerCase().includes(query.toLowerCase()))
@@ -220,11 +229,54 @@ describe('ExplorerModel', () => {
         configuration.folderId,
         'Untitled Canvas',
         'mcanvas',
+        { locale: 'en' },
       );
       expect(createdFolder.parentId).toBe(configuration.folderId);
-      expect(createdFile.parentId).toBe(configuration.folderId);
+      expect(createdFile.node.parentId).toBe(configuration.folderId);
     });
   }
+
+  it('creates canvases using the folder name rule and default template', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 6, 10, 12));
+    try {
+      const repository = new TestExplorerRepository([
+        {
+          ...folder('daily', 'daily', null),
+          nameRule: { mode: 'custom', pattern: '{weekday} - ' },
+          defaultTemplateId: 'tpl',
+        },
+        { ...folder('sub', 'sub', 'daily'), nameRule: { mode: 'inherit' } },
+      ]);
+      const templateIds: (VFSNodeId | null)[] = [];
+      const model = new ExplorerModel(
+        repository,
+        (name, parentId, templateId) => {
+          templateIds.push(templateId);
+          return repository.createFile(name, 'mcanvas', parentId);
+        },
+      );
+
+      const inFolder = await model.createFile('daily', 'Untitled', 'mcanvas', {
+        locale: 'en',
+      });
+      const inSub = await model.createFile('sub', 'Untitled', 'mcanvas', {
+        locale: 'en',
+      });
+      const blank = await model.createFile('daily', 'Untitled', 'mcanvas', {
+        locale: 'en',
+        templateId: null,
+      });
+
+      expect(inFolder.renameValue).toBe('Wednesday - ');
+      expect(inFolder.node.name).toBe('Wednesday');
+      expect(inSub.node.name).toBe('Wednesday');
+      expect(templateIds).toEqual(['tpl', null, null]);
+      expect(blank.renameValue).toBe('Wednesday - ');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('drops a stale refresh after a newer query starts', async () => {
     const repository = new TestExplorerRepository([]);

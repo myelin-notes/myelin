@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import {
+  FileDown,
   FolderInput,
   FolderOpen,
   History,
+  LayoutTemplate,
   Pencil,
   Tag,
   Trash2,
@@ -21,6 +23,8 @@ interface ItemContextMenuProps {
   onReveal?: () => void;
   onManageTags?: () => void;
   onVersionHistory?: () => void;
+  onSaveAsTemplate?: () => void;
+  onExportTemplate?: () => void;
   createSubmenu?: ReactNode;
   /** Extra items rendered after Manage Tags. */
   children?: ReactNode;
@@ -33,6 +37,8 @@ export function ItemContextMenu({
   onReveal,
   onManageTags,
   onVersionHistory,
+  onSaveAsTemplate,
+  onExportTemplate,
   createSubmenu,
   children,
 }: ItemContextMenuProps) {
@@ -65,6 +71,24 @@ export function ItemContextMenu({
         </ContextMenuItem>
       )}
       {children}
+      {onSaveAsTemplate && (
+        <ContextMenuItem
+          className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
+          onClick={onSaveAsTemplate}
+        >
+          <LayoutTemplate className="size-4" />
+          {strings.library.templates.saveAsTemplate}
+        </ContextMenuItem>
+      )}
+      {onExportTemplate && (
+        <ContextMenuItem
+          className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"
+          onClick={onExportTemplate}
+        >
+          <FileDown className="size-4" />
+          {strings.library.templates.exportTemplate}
+        </ContextMenuItem>
+      )}
       {onVersionHistory && (
         <ContextMenuItem
           className="gap-2.5 rounded-md px-3 py-2 text-sm text-text-secondary focus:bg-surface focus:text-text-primary"

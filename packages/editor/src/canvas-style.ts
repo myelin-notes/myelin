@@ -76,6 +76,32 @@ export function hasCanvasStyleOverride(doc: Y.Doc): boolean {
   return overrideMap(doc).size > 0;
 }
 
+/** Only the canvas's own fields; empty when it follows the global default. */
+export function getCanvasStyleOverride(doc: Y.Doc): Partial<CanvasStyle> {
+  return overrideMap(doc).toJSON() as Partial<CanvasStyle>;
+}
+
+/** Applies a style read from an untrusted file: unknown fields, mistyped values and bad images are dropped. */
+export function restoreCanvasStyleOverride(doc: Y.Doc, raw: unknown): void {
+  if (typeof raw !== 'object' || raw === null) {
+    return;
+  }
+  const defaults = getDefaultCanvasStyle();
+  const map = overrideMap(doc);
+  doc.transact(() => {
+    for (const field of FIELDS) {
+      const value = (raw as Record<string, unknown>)[field];
+      const valid =
+        field === 'image'
+          ? value === null || isValidImage(value)
+          : typeof value === typeof defaults[field];
+      if (valid) {
+        map.set(field, value);
+      }
+    }
+  }, LOCAL_ORIGIN);
+}
+
 /** The style a canvas renders with; `null` reads the global default. */
 export function getCanvasStyle(doc: Y.Doc | null): CanvasStyle {
   const style: CanvasStyle = {

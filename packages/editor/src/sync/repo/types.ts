@@ -58,12 +58,21 @@ export interface VFSFolderNode {
   system?: VFSSystemMetadata;
   /** Normalized hex icon color. Absent = the default folder color. */
   color?: string;
+  /** Template used by plain "new canvas" in this folder. Not inherited by subfolders. */
+  defaultTemplateId?: VFSNodeId;
+  /** Absent = no rule. `inherit` defers to the nearest ancestor with a custom rule. */
+  nameRule?: FolderNameRule;
 }
+
+export type FolderNameRule =
+  | { mode: 'custom'; pattern: string }
+  | { mode: 'inherit' };
 
 export type VFSNode = VFSFileNode | VFSFolderNode;
 
 export type VFSSystemMetadata =
   | { kind: 'version-history-root' }
+  | { kind: 'templates-root' }
   | { kind: 'media'; byteLength: number }
   | {
       kind: 'file-version';
@@ -201,6 +210,22 @@ export interface Repository {
   removeTag(nodeId: VFSNodeId, tag: string): Promise<void>;
   /** `null` clears back to the default color. */
   setFolderColor(nodeId: VFSNodeId, color: string | null): Promise<void>;
+  /** `null` clears. */
+  setFolderDefaultTemplate(
+    nodeId: VFSNodeId,
+    templateId: VFSNodeId | null,
+  ): Promise<void>;
+  /** `null` clears. */
+  setFolderNameRule(
+    nodeId: VFSNodeId,
+    rule: FolderNameRule | null,
+  ): Promise<void>;
+  /** `null` until the first template is saved or imported. */
+  getTemplatesRoot(): Promise<VFSFolderNode | null>;
+  /** Creates the templates root on first use. */
+  ensureTemplatesRoot(): Promise<VFSNodeId>;
+  /** Templates are the canvases directly inside the templates root. */
+  listTemplates(): Promise<VFSFileNode[]>;
   /** Absolute on-disk path to a file's stored bytes, or null if not a file. */
   getStoredAbsolutePath(nodeId: VFSNodeId): Promise<string | null>;
 

@@ -1,10 +1,10 @@
-import { Folder } from 'lucide-react';
 import { cn } from '@myelin/editor/utils';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import type { VFSFolderNode } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
-import { folderIconStyle } from '../folder-colors';
 import { TagList } from '../tag-list';
+import { FolderGlyph, useFolderLabel } from '../templates-folder';
 import { useDropTarget } from '../use-drop-target';
 import { useFolderItemContextMenu } from '../use-folder-item-context-menu';
 import {
@@ -50,6 +50,8 @@ export function GridFolderItem({
     onRenameEnd,
   });
 
+  const label = useFolderLabel(folder);
+  const templatesRoot = isTemplatesRoot(folder);
   const { dragOver, dropTargetProps } = useDropTarget({
     targetFolderId: folder.id,
     onMoved,
@@ -61,7 +63,7 @@ export function GridFolderItem({
         <ContextMenuTrigger
           render={
             <button
-              draggable={!renaming}
+              draggable={!renaming && !templatesRoot}
               onClick={() => {
                 if (!renaming) {
                   onNavigate();
@@ -73,7 +75,7 @@ export function GridFolderItem({
               aria-label={
                 renaming
                   ? undefined
-                  : formatExplorerItemAccessibleName(folder.name, folder.tags)
+                  : formatExplorerItemAccessibleName(label, folder.tags)
               }
               className={cn(
                 explorerGridCardClass,
@@ -90,10 +92,7 @@ export function GridFolderItem({
             />
             <div className="relative flex h-full items-center justify-center">
               <div className="flex size-[4.75rem] items-center justify-center rounded-2xl bg-card/80 shadow-elevated backdrop-blur-sm transition-transform duration-300 group-hover:scale-[1.03]">
-                <Folder
-                  className="size-12 shrink-0"
-                  style={folderIconStyle(folder.color)}
-                />
+                <FolderGlyph folder={folder} className="size-12 shrink-0" />
               </div>
             </div>
           </div>
@@ -108,9 +107,9 @@ export function GridFolderItem({
               <>
                 <span
                   className={cn('block', explorerGridTitleClass)}
-                  title={folder.name}
+                  title={label}
                 >
-                  {folder.name}
+                  {label}
                 </span>
                 <TagList
                   tags={folder.tags}
@@ -122,7 +121,7 @@ export function GridFolderItem({
             )}
           </div>
         </ContextMenuTrigger>
-        {menu}
+        {!templatesRoot && menu}
       </ContextMenu>
       {dialogs}
     </>

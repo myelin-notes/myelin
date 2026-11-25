@@ -9,18 +9,20 @@ import {
 } from 'react';
 import { Plus } from 'lucide-react';
 import { VirtualList } from '@myelin/editor/components/virtual-list';
-import { useMessages } from '@myelin/editor/i18n';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { VirtualGrid } from '@/components/virtual-grid';
-import { createBlankCanvasFile } from '@/lib/note/create';
+import { createCanvasFromTemplate } from '@/lib/note/templates';
+import { useTemplates } from '@/lib/note/use-templates';
 import {
   type FileType,
   type NodeSearchResult,
   useRepository,
   useRepositoryStatus,
   type VFSNode,
+  type VFSNodeId,
 } from '@/lib/sync';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import {
@@ -47,7 +49,11 @@ const TREE_GAP = 4;
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
-  startNewFile: (title: string, type: FileType) => Promise<void>;
+  startNewFile: (
+    title: string,
+    type: FileType,
+    templateId?: VFSNodeId | null,
+  ) => Promise<void>;
 }
 
 export type SortMode = ExplorerSortMode;
@@ -80,13 +86,15 @@ export function ExplorerTree({
   onCreateCanvas,
 }: ExplorerTreeProps) {
   const strings = useMessages();
+  const locale = useLocale();
+  const { rootId: templatesRootId } = useTemplates();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
-      new ExplorerModel(repository, (name, parentId) =>
-        createBlankCanvasFile(repository, name, parentId),
+      new ExplorerModel(repository, (name, parentId, templateId) =>
+        createCanvasFromTemplate(repository, name, parentId, templateId),
       ),
     [repository],
   );
@@ -96,6 +104,7 @@ export function ExplorerTree({
   const [loading, setLoading] = useState(true);
   const repositorySetupState = useExplorerSetupState(repositoryStatus.config);
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
+  const [renamePrefill, setRenamePrefill] = useState<string | undefined>();
   const isFiltering = filterTags && filterTags.length > 0;
   const isSearching = !!searchQuery?.trim();
 
@@ -150,6 +159,7 @@ export function ExplorerTree({
       strings.library.createNew.unnamedFolder,
     );
     setRenamingNewId(node.id);
+    setRenamePrefill(undefined);
     setNodes((prev) => [node, ...prev.filter((item) => item.id !== node.id)]);
     setLoading(false);
     onChanged?.();
@@ -161,14 +171,20 @@ export function ExplorerTree({
   ]);
 
   const startNewFile = useCallback(
-    async (title: string, type: FileType) => {
-      const node = await explorer.createFile(currentFolderId, title, type);
+    async (title: string, type: FileType, templateId?: VFSNodeId | null) => {
+      const { node, renameValue } = await explorer.createFile(
+        currentFolderId,
+        title,
+        type,
+        { templateId, locale },
+      );
       setRenamingNewId(node.id);
+      setRenamePrefill(renameValue ?? undefined);
       setNodes((prev) => [...prev.filter((item) => item.id !== node.id), node]);
       setLoading(false);
       onChanged?.();
     },
-    [currentFolderId, explorer, onChanged],
+    [currentFolderId, explorer, locale, onChanged],
   );
 
   useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
@@ -281,6 +297,10 @@ export function ExplorerTree({
             file={node}
             searchMatch={searchMatches.get(node.id)}
             autoRename={node.id === renamingNewId}
+            renamePrefill={renamePrefill}
+            isTemplate={
+              templatesRootId !== null && node.parentId === templatesRootId
+            }
             onRenameEnd={finishNewRename}
             onChanged={reloadAndNotify}
           />
@@ -299,6 +319,10 @@ export function ExplorerTree({
           file={node}
           searchMatch={searchMatches.get(node.id)}
           autoRename={node.id === renamingNewId}
+          renamePrefill={renamePrefill}
+          isTemplate={
+            templatesRootId !== null && node.parentId === templatesRootId
+          }
           onRenameEnd={finishNewRename}
           onChanged={reloadAndNotify}
         />
@@ -311,7 +335,9 @@ export function ExplorerTree({
       finishNewRename,
       onNavigate,
       reloadAndNotify,
+      renamePrefill,
       searchMatches,
+      templatesRootId,
     ],
   );
 

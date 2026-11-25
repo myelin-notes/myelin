@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  getCanvasStyleOverride,
+  setCanvasStyle,
+} from '@myelin/editor/canvas-style';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { addMarkdownPageFrameToYDoc } from '@myelin/editor/page-frame/markdown/import';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -110,6 +114,34 @@ describe('workspace JSON round-trip', () => {
 
     // Covers element order, stroke points, page-frame ProseMirror content, and base64 image bytes.
     expect(serializeNoteElements(rebuilt)).toEqual(elements);
+  });
+
+  it('restores a canvas style, dropping a background image that is not a PNG data URL', () => {
+    const source = new YDocManager();
+    setCanvasStyle(source.doc, { pattern: 'dots', patternColor: '#112233' });
+    const note: NoteJson = {
+      version: NOTE_JSON_VERSION,
+      name: 'Styled',
+      fileType: 'mcanvas',
+      tags: [],
+      createdAt: 1,
+      modifiedAt: 2,
+      canvasStyle: {
+        ...getCanvasStyleOverride(source.doc),
+        image: { src: 'https://example.com/tile.png', width: 10, height: 10 },
+        unknown: 'x',
+      },
+      elements: [],
+    };
+
+    const rebuilt = new YDocManager();
+    rebuildNote(rebuilt, JSON.parse(JSON.stringify(note)) as NoteJson);
+
+    const restored = getCanvasStyleOverride(rebuilt.doc);
+    expect(restored.pattern).toBe('dots');
+    expect(restored.patternColor).toBe('#112233');
+    expect(restored.image).toBeUndefined();
+    expect(restored).not.toHaveProperty('unknown');
   });
 
   it('remaps note-link ids to the imported note when rebuilding', async () => {

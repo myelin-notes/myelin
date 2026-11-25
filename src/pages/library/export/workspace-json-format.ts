@@ -57,6 +57,8 @@ export interface NoteJson {
   tags: string[];
   createdAt: number;
   modifiedAt: number;
+  /** The canvas's own background style; absent when it follows the app default. */
+  canvasStyle?: Record<string, unknown>;
   /** Each element's Y.Map fields, plus `content` (ProseMirror JSON) on frames. */
   elements: Record<string, unknown>[];
 }

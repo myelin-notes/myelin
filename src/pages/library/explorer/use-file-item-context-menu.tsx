@@ -6,6 +6,7 @@ import { ItemContextMenu } from './item-context-menu';
 import { MoveItemDialog } from './move-item-dialog';
 import { RenameReferencesDialog } from './rename-references-dialog';
 import { useExplorerItem } from './use-explorer-item';
+import { useTemplateActions } from './use-template-actions';
 
 /**
  * Shared wiring for a file item's right-click menu: rename (with note-reference
@@ -23,6 +24,9 @@ export function useFileItemContextMenu(
     initialRenaming?: boolean;
     onRenameEnd?: (nodeId: string) => void;
     nodeIds?: readonly string[];
+    /** Offers "Export template" in place of "Save as template". */
+    isTemplate?: boolean;
+    initialRenameValue?: string;
   },
 ) {
   const [moveOpen, setMoveOpen] = useState(false);
@@ -46,9 +50,15 @@ export function useFileItemContextMenu(
     nodeIds: options?.nodeIds,
     onChanged,
     initialRenaming: options?.initialRenaming,
+    initialRenameValue: options?.initialRenameValue,
     onRenameEnd: options?.onRenameEnd,
     renameReferencesOnRename: node.fileType === 'mcanvas',
   });
+
+  const templateActions = useTemplateActions(
+    node,
+    options?.isTemplate ?? false,
+  );
 
   const menu = (
     <ItemContextMenu
@@ -57,6 +67,7 @@ export function useFileItemContextMenu(
       onRemove={handleRemove}
       onManageTags={() => setTagDialogOpen(true)}
       onVersionHistory={() => setVersionHistoryOpen(true)}
+      {...templateActions}
     />
   );
 
