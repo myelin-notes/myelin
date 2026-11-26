@@ -13,7 +13,9 @@ export function FolderGlyph({
   className?: string;
 }) {
   return isTemplatesRoot(folder) ? (
-    <LayoutTemplate className={cn(className, 'text-accent')} />
+    <LayoutTemplate
+      className={cn(className, 'text-emerald-600 dark:text-accent')}
+    />
   ) : (
     <Folder className={className} style={folderIconStyle(folder.color)} />
   );
