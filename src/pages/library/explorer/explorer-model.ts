@@ -1,3 +1,8 @@
+import {
+  cleanName,
+  renderNamePattern,
+  resolveNamePattern,
+} from '@/lib/note/name-pattern';
 import type {
   FileType,
   NodeSearchResult,
@@ -11,6 +16,7 @@ import {
   isRepositoryConfigStructurallyComplete,
   isRepositoryFullyConfigured,
 } from '@/lib/sync/repo/repository-backends';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { nodeMatchesAnyTag } from '@/lib/sync/repo/tag-hierarchy';
 
 export type ExplorerSortMode =
@@ -27,6 +33,7 @@ export interface ExplorerRepository {
     folderId: VFSNodeId | null,
   ): Promise<[VFSFolderNode[], VFSFileNode[]]>;
   getFolderChain(folderId: VFSNodeId | null): Promise<VFSFolderNode[]>;
+  getTemplatesRoot(): Promise<VFSFolderNode | null>;
   searchNodes(
     query: string,
     options?: { limit?: number },
@@ -50,7 +57,20 @@ export interface ExplorerRepository {
 export type ExplorerCanvasFileCreator = (
   name: string,
   parentId: VFSNodeId | null,
+  templateId: VFSNodeId | null,
 ) => Promise<VFSNodeId>;
+
+export interface NewFileOptions {
+  /** `undefined` uses the folder's default template; `null` forces a blank canvas. */
+  templateId?: VFSNodeId | null;
+  locale: string;
+}
+
+export interface CreatedFile {
+  node: VFSFileNode;
+  /** Text to prefill the inline rename with; `null` when no folder name rule applied. */
+  renameValue: string | null;
+}
 
 export interface ExplorerQuery {
   folderId: VFSNodeId | null;
@@ -92,6 +112,9 @@ export function compareExplorerNodes(
   right: VFSNode,
   sortMode: ExplorerSortMode,
 ): number {
+  if (isTemplatesRoot(left) !== isTemplatesRoot(right)) {
+    return isTemplatesRoot(left) ? -1 : 1;
+  }
   if (left.type !== right.type) {
     return left.type === 'folder' ? -1 : 1;
   }
@@ -157,10 +180,7 @@ export class ExplorerModel {
           query.folderId,
         );
       } else {
-        const [folders, files] = await this.repository.listDirectory(
-          query.folderId,
-        );
-        nodes = [...folders, ...files];
+        nodes = await this.loadFolder(query.folderId);
       }
 
       return requestId === this.requestId
@@ -176,7 +196,9 @@ export class ExplorerModel {
 
   async loadFolder(folderId: VFSNodeId | null): Promise<VFSNode[]> {
     const [folders, files] = await this.repository.listDirectory(folderId);
-    return [...folders, ...files];
+    const templatesRoot =
+      folderId === null ? await this.repository.getTemplatesRoot() : null;
+    return [...(templatesRoot ? [templatesRoot] : []), ...folders, ...files];
   }
 
   async loadAncestors(nodes: readonly VFSNode[]): Promise<VFSFolderNode[]> {
@@ -211,17 +233,34 @@ export class ExplorerModel {
     parentId: VFSNodeId | null,
     title: string,
     fileType: FileType,
-  ): Promise<VFSFileNode> {
-    const name = await this.repository.getUniqueFileName(title, parentId);
-    const id =
-      fileType === 'mcanvas'
-        ? await this.createCanvasFile(name, parentId)
-        : await this.repository.createFile(name, fileType, parentId);
+    { templateId, locale }: NewFileOptions,
+  ): Promise<CreatedFile> {
+    const isCanvas = fileType === 'mcanvas';
+    const chain =
+      isCanvas && parentId
+        ? await this.repository.getFolderChain(parentId)
+        : [];
+    const pattern = resolveNamePattern(chain);
+    const renameValue =
+      pattern === null ? null : renderNamePattern(pattern, new Date(), locale);
+    const name = await this.repository.getUniqueFileName(
+      (renameValue !== null && cleanName(renameValue)) || title,
+      parentId,
+    );
+    const id = isCanvas
+      ? await this.createCanvasFile(
+          name,
+          parentId,
+          templateId === undefined
+            ? (chain.at(-1)?.defaultTemplateId ?? null)
+            : templateId,
+        )
+      : await this.repository.createFile(name, fileType, parentId);
     const node = await this.repository.getNode(id);
     if (!node || node.type !== 'file') {
       throw new Error(`Created file is missing: ${id}`);
     }
     this.invalidatePendingRequests();
-    return node;
+    return { node, renameValue };
   }
 }

@@ -14,8 +14,11 @@ import { Button } from '@myelin/ui/button';
 import { WindowControls } from '@/components/layout/window-controls';
 import { WHATS_NEW_RELEASE } from '@/components/whats-new-dialog';
 import { trackEvent } from '@/lib/analytics';
+import { TEMPLATE_EXTENSION } from '@/lib/note/templates';
 import { useRepository } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
+import { importTemplateFile } from '@/pages/library/import/template';
+import defaultTemplate from './default.myelin-template?raw';
 import { InputStep } from './input-step';
 import { PrivacyStep } from './privacy-step';
 import { SampleCanvasStep } from './sample-canvas-step';
@@ -50,6 +53,21 @@ export function OnboardingFlow() {
   const finish = useCallback(
     async (openStarterCanvas: boolean) => {
       let opened = openStarterCanvas;
+
+      try {
+        // A synced library on a second device already has its templates.
+        if ((await repository.listTemplates()).length === 0) {
+          await importTemplateFile({
+            file: new File(
+              [defaultTemplate],
+              `${strings.onboarding.sample.defaultTemplateName}${TEMPLATE_EXTENSION}`,
+            ),
+            repository,
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to add the default template', error);
+      }
 
       if (opened) {
         try {

@@ -327,6 +327,42 @@ const fr: typeof en = {
       emptyDefault: 'Aucun fichier pour l’instant',
       selectedCount: (count: number) => `${count} éléments`,
     },
+    templates: {
+      title: 'Modèles',
+      blankCanvas: 'Canevas vierge',
+      fromTemplate: 'À partir d’un modèle',
+      saveAsTemplate: 'Enregistrer comme modèle',
+      newTemplate: 'Nouveau modèle',
+      importTemplate: 'Importer un modèle',
+      importFailed: 'Impossible d’importer le modèle.',
+      emptyFolder:
+        'Créez de nouveaux canevas à partir d’un modèle. Pour transformer un canevas en modèle, appuyez longuement ou faites un clic droit dessus et choisissez « Enregistrer comme modèle ».',
+      exportTemplate: 'Exporter le modèle',
+      savedAsTemplate: (name: string) => `« ${name} » enregistré comme modèle`,
+      saveFailed: 'Impossible d’enregistrer le modèle.',
+      exportFailed: 'Impossible d’exporter le modèle.',
+      fieldsLabel: 'Champs du modèle',
+      fieldHint:
+        'Cliquez pour insérer au curseur. Rempli lors de la création d’un canevas à partir de ce modèle.',
+      fieldCopied: (token: string) => `${token} copié`,
+    },
+    folderSettings: {
+      menuItem: 'Réglages du dossier…',
+      title: 'Réglages du dossier',
+      defaultTemplate: 'Modèle par défaut',
+      defaultTemplateHint:
+        '« Nouveau canevas » dans ce dossier utilise le modèle par défaut.',
+      noTemplate: 'Aucun',
+      nameRule: 'Nom des nouveaux canevas',
+      ruleNone: 'Aucun',
+      ruleCustom: 'Personnalisé',
+      ruleInherit: 'Hériter du dossier parent',
+      pattern: 'Modèle de nom',
+      insertToken: 'Insérer une variable',
+      preview: 'Aperçu',
+      save: 'Enregistrer',
+      saveFailed: 'Impossible d’enregistrer les réglages du dossier.',
+    },
     itemMenu: {
       moveTo: 'Déplacer vers…',
       moveHere: 'Déplacer ici',
@@ -1429,6 +1465,7 @@ const fr: typeof en = {
       start: 'Ouvrir le canevas',
       skip: 'Commencer à vide',
       canvasName: 'Premiers pas',
+      defaultTemplateName: 'Titre et date',
       highlights: {
         frame:
           'Un cadre de page avec du code, des maths et un diagramme Mermaid',

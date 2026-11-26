@@ -48,7 +48,7 @@ import { useExplorerItem } from './use-explorer-item';
 const onRenameEnd = vi.fn();
 const onChanged = vi.fn();
 
-function renderItem(initialRenaming: boolean) {
+function renderItem(initialRenaming: boolean, initialRenameValue?: string) {
   let item: ReturnType<typeof useExplorerItem>;
   do {
     mocks.stateIndex = 0;
@@ -60,6 +60,7 @@ function renderItem(initialRenaming: boolean) {
       name: 'Untitled',
       dragKind: 'file',
       initialRenaming,
+      initialRenameValue,
       onRenameEnd,
       onChanged,
     });
@@ -83,6 +84,12 @@ describe('new item renaming', () => {
 
   it('starts on mount when the item renders after creation finishes', () => {
     expect(renderItem(true).renaming).toBe(true);
+  });
+
+  it('shows the name-rule prefill when the item mounts already renaming', () => {
+    expect(
+      renderItem(true, 'November 25, 2026 - ').renameInputProps.value,
+    ).toBe('November 25, 2026 - ');
   });
 
   it('ends the request on Escape without restarting on an unchanged request', () => {

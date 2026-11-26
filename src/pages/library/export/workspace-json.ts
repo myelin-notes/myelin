@@ -1,5 +1,9 @@
 import { yXmlFragmentToProseMirrorRootNode } from 'y-prosemirror';
 import * as Y from 'yjs';
+import {
+  getCanvasStyleOverride,
+  hasCanvasStyleOverride,
+} from '@myelin/editor/canvas-style';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
@@ -103,7 +107,7 @@ export function serializeNoteElements(
 }
 
 /** Encode a canvas note as a JSON document carrying all of its elements. */
-async function noteJson(
+export async function noteJson(
   repository: ReadableRepository,
   node: VFSFileNode,
 ): Promise<string> {
@@ -119,6 +123,9 @@ async function noteJson(
     tags: node.tags,
     createdAt: node.createdAt,
     modifiedAt: node.modifiedAt,
+    ...(hasCanvasStyleOverride(ydoc.doc)
+      ? { canvasStyle: getCanvasStyleOverride(ydoc.doc) }
+      : {}),
     elements: serializeNoteElements(ydoc),
   };
   return `${JSON.stringify(note, null, 2)}\n`;

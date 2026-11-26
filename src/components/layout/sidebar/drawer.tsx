@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useMessages } from '@myelin/editor/i18n';
+import { cn } from '@myelin/editor/utils';
 import { usePresence } from '@myelin/ui';
 import { useTabController, useWindowState } from '@/lib/tabs/context';
 import { Sidebar } from '.';
@@ -42,23 +43,27 @@ export function SidebarDrawer() {
   }, [drawerOpen, close]);
 
   const presence = usePresence(drawerOpen);
-  if (!presence.mounted) {
-    return null;
-  }
 
   return (
     <>
-      <button
-        {...presence.state}
-        type="button"
-        aria-label={strings.sidebar.close}
-        className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-40 bg-black/40 fill-mode-forwards duration-150 data-closed:animate-out data-open:animate-in"
-        onClick={close}
-      />
+      {/* Above canvas chrome (z-100..111), below in-canvas modals (z-200); body-portaled dialogs sit above RootLayout's isolate. */}
+      {presence.mounted && (
+        <button
+          {...presence.state}
+          type="button"
+          aria-label={strings.sidebar.close}
+          className="data-closed:fade-out-0 data-open:fade-in-0 fixed inset-0 z-[150] bg-black/40 fill-mode-forwards duration-150 data-closed:animate-out data-open:animate-in"
+          onClick={close}
+        />
+      )}
+      {/* Hidden rather than unmounted so folder/tag expansion and search survive reopening. */}
       <div
         {...presence.state}
         onAnimationEnd={presence.onAnimationEnd}
-        className="data-closed:slide-out-to-left-full data-open:slide-in-from-left-full fixed inset-y-0 left-0 z-50 w-[min(320px,85vw)] bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-xl duration-200 ease-out data-closed:animate-out data-open:animate-in"
+        className={cn(
+          'data-closed:slide-out-to-left-full data-open:slide-in-from-left-full fixed inset-y-0 left-0 z-[150] w-[min(320px,85vw)] bg-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] shadow-xl duration-200 ease-out data-closed:animate-out data-open:animate-in',
+          !presence.mounted && 'hidden',
+        )}
       >
         <Sidebar fill />
       </div>

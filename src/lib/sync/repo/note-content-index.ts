@@ -1,7 +1,7 @@
 import { Logger } from '@myelin/shared/logger';
 import { invoke } from '@tauri-apps/api/core';
 import type { NoteSearchDocument, NoteSearchHit } from './note-search-engine';
-import { isSystemNode, type VFSManifest } from './shared';
+import { isSystemNode, isTemplateNode, type VFSManifest } from './shared';
 import type {
   NodeSearchResult,
   NoteIndexItem,
@@ -224,7 +224,7 @@ export class NoteContentIndex {
     });
     return hits.flatMap((hit) => {
       const node = manifest.nodes[hit.id];
-      return node && !isSystemNode(node)
+      return node && !isSystemNode(node) && !isTemplateNode(manifest, node)
         ? [
             {
               node,
@@ -311,7 +311,7 @@ export class NoteContentIndex {
       let inspected = 0;
       for (const id in manifest.nodes) {
         const node = manifest.nodes[id];
-        if (isSystemNode(node)) {
+        if (isSystemNode(node) || isTemplateNode(manifest, node)) {
           continue;
         }
         seen.add(id);

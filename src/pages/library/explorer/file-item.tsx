@@ -20,11 +20,15 @@ import { RenameReferencesDialog } from './rename-references-dialog';
 import { SearchHighlight } from './search-highlight';
 import { TagList } from './tag-list';
 import { useExplorerItem } from './use-explorer-item';
+import { useTemplateActions } from './use-template-actions';
 
 interface FileItemProps {
   file: VFSFileNode;
   searchMatch?: NodeSearchResult;
   autoRename?: boolean;
+  renamePrefill?: string;
+  /** Offers "Export template" in place of "Save as template". */
+  isTemplate?: boolean;
   onRenameEnd?: (nodeId: string) => void;
   onChanged: () => Promise<void>;
 }
@@ -33,6 +37,8 @@ export function FileItem({
   file,
   searchMatch,
   autoRename,
+  renamePrefill,
+  isTemplate = false,
   onRenameEnd,
   onChanged,
 }: FileItemProps) {
@@ -58,10 +64,12 @@ export function FileItem({
     dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
+    initialRenameValue: renamePrefill,
     onRenameEnd,
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
 
+  const templateActions = useTemplateActions(file, isTemplate);
   const FileIcon = getFileTypeIcon(file.fileType);
   const matchedTerms = searchMatch?.matchedTerms ?? [];
   const snippet = searchMatch?.contentSnippet ?? null;
@@ -133,6 +141,7 @@ export function FileItem({
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
           onVersionHistory={() => setVersionHistoryOpen(true)}
+          {...templateActions}
           onReveal={
             IS_DEV
               ? async () => {

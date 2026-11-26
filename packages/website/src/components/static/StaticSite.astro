@@ -3,6 +3,7 @@
 // closes on the CTA rather than on a question.
 import { buttonVariants, cn } from '@myelin/ui';
 import CheckList from './CheckList.astro';
+import ClipCard from './ClipCard.astro';
 import InkMark from './InkMark.astro';
 import PageScripts from './PageScripts.astro';
 import Shot from './Shot.astro';
@@ -24,6 +25,8 @@ const { locale } = Astro.props;
 const copy = getCopy(locale);
 const faqs = getFaqs(locale);
 const [headBefore, headAfter = ''] = copy.hero.headline.split(copy.hero.headlineMark);
+// Feature sections reuse the features page's copy so the two pages say the same thing.
+const { sections, clips } = copy.features;
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
@@ -105,80 +108,26 @@ const ctaOutline = cn(
     </div>
   </section>
 
-  <!-- PDFs -->
-  <section id="pdfs" class:list={[wrap, band]}>
+  <!-- Sync and collaboration -->
+  <section id="sync" class:list={[wrap, band]}>
     <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
       <div class="lg:col-span-6">
-        <p class={kicker}>01 / {copy.sceneLabels.ink}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
+        <p class={kicker}>01 / {copy.sceneLabels.sync}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
         <InkMark variant={0} class="mt-5" />
       </div>
       <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
-        {copy.ink.pdfBody}
+        {copy.sync.kicker}
       </p>
     </div>
-    <div class="reveal-scale mt-14 lg:mt-16">
-      <Shot src="/media/web-pdf.mp4" alt={copy.shots.pdf} objectPosition="60% 50%" />
-    </div>
-  </section>
-
-  <!-- Page frames -->
-  <section class:list={[wrap, band]}>
-    <div class="grid items-start gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="reveal-scale order-2 md:order-1 md:col-span-6 md:pr-6 lg:col-span-7">
-        <Shot src="/media/web-code.mp4" objectPosition="50% 50%" alt={copy.shots.pageFrame} />
+    <div class="mt-14 grid gap-x-10 gap-y-6 md:grid-cols-12 lg:mt-16">
+      <div class="reveal-scale md:sticky md:top-24 md:col-span-7 md:self-start">
+        <Shot src="/media/ft-live-collab.mp4" alt={clips.liveCollab.alt} width={896} height={578} phoneCrop={false} />
       </div>
-      <div class="order-1 md:order-2 md:col-span-6 lg:col-span-5">
-        <p class={kicker}>02 / {copy.sceneLabels.pages}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.pages.heading}</h2>
-        <InkMark variant={1} class="mt-5" />
-        <p class={lede}>{copy.pages.body}</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- Audio and search, linked notes -->
-  <section class:list={[wrap, band]}>
-    <div class="grid gap-6 lg:grid-cols-2">
-      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
-        <div>
-          <p class={kicker}>03 / {copy.sceneLabels['audio-search']}</p>
-          <h2 class:list={[tileHeading, 'mt-6']}>{copy.audioSearch.heading}</h2>
-        <InkMark variant={2} class="mt-5" />
-          <p class={lede}>{copy.audioSearch.audioBody}</p>
-          <p class={lede}>{copy.audioSearch.searchBody}</p>
-        </div>
-        <div class="-mb-7 mt-auto lg:-mb-10">
-          <Shot src="/media/web-audio.mp4" alt={copy.shots.audio} objectPosition="67% 50%" class="rounded-b-none!" />
-        </div>
-      </div>
-      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
-        <div>
-          <p class={kicker}>04 / {copy.sceneLabels.linked}</p>
-          <h2 class:list={[tileHeading, 'mt-6']}>{copy.linked.heading}</h2>
-        <InkMark variant={0} class="mt-5" />
-          <p class={lede}>{copy.linked.body}</p>
-        </div>
-        <div class="-mb-7 mt-auto lg:-mb-10">
-          <Shot src="/graph.png" alt={copy.shots.graph} objectPosition="55% 50%" class="rounded-b-none!" />
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Sync and collaboration -->
-  <section id="sync" class:list={[wrap, band]}>
-    <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
-      <div class="md:col-span-6 lg:col-span-5">
-        <p class={kicker}>05 / {copy.sceneLabels.sync}</p>
-        <h2 class:list={[heading, 'mt-6']}>{copy.sync.heading}</h2>
-        <InkMark variant={1} class="mt-5" />
-        <p class={lede}>{copy.sync.kicker}</p>
-      </div>
-      <div class="grid gap-5 md:col-span-6 md:pl-6 lg:col-span-7">
+      <div class="grid gap-5 md:col-span-5">
         {
           copy.sync.tiers.map((tier, i) => (
-            <div class="reveal-scale lift rounded-2xl bg-card p-7 shadow-elevated lg:p-8" style={`--i:${i + 1}`}>
+            <div class="reveal-scale lift rounded-2xl bg-card p-6 shadow-elevated" style={`--i:${i + 1}`}>
               <span
                 class:list={[
                   'rounded-xl px-2.5 py-1 text-xs font-medium',
@@ -200,10 +149,94 @@ const ctaOutline = cn(
     </div>
   </section>
 
+  <!-- PDFs -->
+  <section id="pdfs" class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+      <div class="lg:col-span-6">
+        <p class={kicker}>02 / {copy.sceneLabels.ink}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.ink.pdfHeading}</h2>
+        <InkMark variant={1} class="mt-5" />
+      </div>
+      <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+        {copy.ink.pdfBody}
+      </p>
+    </div>
+    <div class="mt-14 grid gap-6 md:grid-cols-2 lg:mt-16">
+      <ClipCard file="wn-pdf-anchor" clip={clips.pdfAnchor} step={1} />
+      <ClipCard file="wn-pdf-quote" clip={clips.pdfQuote} step={2} />
+    </div>
+  </section>
+
+  <!-- Handwriting -->
+  <section id="handwriting" class:list={[wrap, 'pt-24 lg:pt-32']}>
+    <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+      <div class="lg:col-span-6">
+        <p class={kicker}>03 / {sections.handwriting.label}</p>
+        <h2 class:list={[heading, 'mt-6']}>{sections.handwriting.heading}</h2>
+        <InkMark variant={2} class="mt-5" />
+      </div>
+      <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+        {sections.handwriting.lede}
+      </p>
+    </div>
+    <div class="mt-14 grid gap-6 md:grid-cols-2 lg:mt-16">
+      <ClipCard file="ft-shapes" clip={clips.shapes} step={1} />
+      <ClipCard file="ft-tool-wheel" clip={clips.toolWheel} step={2} />
+    </div>
+  </section>
+
+  <!-- Audio and pages -->
+  <section class:list={[wrap, 'pt-6 pb-24 lg:pb-32']}>
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
+          <p class={kicker}>04 / {copy.sceneLabels['audio-search']}</p>
+          <h2 class:list={[tileHeading, 'mt-6']}>{copy.audioSearch.heading}</h2>
+          <InkMark variant={0} class="mt-5" />
+          <p class={lede}>{copy.audioSearch.audioBody}</p>
+          <p class={lede}>{copy.audioSearch.searchBody}</p>
+        </div>
+        <div class="-mb-7 mt-auto lg:-mb-10">
+          <Shot src="/media/web-audio.mp4" alt={copy.shots.audio} objectPosition="67% 50%" class="rounded-b-none!" />
+        </div>
+      </div>
+      <div class="reveal-scale lift flex flex-col gap-10 overflow-hidden rounded-2xl bg-card p-7 shadow-elevated lg:p-10">
+        <div>
+          <p class={kicker}>05 / {sections.pages.label}</p>
+          <h2 class:list={[tileHeading, 'mt-6']}>{clips.slash.title}</h2>
+          <InkMark variant={1} class="mt-5" />
+          <p class={lede}>{clips.slash.body}</p>
+        </div>
+        <div class="-mb-7 mt-auto lg:-mb-10">
+          <Shot src="/media/ft-slash.mp4" alt={clips.slash.alt} width={896} height={578} phoneCrop={false} class="rounded-b-none!" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pro -->
+  <section id="pro" class:list={[wrap, band]}>
+    <div class="grid items-start gap-x-10 gap-y-8 lg:grid-cols-12">
+      <div class="lg:col-span-6">
+        <p class={kicker}>06 / {copy.pricing.pro.name}</p>
+        <h2 class:list={[heading, 'mt-6']}>{copy.pricing.headline}</h2>
+        <InkMark variant={2} class="mt-5" />
+      </div>
+      <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+        {copy.pricing.subheadline}
+      </p>
+    </div>
+    <div class="mt-14 grid gap-6 lg:mt-16 lg:grid-cols-3">
+      <ClipCard file="ft-jupyter" clip={clips.jupyter} pro step={1} />
+      <ClipCard file="ft-mcp-agent" clip={clips.agents} pro step={2} />
+      <ClipCard file="handwriting-search" clip={clips.handwritingSearch} pro step={3} />
+    </div>
+  </section>
+
   <!-- Local-first -->
   <section id="local" class="bg-secondary-container">
     <div class:list={[wrap, band]}>
-      <p class={kicker}>06 / {copy.sceneLabels['local-first']}</p>
+      <p class={kicker}>07 / {copy.sceneLabels['local-first']}</p>
       <h2
         class="reveal mt-6 max-w-3xl font-heading text-[clamp(2.2rem,4.5vw,4rem)] leading-[1.04] font-medium tracking-[-0.015em] text-balance text-text-primary [--i:1]"
       >
@@ -222,7 +255,7 @@ const ctaOutline = cn(
   <section id="import" class:list={[wrap, band]}>
     <div class="grid gap-x-10 gap-y-12 md:grid-cols-12">
       <div class="md:col-span-6 lg:col-span-5">
-        <p class={kicker}>07 / {copy.sceneLabels.import}</p>
+        <p class={kicker}>08 / {copy.sceneLabels.import}</p>
         <h2 class:list={[heading, 'mt-6']}>{copy.importing.heading}</h2>
         <InkMark variant={2} class="mt-5" />
         <p class={lede}>{copy.importing.body}</p>

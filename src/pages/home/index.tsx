@@ -6,12 +6,24 @@ import { formatRelativeTime } from '@myelin/editor/i18n/format';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { errorDescription } from '@/components/command-palette/utils';
-import { createBlankCanvasFile } from '@/lib/note/create';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { openNote } from '@/lib/note/navigation';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
+import { useTemplates } from '@/lib/note/use-templates';
 import {
   useRepository,
   useRepositoryStatus,
   type VFSFileNode,
+  type VFSNodeId,
 } from '@/lib/sync';
 import { useTabController } from '@/lib/tabs/context';
 import { BetaFeedbackBanner } from '@/pages/library/beta-feedback-banner';
@@ -28,6 +40,7 @@ export function HomePage() {
   const repositoryStatus = useRepositoryStatus();
   const setupState = useExplorerSetupState(repositoryStatus.config);
   const tabController = useTabController();
+  const { templates } = useTemplates();
   const scrollRef = useRef<HTMLElement | null>(null);
   // `null` until the first load, so the empty state doesn't flash before the repository opens.
   const [recentFiles, setRecentFiles] = useState<VFSFileNode[] | null>(null);
@@ -50,26 +63,36 @@ export function HomePage() {
     }
   }, [repository]);
 
-  const createCanvas = useCallback(async () => {
-    try {
-      const name = await repository.getUniqueFileName(
-        strings.library.createNew.untitledCanvas,
-        null,
-      );
-      const id = await createBlankCanvasFile(repository, name, null);
-      tabController.openTab({ type: 'canvas', id }, name);
-    } catch (error) {
-      logger.error('Failed to create canvas', error);
-      toast.error(strings.commandPalette.errors.createNote, {
-        description: errorDescription(error),
-      });
-    }
-  }, [
-    repository,
-    strings.commandPalette.errors.createNote,
-    strings.library.createNew.untitledCanvas,
-    tabController,
-  ]);
+  const createCanvas = useCallback(
+    async (templateId: VFSNodeId | null = null) => {
+      try {
+        const name = await repository.getUniqueFileName(
+          strings.library.createNew.untitledCanvas,
+          null,
+        );
+        const id = await createCanvasFromTemplate(
+          repository,
+          name,
+          null,
+          templateId,
+        );
+        await fillTemplateFields(repository, id, locale);
+        tabController.openTab({ type: 'canvas', id }, name);
+      } catch (error) {
+        logger.error('Failed to create canvas', error);
+        toast.error(strings.commandPalette.errors.createNote, {
+          description: errorDescription(error),
+        });
+      }
+    },
+    [
+      locale,
+      repository,
+      strings.commandPalette.errors.createNote,
+      strings.library.createNew.untitledCanvas,
+      tabController,
+    ],
+  );
 
   // Not `lastRemoteSyncAt`: no-op remote checks advance it every 30s, and pulls that change data
   // bump `dataVersion`.
@@ -110,15 +133,41 @@ export function HomePage() {
               {strings.library.emptyState.description}
             </p>
 
-            <Button
-              size="lg"
-              className="mt-7"
-              disabled={setupState !== 'ready'}
-              onClick={() => void createCanvas()}
-            >
-              <Plus />
-              {strings.library.emptyState.cta}
-            </Button>
+            {templates.length === 0 ? (
+              <Button
+                size="lg"
+                className="mt-7"
+                disabled={setupState !== 'ready'}
+                onClick={() => void createCanvas()}
+              >
+                <Plus />
+                {strings.library.emptyState.cta}
+              </Button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  disabled={setupState !== 'ready'}
+                  render={<Button size="lg" className="mt-7" />}
+                >
+                  <Plus />
+                  {strings.library.emptyState.cta}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
+                  <DropdownMenuItem onClick={() => void createCanvas()}>
+                    {strings.library.templates.blankCanvas}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {templates.map((template) => (
+                    <DropdownMenuItem
+                      key={template.id}
+                      onClick={() => void createCanvas(template.id)}
+                    >
+                      {template.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         ) : (
           <div className="fade-in-0 slide-in-from-bottom-2 animate-in duration-[150ms] ease-out">

@@ -7,22 +7,30 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { Plus } from 'lucide-react';
+import { Import, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import { VirtualList } from '@myelin/editor/components/virtual-list';
-import { useMessages } from '@myelin/editor/i18n';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { VirtualGrid } from '@/components/virtual-grid';
-import { createBlankCanvasFile } from '@/lib/note/create';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
+import { useTemplates } from '@/lib/note/use-templates';
 import {
   type FileType,
   type NodeSearchResult,
   useRepository,
   useRepositoryStatus,
   type VFSNode,
+  type VFSNodeId,
 } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
+import { pickAndImportTemplates } from '../import/template';
 import {
   ExplorerModel,
   type ExplorerSortMode,
@@ -32,6 +40,7 @@ import { FileItem } from './file-item';
 import { FolderItem } from './folder-item';
 import { GridFileItem } from './grid/file-item';
 import { GridFolderItem } from './grid/folder-item';
+import { TemplatesPlaceholderItem } from './templates-folder';
 import { useDropTarget } from './use-drop-target';
 import { useExplorerSetupState } from './use-explorer-setup-state';
 
@@ -43,11 +52,17 @@ const EMPTY_SEARCH_MATCHES: ReadonlyMap<string, NodeSearchResult> = new Map();
 const GRID_MIN_COLUMN = 198;
 const GRID_GAP = 16;
 const TREE_GAP = 4;
+const TEMPLATES_PLACEHOLDER = 'templates-placeholder';
 
 export interface ExplorerTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
-  startNewFile: (title: string, type: FileType) => Promise<void>;
+  startNewFile: (
+    title: string,
+    type: FileType,
+    templateId?: VFSNodeId | null,
+  ) => Promise<void>;
+  importTemplates: () => Promise<void>;
 }
 
 export type SortMode = ExplorerSortMode;
@@ -80,13 +95,15 @@ export function ExplorerTree({
   onCreateCanvas,
 }: ExplorerTreeProps) {
   const strings = useMessages();
+  const locale = useLocale();
+  const { rootId: templatesRootId } = useTemplates();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
-      new ExplorerModel(repository, (name, parentId) =>
-        createBlankCanvasFile(repository, name, parentId),
+      new ExplorerModel(repository, (name, parentId, templateId) =>
+        createCanvasFromTemplate(repository, name, parentId, templateId),
       ),
     [repository],
   );
@@ -96,6 +113,7 @@ export function ExplorerTree({
   const [loading, setLoading] = useState(true);
   const repositorySetupState = useExplorerSetupState(repositoryStatus.config);
   const [renamingNewId, setRenamingNewId] = useState<string | null>(null);
+  const [renamePrefill, setRenamePrefill] = useState<string | undefined>();
   const isFiltering = filterTags && filterTags.length > 0;
   const isSearching = !!searchQuery?.trim();
 
@@ -140,9 +158,17 @@ export function ExplorerTree({
     void reload();
   });
 
-  const finishNewRename = useCallback((nodeId: string) => {
-    setRenamingNewId((current) => (current === nodeId ? null : current));
-  }, []);
+  const finishNewRename = useCallback(
+    (nodeId: string) => {
+      if (renamingNewId === nodeId) {
+        fillTemplateFields(repository, nodeId, locale).catch((error) => {
+          logger.error('Failed to fill template fields', error, { nodeId });
+        });
+      }
+      setRenamingNewId((current) => (current === nodeId ? null : current));
+    },
+    [locale, renamingNewId, repository],
+  );
 
   const startNewFolder = useCallback(async () => {
     const node = await explorer.createFolder(
@@ -150,6 +176,7 @@ export function ExplorerTree({
       strings.library.createNew.unnamedFolder,
     );
     setRenamingNewId(node.id);
+    setRenamePrefill(undefined);
     setNodes((prev) => [node, ...prev.filter((item) => item.id !== node.id)]);
     setLoading(false);
     onChanged?.();
@@ -161,21 +188,95 @@ export function ExplorerTree({
   ]);
 
   const startNewFile = useCallback(
-    async (title: string, type: FileType) => {
-      const node = await explorer.createFile(currentFolderId, title, type);
+    async (title: string, type: FileType, templateId?: VFSNodeId | null) => {
+      const { node, renameValue } = await explorer.createFile(
+        currentFolderId,
+        title,
+        type,
+        { templateId, locale },
+      );
       setRenamingNewId(node.id);
+      setRenamePrefill(renameValue ?? undefined);
       setNodes((prev) => [...prev.filter((item) => item.id !== node.id), node]);
       setLoading(false);
       onChanged?.();
     },
-    [currentFolderId, explorer, onChanged],
+    [currentFolderId, explorer, locale, onChanged],
   );
 
-  useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
-    reload,
-    startNewFolder,
+  const openTemplates = useCallback(() => {
+    repository
+      .ensureTemplatesRoot()
+      .then(onNavigate)
+      .catch((error) => {
+        logger.error('Failed to create templates folder', error);
+      });
+  }, [onNavigate, repository]);
+
+  const newTemplate = useCallback(() => {
+    const title = strings.library.createNew.untitledCanvas;
+    void (async () => {
+      const rootId = await repository.ensureTemplatesRoot();
+      if (rootId === currentFolderId) {
+        await startNewFile(title, 'mcanvas', null);
+        return;
+      }
+      const { node, renameValue } = await explorer.createFile(
+        rootId,
+        title,
+        'mcanvas',
+        { templateId: null, locale },
+      );
+      setRenamingNewId(node.id);
+      setRenamePrefill(renameValue ?? undefined);
+      onNavigate(rootId);
+      onChanged?.();
+    })().catch((error) => {
+      logger.error('Failed to create template', error);
+      toast.error(strings.commandPalette.errors.createNote);
+    });
+  }, [
+    currentFolderId,
+    explorer,
+    locale,
+    onChanged,
+    onNavigate,
+    repository,
     startNewFile,
+    strings,
   ]);
+
+  const importTemplates = useCallback(async () => {
+    try {
+      const rootId = await pickAndImportTemplates(repository);
+      if (rootId === null) {
+        return;
+      }
+      if (rootId === currentFolderId) {
+        await reload();
+      } else {
+        onNavigate(rootId);
+      }
+      onChanged?.();
+    } catch (error) {
+      logger.error('Failed to import template', error);
+      toast.error(strings.library.templates.importFailed);
+    }
+  }, [currentFolderId, onChanged, onNavigate, reload, repository, strings]);
+
+  const templateActions = useMemo(
+    () => ({
+      onNewTemplate: newTemplate,
+      onImportTemplate: () => void importTemplates(),
+    }),
+    [importTemplates, newTemplate],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({ reload, startNewFolder, startNewFile, importTemplates }),
+    [reload, startNewFolder, startNewFile, importTemplates],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: index revision refreshes active search results
   useEffect(() => {
@@ -222,6 +323,21 @@ export function ExplorerTree({
     return sortExplorerNodes(nodes, sortMode);
   }, [isSearching, nodes, sortMode]);
 
+  const showTemplatesPlaceholder =
+    currentFolderId === null &&
+    !isSearching &&
+    !isFiltering &&
+    repositorySetupState === 'ready' &&
+    sortedNodes.length > 0 &&
+    !sortedNodes.some(isTemplatesRoot);
+  const items = useMemo<(VFSNode | typeof TEMPLATES_PLACEHOLDER)[]>(
+    () =>
+      showTemplatesPlaceholder
+        ? [TEMPLATES_PLACEHOLDER, ...sortedNodes]
+        : sortedNodes,
+    [showTemplatesPlaceholder, sortedNodes],
+  );
+
   const { dragOver, dropTargetProps } = useDropTarget({
     targetFolderId: currentFolderId,
     onMoved: reloadAndNotify,
@@ -242,30 +358,47 @@ export function ExplorerTree({
   const estimateCardHeight = Math.round((cardWidth * 10) / 16) + 84;
 
   const getNodeKey = useCallback(
-    (index: number) => sortedNodes[index]?.id ?? String(index),
-    [sortedNodes],
+    (index: number) => {
+      const item = items[index];
+      return typeof item === 'string' ? item : (item?.id ?? String(index));
+    },
+    [items],
   );
 
   const estimateTreeHeight = useCallback(
-    (index: number) => (sortedNodes[index]?.type === 'folder' ? 44 : 36),
-    [sortedNodes],
+    (index: number) => {
+      const item = items[index];
+      return typeof item === 'string' || item?.type === 'folder' ? 44 : 36;
+    },
+    [items],
   );
 
   const pinnedIndex = useMemo(() => {
     if (!renamingNewId) {
       return -1;
     }
-    return sortedNodes.findIndex((node) => node.id === renamingNewId);
-  }, [sortedNodes, renamingNewId]);
+    return items.findIndex(
+      (item) => typeof item !== 'string' && item.id === renamingNewId,
+    );
+  }, [items, renamingNewId]);
 
   const canDrop =
     !isFiltering && !isSearching && repositorySetupState === 'ready';
 
   const renderNode = useCallback(
     (index: number) => {
-      const node = sortedNodes[index];
+      const node = items[index];
       if (!node) {
         return null;
+      }
+      if (node === TEMPLATES_PLACEHOLDER) {
+        return (
+          <TemplatesPlaceholderItem
+            grid={viewMode === 'grid'}
+            onOpen={openTemplates}
+            {...templateActions}
+          />
+        );
       }
       if (viewMode === 'grid') {
         return node.type === 'folder' ? (
@@ -275,12 +408,17 @@ export function ExplorerTree({
             onRenameEnd={finishNewRename}
             onNavigate={() => onNavigate(node.id)}
             onMoved={reloadAndNotify}
+            templateActions={templateActions}
           />
         ) : (
           <GridFileItem
             file={node}
             searchMatch={searchMatches.get(node.id)}
             autoRename={node.id === renamingNewId}
+            renamePrefill={renamePrefill}
+            isTemplate={
+              templatesRootId !== null && node.parentId === templatesRootId
+            }
             onRenameEnd={finishNewRename}
             onChanged={reloadAndNotify}
           />
@@ -293,25 +431,34 @@ export function ExplorerTree({
           onRenameEnd={finishNewRename}
           onNavigate={() => onNavigate(node.id)}
           onMoved={reloadAndNotify}
+          templateActions={templateActions}
         />
       ) : (
         <FileItem
           file={node}
           searchMatch={searchMatches.get(node.id)}
           autoRename={node.id === renamingNewId}
+          renamePrefill={renamePrefill}
+          isTemplate={
+            templatesRootId !== null && node.parentId === templatesRootId
+          }
           onRenameEnd={finishNewRename}
           onChanged={reloadAndNotify}
         />
       );
     },
     [
-      sortedNodes,
+      items,
+      openTemplates,
+      templateActions,
       viewMode,
       renamingNewId,
       finishNewRename,
       onNavigate,
       reloadAndNotify,
+      renamePrefill,
       searchMatches,
+      templatesRootId,
     ],
   );
 
@@ -324,18 +471,21 @@ export function ExplorerTree({
   }
 
   if (sortedNodes.length === 0) {
+    const browsing =
+      repositorySetupState === 'ready' && !isSearching && !isFiltering;
+    const inTemplates =
+      browsing &&
+      currentFolderId !== null &&
+      currentFolderId === templatesRootId;
     const showCreateCanvas =
-      repositorySetupState === 'ready' &&
-      !isSearching &&
-      !isFiltering &&
-      onCreateCanvas !== undefined;
+      browsing && !inTemplates && onCreateCanvas !== undefined;
 
     return (
       <div
         {...(canDrop ? dropTargetProps : {})}
         className={cn(
           'min-h-[80px] rounded-xl transition-colors',
-          showCreateCanvas &&
+          (showCreateCanvas || inTemplates) &&
             'flex min-h-40 flex-col items-center justify-center gap-4 px-4 py-8 text-center',
           dragOver && canDrop ? 'bg-accent/10' : '',
         )}
@@ -343,7 +493,7 @@ export function ExplorerTree({
         <span
           className={cn(
             'block text-sm text-text-muted',
-            !showCreateCanvas && 'px-4 py-3',
+            !showCreateCanvas && !inTemplates && 'px-4 py-3',
           )}
         >
           {repositorySetupState === 'setup-required'
@@ -352,8 +502,26 @@ export function ExplorerTree({
               ? strings.library.explorerTree.emptySearch
               : isFiltering
                 ? strings.library.explorerTree.emptyFilter
-                : strings.library.explorerTree.emptyDefault}
+                : inTemplates
+                  ? strings.library.templates.emptyFolder
+                  : strings.library.explorerTree.emptyDefault}
         </span>
+        {inTemplates && (
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="lg" onClick={templateActions.onNewTemplate}>
+              <Plus />
+              {strings.library.templates.newTemplate}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={templateActions.onImportTemplate}
+            >
+              <Import />
+              {strings.library.templates.importTemplate}
+            </Button>
+          </div>
+        )}
         {showCreateCanvas && (
           <Button size="lg" onClick={onCreateCanvas}>
             <Plus />
@@ -377,7 +545,7 @@ export function ExplorerTree({
     return (
       <VirtualGrid
         scrollRef={scrollRef}
-        itemCount={sortedNodes.length}
+        itemCount={items.length}
         columns={columns}
         cardWidth={cardWidth}
         columnGap={GRID_GAP}
@@ -396,7 +564,7 @@ export function ExplorerTree({
   return (
     <VirtualList
       scrollRef={scrollRef}
-      count={sortedNodes.length}
+      count={items.length}
       estimateHeight={estimateTreeHeight}
       getRowKey={getNodeKey}
       gap={TREE_GAP}

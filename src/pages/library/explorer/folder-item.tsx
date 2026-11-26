@@ -1,9 +1,14 @@
-import { Folder } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import type { VFSFolderNode } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { formatExplorerItemAccessibleName } from '../accessibility-labels';
-import { folderIconStyle } from './folder-colors';
 import { TagList } from './tag-list';
+import {
+  FolderGlyph,
+  TemplatesFolderMenu,
+  type TemplatesFolderMenuProps,
+  useFolderLabel,
+} from './templates-folder';
 import { useDropTarget } from './use-drop-target';
 import { useFolderItemContextMenu } from './use-folder-item-context-menu';
 
@@ -13,6 +18,8 @@ interface FolderItemProps {
   onRenameEnd?: (nodeId: string) => void;
   onNavigate: () => void;
   onMoved: () => void;
+  /** Menu actions when `folder` is the templates root. */
+  templateActions: TemplatesFolderMenuProps;
 }
 
 export function FolderItem({
@@ -21,6 +28,7 @@ export function FolderItem({
   onRenameEnd,
   onNavigate,
   onMoved,
+  templateActions,
 }: FolderItemProps) {
   const {
     contextMenuProps,
@@ -36,6 +44,8 @@ export function FolderItem({
     onRenameEnd,
   });
 
+  const label = useFolderLabel(folder);
+  const templatesRoot = isTemplatesRoot(folder);
   const { dragOver, dropTargetProps } = useDropTarget({
     targetFolderId: folder.id,
     onMoved,
@@ -47,7 +57,7 @@ export function FolderItem({
         <ContextMenuTrigger
           render={
             <button
-              draggable={!renaming}
+              draggable={!renaming && !templatesRoot}
               onClick={() => {
                 if (!renaming) {
                   onNavigate();
@@ -59,7 +69,7 @@ export function FolderItem({
               aria-label={
                 renaming
                   ? undefined
-                  : formatExplorerItemAccessibleName(folder.name, folder.tags)
+                  : formatExplorerItemAccessibleName(label, folder.tags)
               }
               className={`group flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 transition-all duration-200 ${
                 dragOver
@@ -69,10 +79,7 @@ export function FolderItem({
             />
           }
         >
-          <Folder
-            className="size-4 shrink-0"
-            style={folderIconStyle(folder.color)}
-          />
+          <FolderGlyph folder={folder} className="size-4 shrink-0" />
           {renaming ? (
             <input
               {...renameInputProps}
@@ -81,7 +88,7 @@ export function FolderItem({
           ) : (
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-medium text-sm text-text-primary">
-                {folder.name}
+                {label}
               </span>
               <TagList
                 tags={folder.tags}
@@ -92,7 +99,7 @@ export function FolderItem({
             </div>
           )}
         </ContextMenuTrigger>
-        {menu}
+        {templatesRoot ? <TemplatesFolderMenu {...templateActions} /> : menu}
       </ContextMenu>
       {dialogs}
     </>

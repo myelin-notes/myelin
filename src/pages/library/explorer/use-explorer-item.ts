@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMessages } from '@myelin/editor/i18n';
 import { UserPrefs } from '@myelin/editor/user-prefs';
 import { Logger } from '@myelin/shared/logger';
+import { cleanName } from '@/lib/note/name-pattern';
 import { type NoteBacklink, useRepository, type VFSNodeId } from '@/lib/sync';
 import { renameNoteReferences } from '@/lib/sync/repo/rename-note-references';
 import { createItemDragImage, type DragItemKind } from './create-drag-image';
@@ -31,6 +32,11 @@ interface UseExplorerItemOptions {
   nodeIds?: readonly string[];
   onChanged: () => void | Promise<void>;
   initialRenaming?: boolean;
+  /**
+   * Text the initial rename starts with, caret at the end, instead of `name` selected. The
+   * committed value also drops trailing separators (see `cleanName`).
+   */
+  initialRenameValue?: string;
   onRenameEnd?: (nodeId: string) => void;
   renameReferencesOnRename?: boolean;
 }
@@ -42,6 +48,7 @@ export function useExplorerItem({
   nodeIds = [nodeId],
   onChanged,
   initialRenaming,
+  initialRenameValue,
   onRenameEnd,
   renameReferencesOnRename,
 }: UseExplorerItemOptions) {
@@ -51,7 +58,13 @@ export function useExplorerItem({
   const [previousInitialRenaming, setPreviousInitialRenaming] =
     useState(initialRenaming);
   const [dragging, setDragging] = useState(false);
-  const [renameValue, setRenameValue] = useState(name);
+  // New rows mount with `initialRenaming` already true, so the change check below never fires.
+  const [renameValue, setRenameValue] = useState(
+    initialRenaming ? (initialRenameValue ?? name) : name,
+  );
+  const [prefilled, setPrefilled] = useState(
+    !!initialRenaming && initialRenameValue !== undefined,
+  );
   const [pendingReferencesPrompt, setPendingReferencesPrompt] =
     useState<PendingRenameReferencesPrompt | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +73,8 @@ export function useExplorerItem({
   if (initialRenaming !== previousInitialRenaming) {
     setPreviousInitialRenaming(initialRenaming);
     if (initialRenaming) {
-      setRenameValue(name);
+      setRenameValue(initialRenameValue ?? name);
+      setPrefilled(initialRenameValue !== undefined);
       setRenaming(true);
     }
   }
@@ -71,7 +85,11 @@ export function useExplorerItem({
       return;
     }
     input.focus();
-    input.select();
+    if (prefilled) {
+      input.setSelectionRange(input.value.length, input.value.length);
+    } else {
+      input.select();
+    }
 
     // A press elsewhere on the row would blur the input, ending the rename before the row's
     // click handler runs, so that click opens the item. Refocusing inside the tap also lets
@@ -85,15 +103,17 @@ export function useExplorerItem({
     };
     row?.addEventListener('mousedown', keepFocus);
     return () => row?.removeEventListener('mousedown', keepFocus);
-  }, [renaming]);
+  }, [renaming, prefilled]);
 
   const startRenaming = () => {
     setRenameValue(name);
+    setPrefilled(false);
     setRenaming(true);
   };
 
   const cancelRenaming = () => {
     setRenaming(false);
+    setPrefilled(false);
     onRenameEnd?.(nodeId);
     setRenameValue(name);
   };
@@ -119,6 +139,7 @@ export function useExplorerItem({
       logger.error('Failed to rename node', err, { nodeId, trimmed });
     }
     setRenaming(false);
+    setPrefilled(false);
     onRenameEnd?.(nodeId);
     await onChanged();
   };
@@ -142,7 +163,7 @@ export function useExplorerItem({
       return;
     }
 
-    const trimmed = renameValue.trim();
+    const trimmed = prefilled ? cleanName(renameValue) : renameValue.trim();
     if (!trimmed || trimmed === name) {
       cancelRenaming();
       return;

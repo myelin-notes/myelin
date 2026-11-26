@@ -6,18 +6,24 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useMessages } from '@myelin/editor/i18n';
+import { toast } from 'sonner';
+import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { isApplePlatform } from '@myelin/shared/os';
-import { createBlankCanvasFile } from '@/lib/note/create';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
 import {
   type FileType,
   useRepository,
   useRepositoryStatus,
   type VFSFolderNode,
   type VFSNode,
+  type VFSNodeId,
 } from '@/lib/sync';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import {
   compareExplorerNodes,
@@ -27,8 +33,13 @@ import {
 } from '@/pages/library/explorer/explorer-model';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
+import { pickAndImportTemplates } from '@/pages/library/import/template';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
-import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
+import {
+  SidebarFileRow,
+  SidebarFolderRow,
+  SidebarTemplatesPlaceholderRow,
+} from './tree-rows';
 
 const logger = new Logger('SidebarTree');
 const SEARCH_DEBOUNCE_MS = 150;
@@ -40,7 +51,11 @@ export type SortMode = ExplorerSortMode;
 export interface SidebarTreeHandle {
   reload: () => Promise<void>;
   startNewFolder: () => Promise<void>;
-  startNewFile: (title: string, type: FileType) => Promise<void>;
+  startNewFile: (
+    title: string,
+    type: FileType,
+    templateId?: VFSNodeId | null,
+  ) => Promise<void>;
 }
 
 interface FlatResults {
@@ -133,13 +148,14 @@ export function SidebarTree({
   onChanged,
 }: SidebarTreeProps) {
   const strings = useMessages();
+  const locale = useLocale();
   const repository = useRepository();
   const repositoryStatus = useRepositoryStatus();
   const noteIndexStatus = useNoteIndexStatus();
   const explorer = useMemo(
     () =>
-      new ExplorerModel(repository, (name, parentId) =>
-        createBlankCanvasFile(repository, name, parentId),
+      new ExplorerModel(repository, (name, parentId, templateId) =>
+        createCanvasFromTemplate(repository, name, parentId, templateId),
       ),
     [repository],
   );
@@ -148,7 +164,10 @@ export function SidebarTree({
     () => new Map(),
   );
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
-  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{
+    id: string;
+    prefill: string | null;
+  } | null>(null);
   const [searchResults, setSearchResults] =
     useState<FlatResults>(EMPTY_RESULTS);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
@@ -310,7 +329,7 @@ export function SidebarTree({
         parentId,
         strings.library.createNew.unnamedFolder,
       );
-      setRenamingId(node.id);
+      setRenaming({ id: node.id, prefill: null });
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
@@ -324,22 +343,33 @@ export function SidebarTree({
       title: string,
       type: FileType,
       parentId: string | null = ROOT_KEY,
+      templateId?: VFSNodeId | null,
     ) => {
-      const node = await explorer.createFile(parentId, title, type);
-      setRenamingId(node.id);
+      const { node, renameValue } = await explorer.createFile(
+        parentId,
+        title,
+        type,
+        { templateId, locale },
+      );
+      setRenaming({ id: node.id, prefill: renameValue });
       if (parentId !== null) {
         setExpanded((prev) => new Set(prev).add(parentId));
       }
       await loadFolder(parentId);
     },
-    [explorer, loadFolder],
+    [explorer, loadFolder, locale],
   );
 
-  useImperativeHandle(ref, () => ({ reload, startNewFolder, startNewFile }), [
-    reload,
-    startNewFolder,
-    startNewFile,
-  ]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      reload,
+      startNewFolder,
+      startNewFile: (title, type, templateId) =>
+        startNewFile(title, type, ROOT_KEY, templateId),
+    }),
+    [reload, startNewFolder, startNewFile],
+  );
 
   const notifyNested = useCallback(() => {
     void reload();
@@ -403,9 +433,17 @@ export function SidebarTree({
     [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
 
-  const finishNewRename = useCallback((nodeId: string) => {
-    setRenamingId((current) => (current === nodeId ? null : current));
-  }, []);
+  const finishNewRename = useCallback(
+    (nodeId: string) => {
+      if (renaming?.id === nodeId) {
+        fillTemplateFields(repository, nodeId, locale).catch((error) => {
+          logger.error('Failed to fill template fields', error, { nodeId });
+        });
+      }
+      setRenaming((current) => (current?.id === nodeId ? null : current));
+    },
+    [locale, renaming?.id, repository],
+  );
 
   // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
   // Descendants of a selected folder are dropped too, or moving the set would flatten them.
@@ -461,14 +499,34 @@ export function SidebarTree({
   }
 
   const notify = isFlat ? notifyFlat : notifyNested;
+  const importTemplates = () => {
+    void pickAndImportTemplates(repository)
+      .then((rootId) => {
+        if (rootId === null) {
+          return;
+        }
+        setExpanded((prev) => new Set(prev).add(rootId));
+        return loadFolder(rootId).then(() => notify());
+      })
+      .catch((error) => {
+        logger.error('Failed to import template', error);
+        toast.error(strings.library.templates.importFailed);
+      });
+  };
+  const templatesRootId =
+    childrenMap.get(ROOT_KEY)?.find(isTemplatesRoot)?.id ?? null;
   const rows = visibleRows.map(({ node, depth, expanded: isExpanded }) => {
     const rowProps = {
       depth,
-      autoRename: !isFlat && node.id === renamingId,
+      isTemplate: node.parentId !== null && node.parentId === templatesRootId,
+      autoRename: !isFlat && node.id === renaming?.id,
+      renamePrefill: renaming?.prefill ?? undefined,
       onRenameEnd: finishNewRename,
       selected: selection.ids.has(node.id),
       selectionIds,
-      onSelect: (e: React.MouseEvent) => selectRow(node.id, e),
+      // Not selectable: a multi-select must never carry the templates folder into Remove or Move.
+      onSelect: (e: React.MouseEvent) =>
+        !isTemplatesRoot(node) && selectRow(node.id, e),
       onChanged: notify,
       onDropHover: (over: boolean) => {
         const folderId = node.type === 'folder' ? node.id : node.parentId;
@@ -493,12 +551,15 @@ export function SidebarTree({
               logger.error('Failed to create folder', error);
             });
           }}
-          onNewFile={(title, type) => {
-            void startNewFile(title, type, node.id).catch((error) => {
-              logger.error('Failed to create canvas', error);
-            });
+          onNewFile={(title, type, templateId) => {
+            void startNewFile(title, type, node.id, templateId).catch(
+              (error) => {
+                logger.error('Failed to create canvas', error);
+              },
+            );
           }}
           importDisabled={importDisabled}
+          onImportTemplate={importTemplates}
           onImport={() => {
             setExpanded((prev) => new Set(prev).add(node.id));
             onImport(node.id);
@@ -528,6 +589,37 @@ export function SidebarTree({
       )}
       {...(isFlat ? {} : rootDropProps)}
     >
+      {!isFlat && childrenMap.has(ROOT_KEY) && templatesRootId === null && (
+        <SidebarTemplatesPlaceholderRow
+          onOpen={() => {
+            void repository
+              .ensureTemplatesRoot()
+              .then((id) => {
+                setExpanded((prev) => new Set(prev).add(id));
+                return reload();
+              })
+              .catch((error) => {
+                logger.error('Failed to create templates folder', error);
+              });
+          }}
+          onImportTemplate={importTemplates}
+          onNewTemplate={() => {
+            void repository
+              .ensureTemplatesRoot()
+              .then((id) =>
+                startNewFile(
+                  strings.library.createNew.untitledCanvas,
+                  'mcanvas',
+                  id,
+                  null,
+                ).then(() => reload()),
+              )
+              .catch((error) => {
+                logger.error('Failed to create template', error);
+              });
+          }}
+        />
+      )}
       {rows.length === 0 ? (
         <p className="px-2 py-1 text-text-muted text-xs italic">
           {emptyMessage}

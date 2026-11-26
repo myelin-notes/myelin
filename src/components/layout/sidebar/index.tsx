@@ -19,7 +19,12 @@ import {
   ContextMenuTrigger,
 } from '@myelin/ui/context-menu';
 import { errorDescription } from '@/components/command-palette/utils';
-import { type FileType, useRepository, useRepositoryStatus } from '@/lib/sync';
+import {
+  type FileType,
+  useRepository,
+  useRepositoryStatus,
+  type VFSNodeId,
+} from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
@@ -100,9 +105,9 @@ export function Sidebar({ fill = false }: { fill?: boolean } = {}) {
   }, [refreshMeta]);
 
   const handleNewFile = useCallback(
-    (title: string, type: FileType) => {
+    (title: string, type: FileType, templateId?: VFSNodeId | null) => {
       void treeRef.current
-        ?.startNewFile(title, type)
+        ?.startNewFile(title, type, templateId)
         .then(() => {
           refreshMeta();
         })

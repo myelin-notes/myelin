@@ -12,6 +12,7 @@ import { getPathBasename } from '../import-tree';
 import { importJupyterFile, isJupyterFile } from '../jupyter';
 import { importMarkdownFile, isMarkdownFile } from '../markdown';
 import { importPdfFile, isNativeGoodnotesFile, isPdfFile } from '../pdf';
+import { importTemplateFile, isTemplateFile } from '../template';
 import type { ImportProvider } from './types';
 
 interface NativeImportFile {
@@ -35,7 +36,12 @@ function partition(files: NativeImportFile[]): PartitionedFiles {
   let mediaCount = 0;
 
   for (const file of files) {
-    if (isMarkdownFile(file) || isPdfFile(file) || isJupyterFile(file)) {
+    if (
+      isMarkdownFile(file) ||
+      isPdfFile(file) ||
+      isJupyterFile(file) ||
+      isTemplateFile(file)
+    ) {
       supported.push(file);
       noteCount++;
     } else if (isStorageFile(file)) {
@@ -63,6 +69,7 @@ export const filesProvider: ImportProvider = {
           'mdx',
           'pdf',
           'ipynb',
+          'myelin-template',
           ...ImportableFileTypes,
         ],
       },
@@ -169,6 +176,8 @@ export const filesProvider: ImportProvider = {
               parentId,
               fallbackTitle,
             });
+          } else if (isTemplateFile(file)) {
+            await importTemplateFile({ file: input, repository });
           }
         }
 

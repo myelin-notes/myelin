@@ -3,9 +3,9 @@
 // for English and `src/pages/[locale]/features.astro` for every other locale.
 import Base from '../layouts/Base.astro';
 import CheckList from './static/CheckList.astro';
+import ClipCard from './static/ClipCard.astro';
 import InkMark from './static/InkMark.astro';
 import PageScripts from './static/PageScripts.astro';
-import Shot from './static/Shot.astro';
 import SiteFooter from './static/SiteFooter.astro';
 import {
   FEATURE_SECTION_IDS,
@@ -24,7 +24,7 @@ const { locale } = Astro.props;
 const copy = getCopy(locale);
 const page = copy.features;
 
-// Each clip is a 896x578 loop in public/media, rendered from the myelin-reels scene of the same name.
+// Each clip is rendered from the myelin-reels scene of the same name.
 const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
   handwriting: [
     ['shapes', 'ft-shapes'],
@@ -33,8 +33,8 @@ const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
     ['lasso', 'ft-lasso'],
   ],
   pdfs: [
-    ['pdfQuote', 'wn-pdf-quote'],
     ['pdfAnchor', 'wn-pdf-anchor'],
+    ['pdfQuote', 'wn-pdf-quote'],
   ],
   pages: [
     ['slash', 'ft-slash'],
@@ -42,22 +42,22 @@ const clips: Partial<Record<FeatureSectionId, [FeatureClipId, string][]>> = {
   ],
   code: [['jupyter', 'ft-jupyter']],
   canvas: [
-    ['canvasStyle', 'wn-canvas-style'],
     ['flags', 'wn-flags'],
+    ['templates', 'ft-templates'],
     ['handwritingSearch', 'handwriting-search'],
+    ['canvasStyle', 'wn-canvas-style'],
   ],
   sync: [['liveCollab', 'ft-live-collab']],
   agents: [['agents', 'ft-mcp-agent']],
 };
 const proClips: FeatureClipId[] = ['jupyter', 'agents', 'handwritingSearch'];
 // Lone-clip sections that put their details left of the clip, so back-to-back ones don't mirror each other.
-const detailsLeft: FeatureSectionId[] = ['sync'];
+const detailsLeft: FeatureSectionId[] = ['code'];
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
 const band = 'py-24 lg:py-32';
 const heading =
   'reveal mt-6 font-heading text-[clamp(1.9rem,3.6vw,3rem)] leading-tight font-medium tracking-[-0.01em] text-balance text-text-primary [--i:1]';
-const cardTitle = 'font-heading text-xl font-medium text-text-primary';
 const cardBody = 'mt-2.5 text-sm leading-relaxed text-text-secondary';
 const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
 ---
@@ -116,33 +116,9 @@ const details = 'reveal gap-x-10 gap-y-4 [--i:3]';
 
             {cards.length > 0 && (
               <div class:list={['mt-14 grid gap-6 lg:mt-16', cards.length === 3 ? 'lg:grid-cols-3' : 'md:grid-cols-2']}>
-                {cards.map(([clipId, file], j) => {
-                  const clip = page.clips[clipId];
-                  return (
-                    <article
-                      class="reveal-scale lift overflow-hidden rounded-2xl bg-card shadow-elevated"
-                      style={`--i:${(j % 2) + 1}`}
-                    >
-                      <Shot
-                        src={`/media/${file}.mp4`}
-                        alt={clip.alt}
-                        width={896}
-                        height={578}
-                        phoneCrop={false}
-                        class="rounded-none! border-b border-border-ghost shadow-none!"
-                      />
-                      <div class="p-6 lg:p-7">
-                        <div class="flex items-center gap-3">
-                          <h3 class={cardTitle}>{clip.title}</h3>
-                          {proClips.includes(clipId) && (
-                            <span class="rounded-xl bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">Pro</span>
-                          )}
-                        </div>
-                        <p class={cardBody}>{clip.body}</p>
-                      </div>
-                    </article>
-                  );
-                })}
+                {cards.map(([clipId, file], j) => (
+                  <ClipCard file={file} clip={page.clips[clipId]} pro={proClips.includes(clipId)} step={(j % 2) + 1} />
+                ))}
                 {detailsBeside && section.details && (
                   <CheckList
                     items={section.details}

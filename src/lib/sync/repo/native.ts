@@ -43,6 +43,7 @@ import {
   createNodeId,
   createNodeSearchIndex,
   deleteNodeFromManifest,
+  findTemplatesRoot,
   getBacklinks,
   getChildrenIds,
   getFileVersionNodes,
@@ -59,6 +60,7 @@ import {
   moveNodeInManifest,
   normalizeCustomColor,
   searchNodeResults,
+  TEMPLATES_ROOT_NAME,
   toFileVersion,
   type VFSManifest,
 } from './shared';
@@ -71,6 +73,7 @@ import type {
   FileVersion,
   FlagEdit,
   FlagType,
+  FolderNameRule,
   NodeSearchResult,
   NoteBacklink,
   NoteFlag,
@@ -1157,6 +1160,76 @@ export class NativeRepository implements Repository {
         node.modifiedAt = Date.now();
       },
     );
+  }
+
+  async setFolderDefaultTemplate(
+    nodeId: VFSNodeId,
+    templateId: VFSNodeId | null,
+  ): Promise<void> {
+    await this.mutateMetadata(
+      'Set folder default template',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (node?.type !== 'folder') {
+          return;
+        }
+        node.defaultTemplateId = templateId ?? undefined;
+        node.modifiedAt = Date.now();
+      },
+    );
+  }
+
+  async setFolderNameRule(
+    nodeId: VFSNodeId,
+    rule: FolderNameRule | null,
+  ): Promise<void> {
+    await this.mutateMetadata(
+      'Set folder name rule',
+      { nodes: [nodeId] },
+      (manifest) => {
+        const node = manifest.nodes[nodeId];
+        if (node?.type !== 'folder') {
+          return;
+        }
+        node.nameRule = rule ?? undefined;
+        node.modifiedAt = Date.now();
+      },
+    );
+  }
+
+  async getTemplatesRoot(): Promise<VFSFolderNode | null> {
+    const { manifest } = await this.loadMetadata();
+    return findTemplatesRoot(manifest);
+  }
+
+  async ensureTemplatesRoot(): Promise<VFSNodeId> {
+    const id = createNodeId();
+    const now = Date.now();
+    return this.mutateMetadata(
+      'Create templates folder',
+      { nodes: [id] },
+      (manifest) => {
+        const existing = findTemplatesRoot(manifest);
+        if (existing) {
+          return existing.id;
+        }
+        manifest.nodes[id] = createFolderNode(
+          id,
+          TEMPLATES_ROOT_NAME,
+          null,
+          now,
+          { kind: 'templates-root' },
+        );
+        addChild(manifest, null, id);
+        return id;
+      },
+    );
+  }
+
+  async listTemplates(): Promise<VFSFileNode[]> {
+    const root = await this.getTemplatesRoot();
+    return root ? (await this.listDirectory(root.id))[1] : [];
   }
 
   async addTag(nodeId: string, tag: string): Promise<void> {

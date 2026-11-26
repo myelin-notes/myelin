@@ -59,6 +59,7 @@ import { VersionHistoryDialog } from '@/components/version-history-dialog';
 import { WheelPicker, type WheelPickerHandle } from '@/components/wheel-picker';
 import { IS_DEV } from '@/lib/env';
 import { openNote, openNoteLink } from '@/lib/note/navigation';
+import { useTemplates } from '@/lib/note/use-templates';
 import { useRepository, type VFSNodeId } from '@/lib/sync';
 import { usePaneId, useTabController } from '@/lib/tabs/context';
 import type { TabId } from '@/lib/tabs/types';
@@ -80,6 +81,7 @@ import { PeerSyncPanel } from './components/peer-sync-panel';
 import { PresetToolbar } from './components/preset-toolbar';
 import { SelectionToolbar } from './components/selection-toolbar';
 import { StatusBar } from './components/status-bar';
+import { TemplateFieldsBar } from './components/template-fields-bar';
 import { TitleBar, TitleBarTooltip } from './components/title-bar';
 import { useEmbedFiles } from './hooks/use-embed-files';
 import { useCanvasEngine } from './hooks/use-engine';
@@ -152,6 +154,7 @@ function CanvasViewInner({
   const drawableCanvasRef = useRef<DrawableCanvas | null>(null);
   const domOverlayRef = useRef<HTMLDivElement>(null);
   const { registerHandlers } = useCanvasCommandContext();
+  const template = useTemplates().templates.find((node) => node.id === id);
   useVisibleCanvasSize(canvasRootRef);
   const compactWheel = useMediaQuery(COMPACT_WHEEL_QUERY);
   const toolState = useToolState(drawableCanvasRef);
@@ -762,6 +765,7 @@ function CanvasViewInner({
         <PeerSyncPanel session={engine.noteSession} status={engine.status} />
       )}
       <TitleBar trailing={titleTrailing} />
+      {template && <TemplateFieldsBar name={template.name} />}
 
       {toolState.presets.length > 0 && (
         <PresetToolbar

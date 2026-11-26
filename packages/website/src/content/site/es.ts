@@ -28,9 +28,7 @@ const es: SiteCopy = {
 
   sceneLabels: {
     ink: 'PDFs',
-    pages: 'Páginas',
     'audio-search': 'Audio y búsqueda',
-    linked: 'Notas enlazadas',
     sync: 'Sincronización',
     'local-first': 'Todo en local',
     import: 'Importar',
@@ -65,22 +63,12 @@ const es: SiteCopy = {
       'Suelta un PDF en el lienzo y anótalo con la misma tinta que todo lo demás: rodea una ecuación, resalta una línea, garabatea en los márgenes. Cuando termines, exporta el PDF anotado.',
   },
 
-  pages: {
-    heading: 'Documentos de verdad, sobre el lienzo.',
-    body: 'Los marcos de página son documentos completos de texto enriquecido: atajos de Markdown, encabezados, listas y casillas, tablas, fórmulas y bloques de código, que Pro te permite ejecutar. Los notebooks de Jupyter se importan directamente en uno.',
-  },
-
   audioSearch: {
     heading: 'Grábalo. Transcríbelo. Encuéntralo en el lienzo.',
     audioBody:
       'Graba clases o reuniones sobre el lienzo. Un modelo Whisper base incluido las transcribe en el propio dispositivo para que encuentres palabras en la transcripción sin enviar el audio fuera. Pro añade modelos más precisos.',
     searchBody:
       'Busca en la biblioteca por título, etiquetas, texto guardado y transcripciones de audio. También puedes buscar dentro de un lienzo abierto.',
-  },
-
-  linked: {
-    heading: 'Tus notas, conectadas.',
-    body: 'Los [[enlaces entre notas]], los retroenlaces y las tarjetas de vista previa mantienen las ideas relacionadas a un solo salto. La paleta de comandos te lleva a cualquier parte, y el historial de versiones por archivo restaura cualquier estado anterior de una nota.',
   },
 
   importing: {
@@ -234,7 +222,7 @@ En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y 
     eyebrow: 'Funciones',
     headline: 'Todo lo que puede hacer Myelin Notes.',
     subheadline:
-      'La página de inicio muestra el panorama general. Aquí está el detalle: las herramientas para escribir a mano, los PDF, las páginas y el lienzo, y cómo encajan entre sí.',
+      'La página de inicio muestra el panorama general. Aquí está el detalle: colaboración en directo sin servidor, PDF a los que tus notas quedan sujetas, herramientas de lápiz que el papel no tiene y, con Pro, agentes de IA y código que puedes ejecutar.',
     jumpNav: 'Secciones',
     sections: {
       handwriting: {
@@ -413,6 +401,11 @@ En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y 
         body: 'Con Pro, Myelin reconoce tu escritura a mano en tu dispositivo, así que Buscar en el lienzo y la búsqueda de la biblioteca encuentran las palabras que escribiste a mano.',
         alt: 'Al escribir «entropy» en Buscar, salta a cada nota manuscrita que la menciona y la selecciona',
       },
+      templates: {
+        title: 'Plantillas y reglas de nombre',
+        body: 'Asigna a una carpeta una plantilla predeterminada y un patrón de nombre como {date} - . Los lienzos nuevos llegan ya con nombre, y {title} y {date} de la plantilla se rellenan solos.',
+        alt: 'En Ajustes de la carpeta, Lectures recibe la plantilla Lecture notes y la regla de nombre {date} - ; un lienzo nuevo llega con la fecha de hoy y su página rellena el título y la fecha',
+      },
     },
     notes: [
       {
@@ -565,13 +558,8 @@ En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y 
 
   shots: {
     hero: 'Un PDF y un marco de página con texto en un mismo lienzo: el lápiz encierra una ecuación, dibuja una flecha hasta la nota, se escribe una línea y se anota a mano «¡resultado clave!»',
-    pdf: 'Un PDF de diapositivas sobre el teorema de Bayes con una viñeta resaltada, la fórmula rodeada en tinta roja y «flip it!» escrito al lado, y después el PDF anotado se exporta',
-    pageFrame:
-      'Un marco de página con una lista de tareas y un bloque de código TypeScript que se ejecuta y muestra su salida al lado',
     audio:
       'Una grabación de audio colocada en el lienzo, grabada, transcrita y luego encontrada buscando «entropy»',
-    graph:
-      'La vista de grafo de Myelin Notes, con los enlaces salientes y los retroenlaces de una nota',
   },
 
   canvas: {

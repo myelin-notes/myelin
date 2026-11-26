@@ -22,9 +22,7 @@ const en: SiteCopy = {
   /** Section kickers on the landing page. */
   sceneLabels: {
     ink: 'PDFs',
-    pages: 'Pages',
     'audio-search': 'Audio & search',
-    linked: 'Linked notes',
     sync: 'Sync & collab',
     'local-first': 'Local-first',
     import: 'Import',
@@ -62,22 +60,12 @@ const en: SiteCopy = {
       'Drop a PDF onto the canvas and mark it up in the same ink as everything else: circle an equation, highlight a line, scribble in the margins. When you are done, export the annotated PDF back out.',
   },
 
-  pages: {
-    heading: 'Real documents, right on the canvas.',
-    body: 'Page frames are full rich-text documents: Markdown shortcuts, headings, lists and checkboxes, tables, math, and code blocks, which Pro lets you run. Jupyter notebooks import straight into one.',
-  },
-
   audioSearch: {
     heading: 'Record it. Transcribe it. Find it on the canvas.',
     audioBody:
       'Record lectures or meetings on the canvas. A bundled Whisper base model transcribes them on-device, so you can find words in the transcript without sending audio away. Pro adds more accurate models.',
     searchBody:
       'Search your library by note title, tags, and saved text or audio transcripts. Find matches within an open canvas, too.',
-  },
-
-  linked: {
-    heading: 'Your notes, connected.',
-    body: '[[Note links]], backlinks, and hover preview cards keep related ideas one hop away. The command palette jumps you anywhere, and per-file version history restores any earlier state of a note.',
   },
 
   importing: {
@@ -231,7 +219,7 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
     eyebrow: 'Features',
     headline: 'Everything Myelin Notes can do.',
     subheadline:
-      'The home page shows the big picture. This is the detail: the tools for handwriting, PDFs, pages, and the canvas, and how they fit together.',
+      'The home page shows the big picture. This is the detail: live collaboration with no server, PDFs your notes stay pinned to, pen tools paper lacks, and, with Pro, AI agents and code you can run.',
     jumpNav: 'Sections',
     sections: {
       handwriting: {
@@ -409,6 +397,11 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
         body: 'With Pro, Myelin recognizes your handwriting on your device, so Find on the canvas and library search match the words you wrote by hand.',
         alt: 'Typing “entropy” into Find jumps to each handwritten note that mentions it and selects it',
       },
+      templates: {
+        title: 'Templates and name rules',
+        body: 'Give a folder a default template and a name pattern like {date} - . New canvases in it arrive already named, with {title} and {date} in the template filled in.',
+        alt: 'In Folder settings, the Lectures folder gets the Lecture notes template and a {date} - name rule; a new canvas is prefilled with today’s date, and its page fills in the title and date',
+      },
     },
     notes: [
       {
@@ -562,13 +555,8 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
   /** Alt text for the static page's screenshots. */
   shots: {
     hero: 'A PDF and a typed page frame on one canvas, as a pen circles an equation, draws an arrow to the note, a line is typed in and "key result!" is handwritten',
-    pdf: 'A lecture slide PDF on Bayes\' theorem where a bullet is highlighted, the formula circled in red ink and "flip it!" written beside it, then the annotated PDF is exported',
-    pageFrame:
-      'A page frame with a checklist and a TypeScript code block that runs and shows its output beside it',
     audio:
       'An audio recording placed on the canvas, recorded, transcribed, then found by searching "entropy"',
-    graph:
-      "The Myelin Notes graph view, showing a note's outgoing links and backlinks",
   },
 
   /** Chrome on the try-it canvas. */

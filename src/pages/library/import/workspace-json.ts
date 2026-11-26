@@ -1,6 +1,7 @@
 import { Node as PMNode } from 'prosemirror-model';
 import { prosemirrorToYXmlFragment } from 'y-prosemirror';
 import * as Y from 'yjs';
+import { restoreCanvasStyleOverride } from '@myelin/editor/canvas-style';
 import { ElementType } from '@myelin/editor/elements/element-type';
 import { parseNoteLinkTarget } from '@myelin/editor/note/link-target';
 import { schema } from '@myelin/editor/page-frame/pm/schema';
@@ -171,6 +172,7 @@ export function rebuildNote(
   note: NoteJson,
   resolveNoteId?: NoteIdResolver,
 ): void {
+  restoreCanvasStyleOverride(ydoc.doc, note.canvasStyle);
   for (const element of note.elements) {
     const { type, uuid, content, ...rest } = element as {
       type?: unknown;

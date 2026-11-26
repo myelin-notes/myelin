@@ -310,6 +310,42 @@ const tr: typeof en = {
       emptyDefault: 'Henüz dosya yok',
       selectedCount: (count: number) => `${count} öğe`,
     },
+    templates: {
+      title: 'Şablonlar',
+      blankCanvas: 'Boş tuval',
+      fromTemplate: 'Şablondan',
+      saveAsTemplate: 'Şablon olarak kaydet',
+      newTemplate: 'Yeni şablon',
+      importTemplate: 'Şablonu içe aktar',
+      importFailed: 'Şablon içe aktarılamadı.',
+      emptyFolder:
+        'Yeni tuvalleri bir şablondan başlatın. Bir tuvali şablona dönüştürmek için üzerine uzun basın veya sağ tıklayın ve “Şablon olarak kaydet”i seçin.',
+      exportTemplate: 'Şablonu dışa aktar',
+      savedAsTemplate: (name: string) => `“${name}” şablon olarak kaydedildi`,
+      saveFailed: 'Şablon kaydedilemedi.',
+      exportFailed: 'Şablon dışa aktarılamadı.',
+      fieldsLabel: 'Şablon alanları',
+      fieldHint:
+        'İmleçte eklemek için tıklayın. Bu şablondan tuval oluşturulduğunda doldurulur.',
+      fieldCopied: (token: string) => `${token} kopyalandı`,
+    },
+    folderSettings: {
+      menuItem: 'Klasör ayarları…',
+      title: 'Klasör ayarları',
+      defaultTemplate: 'Varsayılan şablon',
+      defaultTemplateHint:
+        'Bu klasörde düz “Yeni tuval” varsayılan şablonu kullanır.',
+      noTemplate: 'Yok',
+      nameRule: 'Yeni tuval adı',
+      ruleNone: 'Yok',
+      ruleCustom: 'Özel',
+      ruleInherit: 'Üst klasörden devral',
+      pattern: 'Ad deseni',
+      insertToken: 'Değişken ekle',
+      preview: 'Önizleme',
+      save: 'Kaydet',
+      saveFailed: 'Klasör ayarları kaydedilemedi.',
+    },
     itemMenu: {
       moveTo: 'Taşı…',
       moveHere: 'Buraya taşı',
@@ -1404,6 +1440,7 @@ const tr: typeof en = {
       start: 'Tuvali aç',
       skip: 'Boş başla',
       canvasName: 'Başlarken',
+      defaultTemplateName: 'Başlık ve tarih',
       highlights: {
         frame:
           'Kod, matematik ve bir Mermaid diyagramı içeren bir sayfa çerçevesi',

@@ -20,6 +20,7 @@ import { RenameReferencesDialog } from '../rename-references-dialog';
 import { SearchHighlight } from '../search-highlight';
 import { TagList } from '../tag-list';
 import { useExplorerItem } from '../use-explorer-item';
+import { useTemplateActions } from '../use-template-actions';
 import {
   explorerGridBodyClass,
   explorerGridCardClass,
@@ -38,6 +39,9 @@ interface Props {
   file: VFSFileNode;
   searchMatch?: NodeSearchResult;
   autoRename?: boolean;
+  renamePrefill?: string;
+  /** Offers "Export template" in place of "Save as template". */
+  isTemplate?: boolean;
   onRenameEnd?: (nodeId: string) => void;
   onChanged: () => Promise<void>;
 }
@@ -46,6 +50,8 @@ export function GridFileItem({
   file,
   searchMatch,
   autoRename,
+  renamePrefill,
+  isTemplate = false,
   onRenameEnd,
   onChanged,
 }: Props) {
@@ -55,6 +61,7 @@ export function GridFileItem({
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
   const [loadedThumbUrl, setLoadedThumbUrl] = useState<string | null>(null);
+  const templateActions = useTemplateActions(file, isTemplate);
   const thumbUrl = useThumbnailUrl(file.id);
   const hasThumb = typeof thumbUrl === 'string';
   const imgLoaded = hasThumb && loadedThumbUrl === thumbUrl;
@@ -75,6 +82,7 @@ export function GridFileItem({
     dragKind: 'file',
     onChanged,
     initialRenaming: autoRename,
+    initialRenameValue: renamePrefill,
     onRenameEnd,
     renameReferencesOnRename: file.fileType === 'mcanvas',
   });
@@ -165,6 +173,7 @@ export function GridFileItem({
           onRemove={handleRemove}
           onManageTags={() => setTagDialogOpen(true)}
           onVersionHistory={() => setVersionHistoryOpen(true)}
+          {...templateActions}
           onReveal={
             IS_DEV
               ? async () => {

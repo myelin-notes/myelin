@@ -27,12 +27,14 @@ import {
   useRepositoryStatus,
   type VFSFileNode,
   type VFSFolderNode,
+  type VFSNodeId,
 } from '@/lib/sync';
 import {
   enqueueManualRepositoryRefresh,
   useManualRepositoryRefreshAvailable,
   useManualRepositoryRefreshPending,
 } from '@/lib/sync/manual-refresh';
+import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useNoteIndexStatus } from '@/lib/sync/repo/use-note-index-status';
 import { useTabController } from '@/lib/tabs/context';
 import { IS_PHONE_BUILD } from '@/lib/viewport-scale';
@@ -184,13 +186,15 @@ export function MobileLibrary() {
   }, []);
 
   const handleNewFile = useCallback(
-    (title: string, type: FileType) => {
-      void explorerRef.current?.startNewFile(title, type).catch((error) => {
-        logger.error('Failed to create file', error, { fileType: type });
-        toast.error(strings.commandPalette.errors.createNote, {
-          description: errorDescription(error),
+    (title: string, type: FileType, templateId?: VFSNodeId | null) => {
+      void explorerRef.current
+        ?.startNewFile(title, type, templateId)
+        .catch((error) => {
+          logger.error('Failed to create file', error, { fileType: type });
+          toast.error(strings.commandPalette.errors.createNote, {
+            description: errorDescription(error),
+          });
         });
-      });
     },
     [strings.commandPalette.errors.createNote],
   );
@@ -340,7 +344,11 @@ export function MobileLibrary() {
                           <BreadcrumbCrumb
                             variant="crumb"
                             targetFolderId={crumb.id}
-                            label={crumb.name}
+                            label={
+                              isTemplatesRoot(crumb)
+                                ? strings.library.templates.title
+                                : crumb.name
+                            }
                             isLast={i === breadcrumbs.length - 1}
                             onNavigate={() => setCurrentFolderId(crumb.id)}
                             onMoved={() => {
@@ -417,6 +425,11 @@ export function MobileLibrary() {
                     onNewFile={handleNewFile}
                     onImport={imports.openPicker}
                     importDisabled={imports.importDisabled}
+                    onImportTemplate={
+                      isTemplatesRoot(breadcrumbs.at(-1))
+                        ? () => void explorerRef.current?.importTemplates()
+                        : undefined
+                    }
                     labeled
                   />
                 </div>

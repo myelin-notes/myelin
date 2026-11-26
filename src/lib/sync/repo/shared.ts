@@ -123,6 +123,26 @@ export function isSystemNode(node: VFSNode | null | undefined): boolean {
   return Boolean(node?.system);
 }
 
+export const TEMPLATES_ROOT_NAME = '.myelin-templates';
+
+export function isTemplatesRoot(node: VFSNode | null | undefined): boolean {
+  return node?.type === 'folder' && node.system?.kind === 'templates-root';
+}
+
+export function findTemplatesRoot(manifest: VFSManifest): VFSFolderNode | null {
+  return (
+    getChildren(manifest, null).find((node): node is VFSFolderNode =>
+      isTemplatesRoot(node),
+    ) ?? null
+  );
+}
+
+export function isTemplateNode(manifest: VFSManifest, node: VFSNode): boolean {
+  return (
+    node.parentId !== null && isTemplatesRoot(manifest.nodes[node.parentId])
+  );
+}
+
 export function isFileVersionNode(
   node: VFSNode | null | undefined,
 ): node is VFSFileNode & {
@@ -233,7 +253,9 @@ export function createNodeSearchIndex(
   manifest: VFSManifest,
 ): SearchIndex<VFSNode> {
   return createSearchIndex({
-    items: Object.values(manifest.nodes).filter((node) => !isSystemNode(node)),
+    items: Object.values(manifest.nodes).filter(
+      (node) => !isSystemNode(node) && !isTemplateNode(manifest, node),
+    ),
     getId: (node) => node.id,
     fields: nodeSearchFields(),
   });
@@ -371,7 +393,9 @@ export function getRecentFiles(
   return Object.values(manifest.nodes)
     .filter(
       (node): node is VFSFileNode =>
-        node.type === 'file' && !isSystemNode(node),
+        node.type === 'file' &&
+        !isSystemNode(node) &&
+        !isTemplateNode(manifest, node),
     )
     .sort((a, b) => b.modifiedAt - a.modifiedAt)
     .slice(0, limit);
@@ -413,7 +437,10 @@ function isGraphCanvasNode(
 
 export function getNoteGraph(manifest: VFSManifest): RepositoryNoteGraph {
   const nodes = Object.values(manifest.nodes)
-    .filter(isGraphCanvasNode)
+    .filter(
+      (node): node is VFSFileNode =>
+        isGraphCanvasNode(node) && !isTemplateNode(manifest, node),
+    )
     .map((node) => ({
       id: node.id,
       name: node.name,
