@@ -4,7 +4,12 @@ import type { VFSFolderNode } from '@/lib/sync';
 import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { formatExplorerItemAccessibleName } from '../../accessibility-labels';
 import { TagList } from '../tag-list';
-import { FolderGlyph, useFolderLabel } from '../templates-folder';
+import {
+  FolderGlyph,
+  TemplatesFolderMenu,
+  type TemplatesFolderMenuProps,
+  useFolderLabel,
+} from '../templates-folder';
 import { useDropTarget } from '../use-drop-target';
 import { useFolderItemContextMenu } from '../use-folder-item-context-menu';
 import {
@@ -27,6 +32,8 @@ interface Props {
   onRenameEnd?: (nodeId: string) => void;
   onNavigate: () => void;
   onMoved: () => void;
+  /** Menu actions when `folder` is the templates root. */
+  templateActions: TemplatesFolderMenuProps;
 }
 
 export function GridFolderItem({
@@ -35,6 +42,7 @@ export function GridFolderItem({
   onRenameEnd,
   onNavigate,
   onMoved,
+  templateActions,
 }: Props) {
   const {
     contextMenuProps,
@@ -121,7 +129,7 @@ export function GridFolderItem({
             )}
           </div>
         </ContextMenuTrigger>
-        {!templatesRoot && menu}
+        {templatesRoot ? <TemplatesFolderMenu {...templateActions} /> : menu}
       </ContextMenu>
       {dialogs}
     </>

@@ -323,6 +323,8 @@ const en = {
       newTemplate: 'New template',
       importTemplate: 'Import template',
       importFailed: 'Could not import the template.',
+      emptyFolder:
+        'Start new canvases from a template. To turn a canvas into one, long-press or right-click it and choose “Save as template”.',
       exportTemplate: 'Export template',
       savedAsTemplate: (name: string) => `Saved “${name}” as a template`,
       saveFailed: 'Could not save the template.',

@@ -335,6 +335,8 @@ const fr: typeof en = {
       newTemplate: 'Nouveau modèle',
       importTemplate: 'Importer un modèle',
       importFailed: 'Impossible d’importer le modèle.',
+      emptyFolder:
+        'Créez de nouveaux canevas à partir d’un modèle. Pour transformer un canevas en modèle, appuyez longuement ou faites un clic droit dessus et choisissez « Enregistrer comme modèle ».',
       exportTemplate: 'Exporter le modèle',
       savedAsTemplate: (name: string) => `« ${name} » enregistré comme modèle`,
       saveFailed: 'Impossible d’enregistrer le modèle.',

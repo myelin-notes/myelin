@@ -318,6 +318,8 @@ const tr: typeof en = {
       newTemplate: 'Yeni şablon',
       importTemplate: 'Şablonu içe aktar',
       importFailed: 'Şablon içe aktarılamadı.',
+      emptyFolder:
+        'Yeni tuvalleri bir şablondan başlatın. Bir tuvali şablona dönüştürmek için üzerine uzun basın veya sağ tıklayın ve “Şablon olarak kaydet”i seçin.',
       exportTemplate: 'Şablonu dışa aktar',
       savedAsTemplate: (name: string) => `“${name}” şablon olarak kaydedildi`,
       saveFailed: 'Şablon kaydedilemedi.',

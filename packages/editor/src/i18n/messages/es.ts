@@ -329,6 +329,8 @@ const es: typeof en = {
       newTemplate: 'Nueva plantilla',
       importTemplate: 'Importar plantilla',
       importFailed: 'No se pudo importar la plantilla.',
+      emptyFolder:
+        'Crea lienzos nuevos a partir de una plantilla. Para convertir un lienzo en plantilla, mantenlo pulsado o haz clic derecho y elige «Guardar como plantilla».',
       exportTemplate: 'Exportar plantilla',
       savedAsTemplate: (name: string) => `“${name}” guardado como plantilla`,
       saveFailed: 'No se pudo guardar la plantilla.',

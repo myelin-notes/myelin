@@ -1,25 +1,19 @@
-import { ChevronRight, Import, LayoutTemplate, Plus } from 'lucide-react';
+import { ChevronRight, LayoutTemplate } from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@myelin/ui/context-menu';
+import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
-import {
-  type CreateNewActions,
-  createNewItemClass,
-} from '@/pages/library/create-new-options';
+import type { CreateNewActions } from '@/pages/library/create-new-options';
 import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import {
   FolderGlyph,
+  TemplatesFolderMenu,
+  type TemplatesFolderMenuProps,
   useFolderLabel,
 } from '@/pages/library/explorer/templates-folder';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
@@ -192,33 +186,6 @@ export function SidebarFolderRow({
       </ContextMenu>
       {dialogs}
     </>
-  );
-}
-
-interface TemplatesFolderMenuProps {
-  onNewTemplate: () => void;
-  onImportTemplate: () => void;
-}
-
-function TemplatesFolderMenu({
-  onNewTemplate,
-  onImportTemplate,
-}: TemplatesFolderMenuProps) {
-  const strings = useMessages();
-  return (
-    <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
-      <ContextMenuItem className={createNewItemClass} onClick={onNewTemplate}>
-        <Plus className="size-4" />
-        {strings.library.templates.newTemplate}
-      </ContextMenuItem>
-      <ContextMenuItem
-        className={createNewItemClass}
-        onClick={onImportTemplate}
-      >
-        <Import className="size-4" />
-        {strings.library.templates.importTemplate}
-      </ContextMenuItem>
-    </ContextMenuContent>
   );
 }
 

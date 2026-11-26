@@ -27,6 +27,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
   onNewFile,
   onImport,
   importDisabled = false,
+  onImportTemplate,
   labeled = false,
 }: CreateNewDropdownProps) {
   const strings = useMessages();
@@ -35,6 +36,7 @@ export const CreateNewDropdown = memo(function CreateNewDropdown({
     onNewFile,
     onImport,
     importDisabled,
+    onImportTemplate,
   });
 
   return (

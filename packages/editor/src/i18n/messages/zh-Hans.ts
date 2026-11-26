@@ -306,6 +306,8 @@ const zhHans: typeof en = {
       newTemplate: '新建模板',
       importTemplate: '导入模板',
       importFailed: '无法导入模板。',
+      emptyFolder:
+        '从模板创建新画布。要将画布设为模板，请长按或右键点击它，然后选择“存为模板”。',
       exportTemplate: '导出模板',
       savedAsTemplate: (name: string) => `已将“${name}”存为模板`,
       saveFailed: '无法保存模板。',

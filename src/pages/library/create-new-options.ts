@@ -1,4 +1,10 @@
-import { FolderPlus, Import, LayoutGrid, LayoutTemplate } from 'lucide-react';
+import {
+  FolderPlus,
+  Import,
+  LayoutGrid,
+  LayoutTemplate,
+  Plus,
+} from 'lucide-react';
 import { useMessages } from '@myelin/editor/i18n';
 import { useTemplates } from '@/lib/note/use-templates';
 import { type FileType, useRepositoryStatus, type VFSNodeId } from '@/lib/sync';
@@ -14,6 +20,8 @@ export interface CreateNewActions {
   ) => void;
   onImport?: () => void;
   importDisabled?: boolean;
+  /** Set when the current folder is the templates folder; the menu then offers only template actions. */
+  onImportTemplate?: () => void;
 }
 
 export const createNewItemClass =
@@ -30,6 +38,7 @@ export function useCreateNewOptions({
   onNewFile,
   onImport,
   importDisabled = false,
+  onImportTemplate,
 }: CreateNewActions) {
   const strings = useMessages();
   const setupRequired =
@@ -41,6 +50,27 @@ export function useCreateNewOptions({
       'mcanvas',
       templateId,
     );
+
+  if (onImportTemplate) {
+    return [
+      {
+        id: 'new-template',
+        label: strings.library.templates.newTemplate,
+        icon: Plus,
+        onClick: () => newCanvas(null),
+        choices: undefined,
+        disabled: setupRequired,
+      },
+      {
+        id: 'import-template',
+        label: strings.library.templates.importTemplate,
+        icon: Import,
+        onClick: onImportTemplate,
+        choices: undefined,
+        disabled: setupRequired,
+      },
+    ];
+  }
 
   return [
     {
