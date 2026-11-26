@@ -409,6 +409,11 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
         body: 'With Pro, Myelin recognizes your handwriting on your device, so Find on the canvas and library search match the words you wrote by hand.',
         alt: 'Typing “entropy” into Find jumps to each handwritten note that mentions it and selects it',
       },
+      templates: {
+        title: 'Templates and name rules',
+        body: 'Give a folder a default template and a name pattern like {date} - . New canvases in it arrive already named, with {title} and {date} in the template filled in.',
+        alt: 'In Folder settings, the Lectures folder gets the Lecture notes template and a {date} - name rule; a new canvas is prefilled with today’s date, and its page fills in the title and date',
+      },
     },
     notes: [
       {

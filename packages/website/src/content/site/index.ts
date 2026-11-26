@@ -86,7 +86,8 @@ export type FeatureClipId =
   | 'flags'
   | 'liveCollab'
   | 'agents'
-  | 'handwritingSearch';
+  | 'handwritingSearch'
+  | 'templates';
 
 interface FeatureSection {
   /** The kicker, and the section's jump link at the top of the page. */

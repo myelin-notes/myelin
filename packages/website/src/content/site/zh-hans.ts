@@ -401,6 +401,11 @@ const zhHans: SiteCopy = {
         body: '使用 Pro，Myelin 会在你的设备上识别手写内容，画布查找和资料库搜索都能找到你手写的文字。',
         alt: '在查找中输入“entropy”，会跳到每段提到它的手写笔记并将其选中',
       },
+      templates: {
+        title: '模板与命名规则',
+        body: '为文件夹设置默认模板和类似 {date} - 的命名规则。在其中新建的画布会自动命名，模板里的 {title} 和 {date} 也会自动填好。',
+        alt: '在文件夹设置中，为 Lectures 文件夹选择 Lecture notes 模板和 {date} - 命名规则；新画布自动以今天的日期命名，页面填入标题和日期',
+      },
     },
     notes: [
       {

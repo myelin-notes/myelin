@@ -404,6 +404,11 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
         body: 'Pro ile Myelin el yazınızı cihazınızda tanır; böylece tuvaldeki Bul ve kütüphane araması elle yazdığınız kelimeleri eşleştirir.',
         alt: 'Bul alanına “entropy” yazmak, onu içeren her el yazısı nota atlayıp onu seçiyor',
       },
+      templates: {
+        title: 'Şablonlar ve ad kuralları',
+        body: 'Bir klasöre varsayılan şablon ve {date} - gibi bir ad kalıbı verin. İçindeki yeni tuvaller adı konmuş olarak gelir; şablondaki {title} ve {date} kendiliğinden doldurulur.',
+        alt: 'Klasör ayarlarında Lectures klasörüne Lecture notes şablonu ve {date} - ad kuralı veriliyor; yeni tuval bugünün tarihiyle adlandırılıyor ve sayfası başlığı ve tarihi dolduruyor',
+      },
     },
     notes: [
       {

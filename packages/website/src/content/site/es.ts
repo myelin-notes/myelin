@@ -413,6 +413,11 @@ En beta cerrada. Hoy Myelin Notes está disponible para todos en Mac, Windows y 
         body: 'Con Pro, Myelin reconoce tu escritura a mano en tu dispositivo, así que Buscar en el lienzo y la búsqueda de la biblioteca encuentran las palabras que escribiste a mano.',
         alt: 'Al escribir «entropy» en Buscar, salta a cada nota manuscrita que la menciona y la selecciona',
       },
+      templates: {
+        title: 'Plantillas y reglas de nombre',
+        body: 'Asigna a una carpeta una plantilla predeterminada y un patrón de nombre como {date} - . Los lienzos nuevos llegan ya con nombre, y {title} y {date} de la plantilla se rellenan solos.',
+        alt: 'En Ajustes de la carpeta, Lectures recibe la plantilla Lecture notes y la regla de nombre {date} - ; un lienzo nuevo llega con la fecha de hoy y su página rellena el título y la fecha',
+      },
     },
     notes: [
       {

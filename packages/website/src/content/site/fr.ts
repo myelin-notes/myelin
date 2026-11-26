@@ -406,6 +406,11 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
         body: 'Avec Pro, Myelin reconnaît votre écriture manuscrite sur votre appareil : la recherche du canevas et celle de la bibliothèque trouvent les mots écrits à la main.',
         alt: 'Taper « entropy » dans Rechercher mène à chaque note manuscrite qui le contient et la sélectionne',
       },
+      templates: {
+        title: 'Modèles et règles de nom',
+        body: 'Donnez à un dossier un modèle par défaut et un motif de nom comme {date} - . Les nouveaux canevas arrivent déjà nommés, avec {title} et {date} remplis dans le modèle.',
+        alt: 'Dans Réglages du dossier, Lectures reçoit le modèle Lecture notes et la règle de nom {date} - ; un nouveau canevas est prérempli avec la date du jour et sa page remplit le titre et la date',
+      },
     },
     notes: [
       {
