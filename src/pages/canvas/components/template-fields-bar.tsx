@@ -66,9 +66,12 @@ export function TemplateFieldsBar({ name }: { name: string }) {
             </TooltipTrigger>
             <TooltipContent>
               <div className="flex max-w-60 flex-col gap-1">
-                <span className="font-medium">
-                  {renderTemplateFields(token, name, new Date(), locale)}
-                </span>
+                {/* No folder preview: a template's own folder is the templates folder. */}
+                {token !== '{folder}' && (
+                  <span className="font-medium">
+                    {renderTemplateFields(token, name, '', new Date(), locale)}
+                  </span>
+                )}
                 <span className="opacity-80">{strings.fieldHint}</span>
               </div>
             </TooltipContent>

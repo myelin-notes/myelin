@@ -30,18 +30,24 @@ export function renderNamePattern(
   });
 }
 
-export const TEMPLATE_FIELD_TOKENS = ['{title}', ...NAME_PATTERN_TOKENS];
+export const TEMPLATE_FIELD_TOKENS = [
+  '{title}',
+  '{folder}',
+  ...NAME_PATTERN_TOKENS,
+];
 
+/** `folder` is the containing folder's name, empty at the library root. */
 export function renderTemplateFields(
   text: string,
   title: string,
+  folder: string,
   date: Date,
   locale: string,
 ): string {
-  // Title last, so a title that itself contains "{date}" isn't expanded.
-  return renderNamePattern(text, date, locale).replaceAll(
-    '{title}',
-    () => title,
+  // Names last and in one pass, so a name that itself contains "{date}" or "{title}" isn't expanded.
+  return renderNamePattern(text, date, locale).replace(
+    /\{(title|folder)\}/g,
+    (_, token: string) => (token === 'title' ? title : folder),
   );
 }
 

@@ -85,8 +85,8 @@ function fillXml(
 }
 
 /**
- * Replaces `{title}`, `{date}` etc. in every text element with the note's current name and
- * `date`. Runs once the name is final, so a canvas created from a template keeps its tokens until
+ * Replaces `{title}`, `{folder}`, `{date}` etc. in every text element with the note's current
+ * name, its folder's name and `date`. Runs once the name is final, so a canvas created from a template keeps its tokens until
  * then. A no-op inside the templates folder, where tokens must survive.
  */
 export async function fillTemplateFields(
@@ -110,7 +110,7 @@ export async function fillTemplateFields(
   const ydoc = YDocManager.fromUpdate(snapshot.update);
   try {
     const fill = (text: string) =>
-      renderTemplateFields(text, node.name, date, locale);
+      renderTemplateFields(text, node.name, parent?.name ?? '', date, locale);
     const before = Y.encodeStateVector(ydoc.doc);
     ydoc.transact(() => {
       for (const yMap of ydoc.elements) {

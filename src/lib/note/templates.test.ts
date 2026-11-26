@@ -112,7 +112,7 @@ describe('fillTemplateFields', () => {
     const repository = new TestRepository('repositories/template-fields');
     const ydoc = new YDocManager();
     ydoc.createElementMap(ElementType.TEXT, 'text-1', {
-      text: '{title} – {weekday}',
+      text: '{title} – {weekday} ({folder})',
       richText: docFromText('{title} – {weekday}').toJSON(),
     });
     ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-1', {});
@@ -133,10 +133,11 @@ describe('fillTemplateFields', () => {
       ydoc.encodeState(),
     );
 
+    const folderId = await repository.createFolder('{title} Work', null);
     const createdId = await createCanvasFromTemplate(
       repository,
       'Untitled canvas',
-      null,
+      folderId,
       templateId,
     );
     await repository.renameNode(createdId, 'Standup $& notes');
@@ -164,14 +165,14 @@ describe('fillTemplateFields', () => {
       };
     };
     const created = await read(createdId);
-    expect(created.text).toBe('Standup $& notes – Friday');
+    expect(created.text).toBe('Standup $& notes – Friday ({title} Work)');
     expect(created.richText).toBe('Standup $& notes – Friday');
     expect(created.page.child(0).textContent).toBe('Standup $& notes');
     expect(created.page.child(0).firstChild!.marks[0].type.name).toBe('bold');
     expect(created.page.child(1).textContent).toBe('Price: {cost}');
 
     const template = await read(templateId);
-    expect(template.text).toBe('{title} – {weekday}');
+    expect(template.text).toBe('{title} – {weekday} ({folder})');
     expect(template.page.child(0).textContent).toBe('{title}');
   });
 });
