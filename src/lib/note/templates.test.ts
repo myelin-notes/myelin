@@ -43,6 +43,7 @@ describe('templates', () => {
     await saveAsTemplate(repository, canvas);
 
     const [templateNode] = await repository.listTemplates();
+    await repository.setTags(templateNode.id, ['weekly', 'review']);
     expect(templateNode.name).toBe('Weekly review');
     const [folders, files] = await repository.listDirectory(null);
     expect(folders).toEqual([]);
@@ -63,6 +64,10 @@ describe('templates', () => {
       pattern: 'dots',
       patternColor: '#112233',
     });
+    expect((await repository.getNode(createdId))?.tags).toEqual([
+      'weekly',
+      'review',
+    ]);
   });
 
   it('round-trips a template file into the templates folder with its style', async () => {

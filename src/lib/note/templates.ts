@@ -13,9 +13,15 @@ export async function createCanvasFromTemplate(
   templateId: VFSNodeId | null,
 ): Promise<VFSNodeId> {
   const bytes = templateId ? await repository.readFileBytes(templateId) : null;
-  return bytes
-    ? repository.createFile(name, 'mcanvas', parentId, bytes)
-    : createBlankCanvasFile(repository, name, parentId);
+  if (!bytes) {
+    return createBlankCanvasFile(repository, name, parentId);
+  }
+  const id = await repository.createFile(name, 'mcanvas', parentId, bytes);
+  const tags = (await repository.getNode(templateId!))?.tags ?? [];
+  if (tags.length > 0) {
+    await repository.setTags(id, tags);
+  }
+  return id;
 }
 
 export async function saveAsTemplate(
