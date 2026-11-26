@@ -1,12 +1,21 @@
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Import, LayoutTemplate, Plus } from 'lucide-react';
+import { useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
-import { ContextMenu, ContextMenuTrigger } from '@myelin/ui/context-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@myelin/ui/context-menu';
 import { openNote } from '@/lib/note/navigation';
 import type { VFSFileNode, VFSFolderNode } from '@/lib/sync';
 import { isTemplatesRoot } from '@/lib/sync/repo/shared';
 import { useTabController } from '@/lib/tabs/context';
 import { formatExplorerItemAccessibleName } from '@/pages/library/accessibility-labels';
-import type { CreateNewActions } from '@/pages/library/create-new-options';
+import {
+  type CreateNewActions,
+  createNewItemClass,
+} from '@/pages/library/create-new-options';
 import { getFileTypeIcon } from '@/pages/library/explorer/file-icon';
 import { TagList } from '@/pages/library/explorer/tag-list';
 import {
@@ -54,6 +63,8 @@ interface FolderRowProps extends RowProps {
   onNewFile: NonNullable<CreateNewActions['onNewFile']>;
   onImport: () => void;
   importDisabled: boolean;
+  /** Only used by the templates folder's menu. */
+  onImportTemplate: () => void;
 }
 
 export function SidebarFolderRow({
@@ -72,6 +83,7 @@ export function SidebarFolderRow({
   onNewFile,
   onImport,
   importDisabled,
+  onImportTemplate,
   onChanged,
   onDropHover,
 }: FolderRowProps) {
@@ -98,6 +110,7 @@ export function SidebarFolderRow({
       />
     ),
   });
+  const strings = useMessages();
   const label = useFolderLabel(node);
   const templatesRoot = isTemplatesRoot(node);
   const { dropTargetProps } = useDropTarget({
@@ -162,10 +175,81 @@ export function SidebarFolderRow({
             </div>
           )}
         </ContextMenuTrigger>
-        {!templatesRoot && menu}
+        {templatesRoot ? (
+          <TemplatesFolderMenu
+            onNewTemplate={() =>
+              onNewFile(
+                strings.library.createNew.untitledCanvas,
+                'mcanvas',
+                null,
+              )
+            }
+            onImportTemplate={onImportTemplate}
+          />
+        ) : (
+          menu
+        )}
       </ContextMenu>
       {dialogs}
     </>
+  );
+}
+
+interface TemplatesFolderMenuProps {
+  onNewTemplate: () => void;
+  onImportTemplate: () => void;
+}
+
+function TemplatesFolderMenu({
+  onNewTemplate,
+  onImportTemplate,
+}: TemplatesFolderMenuProps) {
+  const strings = useMessages();
+  return (
+    <ContextMenuContent className="min-w-[180px] rounded-xl bg-page p-1.5 shadow-ambient">
+      <ContextMenuItem className={createNewItemClass} onClick={onNewTemplate}>
+        <Plus className="size-4" />
+        {strings.library.templates.newTemplate}
+      </ContextMenuItem>
+      <ContextMenuItem
+        className={createNewItemClass}
+        onClick={onImportTemplate}
+      >
+        <Import className="size-4" />
+        {strings.library.templates.importTemplate}
+      </ContextMenuItem>
+    </ContextMenuContent>
+  );
+}
+
+/** Stands in for the templates folder until it exists; it is created on first use, not on load,
+ * so a device that hasn't synced yet can't add a second templates folder. */
+export function SidebarTemplatesPlaceholderRow({
+  onOpen,
+  ...menuProps
+}: TemplatesFolderMenuProps & { onOpen: () => void }) {
+  const strings = useMessages();
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          <button
+            type="button"
+            onClick={onOpen}
+            aria-expanded={false}
+            style={{ paddingLeft: treeRowPadding(0) }}
+            className="group relative flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-md pr-2 transition-colors duration-150 hover:bg-hover-tint"
+          />
+        }
+      >
+        <ChevronRight className="size-3.5 shrink-0 text-text-muted" />
+        <LayoutTemplate className="size-4 shrink-0 text-emerald-600 dark:text-accent" />
+        <span className="truncate font-medium text-[13px] text-text-primary">
+          {strings.library.templates.title}
+        </span>
+      </ContextMenuTrigger>
+      <TemplatesFolderMenu {...menuProps} />
+    </ContextMenu>
   );
 }
 

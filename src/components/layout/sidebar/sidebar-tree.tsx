@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { toast } from 'sonner';
 import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
@@ -29,8 +30,13 @@ import {
 } from '@/pages/library/explorer/explorer-model';
 import { useDropTarget } from '@/pages/library/explorer/use-drop-target';
 import { useExplorerSetupState } from '@/pages/library/explorer/use-explorer-setup-state';
+import { pickAndImportTemplates } from '@/pages/library/import/template';
 import { buildResultTree, type ResultTreeNode } from './result-tree';
-import { SidebarFileRow, SidebarFolderRow } from './tree-rows';
+import {
+  SidebarFileRow,
+  SidebarFolderRow,
+  SidebarTemplatesPlaceholderRow,
+} from './tree-rows';
 
 const logger = new Logger('SidebarTree');
 const SEARCH_DEBOUNCE_MS = 150;
@@ -482,6 +488,20 @@ export function SidebarTree({
   }
 
   const notify = isFlat ? notifyFlat : notifyNested;
+  const importTemplates = () => {
+    void pickAndImportTemplates(repository)
+      .then((rootId) => {
+        if (rootId === null) {
+          return;
+        }
+        setExpanded((prev) => new Set(prev).add(rootId));
+        return loadFolder(rootId).then(() => notify());
+      })
+      .catch((error) => {
+        logger.error('Failed to import template', error);
+        toast.error(strings.library.templates.importFailed);
+      });
+  };
   const templatesRootId =
     childrenMap.get(ROOT_KEY)?.find(isTemplatesRoot)?.id ?? null;
   const rows = visibleRows.map(({ node, depth, expanded: isExpanded }) => {
@@ -528,6 +548,7 @@ export function SidebarTree({
             );
           }}
           importDisabled={importDisabled}
+          onImportTemplate={importTemplates}
           onImport={() => {
             setExpanded((prev) => new Set(prev).add(node.id));
             onImport(node.id);
@@ -557,6 +578,37 @@ export function SidebarTree({
       )}
       {...(isFlat ? {} : rootDropProps)}
     >
+      {!isFlat && childrenMap.has(ROOT_KEY) && templatesRootId === null && (
+        <SidebarTemplatesPlaceholderRow
+          onOpen={() => {
+            void repository
+              .ensureTemplatesRoot()
+              .then((id) => {
+                setExpanded((prev) => new Set(prev).add(id));
+                return reload();
+              })
+              .catch((error) => {
+                logger.error('Failed to create templates folder', error);
+              });
+          }}
+          onImportTemplate={importTemplates}
+          onNewTemplate={() => {
+            void repository
+              .ensureTemplatesRoot()
+              .then((id) =>
+                startNewFile(
+                  strings.library.createNew.untitledCanvas,
+                  'mcanvas',
+                  id,
+                  null,
+                ).then(() => reload()),
+              )
+              .catch((error) => {
+                logger.error('Failed to create template', error);
+              });
+          }}
+        />
+      )}
       {rows.length === 0 ? (
         <p className="px-2 py-1 text-text-muted text-xs italic">
           {emptyMessage}
