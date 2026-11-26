@@ -1455,6 +1455,7 @@ const es: typeof en = {
       start: 'Abrir el lienzo',
       skip: 'Empezar en blanco',
       canvasName: 'Primeros pasos',
+      defaultTemplateName: 'Título y fecha',
       highlights: {
         frame: 'Una página con código, fórmulas y un diagrama de Mermaid',
         canvas: 'Texto y LaTeX colocados en el lienzo junto a la página',

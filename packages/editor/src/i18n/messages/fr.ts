@@ -1465,6 +1465,7 @@ const fr: typeof en = {
       start: 'Ouvrir le canevas',
       skip: 'Commencer à vide',
       canvasName: 'Premiers pas',
+      defaultTemplateName: 'Titre et date',
       highlights: {
         frame:
           'Un cadre de page avec du code, des maths et un diagramme Mermaid',

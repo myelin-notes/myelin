@@ -1440,6 +1440,7 @@ const tr: typeof en = {
       start: 'Tuvali aç',
       skip: 'Boş başla',
       canvasName: 'Başlarken',
+      defaultTemplateName: 'Başlık ve tarih',
       highlights: {
         frame:
           'Kod, matematik ve bir Mermaid diyagramı içeren bir sayfa çerçevesi',

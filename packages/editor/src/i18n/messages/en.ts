@@ -1440,6 +1440,7 @@ const en = {
       start: 'Open the canvas',
       skip: 'Start empty',
       canvasName: 'Getting started',
+      defaultTemplateName: 'Title and date',
       highlights: {
         frame: 'A page frame with code, math, and a Mermaid diagram',
         canvas: 'Text and LaTeX placed on the canvas next to it',

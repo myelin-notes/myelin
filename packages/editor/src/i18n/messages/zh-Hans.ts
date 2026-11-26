@@ -1393,6 +1393,7 @@ const zhHans: typeof en = {
       start: '打开画布',
       skip: '从空白开始',
       canvasName: '入门',
+      defaultTemplateName: '标题和日期',
       highlights: {
         frame: '一个页面框，里面有代码、公式和 Mermaid 图',
         canvas: '放在画布上、页面旁边的文本和 LaTeX 块',
