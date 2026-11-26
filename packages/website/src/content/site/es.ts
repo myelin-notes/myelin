@@ -197,7 +197,7 @@ No del todo. El código es público, así que cualquiera puede leerlo y comproba
 
 ## ¿Puedo colaborar con otras personas?
 
-Sí, en directo y de igual a igual, ya hoy. No hay cuenta de Myelin ni nada en medio. Los dispositivos se encuentran a través de la sincronización con GitHub, así que ambos extremos necesitan acceso al mismo repositorio. Los cuadernos compartidos con permisos llegan en la v1.0.
+Por ahora, solo compartiendo todo un espacio de trabajo. Cuando dos dispositivos sincronizan el mismo espacio de trabajo y abren la misma nota, ambos pueden editarla a la vez y ver los cambios del otro en directo. No hace falta cuenta de Myelin. Sirve para tus propios dispositivos, o para alguien con quien no te importe compartir el espacio de trabajo entero. Compartir un solo cuaderno con alguien, con permisos, se implementará en la v1.0.
 
 ## ¿Puedo importar desde otra app?
 

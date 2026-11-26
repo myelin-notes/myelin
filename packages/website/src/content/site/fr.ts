@@ -189,7 +189,7 @@ Pas tout à fait. Le code source est public : chacun peut le lire et vérifier c
 
 ## Puis-je collaborer avec d’autres ?
 
-Oui, en direct et de pair à pair, dès aujourd’hui. Il n’y a pas de compte Myelin et rien au milieu. Les appareils se trouvent via la synchronisation GitHub, donc les deux côtés doivent avoir accès au même dépôt. Les carnets partagés avec permissions arrivent en v1.0.
+Pour l’instant, seulement en partageant tout un espace de travail. Quand deux appareils synchronisent le même espace de travail et ouvrent la même note, les deux peuvent la modifier en même temps et voir les changements de l’autre en direct. Aucun compte Myelin n’est nécessaire. Cela convient à vos propres appareils, ou à quelqu’un avec qui vous voulez bien partager l’espace de travail entier. Partager un seul carnet avec quelqu’un, avec permissions, sera implémenté en v1.0.
 
 ## Puis-je importer depuis une autre app ?
 

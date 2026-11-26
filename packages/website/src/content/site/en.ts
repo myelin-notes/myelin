@@ -194,7 +194,7 @@ Not quite. The source is public, so anyone can read it and check what the app do
 
 ## Can I collaborate with others?
 
-Yes, live and peer to peer, today. There is no Myelin account and nothing sitting in the middle. Devices find each other through GitHub sync, so both ends need access to the same repo. Shared notebooks with permissions arrive in v1.0.
+For now, only by sharing a whole workspace. When two devices sync the same workspace and open the same note, both can edit it at once and see each other's changes live. No Myelin account is needed. That suits your own devices, or someone you are happy to share the entire workspace with. Sharing a single notebook with someone, with permissions will be implemented in v1.0.
 
 ## Can I import from another app?
 

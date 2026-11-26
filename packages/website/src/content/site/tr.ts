@@ -188,7 +188,7 @@ Tam olarak değil. Kaynak kodu herkese açıktır; böylece herkes okuyup uygula
 
 ## Başkalarıyla birlikte çalışabilir miyim?
 
-Evet, bugün, canlı ve eşler arası. Myelin hesabı yok ve arada duran hiçbir şey yok. Cihazlar birbirini GitHub eşitlemesi üzerinden bulur, bu yüzden her iki tarafın da aynı depoya erişimi olmalıdır. İzinli paylaşılan defterler v1.0 ile geliyor.
+Şimdilik yalnızca bütün bir çalışma alanını paylaşarak. İki cihaz aynı çalışma alanını eşitleyip aynı notu açtığında, ikisi de notu aynı anda düzenleyebilir ve birbirinin değişikliklerini canlı olarak görür. Myelin hesabı gerekmez. Bu, kendi cihazlarınız ya da çalışma alanının tamamını paylaşmaktan çekinmeyeceğiniz biri için uygundur. Tek bir defteri izinlerle biriyle paylaşma özelliği v1.0'da uygulanacak.
 
 ## Başka bir uygulamadan içe aktarabilir miyim?
 
