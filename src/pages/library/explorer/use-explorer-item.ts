@@ -58,8 +58,13 @@ export function useExplorerItem({
   const [previousInitialRenaming, setPreviousInitialRenaming] =
     useState(initialRenaming);
   const [dragging, setDragging] = useState(false);
-  const [renameValue, setRenameValue] = useState(name);
-  const [prefilled, setPrefilled] = useState(false);
+  // New rows mount with `initialRenaming` already true, so the change check below never fires.
+  const [renameValue, setRenameValue] = useState(
+    initialRenaming ? (initialRenameValue ?? name) : name,
+  );
+  const [prefilled, setPrefilled] = useState(
+    !!initialRenaming && initialRenameValue !== undefined,
+  );
   const [pendingReferencesPrompt, setPendingReferencesPrompt] =
     useState<PendingRenameReferencesPrompt | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
