@@ -329,6 +329,10 @@ const en = {
       savedAsTemplate: (name: string) => `Saved “${name}” as a template`,
       saveFailed: 'Could not save the template.',
       exportFailed: 'Could not export the template.',
+      fieldsLabel: 'Template fields',
+      fieldHint:
+        'Click to insert at the cursor. Filled in when a canvas is created from this template.',
+      fieldCopied: (token: string) => `Copied ${token}`,
     },
     folderSettings: {
       menuItem: 'Folder settings…',

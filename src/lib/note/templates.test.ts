@@ -1,14 +1,28 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  prosemirrorToYXmlFragment,
+  yXmlFragmentToProseMirrorRootNode,
+} from 'y-prosemirror';
 import * as Y from 'yjs';
 import {
   getCanvasStyleOverride,
   setCanvasStyle,
 } from '@myelin/editor/canvas-style';
+import { ElementType } from '@myelin/editor/elements/element-type';
+import {
+  docFromJson,
+  docFromText,
+} from '@myelin/editor/elements/text/rich-text';
+import { schema } from '@myelin/editor/page-frame/pm/schema';
 import { YDocManager } from '@myelin/editor/ydoc-manager';
 import { noteJson } from '@/pages/library/export/workspace-json';
 import { importTemplateFile } from '@/pages/library/import/template';
 import { TestRepository } from '@/test/test-repository';
-import { createCanvasFromTemplate, saveAsTemplate } from './templates';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+  saveAsTemplate,
+} from './templates';
 
 vi.mock('@tauri-apps/api/core', () => ({
   convertFileSrc: (path: string) => path,
@@ -90,5 +104,74 @@ describe('templates', () => {
       pattern: 'dots',
       patternColor: '#112233',
     });
+  });
+});
+
+describe('fillTemplateFields', () => {
+  it('fills tokens in text boxes and page frames with the final name, keeping formatting and the template intact', async () => {
+    const repository = new TestRepository('repositories/template-fields');
+    const ydoc = new YDocManager();
+    ydoc.createElementMap(ElementType.TEXT, 'text-1', {
+      text: '{title} – {weekday}',
+      richText: docFromText('{title} – {weekday}').toJSON(),
+    });
+    ydoc.createElementMap(ElementType.PAGE_FRAME, 'frame-1', {});
+    const page = schema.node('doc', null, [
+      schema.node('heading', { level: 1 }, [
+        schema.text('{title}', [schema.marks.bold.create()]),
+      ]),
+      schema.node('paragraph', null, [schema.text('Price: {cost}')]),
+    ]);
+    ydoc.transact(() =>
+      prosemirrorToYXmlFragment(page, ydoc.getXmlFragment('frame-1')),
+    );
+    const rootId = await repository.ensureTemplatesRoot();
+    const templateId = await repository.createFile(
+      'Meeting',
+      'mcanvas',
+      rootId,
+      ydoc.encodeState(),
+    );
+
+    const createdId = await createCanvasFromTemplate(
+      repository,
+      'Untitled canvas',
+      null,
+      templateId,
+    );
+    await repository.renameNode(createdId, 'Standup $& notes');
+    await fillTemplateFields(
+      repository,
+      createdId,
+      'en-US',
+      new Date(2026, 6, 10),
+    );
+    // Inside the templates folder tokens must survive.
+    await fillTemplateFields(repository, templateId, 'en-US');
+
+    const read = async (id: string) => {
+      const doc = YDocManager.fromUpdate(
+        (await repository.loadDocument(id)).update!,
+      );
+      const text = doc.elements.get(0);
+      return {
+        text: text.get('text'),
+        richText: docFromJson(text.get('richText'), '').textContent,
+        page: yXmlFragmentToProseMirrorRootNode(
+          doc.getXmlFragment('frame-1'),
+          schema,
+        ),
+      };
+    };
+    const created = await read(createdId);
+    expect(created.text).toBe('Standup $& notes – Friday');
+    expect(created.richText).toBe('Standup $& notes – Friday');
+    expect(created.page.child(0).textContent).toBe('Standup $& notes');
+    expect(created.page.child(0).firstChild!.marks[0].type.name).toBe('bold');
+    expect(created.page.child(1).textContent).toBe('Price: {cost}');
+
+    const template = await read(templateId);
+    expect(template.text).toBe('{title} – {weekday}');
+    expect(template.page.child(0).textContent).toBe('{title}');
   });
 });

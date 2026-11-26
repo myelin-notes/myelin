@@ -324,6 +324,10 @@ const tr: typeof en = {
       savedAsTemplate: (name: string) => `“${name}” şablon olarak kaydedildi`,
       saveFailed: 'Şablon kaydedilemedi.',
       exportFailed: 'Şablon dışa aktarılamadı.',
+      fieldsLabel: 'Şablon alanları',
+      fieldHint:
+        'İmleçte eklemek için tıklayın. Bu şablondan tuval oluşturulduğunda doldurulur.',
+      fieldCopied: (token: string) => `${token} kopyalandı`,
     },
     folderSettings: {
       menuItem: 'Klasör ayarları…',

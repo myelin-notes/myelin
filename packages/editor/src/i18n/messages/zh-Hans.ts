@@ -312,6 +312,9 @@ const zhHans: typeof en = {
       savedAsTemplate: (name: string) => `已将“${name}”存为模板`,
       saveFailed: '无法保存模板。',
       exportFailed: '无法导出模板。',
+      fieldsLabel: '模板字段',
+      fieldHint: '点击在光标处插入。从此模板创建画布时会自动填写。',
+      fieldCopied: (token: string) => `已复制 ${token}`,
     },
     folderSettings: {
       menuItem: '文件夹设置…',

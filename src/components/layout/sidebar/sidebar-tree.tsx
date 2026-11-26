@@ -11,7 +11,10 @@ import { useLocale, useMessages } from '@myelin/editor/i18n';
 import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { isApplePlatform } from '@myelin/shared/os';
-import { createCanvasFromTemplate } from '@/lib/note/templates';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
 import {
   type FileType,
   useRepository,
@@ -430,9 +433,17 @@ export function SidebarTree({
     [childrenMap, collapsedIds, expanded, isFlat, resultTree, sortMode],
   );
 
-  const finishNewRename = useCallback((nodeId: string) => {
-    setRenaming((current) => (current?.id === nodeId ? null : current));
-  }, []);
+  const finishNewRename = useCallback(
+    (nodeId: string) => {
+      if (renaming?.id === nodeId) {
+        fillTemplateFields(repository, nodeId, locale).catch((error) => {
+          logger.error('Failed to fill template fields', error, { nodeId });
+        });
+      }
+      setRenaming((current) => (current?.id === nodeId ? null : current));
+    },
+    [locale, renaming?.id, repository],
+  );
 
   // Only visible rows act; ids hidden by collapse/move/delete stay inert until shown again.
   // Descendants of a selected folder are dropped too, or moving the set would flatten them.

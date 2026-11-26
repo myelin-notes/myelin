@@ -14,7 +14,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { openNote } from '@/lib/note/navigation';
-import { createCanvasFromTemplate } from '@/lib/note/templates';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
 import { useTemplates } from '@/lib/note/use-templates';
 import {
   useRepository,
@@ -73,6 +76,7 @@ export function HomePage() {
           null,
           templateId,
         );
+        await fillTemplateFields(repository, id, locale);
         tabController.openTab({ type: 'canvas', id }, name);
       } catch (error) {
         logger.error('Failed to create canvas', error);
@@ -82,6 +86,7 @@ export function HomePage() {
       }
     },
     [
+      locale,
       repository,
       strings.commandPalette.errors.createNote,
       strings.library.createNew.untitledCanvas,

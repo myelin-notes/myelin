@@ -335,6 +335,10 @@ const es: typeof en = {
       savedAsTemplate: (name: string) => `“${name}” guardado como plantilla`,
       saveFailed: 'No se pudo guardar la plantilla.',
       exportFailed: 'No se pudo exportar la plantilla.',
+      fieldsLabel: 'Campos de plantilla',
+      fieldHint:
+        'Haz clic para insertarlo en el cursor. Se completa al crear un lienzo a partir de esta plantilla.',
+      fieldCopied: (token: string) => `Copiado ${token}`,
     },
     folderSettings: {
       menuItem: 'Ajustes de la carpeta…',

@@ -15,7 +15,10 @@ import { cn } from '@myelin/editor/utils';
 import { Logger } from '@myelin/shared/logger';
 import { Button } from '@myelin/ui/button';
 import { VirtualGrid } from '@/components/virtual-grid';
-import { createCanvasFromTemplate } from '@/lib/note/templates';
+import {
+  createCanvasFromTemplate,
+  fillTemplateFields,
+} from '@/lib/note/templates';
 import { useTemplates } from '@/lib/note/use-templates';
 import {
   type FileType,
@@ -155,9 +158,17 @@ export function ExplorerTree({
     void reload();
   });
 
-  const finishNewRename = useCallback((nodeId: string) => {
-    setRenamingNewId((current) => (current === nodeId ? null : current));
-  }, []);
+  const finishNewRename = useCallback(
+    (nodeId: string) => {
+      if (renamingNewId === nodeId) {
+        fillTemplateFields(repository, nodeId, locale).catch((error) => {
+          logger.error('Failed to fill template fields', error, { nodeId });
+        });
+      }
+      setRenamingNewId((current) => (current === nodeId ? null : current));
+    },
+    [locale, renamingNewId, repository],
+  );
 
   const startNewFolder = useCallback(async () => {
     const node = await explorer.createFolder(

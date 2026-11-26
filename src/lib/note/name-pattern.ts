@@ -30,6 +30,21 @@ export function renderNamePattern(
   });
 }
 
+export const TEMPLATE_FIELD_TOKENS = ['{title}', ...NAME_PATTERN_TOKENS];
+
+export function renderTemplateFields(
+  text: string,
+  title: string,
+  date: Date,
+  locale: string,
+): string {
+  // Title last, so a title that itself contains "{date}" isn't expanded.
+  return renderNamePattern(text, date, locale).replaceAll(
+    '{title}',
+    () => title,
+  );
+}
+
 /** Trims trailing whitespace and dangling separators left by a half-typed name like "July 10 - ". */
 export function cleanName(name: string): string {
   return name.trimStart().replace(/[\s\-–—:,|]+$/, '');

@@ -341,6 +341,10 @@ const fr: typeof en = {
       savedAsTemplate: (name: string) => `« ${name} » enregistré comme modèle`,
       saveFailed: 'Impossible d’enregistrer le modèle.',
       exportFailed: 'Impossible d’exporter le modèle.',
+      fieldsLabel: 'Champs du modèle',
+      fieldHint:
+        'Cliquez pour insérer au curseur. Rempli lors de la création d’un canevas à partir de ce modèle.',
+      fieldCopied: (token: string) => `${token} copié`,
     },
     folderSettings: {
       menuItem: 'Réglages du dossier…',
