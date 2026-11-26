@@ -90,6 +90,7 @@ export class CanvasRenderer {
     this.ctx = foregroundCtx;
     this.canvas = foregroundCanvas;
     this.bgStyle = getCanvasStyle(doc);
+    this.setBackgroundStyle(this.bgStyle);
     this.syncSizeToContainer();
     this.unsubBgPref = subscribeCanvasStyle(doc, () => {
       this.setBackgroundStyle(getCanvasStyle(doc));
