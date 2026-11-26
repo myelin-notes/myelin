@@ -18,11 +18,9 @@ export {
 
 /** Landing page sections that carry a kicker label, in page order. */
 export const SCENE_IDS = [
-  'ink',
-  'pages',
-  'audio-search',
-  'linked',
   'sync',
+  'ink',
+  'audio-search',
   'local-first',
   'import',
   'download',
@@ -58,13 +56,13 @@ export function linkHref(id: LinkId, locale: Locale): string {
 
 /** Sections of the features page, in page order. */
 export const FEATURE_SECTION_IDS = [
-  'handwriting',
-  'pdfs',
-  'pages',
-  'code',
-  'canvas',
   'sync',
+  'pdfs',
+  'handwriting',
+  'canvas',
+  'pages',
   'agents',
+  'code',
   'connect',
   'more',
 ] as const;
@@ -185,18 +183,11 @@ export interface SiteCopy {
     pdfBody: string;
   };
 
-  pages: {
-    heading: string;
-    body: string;
-  };
-
   audioSearch: {
     heading: string;
     audioBody: string;
     searchBody: string;
   };
-
-  linked: { heading: string; body: string };
 
   importing: {
     heading: string;
@@ -290,10 +281,7 @@ export interface SiteCopy {
 
   shots: {
     hero: string;
-    pdf: string;
-    pageFrame: string;
     audio: string;
-    graph: string;
   };
 
   canvas: {

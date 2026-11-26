@@ -1,0 +1,32 @@
+---
+// A features-page clip (an 896x578 loop in public/media) with its title and body.
+import Shot from './Shot.astro';
+
+interface Props {
+  file: string;
+  clip: { title: string; body: string; alt: string };
+  pro?: boolean;
+  /** Stagger step for the reveal animation. */
+  step: number;
+}
+
+const { file, clip, pro = false, step } = Astro.props;
+---
+
+<article class="reveal-scale lift overflow-hidden rounded-2xl bg-card shadow-elevated" style={`--i:${step}`}>
+  <Shot
+    src={`/media/${file}.mp4`}
+    alt={clip.alt}
+    width={896}
+    height={578}
+    phoneCrop={false}
+    class="rounded-none! border-b border-border-ghost shadow-none!"
+  />
+  <div class="p-6 lg:p-7">
+    <div class="flex items-center gap-3">
+      <h3 class="font-heading text-xl font-medium text-text-primary">{clip.title}</h3>
+      {pro && <span class="rounded-xl bg-tag px-2.5 py-1 text-xs font-medium text-text-tag">Pro</span>}
+    </div>
+    <p class="mt-2.5 text-sm leading-relaxed text-text-secondary">{clip.body}</p>
+  </div>
+</article>

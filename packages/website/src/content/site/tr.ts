@@ -19,9 +19,7 @@ const tr: SiteCopy = {
 
   sceneLabels: {
     ink: 'PDF’ler',
-    pages: 'Sayfalar',
     'audio-search': 'Ses ve arama',
-    linked: 'Bağlantılı notlar',
     sync: 'Eşitleme ve iş birliği',
     'local-first': 'Önce yerel',
     import: 'İçe aktarma',
@@ -56,22 +54,12 @@ const tr: SiteCopy = {
       'Bir PDF’i tuvale bırakın ve onu diğer her şeyle aynı mürekkeple işaretleyin: bir denklemi daire içine alın, bir satırı vurgulayın, kenar boşluklarına not düşün. İşiniz bitince açıklamalı PDF’i dışa aktarın.',
   },
 
-  pages: {
-    heading: 'Gerçek belgeler, doğrudan tuvalde.',
-    body: 'Sayfa çerçeveleri tam teşekküllü zengin metin belgeleridir: Markdown kısayolları, başlıklar, listeler ve onay kutuları, tablolar, matematik ve Pro ile çalıştırabileceğiniz kod blokları. Jupyter defterleri doğrudan bir sayfa çerçevesine aktarılır.',
-  },
-
   audioSearch: {
     heading: 'Kaydedin. Yazıya dökün. Tuvalde bulun.',
     audioBody:
       'Dersleri veya toplantıları tuvalde kaydedin. Uygulamayla gelen Whisper base modeli bunları cihazda yazıya döker; böylece sesi hiçbir yere göndermeden dökümdeki kelimeleri bulabilirsiniz. Pro daha doğru modeller ekler.',
     searchBody:
       'Kütüphanenizde not başlığına, etiketlere ve kayıtlı metin ya da ses dökümlerine göre arayın. Açık bir tuvalin içindeki eşleşmeleri de bulun.',
-  },
-
-  linked: {
-    heading: 'Notlarınız, birbirine bağlı.',
-    body: '[[Not bağlantıları]], geri bağlantılar ve üzerine gelince açılan önizleme kartları, ilgili fikirleri bir adım ötede tutar. Komut paleti sizi her yere götürür ve dosya başına sürüm geçmişi bir notun herhangi bir önceki halini geri yükler.',
   },
 
   importing: {
@@ -225,7 +213,7 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
     eyebrow: 'Özellikler',
     headline: 'Myelin Notes’un yapabildiği her şey.',
     subheadline:
-      'Ana sayfa genel resmi gösterir. Burası ayrıntılar: el yazısı, PDF’ler, sayfalar ve tuval için araçlar ve bunların birbirine nasıl uyduğu.',
+      'Ana sayfa genel resmi gösterir. Burası ayrıntılar: sunucusuz canlı iş birliği, notlarınızın sayfasına bağlı kaldığı PDF’ler, kâğıtta olmayan kalem araçları ve Pro ile yapay zekâ ajanları ve çalıştırabildiğiniz kod.',
     jumpNav: 'Bölümler',
     sections: {
       handwriting: {
@@ -560,13 +548,8 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
 
   shots: {
     hero: 'Tek bir tuvalde bir PDF ve yazılı bir sayfa çerçevesi; bir kalem bir denklemi daire içine alıyor, nota bir ok çiziyor, bir satır yazılıyor ve elle "key result!" yazılıyor',
-    pdf: 'Bayes teoremi üzerine bir ders slaydı PDF\'i; bir madde vurgulanıyor, formül kırmızı mürekkeple daire içine alınıyor ve yanına "flip it!" yazılıyor, ardından açıklamalı PDF dışa aktarılıyor',
-    pageFrame:
-      'Bir kontrol listesi ve çalışıp çıktısını yanında gösteren bir TypeScript kod bloğu içeren bir sayfa çerçevesi',
     audio:
       'Tuvale yerleştirilen bir ses kaydı kaydediliyor, yazıya dökülüyor, ardından "entropy" aranarak bulunuyor',
-    graph:
-      'Bir notun giden bağlantılarını ve geri bağlantılarını gösteren Myelin Notes grafik görünümü',
   },
 
   canvas: {

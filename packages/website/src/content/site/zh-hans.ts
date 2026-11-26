@@ -22,9 +22,7 @@ const zhHans: SiteCopy = {
 
   sceneLabels: {
     ink: 'PDF',
-    pages: '页面',
     'audio-search': '音频与搜索',
-    linked: '笔记链接',
     sync: '同步与协作',
     'local-first': '本地优先',
     import: '导入',
@@ -58,22 +56,12 @@ const zhHans: SiteCopy = {
       '把 PDF 拖到画布上，用与其他内容相同的笔迹批注：圈出公式、高亮某一行、在页边随手涂写。完成后，可以把带批注的 PDF 导出。',
   },
 
-  pages: {
-    heading: '真正的文档，就在画布上',
-    body: '页面框是完整的富文本文档：Markdown 快捷输入、标题、列表与复选框、表格、公式，以及代码块（升级 Pro 即可运行）。Jupyter Notebook 可以直接导入为页面框。',
-  },
-
   audioSearch: {
     heading: '录下来，转成文字。在画布上找得到',
     audioBody:
       '在画布上录下课堂或会议。内置的 Whisper base 模型在本地设备上完成转写，让你无需上传音频就能查找转写内容。Pro 提供更准确的模型。',
     searchBody:
       '在资料库中搜索笔记标题、标签、已保存文字和音频转写内容；也可以在打开的画布中查找。',
-  },
-
-  linked: {
-    heading: '你的笔记，彼此相连',
-    body: '[[笔记链接]]、反向链接与悬停预览卡片，让相关的想法始终只有一步之遥。命令面板带你跳转到任何位置，按文件保存的版本历史可以还原笔记的任一早期状态。',
   },
 
   importing: {
@@ -223,7 +211,7 @@ const zhHans: SiteCopy = {
     eyebrow: '功能',
     headline: 'Myelin Notes 能做的一切',
     subheadline:
-      '首页展示的是全貌，这里讲的是细节：手写、PDF、页面和画布上的各种工具，以及它们如何配合。',
+      '首页展示的是全貌，这里讲的是细节：无需服务器的实时协作、笔记始终固定在页面上的 PDF、纸张做不到的笔工具，以及 Pro 提供的 AI 智能体和可直接运行的代码。',
     jumpNav: '章节',
     sections: {
       handwriting: {
@@ -556,11 +544,7 @@ const zhHans: SiteCopy = {
 
   shots: {
     hero: '同一画布上的 PDF 和键入的页面框：笔圈出一个公式，画一支箭头指向笔记，笔记里输入一行文字，并手写下“key result!”',
-    pdf: '一份讲解贝叶斯定理的课件 PDF，其中一条要点被高亮、公式被红笔圈出、旁边写下“flip it!”，随后导出带批注的 PDF',
-    pageFrame:
-      '一个带有待办清单和 TypeScript 代码块的页面框，代码块运行后在旁边显示输出',
     audio: '画布上的一段音频，经过录制、转写，然后通过搜索“entropy”找到',
-    graph: 'Myelin Notes 的关系图谱视图，显示某则笔记的出链与反向链接',
   },
 
   canvas: {

@@ -20,9 +20,7 @@ const fr: SiteCopy = {
 
   sceneLabels: {
     ink: 'PDF',
-    pages: 'Pages',
     'audio-search': 'Audio et recherche',
-    linked: 'Notes liées',
     sync: 'Synchro et collab',
     'local-first': 'Local d’abord',
     import: 'Import',
@@ -58,22 +56,12 @@ const fr: SiteCopy = {
       'Déposez un PDF sur le canevas et annotez-le avec la même encre que tout le reste : entourez une équation, surlignez une ligne, griffonnez dans les marges. Quand vous avez terminé, exportez le PDF annoté.',
   },
 
-  pages: {
-    heading: 'De vrais documents, directement sur le canevas.',
-    body: 'Les cadres de page sont de vrais documents en texte enrichi : raccourcis Markdown, titres, listes et cases à cocher, tableaux, maths et blocs de code, exécutables avec Pro. Les notebooks Jupyter s’y importent directement.',
-  },
-
   audioSearch: {
     heading: 'Enregistrez. Transcrivez. Retrouvez sur le canevas.',
     audioBody:
       'Enregistrez cours ou réunions sur le canevas. Un modèle Whisper base intégré les transcrit sur l’appareil : vous pouvez retrouver des mots dans la transcription sans envoyer l’audio ailleurs. Pro ajoute des modèles plus précis.',
     searchBody:
       'Recherchez dans la bibliothèque par titre, étiquette, texte enregistré et transcription audio. Vous pouvez aussi rechercher dans un canevas ouvert.',
-  },
-
-  linked: {
-    heading: 'Vos notes, connectées.',
-    body: 'Les [[liens de notes]], les liens entrants et les aperçus au survol gardent les idées voisines à un clic. La palette de commandes vous emmène n’importe où, et l’historique des versions par fichier restaure n’importe quel état antérieur d’une note.',
   },
 
   importing: {
@@ -226,7 +214,7 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
     eyebrow: 'Fonctionnalités',
     headline: 'Tout ce que fait Myelin Notes.',
     subheadline:
-      'La page d’accueil montre l’essentiel. Voici le détail : les outils pour l’écriture manuscrite, les PDF, les pages et le canevas, et la façon dont ils s’articulent.',
+      'La page d’accueil montre l’essentiel. Voici le détail : la collaboration en direct sans serveur, des PDF auxquels vos notes restent attachées, des outils de stylet que le papier n’a pas, et, avec Pro, des agents IA et du code que vous pouvez exécuter.',
     jumpNav: 'Sections',
     sections: {
       handwriting: {
@@ -565,13 +553,8 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
 
   shots: {
     hero: 'Un PDF et un cadre de page saisi sur un même canevas : le stylet entoure une équation, trace une flèche vers la note, une ligne est tapée et « key result! » est écrit à la main',
-    pdf: "Le PDF d'une diapositive de cours sur le théorème de Bayes : une puce surlignée, la formule entourée à l'encre rouge et « flip it! » écrit à côté, puis le PDF annoté est exporté",
-    pageFrame:
-      'Un cadre de page avec une liste de tâches et un bloc de code TypeScript qui s’exécute et affiche sa sortie à côté',
     audio:
       'Un enregistrement audio placé sur le canevas, enregistré, transcrit, puis retrouvé en cherchant « entropy »',
-    graph:
-      'La vue graphe de Myelin Notes, montrant les liens sortants et entrants d’une note',
   },
 
   canvas: {
