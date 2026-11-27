@@ -1241,6 +1241,7 @@ const zhHans: typeof en = {
       medium: (value: number) => `中（${value}）`,
       bold: (value: number) => `粗（${value}）`,
       pressure: '压感',
+      growWhenScrubbing: '快速擦除时变大',
       stabilization: '防抖',
       lineStyle: '线条',
       solid: '实线',

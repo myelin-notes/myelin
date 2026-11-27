@@ -90,6 +90,33 @@ describe('EraserTool', () => {
     expect(pdf.isOver).not.toHaveBeenCalled();
   });
 
+  it('grows while scrubbing fast, unless disabled, and not while moving slowly', () => {
+    const pointer = (clientX: number, timeStamp: number) =>
+      ({ clientX, clientY: 0, timeStamp }) as PointerEvent;
+    const scrub = (msPerPass: number, grow = true) => {
+      const stroke = makeElement(ElementType.STROKE, false);
+      const { canvas } = makeCanvas([stroke.element]);
+      const tool = new EraserTool(() => catalogs.en);
+      for (const option of tool.getOptions()) {
+        if (option.type === 'toggle' && option.key === 'growWhenScrubbing') {
+          option.set(grow);
+        }
+      }
+      tool.start(canvas, pointer(0, 0));
+      for (let pass = 1; pass <= 10; pass++) {
+        tool.update(canvas, pointer(pass % 2 ? 200 : 0, pass * msPerPass), {
+          x: 0,
+          y: 0,
+        });
+      }
+      return (stroke.isOver.mock.lastCall as unknown[] | undefined)?.[2];
+    };
+
+    expect(scrub(1000)).toBe(20);
+    expect(scrub(20)).toBeGreaterThan(40);
+    expect(scrub(20, false)).toBe(20);
+  });
+
   it('leaves strokes and shapes outside the cursor untouched', () => {
     const stroke = makeElement(ElementType.STROKE, false);
     const shape = makeElement(ElementType.SHAPE, false);

@@ -1306,6 +1306,7 @@ const fr: typeof en = {
       medium: (value: number) => `Moyen (${value})`,
       bold: (value: number) => `Épais (${value})`,
       pressure: 'Pression',
+      growWhenScrubbing: 'Agrandir en frottant',
       stabilization: 'Stabilisation',
       lineStyle: 'Trait',
       solid: 'Plein',

@@ -1282,6 +1282,7 @@ const en = {
       medium: (value: number) => `Medium (${value})`,
       bold: (value: number) => `Bold (${value})`,
       pressure: 'Pressure',
+      growWhenScrubbing: 'Grow when scrubbing',
       stabilization: 'Stabilization',
       lineStyle: 'Line',
       solid: 'Solid',
