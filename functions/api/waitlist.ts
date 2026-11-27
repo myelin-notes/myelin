@@ -1,9 +1,10 @@
-// POST adds an email to the Resend segment that gets the Pro launch broadcast.
+// POST adds an email to the Resend segment for the launch it waits on: Pro or the mobile apps.
 const MAX_EMAIL_LENGTH = 254;
 
 interface Env {
   RESEND_API_KEY?: string;
   RESEND_WAITLIST_SEGMENT_ID?: string;
+  RESEND_MOBILE_WAITLIST_SEGMENT_ID?: string;
 }
 
 interface WaitlistFunctionContext {
@@ -50,8 +51,17 @@ export async function onRequestPost({
     return json('Please enter a valid email address.', 400);
   }
 
+  const list = formData.get('list');
+  if (list !== 'pro' && list !== 'mobile') {
+    return json('Unknown waitlist.', 400);
+  }
+
   const apiKey = env.RESEND_API_KEY?.trim();
-  const segmentId = env.RESEND_WAITLIST_SEGMENT_ID?.trim();
+  const segmentId = (
+    list === 'pro'
+      ? env.RESEND_WAITLIST_SEGMENT_ID
+      : env.RESEND_MOBILE_WAITLIST_SEGMENT_ID
+  )?.trim();
   if (!apiKey || !segmentId) {
     return json('The waitlist is temporarily unavailable.', 503);
   }

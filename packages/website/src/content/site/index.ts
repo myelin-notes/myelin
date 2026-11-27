@@ -108,6 +108,15 @@ interface SyncTier {
   body: string;
 }
 
+export interface WaitlistCopy {
+  note: string;
+  emailLabel: string;
+  submit: string;
+  sending: string;
+  joined: string;
+  failed: string;
+}
+
 interface PricingPlan {
   name: string;
   price: string;
@@ -217,6 +226,8 @@ export interface SiteCopy {
     /** Heads the row of platforms that have no build yet. */
     comingSoon: string;
     mobileBadge: string;
+    /** Under `mobileBadge`: signs up for the mobile launch email. */
+    waitlist: WaitlistCopy;
     faqTitle: string;
     /** `## ` headings become the FAQ entries; see `getFaqs`. */
     faqMarkdown: string;
@@ -267,17 +278,8 @@ export interface SiteCopy {
       /** Shown when an emailed checkout link is forged or past its 24 hours. */
       linkExpired: string;
     };
-    /** Replaces the Pro checkout while `checkoutOpen` is off in `Pricing.astro`. */
-    waitlist: {
-      note: string;
-      emailLabel: string;
-      submit: string;
-      sending: string;
-      joined: string;
-      failed: string;
-    };
-    /** Replaces the Student checkout while `checkoutOpen` is off in `Pricing.astro`. */
-    comingSoon: string;
+    /** Replaces the Pro and Student checkout while `checkoutOpen` is off in `Pricing.astro`. */
+    waitlist: WaitlistCopy;
     /** Under the home page's Pro section, while Pro features are free during the beta. */
     betaNote: string;
     faqTitle: string;

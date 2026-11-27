@@ -168,6 +168,15 @@ const fr: SiteCopy = {
     comingSoon: 'Bêta fermée',
     mobileBadge:
       'iPhone, iPad et Android sont en bêta fermée : les mêmes notes, pas une visionneuse au rabais',
+    waitlist: {
+      note: 'Recevez un e-mail à la sortie des applications mobiles.',
+      emailLabel: 'E-mail',
+      submit: 'Me prévenir',
+      sending: 'Ajout…',
+      joined:
+        'Vous êtes sur la liste. Nous vous écrirons à la sortie des applications mobiles.',
+      failed: 'Nous n’avons pas pu vous ajouter. Veuillez réessayer.',
+    },
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 
@@ -512,7 +521,6 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
       joined: 'Vous êtes sur la liste. Nous vous écrirons au lancement de Pro.',
       failed: 'Nous n’avons pas pu vous ajouter. Veuillez réessayer.',
     },
-    comingSoon: 'Bientôt',
     betaNote:
       'Certaines fonctionnalités Pro ne sont pas encore disponibles. Celles qui le sont restent gratuites pendant la bêta de Myelin.',
     faqTitle: 'Questions sur les tarifs',

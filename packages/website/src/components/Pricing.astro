@@ -7,6 +7,7 @@ import CheckList from './static/CheckList.astro';
 import InkMark from './static/InkMark.astro';
 import PageScripts from './static/PageScripts.astro';
 import SiteFooter from './static/SiteFooter.astro';
+import WaitlistForm from './static/WaitlistForm.astro';
 import { getCopy, siteLinks } from '../content/site';
 import type { Locale } from '../lib/locale';
 
@@ -17,7 +18,7 @@ interface Props {
 const { locale } = Astro.props;
 const page = getCopy(locale).pricing;
 const { free, pro, student, waitlist } = page;
-// Off until Pro launches: the Pro card shows the waitlist form and the Student card `comingSoon`.
+// Off until Pro launches: the Pro and Student cards show the waitlist form in place of their checkout.
 const checkoutOpen = false;
 
 const wrap = 'mx-auto max-w-6xl px-6 lg:px-10';
@@ -86,38 +87,7 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
                 <p class="mt-4 text-sm text-text-muted">{pro.licenseNote}</p>
               </>
             ) : (
-              <form
-                id="waitlist"
-                action="/api/waitlist"
-                method="post"
-                class="mt-10 text-sm"
-                data-sending={waitlist.sending}
-                data-joined={waitlist.joined}
-                data-failed={waitlist.failed}
-              >
-                <p class="text-text-secondary">{waitlist.note}</p>
-                <label for="waitlist-email" class="sr-only">{waitlist.emailLabel}</label>
-                <div class="mt-4 flex flex-wrap gap-3">
-                  <input
-                    id="waitlist-email"
-                    name="email"
-                    type="email"
-                    autocomplete="email"
-                    maxlength="254"
-                    required
-                    placeholder={waitlist.emailLabel}
-                    class="h-10 min-w-0 flex-1 basis-48 rounded-xl border border-border-divider bg-card px-4 text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-primary"
-                  />
-                  <button type="submit" class={cn(buttonVariants(), 'h-10 rounded-xl px-5 text-sm')}>
-                    {waitlist.submit}
-                  </button>
-                </div>
-                <div class="absolute -left-[10000px]" aria-hidden="true">
-                  <label for="waitlist-company">Company</label>
-                  <input id="waitlist-company" name="company" type="text" autocomplete="off" tabindex="-1" />
-                </div>
-                <p id="waitlist-status" class="mt-3 text-text-secondary" role="status" aria-live="polite"></p>
-              </form>
+              <WaitlistForm list="pro" id="pro-waitlist" copy={waitlist} class="mt-10" />
             )
           }
         </div>
@@ -173,9 +143,7 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
                 <p class="mt-4 text-sm text-text-muted">{pro.licenseNote}</p>
               </>
             ) : (
-              <button type="button" disabled class={cn(buttonVariants({ variant: 'outline' }), button, 'self-start')}>
-                {page.comingSoon}
-              </button>
+              <WaitlistForm list="pro" id="student-waitlist" copy={waitlist} class="mt-8" />
             )
           }
         </div>
@@ -246,40 +214,6 @@ const button = 'mt-10 h-11 gap-2 rounded-xl px-6 text-sm';
     history.replaceState(null, '', location.pathname);
     openCheckout(studentToken);
   }
-
-  const waitlistForm = document.querySelector<HTMLFormElement>('#waitlist');
-  const waitlistStatus = document.querySelector<HTMLElement>('#waitlist-status');
-  const waitlistButton = waitlistForm?.querySelector<HTMLButtonElement>('button[type="submit"]');
-
-  waitlistForm?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!waitlistForm.reportValidity() || !waitlistStatus || !waitlistButton) {
-      return;
-    }
-
-    const { sending, joined, failed } = waitlistForm.dataset;
-    const label = waitlistButton.textContent;
-    waitlistButton.disabled = true;
-    waitlistButton.textContent = sending ?? '';
-    waitlistStatus.textContent = '';
-
-    try {
-      const response = await fetch(waitlistForm.action, {
-        method: 'POST',
-        headers: { Accept: 'application/json' },
-        body: new FormData(waitlistForm),
-      });
-      waitlistStatus.textContent = (response.ok ? joined : failed) ?? '';
-      if (response.ok) {
-        waitlistForm.reset();
-      }
-    } catch {
-      waitlistStatus.textContent = failed ?? '';
-    } finally {
-      waitlistButton.disabled = false;
-      waitlistButton.textContent = label;
-    }
-  });
 
   const form = document.querySelector<HTMLFormElement>('#student');
   const status = document.querySelector<HTMLElement>('#student-status');

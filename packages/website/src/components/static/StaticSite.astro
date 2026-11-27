@@ -8,6 +8,7 @@ import InkMark from './InkMark.astro';
 import PageScripts from './PageScripts.astro';
 import Shot from './Shot.astro';
 import SiteFooter from './SiteFooter.astro';
+import WaitlistForm from './WaitlistForm.astro';
 import { IMPORT_SOURCE_ICONS } from '../import-icons';
 import {
   getCopy,
@@ -363,6 +364,7 @@ const ctaOutline = cn(
       <p class="mt-10 text-sm text-text-on-dark/55">
         {copy.download.mobileBadge}
       </p>
+      <WaitlistForm list="mobile" id="mobile-waitlist" copy={copy.download.waitlist} tone="dark" class="mt-6" />
     </div>
   </section>
 
