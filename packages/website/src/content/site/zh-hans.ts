@@ -496,6 +496,8 @@ const zhHans: SiteCopy = {
       failed: '链接发送失败，请重试。',
       linkExpired: '此学生链接已过期，请在下方重新申请。',
     },
+    comingSoon: '即将推出',
+    betaNote: '部分 Pro 功能尚未推出。已推出的功能在 Myelin 测试期间免费使用。',
     faqTitle: '价格常见问题',
     faqs: [
       {

@@ -222,9 +222,10 @@ const ctaOutline = cn(
         <h2 class:list={[heading, 'mt-6']}>{copy.pricing.headline}</h2>
         <InkMark variant={2} class="mt-5" />
       </div>
-      <p class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
-        {copy.pricing.subheadline}
-      </p>
+      <div class="reveal text-text-secondary [--i:2] lg:col-span-5 lg:col-start-8 lg:pt-10">
+        <p>{copy.pricing.subheadline}</p>
+        <p class="mt-4">{copy.pricing.betaNote}</p>
+      </div>
     </div>
     <div class="mt-14 grid gap-6 lg:mt-16 lg:grid-cols-3">
       <ClipCard file="ft-jupyter" clip={clips.jupyter} pro step={1} />

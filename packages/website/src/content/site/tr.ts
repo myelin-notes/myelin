@@ -500,6 +500,9 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
       linkExpired:
         'Bu öğrenci bağlantısının süresi doldu. Aşağıdan yenisini isteyin.',
     },
+    comingSoon: 'Yakında',
+    betaNote:
+      'Bazı Pro özellikleri henüz kullanılamıyor. Kullanılabilenler, Myelin beta sürecindeyken ücretsiz.',
     faqTitle: 'Fiyatlandırma soruları',
     faqs: [
       {

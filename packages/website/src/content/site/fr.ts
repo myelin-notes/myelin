@@ -504,6 +504,9 @@ En bêta fermée. Aujourd’hui Myelin Notes est disponible pour tous sur Mac, W
       linkExpired:
         'Ce lien étudiant a expiré. Demandez-en un nouveau ci-dessous.',
     },
+    comingSoon: 'Bientôt',
+    betaNote:
+      'Certaines fonctionnalités Pro ne sont pas encore disponibles. Celles qui le sont restent gratuites pendant la bêta de Myelin.',
     faqTitle: 'Questions sur les tarifs',
     faqs: [
       {
