@@ -165,6 +165,14 @@ const zhHans: SiteCopy = {
     comingSoon: '内测中',
     mobileBadge:
       'iPhone、iPad 与 Android 版本正在内测：同样的笔记，而不是功能缩水的阅读器',
+    waitlist: {
+      note: '移动版上线时收到邮件通知。',
+      emailLabel: '邮箱',
+      submit: '通知我',
+      sending: '正在添加…',
+      joined: '你已加入名单。移动版上线时我们会发邮件通知你。',
+      failed: '添加失败，请重试。',
+    },
     faqTitle: '常见问题',
     faqMarkdown: `# 常见问题
 
@@ -496,6 +504,15 @@ const zhHans: SiteCopy = {
       failed: '链接发送失败，请重试。',
       linkExpired: '此学生链接已过期，请在下方重新申请。',
     },
+    waitlist: {
+      note: 'Pro 上线时，我们只会给你发一封邮件。',
+      emailLabel: '邮箱',
+      submit: '通知我',
+      sending: '正在添加…',
+      joined: '你已加入名单。Pro 上线时我们会发邮件通知你。',
+      failed: '添加失败，请重试。',
+    },
+    betaNote: '部分 Pro 功能尚未推出。已推出的功能在 Myelin 测试期间免费使用。',
     faqTitle: '价格常见问题',
     faqs: [
       {

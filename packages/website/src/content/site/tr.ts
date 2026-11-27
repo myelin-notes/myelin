@@ -167,6 +167,15 @@ const tr: SiteCopy = {
     comingSoon: 'Kapalı beta',
     mobileBadge:
       'iPhone, iPad ve Android kapalı betada: aynı notlar, kısıtlı bir görüntüleyici değil',
+    waitlist: {
+      note: 'Mobil uygulamalar çıktığında e-posta alın.',
+      emailLabel: 'E-posta',
+      submit: 'Bana haber ver',
+      sending: 'Ekleniyor…',
+      joined:
+        'Listedesiniz. Mobil uygulamalar çıktığında size e-posta göndereceğiz.',
+      failed: 'Sizi ekleyemedik. Lütfen tekrar deneyin.',
+    },
     faqTitle: 'SSS',
     faqMarkdown: `# SSS
 
@@ -500,6 +509,16 @@ Kapalı betada. Bugün Myelin Notes, Mac, Windows ve Linux’ta herkese açık o
       linkExpired:
         'Bu öğrenci bağlantısının süresi doldu. Aşağıdan yenisini isteyin.',
     },
+    waitlist: {
+      note: 'Pro çıktığında size yalnızca bir kez e-posta göndereceğiz.',
+      emailLabel: 'E-posta',
+      submit: 'Bana haber ver',
+      sending: 'Ekleniyor…',
+      joined: 'Listedesiniz. Pro çıktığında size e-posta göndereceğiz.',
+      failed: 'Sizi ekleyemedik. Lütfen tekrar deneyin.',
+    },
+    betaNote:
+      'Bazı Pro özellikleri henüz kullanılamıyor. Kullanılabilenler, Myelin beta sürecindeyken ücretsiz.',
     faqTitle: 'Fiyatlandırma soruları',
     faqs: [
       {

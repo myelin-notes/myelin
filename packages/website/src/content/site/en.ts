@@ -173,6 +173,15 @@ const en: SiteCopy = {
     comingSoon: 'Closed beta',
     mobileBadge:
       'iPhone, iPad, and Android are in closed beta: the same notes, not a cut-down viewer',
+    waitlist: {
+      note: 'Get an email when the mobile apps are out.',
+      emailLabel: 'Email',
+      submit: 'Notify me',
+      sending: 'Adding…',
+      joined:
+        'You are on the list. We will email you when the mobile apps are out.',
+      failed: 'We could not add you. Please try again.',
+    },
     faqTitle: 'FAQ',
     faqMarkdown: `# FAQ
 
@@ -504,6 +513,16 @@ In closed beta. Today Myelin Notes is publicly available on Mac, Windows, and Li
       failed: 'We could not send the link. Please try again.',
       linkExpired: 'This student link has expired. Request a new one below.',
     },
+    waitlist: {
+      note: 'We will email you once when Pro launches.',
+      emailLabel: 'Email',
+      submit: 'Notify me',
+      sending: 'Adding…',
+      joined: 'You are on the list. We will email you when Pro launches.',
+      failed: 'We could not add you. Please try again.',
+    },
+    betaNote:
+      'Some Pro features aren’t available yet. The ones that are stay free while Myelin is in beta.',
     faqTitle: 'Pricing questions',
     faqs: [
       {

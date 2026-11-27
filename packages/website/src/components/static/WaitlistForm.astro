@@ -1,0 +1,106 @@
+---
+import { buttonVariants, cn } from '@myelin/ui';
+import type { WaitlistCopy } from '../../content/site';
+
+interface Props {
+  /** Which Resend segment `/api/waitlist` adds the email to. */
+  list: 'pro' | 'mobile';
+  /** Prefix for the element ids, unique per page. */
+  id: string;
+  copy: WaitlistCopy;
+  /** `dark` for the home page's dark download section. */
+  tone?: 'light' | 'dark';
+  class?: string;
+}
+
+const { list, id, copy, tone = 'light', class: className } = Astro.props;
+const dark = tone === 'dark';
+---
+
+{/* The script reads its status messages from the data attributes, so they stay translated. */}
+<form
+  data-waitlist
+  action="/api/waitlist"
+  method="post"
+  class:list={['text-sm', className]}
+  data-sending={copy.sending}
+  data-joined={copy.joined}
+  data-failed={copy.failed}
+>
+  <input type="hidden" name="list" value={list} />
+  <p class={dark ? 'text-text-on-dark/75' : 'text-text-secondary'}>{copy.note}</p>
+  <label for={`${id}-email`} class="sr-only">{copy.emailLabel}</label>
+  <div class="mt-4 flex max-w-md flex-wrap gap-3">
+    <input
+      id={`${id}-email`}
+      name="email"
+      type="email"
+      autocomplete="email"
+      maxlength="254"
+      required
+      placeholder={copy.emailLabel}
+      class:list={[
+        'h-10 min-w-0 flex-1 basis-48 rounded-xl border px-4 outline-none transition-colors',
+        dark
+          ? 'border-white/20 bg-white/10 text-text-on-dark placeholder:text-text-on-dark/50 focus:border-white/60'
+          : 'border-border-divider bg-card text-text-primary placeholder:text-text-muted focus:border-primary',
+      ]}
+    />
+    <button
+      type="submit"
+      class={dark
+        ? 'h-10 rounded-xl bg-white px-5 text-sm font-semibold text-text-primary transition-colors hover:bg-white/85'
+        : cn(buttonVariants(), 'h-10 rounded-xl px-5 text-sm')}
+    >
+      {copy.submit}
+    </button>
+  </div>
+  <div class="absolute -left-[10000px]" aria-hidden="true">
+    <label for={`${id}-company`}>Company</label>
+    <input id={`${id}-company`} name="company" type="text" autocomplete="off" tabindex="-1" />
+  </div>
+  <p
+    data-waitlist-status
+    class:list={['mt-3', dark ? 'text-text-on-dark/75' : 'text-text-secondary']}
+    role="status"
+    aria-live="polite"
+  >
+  </p>
+</form>
+
+<script>
+  for (const form of document.querySelectorAll<HTMLFormElement>('form[data-waitlist]')) {
+    const status = form.querySelector<HTMLElement>('[data-waitlist-status]');
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.reportValidity() || !status || !button) {
+        return;
+      }
+
+      const { sending, joined, failed } = form.dataset;
+      const label = button.textContent;
+      button.disabled = true;
+      button.textContent = sending ?? '';
+      status.textContent = '';
+
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          headers: { Accept: 'application/json' },
+          body: new FormData(form),
+        });
+        status.textContent = (response.ok ? joined : failed) ?? '';
+        if (response.ok) {
+          form.reset();
+        }
+      } catch {
+        status.textContent = failed ?? '';
+      } finally {
+        button.disabled = false;
+        button.textContent = label;
+      }
+    });
+  }
+</script>
