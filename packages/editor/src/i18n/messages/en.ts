@@ -1170,6 +1170,7 @@ const en = {
       openSource: 'Open source link',
       editPoints: 'Edit points',
       finishEditingPoints: 'Finish editing points',
+      fillShape: 'Fill shape',
       bold: 'Bold',
       italic: 'Italic',
     },

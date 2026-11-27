@@ -1183,6 +1183,7 @@ const es: typeof en = {
       openSource: 'Abrir enlace de origen',
       editPoints: 'Editar puntos',
       finishEditingPoints: 'Terminar de editar puntos',
+      fillShape: 'Rellenar forma',
       bold: 'Negrita',
       italic: 'Cursiva',
     },

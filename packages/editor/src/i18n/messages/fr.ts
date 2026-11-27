@@ -1193,6 +1193,7 @@ const fr: typeof en = {
       openSource: 'Ouvrir le lien source',
       editPoints: 'Modifier les points',
       finishEditingPoints: 'Terminer la modification des points',
+      fillShape: 'Remplir la forme',
       bold: 'Gras',
       italic: 'Italique',
     },

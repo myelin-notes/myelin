@@ -263,6 +263,52 @@ describe('ShapeElement resize', () => {
   });
 });
 
+describe('ShapeElement fill', () => {
+  it('persists, survives undo of the first fill, and hits the interior only when filled', () => {
+    const ydoc = new YDocManager();
+    const shape = new ShapeElement('f', 'rect', [0, 0, 100, 60], STYLE);
+    const yMap = ydoc.createElementMap(ElementType.SHAPE, shape.uuid, {
+      offsetX: 0,
+      offsetY: 0,
+      scaleX: 1,
+      scaleY: 1,
+      ...shape.getYMapProps(),
+    });
+    shape.bindToYMap(yMap);
+    yMap.observe((event) => shape.syncFromYMap(event.keysChanged));
+    const ctx = {} as CanvasRenderingContext2D;
+
+    expect(shape.isOver(50, 30, 1, ctx)).toBe(false);
+    ydoc.undoManager.stopCapturing();
+    shape.setFilled(true);
+    expect(shape.isOver(50, 30, 1, ctx)).toBe(true);
+
+    const reloaded = new ShapeElement('f', 'rect', [0, 0, 0, 0], STYLE);
+    reloaded.bindToYMap(yMap);
+    expect(reloaded.isFilled).toBe(true);
+
+    ydoc.undoManager.undo();
+    expect(shape.isFilled).toBe(false);
+  });
+
+  it('fills the PDF path only for filled closed shapes', () => {
+    const outline = makePdfCtx();
+    new ShapeElement('o', 'ellipse', [0, 0, 80, 60], STYLE).drawToPdf(
+      outline.ctx,
+    );
+    expect(outline.items[0]).not.toHaveProperty('fill');
+
+    const filled = makePdfCtx();
+    const shape = new ShapeElement('e', 'ellipse', [0, 0, 80, 60], STYLE);
+    shape.setFilled(true);
+    shape.drawToPdf(filled.ctx);
+    expect(filled.items[0]).toMatchObject({
+      fill: [25, 28, 30],
+      stroke: [25, 28, 30],
+    });
+  });
+});
+
 describe('ShapeElement bounding box', () => {
   it('gives a horizontal line a selectable box', () => {
     // The recognizer levels near-horizontal lines, so both endpoints share a y. A zero-height box is

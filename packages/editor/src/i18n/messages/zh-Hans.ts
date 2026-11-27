@@ -1130,6 +1130,7 @@ const zhHans: typeof en = {
       openSource: '打开来源链接',
       editPoints: '编辑节点',
       finishEditingPoints: '完成节点编辑',
+      fillShape: '填充形状',
       bold: '粗体',
       italic: '斜体',
     },

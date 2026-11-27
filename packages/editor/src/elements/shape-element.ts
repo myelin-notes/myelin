@@ -1,4 +1,4 @@
-import { PenToolIcon } from 'lucide-react';
+import { PaintBucketIcon, PenToolIcon } from 'lucide-react';
 import type * as Y from 'yjs';
 import { resolveInkColor } from '../canvas-theme';
 import type { DrawableCanvas, Vector2 } from '../drawable-canvas';
@@ -37,6 +37,7 @@ export class ShapeElement extends AnchorableElement {
   /** Pre-drag geometry snapshot; resize ratios are cumulative from drag start. */
   private resizeBaseGeom: number[] | null = null;
   private editingPoints = false;
+  private filled = false;
 
   public constructor(
     uuid: string,
@@ -55,6 +56,7 @@ export class ShapeElement extends AnchorableElement {
       color: this.style.color,
       size: this.style.size,
       ...(this.style.dashed ? { dashed: true } : {}),
+      ...(this.filled ? { filled: true } : {}),
       // Flat geometry stored directly as one Y.Map value; the shape's geometry
       // is fully known at construction, so there is nothing to seed later.
       geom: [...this.geom],
@@ -69,6 +71,16 @@ export class ShapeElement extends AnchorableElement {
     this.style = { ...this.style, ...updates };
     this.updateBounds();
     this.syncToYMap(updates);
+    this.onTransformChanged?.();
+  }
+
+  public get isFilled(): boolean {
+    return this.filled;
+  }
+
+  public setFilled(filled: boolean): void {
+    this.filled = filled;
+    this.syncToYMap({ filled });
     this.onTransformChanged?.();
   }
 
@@ -148,11 +160,25 @@ export class ShapeElement extends AnchorableElement {
         this.style.dashed = v as boolean;
         this.onTransformChanged?.();
       },
+      filled: (v) => {
+        this.filled = v as boolean;
+        this.onTransformChanged?.();
+      },
       geom: (v) => {
         this.geom = normalizeGeom(this.shapeType, v as number[]);
         this.updateBounds();
       },
     });
+  }
+
+  public override syncFromYMap(keys: Iterable<string>): void {
+    const changed = [...keys];
+    super.syncFromYMap(changed);
+    // Undoing the first fill deletes the key, which the field handler never sees.
+    if (changed.includes('filled') && !this.yMap?.has('filled')) {
+      this.filled = false;
+      this.onTransformChanged?.();
+    }
   }
 
   public get localBoundingBox(): DOMRect {
@@ -250,7 +276,20 @@ export class ShapeElement extends AnchorableElement {
     if (!canvas) {
       return [];
     }
+    const fillItem: SelectionToolbarItem[] =
+      this.shapeType === 'line'
+        ? []
+        : [
+            {
+              id: 'fill',
+              label: strings.canvas.selectionToolbar.fillShape,
+              icon: PaintBucketIcon,
+              active: this.filled,
+              onClick: () => this.setFilled(!this.filled),
+            },
+          ];
     return [
+      ...fillItem,
       {
         id: 'edit-points',
         label: this.editingPoints
@@ -419,6 +458,10 @@ export class ShapeElement extends AnchorableElement {
         ctx.closePath();
         break;
     }
+    if (this.filled && this.shapeType !== 'line') {
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fill();
+    }
     // drawThumbnail calls draw2D without save/restore, so the dash must not outlive this stroke.
     if (this.style.dashed) {
       ctx.setLineDash(dashPattern(this.style.size));
@@ -437,6 +480,9 @@ export class ShapeElement extends AnchorableElement {
   ): boolean {
     const g = this.geom;
     const tol = radius + this.style.size / 2;
+    if (this.filled && this.isInsideLocal(x, y)) {
+      return true;
+    }
     switch (this.shapeType) {
       case 'line':
         return distToSegment(x, y, g[0], g[1], g[2], g[3]) <= tol;
@@ -460,6 +506,27 @@ export class ShapeElement extends AnchorableElement {
         return distToEllipseBoundary(x, y, g) <= tol;
       default:
         return false;
+    }
+  }
+
+  private isInsideLocal(x: number, y: number): boolean {
+    const g = this.geom;
+    switch (this.shapeType) {
+      case 'line':
+        return false;
+      case 'ellipse': {
+        const rx = g[2] / 2;
+        const ry = g[3] / 2;
+        if (Math.abs(rx) <= 1e-6 || Math.abs(ry) <= 1e-6) {
+          return false;
+        }
+        const nx = (x - (g[0] + rx)) / rx;
+        const ny = (y - (g[1] + ry)) / ry;
+        return nx * nx + ny * ny <= 1;
+      }
+      case 'rect':
+      case 'triangle':
+        return pointInPolygon(x, y, coordinatePairs(g));
     }
   }
 
@@ -487,11 +554,13 @@ export class ShapeElement extends AnchorableElement {
     }
     // One path, not per-segment lines: translucent segments would double up at the joints.
     const { rgb, opacity } = parseCssColor(this.style.color);
+    const closed = this.shapeType !== 'line';
     const ptPerLocal = ctx.ptPerWorldY * Math.abs(this.scale.y);
     ctx.push({
       t: 'path',
       pts,
-      closed: this.shapeType !== 'line',
+      closed,
+      ...(closed && this.filled && { fill: rgb }),
       stroke: rgb,
       lineWidth: ptPerLocal * this.style.size,
       ...(this.style.dashed && {
@@ -592,6 +661,22 @@ function polygonEdges(g: number[]): [number, number, number, number][] {
     const next = points[(index + 1) % points.length];
     return [point[0], point[1], next[0], next[1]];
   });
+}
+
+function pointInPolygon(
+  x: number,
+  y: number,
+  points: [number, number][],
+): boolean {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const [xi, yi] = points[i];
+    const [xj, yj] = points[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
 }
 
 function fractionWithin(value: number, start: number, length: number): number {

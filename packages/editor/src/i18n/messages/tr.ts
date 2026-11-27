@@ -1171,6 +1171,7 @@ const tr: typeof en = {
       openSource: 'Kaynak bağlantısını aç',
       editPoints: 'Noktaları düzenle',
       finishEditingPoints: 'Nokta düzenlemeyi bitir',
+      fillShape: 'Şekli doldur',
       bold: 'Kalın',
       italic: 'İtalik',
     },
