@@ -267,7 +267,16 @@ export interface SiteCopy {
       /** Shown when an emailed checkout link is forged or past its 24 hours. */
       linkExpired: string;
     };
-    /** Replaces the Pro and Student checkout while `checkoutOpen` is off in `Pricing.astro`. */
+    /** Replaces the Pro checkout while `checkoutOpen` is off in `Pricing.astro`. */
+    waitlist: {
+      note: string;
+      emailLabel: string;
+      submit: string;
+      sending: string;
+      joined: string;
+      failed: string;
+    };
+    /** Replaces the Student checkout while `checkoutOpen` is off in `Pricing.astro`. */
     comingSoon: string;
     /** Under the home page's Pro section, while Pro features are free during the beta. */
     betaNote: string;
